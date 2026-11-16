@@ -36,7 +36,7 @@ import {
 } from "@/db/conditional-write";
 import { defineService, op } from "@/db/define-service";
 import { m } from "@/i18n";
-import { examResult, resultPolicy } from "@/services/exam-result";
+import { examResult, resultPolicy, unweighted } from "@/services/exam-result";
 import { regradeBlocker, regradeBlockerMessage } from "@/services/regrade";
 import type { Prisma, PrismaTx } from "../client";
 import {
@@ -343,7 +343,7 @@ export const makeRegradeRequestService = defineService<RegradeRequestT>()(
 					(entry) => entry.questionId === contested.questionId,
 				);
 				const [outcome] = examResult(
-					[contested.question.slug],
+					unweighted([contested.question.slug]),
 					answers.map((entry) => ({
 						...entry,
 						question: contested.question.slug,

@@ -2,6 +2,7 @@ import { expect, test } from "@playwright/test";
 import { FULL_ACCESS } from "@/auth/actor";
 import type { CourseId } from "@/core/schemas";
 import { db } from "@/db";
+import { prisma } from "@/db/client";
 import { persistedCourseFactory } from "@/fixtures/course.factory";
 import { persistedExamFactory } from "@/fixtures/exam.factory";
 import { capitalChoice } from "@/mdq/fixtures";
@@ -95,4 +96,24 @@ test("an exam that pins a version reads the weight of that version, whatever the
 		pinned: 3,
 		loose: 7,
 	});
+});
+
+test("a question whose weight is negative weighs 1 in the exam", async () => {
+	const course = await persistedCourseFactory.create();
+	await saveQuestion(course.id, "negative", "v1");
+	const ref = await prisma.questionRef.findFirstOrThrow({
+		where: { courseId: course.id, slug: "negative" },
+	});
+	await prisma.questionData.updateMany({
+		where: { id: ref.latestId as number },
+		data: { publicPayload: { weight: -2 } },
+	});
+
+	const exam = await persistedExamFactory.create({
+		course: course.id,
+		slug: "e",
+		questions: [{ slug: "negative" }],
+	});
+
+	expect(weights(exam)).toEqual({ negative: 1 });
 });

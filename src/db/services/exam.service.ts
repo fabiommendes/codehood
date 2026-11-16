@@ -196,7 +196,11 @@ const buildExamService = (deps: Deps) =>
 					);
 				}
 
-				return fromDb(row, "full", (await loadWeights(tx, [row])).get(row.id));
+				return fromDb(
+					row,
+					"full",
+					(await loadWeights(tx, [row])).get(row.id) ?? [],
+				);
 			},
 		});
 
@@ -233,7 +237,11 @@ const buildExamService = (deps: Deps) =>
 
 				const views = await attachmentViews(tx, [row], opts.actor);
 				const weights = await loadWeights(tx, [row]);
-				return fromDb(row, views.get(row.id) ?? "hidden", weights.get(row.id));
+				return fromDb(
+					row,
+					views.get(row.id) ?? "hidden",
+					weights.get(row.id) ?? [],
+				);
 			},
 		});
 
@@ -294,7 +302,7 @@ const buildExamService = (deps: Deps) =>
 				const views = await attachmentViews(tx, rows, opts.actor);
 				const weights = await loadWeights(tx, rows);
 				return rows.map((row) =>
-					fromDb(row, views.get(row.id) ?? "hidden", weights.get(row.id)),
+					fromDb(row, views.get(row.id) ?? "hidden", weights.get(row.id) ?? []),
 				);
 			},
 		});
@@ -355,7 +363,7 @@ const buildExamService = (deps: Deps) =>
 						exam: fromDb(
 							row,
 							views.get(row.id) ?? "hidden",
-							weights.get(row.id),
+							weights.get(row.id) ?? [],
 						),
 					});
 				}
@@ -450,7 +458,11 @@ const buildExamService = (deps: Deps) =>
 					});
 				}
 
-				return fromDb(row, "full", (await loadWeights(tx, [row])).get(row.id));
+				return fromDb(
+					row,
+					"full",
+					(await loadWeights(tx, [row])).get(row.id) ?? [],
+				);
 			},
 		});
 
@@ -532,7 +544,7 @@ const buildExamService = (deps: Deps) =>
 				const exam = fromDb(
 					row,
 					"full",
-					(await loadWeights(tx, [row])).get(row.id),
+					(await loadWeights(tx, [row])).get(row.id) ?? [],
 				);
 				const now = new Date();
 				const schedule = exceptionSchedule(
@@ -564,7 +576,7 @@ const buildExamService = (deps: Deps) =>
 				return fromDb(
 					updated,
 					"full",
-					(await loadWeights(tx, [updated])).get(updated.id),
+					(await loadWeights(tx, [updated])).get(updated.id) ?? [],
 				);
 			},
 		});
@@ -598,7 +610,11 @@ const buildExamService = (deps: Deps) =>
 					opts,
 					{ include: examInclude() },
 				);
-				return fromDb(row, "full", (await loadWeights(tx, [row])).get(row.id));
+				return fromDb(
+					row,
+					"full",
+					(await loadWeights(tx, [row])).get(row.id) ?? [],
+				);
 			},
 		});
 
@@ -1043,7 +1059,7 @@ async function attachmentViews(
 	for (const row of students) {
 		const exception = byExam.get(row.id);
 		const open = attachmentsOpen(
-			fromDb(row, "hidden"),
+			fromDb(row, "hidden", []),
 			exception
 				? {
 						extraTime: fromMs(exception.extraTimeMs),
@@ -1080,10 +1096,12 @@ async function downloadableExam(
 	return row;
 }
 
-/// The `weight` a question document's public payload carries, 1 when it has none.
+/// The `weight` a question document's public payload carries, 1 when it has none or it is negative or not finite.
 function payloadWeight(payload: Prisma.JsonValue | undefined): number {
 	const weight = (payload as { weight?: unknown } | null | undefined)?.weight;
-	return typeof weight === "number" ? weight : 1;
+	return typeof weight === "number" && Number.isFinite(weight) && weight >= 0
+		? weight
+		: 1;
 }
 
 /**
@@ -1229,7 +1247,7 @@ function publicAttachments(list: Attachment[]) {
 function fromDb(
 	row: DbExam,
 	view: AttachmentView,
-	weights: readonly number[] = [],
+	weights: readonly number[],
 ): Exam {
 	const list = (row.attachments as Attachment[] | null) ?? [];
 	const files = row.files as AttachmentFiles | null;

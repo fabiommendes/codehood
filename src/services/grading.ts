@@ -17,6 +17,7 @@ import {
 	newestPassesFirst,
 	type QuestionOutcome,
 	type ResultPolicy,
+	unweighted,
 	type WeightedQuestion,
 } from "./exam-result";
 import {
@@ -272,7 +273,7 @@ function codeAnswer(
 	policy: ResultPolicy,
 ) {
 	const outcome = examResult(
-		[question],
+		unweighted([question]),
 		submissions,
 		submissions.flatMap(
 			(submission) => passesBySubmission.get(submission.publicId) ?? [],
@@ -451,7 +452,7 @@ export interface AttemptRow {
  * unanswered and will-not-grade questions counting as zero. Names compare
  * without regard to case, and ties fall back to the username.
  *
- * @params questions The exam's questions with their weights, in exam order. A bare slug weighs 1.
+ * @params questions The exam's questions with their weights, in exam order.
  * @params feedback Every grading pass on the exam, released or not.
  * @params students The course's students, dropped ones included.
  * @params exceptions The exam's exceptions, by username; each attempt is `in-progress` or `submitted` by its author's personal timing, as in {@link countingAnswers}.
@@ -459,7 +460,7 @@ export interface AttemptRow {
  */
 export function attemptRows(
 	exam: ExamTiming,
-	questions: readonly (string | WeightedQuestion)[],
+	questions: readonly WeightedQuestion[],
 	attempts: GradingAttempt[],
 	feedback: GradingFeedback[],
 	students: GradedStudent[],
@@ -468,7 +469,7 @@ export function attemptRows(
 	policy: ResultPolicy = {},
 ): AttemptRow[] {
 	const schedule = examSchedule(exam, exceptions);
-	const slugs = questions.map((q) => (typeof q === "string" ? q : q.slug));
+	const slugs = questions.map((q) => q.slug);
 	const studentsByUsername = new Map(
 		students.map((student) => [student.username, student]),
 	);

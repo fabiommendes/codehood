@@ -10,7 +10,7 @@ import { type PrismaTx, prisma } from "./client";
  *
  * @example
  * const policyOf = await loadResultPolicy(course.id);
- * examResult(slugs, submissions, feedback, policyOf(exam));
+ * examResult(questions, submissions, feedback, policyOf(exam));
  */
 export async function loadResultPolicy(
 	courseId: number,

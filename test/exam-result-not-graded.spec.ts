@@ -6,6 +6,7 @@ import {
 	examResult,
 	formatScore,
 	type QuestionOutcome,
+	unweighted,
 } from "@/services/exam-result";
 import { gradeReleaseBlocker } from "@/services/exam-state";
 import { instructorHome, type TaughtExam } from "@/services/instructor-home";
@@ -57,7 +58,7 @@ function feedback(
 
 test("examResult: a will-not-grade submission with no pass is not-graded with a null score", () => {
 	const result = examResult(
-		["q1"],
+		unweighted(["q1"]),
 		[submission("s1", "q1", 0, "WILL_NOT_GRADE")],
 		[],
 	);
@@ -75,7 +76,7 @@ test("examResult: a will-not-grade submission with no pass is not-graded with a 
 
 test("examResult: a will-not-grade submission stays not-graded with passes on it, and keeps their comments newest first", () => {
 	const result = examResult(
-		["q1"],
+		unweighted(["q1"]),
 		[submission("s1", "q1", 0, "WILL_NOT_GRADE")],
 		[
 			feedback("s1", "1", 5, "First look"),
@@ -98,7 +99,7 @@ test("examResult: a will-not-grade submission stays not-graded with passes on it
 
 test("examResult: a not-graded answer is never pending and never zero", () => {
 	const result = examResult(
-		["q1"],
+		unweighted(["q1"]),
 		[submission("s1", "q1", 0, "WILL_NOT_GRADE")],
 		[feedback("s1", "0", 5)],
 	);
@@ -114,7 +115,7 @@ test("examResult: a not-graded answer is never pending and never zero", () => {
 
 test("examResult: two answers graded 100% and a third will-not-grade total 2/3, not null", () => {
 	const result = examResult(
-		["q1", "q2", "q3"],
+		unweighted(["q1", "q2", "q3"]),
 		[
 			submission("s1", "q1", 0),
 			submission("s2", "q2", 1),
@@ -130,7 +131,7 @@ test("examResult: two answers graded 100% and a third will-not-grade total 2/3, 
 
 test("examResult: a will-not-grade answer alone totals zero, not null", () => {
 	const result = examResult(
-		["q1"],
+		unweighted(["q1"]),
 		[submission("s1", "q1", 0, "WILL_NOT_GRADE")],
 		[],
 	);
@@ -140,7 +141,7 @@ test("examResult: a will-not-grade answer alone totals zero, not null", () => {
 
 test("examResult: a pending answer next to a will-not-grade one still makes the total null", () => {
 	const result = examResult(
-		["q1", "q2"],
+		unweighted(["q1", "q2"]),
 		[submission("s1", "q1", 0, "WILL_NOT_GRADE"), submission("s2", "q2", 1)],
 		[],
 	);
@@ -154,7 +155,7 @@ test("examResult: a pending answer next to a will-not-grade one still makes the 
 
 test("examResult: an older will-not-grade submission followed by a newer ungraded one is pending", () => {
 	const result = examResult(
-		["q1"],
+		unweighted(["q1"]),
 		[
 			submission("old", "q1", 0, "WILL_NOT_GRADE"),
 			submission("new", "q1", 10, "PENDING_GRADE"),
@@ -170,7 +171,7 @@ test("examResult: an older will-not-grade submission followed by a newer ungrade
 
 test("examResult: an older ungraded submission followed by a newer will-not-grade one is not-graded", () => {
 	const result = examResult(
-		["q1"],
+		unweighted(["q1"]),
 		[
 			submission("old", "q1", 0, "PENDING_GRADE"),
 			submission("new", "q1", 10, "WILL_NOT_GRADE"),
@@ -186,7 +187,7 @@ test("examResult: an older ungraded submission followed by a newer will-not-grad
 
 test("examResult: the newest submission counts whatever order they arrive in, for the status too", () => {
 	const result = examResult(
-		["q1"],
+		unweighted(["q1"]),
 		[
 			submission("new", "q1", 10, "WILL_NOT_GRADE"),
 			submission("old", "q1", 0, "PENDING_GRADE"),
@@ -210,7 +211,11 @@ const otherStatuses: Array<Submission["status"] | undefined> = [
 
 for (const status of otherStatuses) {
 	test(`examResult: a submission with status ${status ?? "missing"} and no pass is pending`, () => {
-		const result = examResult(["q1"], [submission("s1", "q1", 0, status)], []);
+		const result = examResult(
+			unweighted(["q1"]),
+			[submission("s1", "q1", 0, status)],
+			[],
+		);
 
 		expect(result.questions).toEqual([
 			{
@@ -225,7 +230,7 @@ for (const status of otherStatuses) {
 
 	test(`examResult: a submission with status ${status ?? "missing"} and a pass is graded with its score`, () => {
 		const result = examResult(
-			["q1"],
+			unweighted(["q1"]),
 			[submission("s1", "q1", 0, status)],
 			[feedback("s1", "3/4", 5, "Good")],
 		);

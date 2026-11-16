@@ -5,7 +5,7 @@ import { db } from "@/db";
 import { prisma } from "@/db/client";
 import { persistedResponseFactory } from "@/fixtures/response.factory";
 import { sumCode } from "@/mdq/fixtures";
-import { examResult, resultPolicy } from "@/services/exam-result";
+import { examResult, resultPolicy, unweighted } from "@/services/exam-result";
 import type { ExamTiming } from "@/services/exam-state";
 import {
 	type CountingAnswer,
@@ -146,7 +146,7 @@ test("sends that only failed the pretest are graded 0", () => {
 		[],
 	);
 	const [outcome] = examResult(
-		["q"],
+		unweighted(["q"]),
 		[
 			send("a", 1, { status: "PRETEST_FAILED" as Row["status"] }, 1),
 			send("b", 2, { status: "PRETEST_FAILED" as Row["status"] }, 2),
@@ -254,7 +254,12 @@ test("property: verdict and state agree with examResult", () => {
 						: []),
 				]);
 				const policy = resultPolicy(practice ? "PRACTICE" : "EXAM", {});
-				const [expected] = examResult(["q"], rows, feedback, policy).questions;
+				const [expected] = examResult(
+					unweighted(["q"]),
+					rows,
+					feedback,
+					policy,
+				).questions;
 				const answer = answerOf(rows, feedback, practice);
 				expect(answer.state).toBe(expected?.status);
 				expect(answer.verdict).toBe(expected?.score);
@@ -352,7 +357,7 @@ test("loadExamGrading: the answers of a code question agree with examResult", as
 		expect(attempt, author).toBeDefined();
 		expect(answer, author).toBeDefined();
 		const [expected] = examResult(
-			[slug],
+			unweighted([slug]),
 			(attempt as NonNullable<typeof attempt>).submissions,
 			feedback,
 			policy,

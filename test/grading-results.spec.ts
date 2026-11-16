@@ -5,6 +5,7 @@ import { prisma } from "@/db/client";
 import { persistedCourseFactory } from "@/fixtures/course.factory";
 import { persistedExamFactory } from "@/fixtures/exam.factory";
 import { capitalShortAnswer } from "@/mdq/fixtures";
+import { unweighted } from "@/services/exam-result";
 import type { ExamTiming, ExceptionTiming } from "@/services/exam-state";
 import {
 	attemptRows,
@@ -119,7 +120,14 @@ function rowsOf(
 	students: GradedStudent[] = [student("ana", "Ana")],
 	exam: ExamTiming = openExam(),
 ) {
-	return attemptRows(exam, QUESTIONS, attempts, feedback, students, NOW);
+	return attemptRows(
+		exam,
+		unweighted(QUESTIONS),
+		attempts,
+		feedback,
+		students,
+		NOW,
+	);
 }
 
 test("attemptRows: one row per attempt, with the student and when they started", () => {
@@ -181,8 +189,22 @@ test("attemptRows: an attempt past its own deadline is submitted", () => {
 		acceptingSubmissions: true,
 	});
 
-	const late = attemptRows(timed, QUESTIONS, [running], [], [], at(61));
-	const early = attemptRows(timed, QUESTIONS, [running], [], [], at(30));
+	const late = attemptRows(
+		timed,
+		unweighted(QUESTIONS),
+		[running],
+		[],
+		[],
+		at(61),
+	);
+	const early = attemptRows(
+		timed,
+		unweighted(QUESTIONS),
+		[running],
+		[],
+		[],
+		at(30),
+	);
 
 	expect(late[0]?.state).toBe("submitted");
 	expect(early[0]?.state).toBe("in-progress");
@@ -742,7 +764,7 @@ test("attemptRows: a student whose extra time is still running is in progress wh
 	// The exam's window ended 40 minutes ago; ana has 45 more minutes.
 	const rows = attemptRows(
 		justClosedExam(),
-		QUESTIONS,
+		unweighted(QUESTIONS),
 		[unclosed("ana"), unclosed("bob")],
 		[],
 		[student("ana", "Ana"), student("bob", "Bob")],
@@ -759,7 +781,7 @@ test("attemptRows: a student whose extra time is still running is in progress wh
 test("attemptRows: extra time that has run out leaves the attempt submitted", () => {
 	const rows = attemptRows(
 		justClosedExam(),
-		QUESTIONS,
+		unweighted(QUESTIONS),
 		[unclosed("ana")],
 		[],
 		[student("ana", "Ana")],
@@ -778,7 +800,7 @@ test("attemptRows: a makeup in progress keeps the attempt open on an exam comple
 	};
 	const [row] = attemptRows(
 		completed,
-		QUESTIONS,
+		unweighted(QUESTIONS),
 		[unclosed("ana")],
 		[],
 		[student("ana", "Ana")],

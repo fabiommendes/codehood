@@ -8,7 +8,7 @@
  */
 
 import { correctResponses, type QuestionDocument } from "@/mdq";
-import { examResult, type ResultPolicy } from "./exam-result";
+import { examResult, type ResultPolicy, unweighted } from "./exam-result";
 import {
 	attemptOf,
 	type ExamTiming,
@@ -166,7 +166,12 @@ function scoreRows(
 	for (const attempt of attempts) {
 		if (!isFinished(attemptOf(schedule, attempt.author, attempt, now)))
 			continue;
-		const result = examResult(questions, attempt.submissions, feedback, policy);
+		const result = examResult(
+			unweighted(questions),
+			attempt.submissions,
+			feedback,
+			policy,
+		);
 		if (result.total === null) continue;
 		rows.push(result.questions.map((outcome) => outcome.score ?? 0));
 	}

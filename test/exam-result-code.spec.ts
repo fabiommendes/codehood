@@ -1,5 +1,5 @@
 import { expect, test } from "@playwright/test";
-import { examResult } from "@/services/exam-result";
+import { examResult, unweighted } from "@/services/exam-result";
 
 const T0 = new Date("2026-03-10T10:00:00Z");
 
@@ -28,7 +28,7 @@ const POLICY = { codePenalty: { q: 0.2 } };
 
 test("examResult code: pretest failure, 0.6 then 1.0 with penalty 0.2 is 0.8", () => {
 	const result = examResult(
-		["q"],
+		unweighted(["q"]),
 		[sent("a", 1, "SUBMIT", "PRETEST_FAILED"), sent("b", 2), sent("c", 3)],
 		[pass("b", "3/5", 5), pass("c", "1", 6)],
 		POLICY,
@@ -44,7 +44,7 @@ test("examResult code: pretest failure, 0.6 then 1.0 with penalty 0.2 is 0.8", (
 
 test("examResult code: the question lists each graded submission with its discount", () => {
 	const result = examResult(
-		["q"],
+		unweighted(["q"]),
 		[sent("b", 2), sent("c", 3)],
 		[pass("b", "3/5", 5), pass("c", "1", 6)],
 		POLICY,
@@ -58,7 +58,7 @@ test("examResult code: the question lists each graded submission with its discou
 
 test("examResult code: a practice exam has no discount", () => {
 	const result = examResult(
-		["q"],
+		unweighted(["q"]),
 		[sent("b", 2), sent("c", 3)],
 		[pass("b", "3/5", 5), pass("c", "1", 6)],
 		{ ...POLICY, practice: true },
@@ -69,7 +69,7 @@ test("examResult code: a practice exam has no discount", () => {
 
 test("examResult code: without a penalty for the question it is 0.2", () => {
 	const result = examResult(
-		["q"],
+		unweighted(["q"]),
 		[sent("b", 2), sent("c", 3)],
 		[pass("b", "3/5", 5), pass("c", "1", 6)],
 	);
@@ -79,7 +79,7 @@ test("examResult code: without a penalty for the question it is 0.2", () => {
 
 test("examResult code: an earlier better submission counts over a later worse one", () => {
 	const result = examResult(
-		["q"],
+		unweighted(["q"]),
 		[sent("b", 2), sent("c", 3)],
 		[pass("b", "9/10", 5), pass("c", "1/2", 6)],
 		POLICY,
@@ -90,7 +90,7 @@ test("examResult code: an earlier better submission counts over a later worse on
 
 test("examResult code: a human pass replaces the bot's grade on that submission", () => {
 	const result = examResult(
-		["q"],
+		unweighted(["q"]),
 		[sent("b", 2)],
 		[pass("b", "1/2", 5), pass("b", "1", 9)],
 		POLICY,
@@ -101,7 +101,7 @@ test("examResult code: a human pass replaces the bot's grade on that submission"
 
 test("examResult code: the newest submission still waiting makes the question pending", () => {
 	const result = examResult(
-		["q"],
+		unweighted(["q"]),
 		[sent("b", 2), sent("c", 3)],
 		[pass("b", "3/5", 5)],
 		POLICY,
@@ -113,7 +113,7 @@ test("examResult code: the newest submission still waiting makes the question pe
 
 test("examResult code: only submissions that failed the pretest score zero", () => {
 	const result = examResult(
-		["q"],
+		unweighted(["q"]),
 		[sent("b", 2, "SUBMIT", "PRETEST_FAILED")],
 		[],
 		POLICY,
@@ -124,7 +124,7 @@ test("examResult code: only submissions that failed the pretest score zero", () 
 
 test("examResult code: autosaves do not count once a submission exists", () => {
 	const result = examResult(
-		["q"],
+		unweighted(["q"]),
 		[sent("b", 2), sent("auto", 9, "AUTOSAVE")],
 		[pass("b", "1", 5)],
 		POLICY,
@@ -135,7 +135,7 @@ test("examResult code: autosaves do not count once a submission exists", () => {
 
 test("examResult code: a final submission counts as a submission", () => {
 	const result = examResult(
-		["q"],
+		unweighted(["q"]),
 		[sent("b", 2, "FINAL")],
 		[pass("b", "1/2", 5)],
 		POLICY,
@@ -146,7 +146,7 @@ test("examResult code: a final submission counts as a submission", () => {
 
 test("examResult code: with autosaves only, the newest one is judged as before", () => {
 	const result = examResult(
-		["q"],
+		unweighted(["q"]),
 		[sent("a", 1, "AUTOSAVE"), sent("b", 2, "AUTOSAVE")],
 		[pass("b", "1/2", 5)],
 		POLICY,
@@ -158,7 +158,7 @@ test("examResult code: with autosaves only, the newest one is judged as before",
 
 test("examResult code: a submission marked will-not-grade is left out", () => {
 	const result = examResult(
-		["q"],
+		unweighted(["q"]),
 		[sent("b", 2), sent("c", 3, "SUBMIT", "WILL_NOT_GRADE")],
 		[pass("b", "1/2", 5)],
 		POLICY,
@@ -169,7 +169,7 @@ test("examResult code: a submission marked will-not-grade is left out", () => {
 
 test("examResult code: a score below zero counts as zero, discounted or not", () => {
 	const result = examResult(
-		["q"],
+		unweighted(["q"]),
 		[sent("b", 2)],
 		[pass("b", "-1", 5)],
 		POLICY,
@@ -183,7 +183,7 @@ test("examResult code: a score below zero counts as zero, discounted or not", ()
 
 test("examResult code: the discount of later submissions follows the grade a human gave, not the bot's", () => {
 	const result = examResult(
-		["q"],
+		unweighted(["q"]),
 		[sent("b", 2), sent("c", 3)],
 		[pass("b", "1/2", 5), pass("b", "1", 9), pass("c", "1", 6)],
 		POLICY,
@@ -197,7 +197,7 @@ test("examResult code: the discount of later submissions follows the grade a hum
 
 test("examResult code: every earlier wrong submission costs one discount", () => {
 	const result = examResult(
-		["q"],
+		unweighted(["q"]),
 		[sent("a", 1), sent("b", 2), sent("c", 3)],
 		[pass("a", "1/2", 5), pass("b", "1/2", 6), pass("c", "1", 7)],
 		POLICY,

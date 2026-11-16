@@ -8,7 +8,7 @@ import { persistedCourseFactory } from "@/fixtures/course.factory";
 import { persistedExamFactory } from "@/fixtures/exam.factory";
 import { persistedUserFactory } from "@/fixtures/user.factory";
 import { sumCode } from "@/mdq/fixtures";
-import { examResult } from "@/services/exam-result";
+import { examResult, unweighted } from "@/services/exam-result";
 
 // The result of a `code` question read through the services: the submissions
 // of an attempt, the passes on them and the policy loaded from the course.
@@ -117,7 +117,7 @@ async function resultOf(type: "EXAM" | "PRACTICE", penalty = 0.2) {
 	);
 	const policyOf = await loadResultPolicy(course.id);
 	return examResult(
-		[slug],
+		unweighted([slug]),
 		attempt?.submissions ?? [],
 		feedback,
 		policyOf({ type }),

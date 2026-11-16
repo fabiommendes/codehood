@@ -1,6 +1,6 @@
 import { expect, test } from "@playwright/test";
 import fc from "fast-check";
-import { examResult, formatScore } from "@/services/exam-result";
+import { examResult, formatScore, unweighted } from "@/services/exam-result";
 
 const T0 = new Date("2026-03-10T10:00:00Z");
 
@@ -32,14 +32,14 @@ function feedback(
 //
 
 test("examResult: one outcome per question slug, in the order given", () => {
-	const result = examResult(["c", "a", "b"], [], []);
+	const result = examResult(unweighted(["c", "a", "b"]), [], []);
 
 	expect(result.questions.map((q) => q.question)).toEqual(["c", "a", "b"]);
 });
 
 test("examResult: a question with feedback on its answer is graded with that score", () => {
 	const result = examResult(
-		["q1"],
+		unweighted(["q1"]),
 		[submission("s1", "q1", 0)],
 		[feedback("s1", "1", 5)],
 	);
@@ -68,7 +68,7 @@ const scoreStrings: Array<[string, number]> = [
 for (const [text, value] of scoreStrings) {
 	test(`examResult: score string "${text}" becomes the number ${value}`, () => {
 		const result = examResult(
-			["q1"],
+			unweighted(["q1"]),
 			[submission("s1", "q1", 0)],
 			[feedback("s1", text, 5)],
 		);
@@ -79,7 +79,11 @@ for (const [text, value] of scoreStrings) {
 }
 
 test("examResult: an answered question without feedback is pending, with a null score, never zero", () => {
-	const result = examResult(["q1"], [submission("s1", "q1", 0)], []);
+	const result = examResult(
+		unweighted(["q1"]),
+		[submission("s1", "q1", 0)],
+		[],
+	);
 
 	expect(result.questions).toEqual([
 		{
@@ -93,7 +97,7 @@ test("examResult: an answered question without feedback is pending, with a null 
 });
 
 test("examResult: a question with no submission is unanswered with a null score", () => {
-	const result = examResult(["q1"], [], []);
+	const result = examResult(unweighted(["q1"]), [], []);
 
 	expect(result.questions).toEqual([
 		{ question: "q1", status: "unanswered", score: null, comments: [] },
@@ -102,7 +106,7 @@ test("examResult: a question with no submission is unanswered with a null score"
 
 test("examResult: feedback on a submission to another question does not grade this one", () => {
 	const result = examResult(
-		["q1", "q2"],
+		unweighted(["q1", "q2"]),
 		[submission("s1", "q1", 0), submission("s2", "q2", 1)],
 		[feedback("s1", "1", 5)],
 	);
@@ -116,7 +120,7 @@ test("examResult: feedback on a submission to another question does not grade th
 
 test("examResult: each outcome names the counting submission, the newest of its question, and none when unanswered", () => {
 	const result = examResult(
-		["q1", "q2", "q3"],
+		unweighted(["q1", "q2", "q3"]),
 		[
 			submission("old", "q1", 0),
 			submission("new", "q1", 10),
@@ -134,7 +138,7 @@ test("examResult: each outcome names the counting submission, the newest of its 
 
 test("examResult: the newest submission of a question is the one that counts", () => {
 	const result = examResult(
-		["q1"],
+		unweighted(["q1"]),
 		[submission("old", "q1", 0), submission("new", "q1", 10)],
 		[feedback("old", "0", 20), feedback("new", "1", 15)],
 	);
@@ -144,7 +148,7 @@ test("examResult: the newest submission of a question is the one that counts", (
 
 test("examResult: the newest submission counts whatever order submissions arrive in", () => {
 	const result = examResult(
-		["q1"],
+		unweighted(["q1"]),
 		[submission("new", "q1", 10), submission("old", "q1", 0)],
 		[feedback("old", "0", 20), feedback("new", "1", 15)],
 	);
@@ -154,7 +158,7 @@ test("examResult: the newest submission counts whatever order submissions arrive
 
 test("examResult: feedback on an older submission is ignored, leaving the newer answer pending", () => {
 	const result = examResult(
-		["q1"],
+		unweighted(["q1"]),
 		[submission("old", "q1", 0), submission("new", "q1", 10)],
 		[feedback("old", "1", 20, "Well done")],
 	);
@@ -172,7 +176,7 @@ test("examResult: feedback on an older submission is ignored, leaving the newer 
 
 test("examResult: among several passes on the counting submission, the newest by updatedAt is the verdict", () => {
 	const result = examResult(
-		["q1"],
+		unweighted(["q1"]),
 		[submission("s1", "q1", 0)],
 		[
 			feedback("s1", "0", 5),
@@ -191,9 +195,13 @@ test("examResult: the verdict does not depend on the order feedback arrives in",
 		feedback("s1", "1", 10),
 	];
 
-	const forward = examResult(["q1"], [submission("s1", "q1", 0)], passes);
+	const forward = examResult(
+		unweighted(["q1"]),
+		[submission("s1", "q1", 0)],
+		passes,
+	);
 	const backward = examResult(
-		["q1"],
+		unweighted(["q1"]),
 		[submission("s1", "q1", 0)],
 		[...passes].reverse(),
 	);
@@ -207,7 +215,7 @@ test("examResult: the verdict does not depend on the order feedback arrives in",
 
 test("examResult: comments are every non-empty feedback text on the counting submission, newest first", () => {
 	const result = examResult(
-		["q1"],
+		unweighted(["q1"]),
 		[submission("s1", "q1", 0)],
 		[
 			feedback("s1", "0", 5, "First pass"),
@@ -225,7 +233,7 @@ test("examResult: comments are every non-empty feedback text on the counting sub
 
 test("examResult: null and empty feedback texts are not comments", () => {
 	const result = examResult(
-		["q1"],
+		unweighted(["q1"]),
 		[submission("s1", "q1", 0)],
 		[
 			feedback("s1", "0", 5, null),
@@ -239,7 +247,7 @@ test("examResult: null and empty feedback texts are not comments", () => {
 
 test("examResult: comments on an older submission of the question are left out", () => {
 	const result = examResult(
-		["q1"],
+		unweighted(["q1"]),
 		[submission("old", "q1", 0), submission("new", "q1", 10)],
 		[
 			feedback("old", "0", 5, "About the old answer"),
@@ -256,7 +264,7 @@ test("examResult: comments on an older submission of the question are left out",
 
 test("examResult: total is the mean of the graded scores", () => {
 	const result = examResult(
-		["q1", "q2"],
+		unweighted(["q1", "q2"]),
 		[submission("s1", "q1", 0), submission("s2", "q2", 1)],
 		[feedback("s1", "1", 5), feedback("s2", "0.5", 5)],
 	);
@@ -266,7 +274,7 @@ test("examResult: total is the mean of the graded scores", () => {
 
 test("examResult: an unanswered question counts as zero in the total but keeps a null score", () => {
 	const result = examResult(
-		["q1", "q2", "q3"],
+		unweighted(["q1", "q2", "q3"]),
 		[submission("s1", "q1", 0), submission("s2", "q2", 1)],
 		[feedback("s1", "1", 5), feedback("s2", "1", 5)],
 	);
@@ -277,7 +285,7 @@ test("examResult: an unanswered question counts as zero in the total but keeps a
 
 test("examResult: a negative score pulls the total down", () => {
 	const result = examResult(
-		["q1", "q2"],
+		unweighted(["q1", "q2"]),
 		[submission("s1", "q1", 0), submission("s2", "q2", 1)],
 		[feedback("s1", "1", 5), feedback("s2", "-1", 5)],
 	);
@@ -287,7 +295,7 @@ test("examResult: a negative score pulls the total down", () => {
 
 test("examResult: total is null while any answered question is pending", () => {
 	const result = examResult(
-		["q1", "q2"],
+		unweighted(["q1", "q2"]),
 		[submission("s1", "q1", 0), submission("s2", "q2", 1)],
 		[feedback("s1", "1", 5)],
 	);
@@ -296,19 +304,23 @@ test("examResult: total is null while any answered question is pending", () => {
 });
 
 test("examResult: total is null with a pending question even beside an unanswered one", () => {
-	const result = examResult(["q1", "q2"], [submission("s1", "q1", 0)], []);
+	const result = examResult(
+		unweighted(["q1", "q2"]),
+		[submission("s1", "q1", 0)],
+		[],
+	);
 
 	expect(result.total).toBeNull();
 });
 
 test("examResult: an exam nobody answered totals zero, not null", () => {
-	const result = examResult(["q1", "q2"], [], []);
+	const result = examResult(unweighted(["q1", "q2"]), [], []);
 
 	expect(result.total).toBe(0);
 });
 
 test("examResult: an exam with no questions has no outcomes and a null total", () => {
-	const result = examResult([], [], []);
+	const result = examResult(unweighted([]), [], []);
 
 	expect(result).toEqual({ questions: [], total: null });
 });
@@ -327,7 +339,7 @@ test("examResult: total is the mean of every question's score over the whole exa
 				mark === null ? [] : [feedback(`s${i}`, `${mark}/4`, i)],
 			);
 
-			const result = examResult(slugs, submissions, grades);
+			const result = examResult(unweighted(slugs), submissions, grades);
 
 			const expected =
 				marks.reduce<number>((sum, mark) => sum + (mark ?? 0) / 4, 0) /

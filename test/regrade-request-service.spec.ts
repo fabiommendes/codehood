@@ -10,7 +10,11 @@ import { persistedQuestionFactory } from "@/fixtures/question.factory";
 import { persistedResponseFactory } from "@/fixtures/response.factory";
 import { persistedSubmissionFactory } from "@/fixtures/submission.factory";
 import { persistedUserFactory } from "@/fixtures/user.factory";
-import { examResult, type QuestionOutcome } from "@/services/exam-result";
+import {
+	examResult,
+	type QuestionOutcome,
+	unweighted,
+} from "@/services/exam-result";
 import { type RegradeBlocker, regradeBlockerMessage } from "@/services/regrade";
 
 const MINUTE = 60_000;
@@ -609,7 +613,7 @@ async function outcomeOf(scenario: Scenario): Promise<QuestionOutcome> {
 		{ actor: student },
 	);
 	const result = examResult(
-		[open.question.slug],
+		unweighted([open.question.slug]),
 		[
 			{
 				publicId: submission.publicId,

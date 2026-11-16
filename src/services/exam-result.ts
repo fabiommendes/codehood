@@ -128,6 +128,16 @@ export interface WeightedQuestion {
 	weight: number;
 }
 
+/**
+ * The slugs as questions that all weigh 1.
+ *
+ * @example
+ * unweighted(["a", "b"]) // [{ slug: "a", weight: 1 }, { slug: "b", weight: 1 }]
+ */
+export function unweighted(slugs: readonly string[]): WeightedQuestion[] {
+	return slugs.map((slug) => ({ slug, weight: 1 }));
+}
+
 export interface ExamResult {
 	/// One entry per exam question, in exam order.
 	questions: QuestionOutcome[];
@@ -148,7 +158,7 @@ export interface ExamResult {
  * whatever feedback it has: its score is `null`, it counts as zero in the
  * total, it is not pending, and it keeps its comments.
  *
- * @params questions The exam's questions in exam order, with their weights. A bare slug weighs 1.
+ * @params questions The exam's questions in exam order, with their weights.
  * @params submissions Every submission of the attempt, any order.
  * A question with `SUBMIT` or `FINAL` submissions is a `code` question sent for
  * grading: its score comes from all of them (see `codeQuestionScore`), not
@@ -158,15 +168,12 @@ export interface ExamResult {
  * @params policy How the exam discounts `code` submissions; defaults apply when missing.
  */
 export function examResult(
-	questions: readonly (string | WeightedQuestion)[],
+	questions: readonly WeightedQuestion[],
 	submissions: ResultSubmission[],
 	feedback: ResultFeedback[],
 	policy: ResultPolicy = {},
 ): ExamResult {
-	const refs = questions.map((q) =>
-		typeof q === "string" ? { slug: q, weight: 1 } : q,
-	);
-	const outcomes = refs.map(({ slug }) => {
+	const outcomes = questions.map(({ slug }) => {
 		const sent = submissions.filter(
 			(submission) =>
 				submission.question === slug &&
@@ -182,7 +189,7 @@ export function examResult(
 		questions: outcomes,
 		total: totalOf(
 			outcomes,
-			refs.map((ref) => ref.weight),
+			questions.map((question) => question.weight),
 		),
 	};
 }
