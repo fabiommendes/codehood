@@ -1,0 +1,256 @@
+---
+import GlassWall from "@/components/brand/GlassWall.astro";
+import { SCENES, type SceneName } from "@/components/brand/scenes";
+import CsvDownload from "@/components/CsvDownload.astro";
+import EmptyState from "@/components/EmptyState.astro";
+import Field from "@/components/form/Field";
+import FormAlert from "@/components/form/FormAlert";
+import PasswordConfirm from "@/components/PasswordConfirm.astro";
+import AttachmentList from "@/components/question/AttachmentList";
+import Button from "@/components/ui/Button";
+import type { FieldSpec } from "@/forms/describe-field";
+import ComponentsPage from "./_ComponentsPage.astro";
+
+export const prerender = false;
+
+// The Solid islands here render on the server only (no `client:*`), so buttons
+// and dialogs look real but do nothing.
+
+const sections = [
+	{ id: "empty", label: "Empty states" },
+	{ id: "fields", label: "Fields" },
+	{ id: "password", label: "Password" },
+	{ id: "files", label: "Files" },
+	{ id: "glass-wall", label: "Glass wall" },
+];
+
+/// One scene with actions and one without are enough; `/design/motifs` shows them all.
+const scenes: SceneName[] = ["lockedHouse", "constellation"];
+
+/// Specs as `describeField` produces them from a schema.
+const text = { required: true, attrs: { minlength: 3, maxlength: 80 } };
+const fields: FieldSpec[] = [
+	{
+		...text,
+		name: "title",
+		kind: "text",
+		label: "Title",
+		hint: "Shown on the exam list.",
+	},
+	{
+		...text,
+		name: "email",
+		kind: "email",
+		label: "E-mail",
+		placeholder: "ada@example.org",
+		attrs: {},
+	},
+	{
+		...text,
+		name: "url",
+		kind: "url",
+		label: "Repository URL",
+		required: false,
+		attrs: {},
+	},
+	{
+		...text,
+		name: "seats",
+		kind: "number",
+		label: "Seats",
+		attrs: { min: 1, max: 200 },
+	},
+	{ ...text, name: "day", kind: "date", label: "Day", attrs: {} },
+	{ ...text, name: "start", kind: "datetime", label: "Starts at", attrs: {} },
+	{
+		...text,
+		name: "kind",
+		kind: "enum",
+		label: "Type",
+		attrs: {},
+		options: [
+			{ value: "QUIZ", label: "Quiz" },
+			{ value: "EXAM", label: "Exam" },
+			{ value: "PRACTICE", label: "Practice" },
+		],
+	},
+	{
+		...text,
+		name: "format",
+		kind: "enum",
+		widget: "radio",
+		label: "Format",
+		attrs: {},
+		options: [
+			{ value: "PLAINTEXT", label: "Plain text" },
+			{ value: "MARKDOWN", label: "Markdown" },
+		],
+	},
+	{
+		...text,
+		name: "history",
+		kind: "boolean",
+		widget: "toggle",
+		label: "Record the edit history",
+		required: false,
+		attrs: {},
+	},
+	{
+		...text,
+		name: "agree",
+		kind: "boolean",
+		label: "I agree",
+		required: false,
+		attrs: {},
+	},
+	{
+		...text,
+		name: "notes",
+		kind: "textarea",
+		label: "Notes",
+		required: false,
+		attrs: {},
+		placeholder: "Anything the graders should know.",
+	},
+];
+
+/// The value shown back and the errors of the fields in "With errors".
+const invalid: Record<string, { value?: string; errors: string[] }> = {
+	title: { value: "ab", errors: ["Use at least 3 characters."] },
+	email: { value: "ada@", errors: ["Enter a valid e-mail address."] },
+	kind: { errors: ["Choose a type."] },
+	format: { errors: ["Choose a format."] },
+};
+
+const attachments = [
+	{ name: "dataset.csv", format: "csv", label: "12 KB" },
+	{ name: "notes.pdf", format: "pdf" },
+	{
+		name: "starter.py",
+		format: "python",
+		text: 'def solve(graph, start):\n    """Return the vertices reachable from start."""\n    raise NotImplementedError\n',
+	},
+];
+
+const csvRows = [
+	["Student", "Grade"],
+	["Ada Lovelace", "9.5"],
+	["Grace Hopper", "10"],
+];
+---
+
+<ComponentsPage href="/design/components/ui" sections={sections}>
+  <Fragment slot="intro">
+    The building blocks every screen is made of: empty states, form fields, the password confirmation, file lists and
+    the glass wall. Each renders from fixture props.
+  </Fragment>
+
+  <section id="empty" class="mb-14 scroll-mt-6">
+    <h2 class="text-2xl font-bold">Empty states</h2>
+    <p class="mt-2 mb-6 text-sm text-muted">
+      <code class="font-mono">EmptyState</code>: an illustration, what is missing and who acts next. With and without the
+      actions slot.
+    </p>
+    <div class="flex flex-col gap-10">
+      {
+        scenes.map((name, index) => (
+          <div class="rounded-box border border-edge bg-base-100 p-6">
+            <p class="mb-4 font-mono text-xs text-muted">{name}</p>
+            <EmptyState scene={name} title={SCENES[name].caption}>
+              Nothing here yet. Whoever teaches the course publishes it with the CLI.
+              {index === 0 && (
+                <Fragment slot="actions">
+                  <Button variant="primary">Do something</Button>
+                  <Button variant="ghost">Later</Button>
+                </Fragment>
+              )}
+            </EmptyState>
+          </div>
+        ))
+      }
+    </div>
+  </section>
+
+  <section id="fields" class="mb-14 scroll-mt-6">
+    <h2 class="text-2xl font-bold">Fields</h2>
+    <p class="mt-2 mb-6 text-sm text-muted">
+      <code class="font-mono">Field</code> renders one control, with label, hint and errors, from a spec
+      derived from a Zod schema. <code class="font-mono">FormAlert</code> shows the error that belongs to no
+      field.
+    </p>
+    <div class="grid max-w-3xl gap-x-6 gap-y-2 rounded-box border border-edge bg-base-100 p-5 sm:grid-cols-2">
+      {fields.map((spec) => <Field {...spec} id={`ui-${spec.name}`} />)}
+    </div>
+    <h3 class="mt-10 mb-3 text-xl font-semibold">With errors</h3>
+    <div class="grid max-w-3xl gap-x-6 gap-y-2 rounded-box border border-edge bg-base-100 p-5 sm:grid-cols-2">
+      {
+        fields
+          .filter((spec) => spec.name in invalid)
+          .map((spec) => (
+            <Field {...spec} id={`ui-err-${spec.name}`} {...invalid[spec.name]} />
+          ))
+      }
+    </div>
+    <h3 class="mt-10 mb-3 text-xl font-semibold">FormAlert</h3>
+    <div class="max-w-xl">
+      <FormAlert error="You may not edit this exam." />
+    </div>
+  </section>
+
+  <section id="password" class="mb-14 scroll-mt-6">
+    <h2 class="text-2xl font-bold">Password</h2>
+    <p class="mt-2 mb-6 text-sm text-muted">
+      <code class="font-mono">PasswordConfirm</code> sits after a password input and blocks the submit when
+      the two differ. Type different values and press the button to see the message.
+    </p>
+    <form class="max-w-sm rounded-box border border-edge bg-base-100 p-5" onsubmit="return false">
+      <fieldset class="fieldset">
+        <legend class="fieldset-legend"><label for="ui-password">Password</label></legend>
+        <input
+          type="password"
+          id="ui-password"
+          name="password"
+          required
+          minlength="8"
+          autocomplete="new-password"
+          class="input w-full"
+        />
+      </fieldset>
+      <PasswordConfirm id="ui-password-confirm" />
+      <button type="submit" class="btn btn-primary mt-4">Save</button>
+    </form>
+  </section>
+
+  <section id="files" class="mb-14 scroll-mt-6">
+    <h2 class="text-2xl font-bold">Files</h2>
+    <p class="mt-2 mb-6 text-sm text-muted">
+      <code class="font-mono">AttachmentList</code> lists what a question gives the student; a fenced
+      attachment also shows its code. <code class="font-mono">CsvDownload</code> builds the file in the browser
+      from the rows on the page, so the button works here.
+    </p>
+    <h3 class="mb-3 text-xl font-semibold">AttachmentList</h3>
+    <div class="max-w-xl">
+      <AttachmentList attachments={attachments} url={(name: string) => `#${name}`} />
+    </div>
+    <h3 class="mt-10 mb-3 text-xl font-semibold">Without download links</h3>
+    <div class="max-w-xl">
+      <AttachmentList attachments={attachments.slice(0, 2)} url={() => null} />
+    </div>
+    <h3 class="mt-10 mb-3 text-xl font-semibold">CsvDownload</h3>
+    <div class="flex gap-3">
+      <CsvDownload id="ui-grades" filename="grades.csv" rows={csvRows} />
+      <CsvDownload id="ui-grades-off" filename="grades.csv" rows={csvRows} disabled />
+    </div>
+  </section>
+
+  <section id="glass-wall" class="mb-14 scroll-mt-6">
+    <h2 class="text-2xl font-bold">Glass wall</h2>
+    <p class="mt-2 mb-6 text-sm text-muted">
+      <code class="font-mono">GlassWall</code>: the field of turning Ds behind the sign-in and error screens, here
+      clipped to a box.
+    </p>
+    <div class="relative isolate h-64 overflow-hidden rounded-box border border-edge bg-base-200">
+      <GlassWall cols={40} rows={20} />
+    </div>
+  </section>
+</ComponentsPage>

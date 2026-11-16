@@ -1,0 +1,411 @@
+---
+import VariantPicker from "@/components/dev/VariantPicker.astro";
+import RegradeControls, {
+	type QuestionRegrade,
+} from "@/components/exam/RegradeControls";
+import AnswerDistribution from "@/components/grading/AnswerDistribution.astro";
+import AppliedItems, {
+	type AppliedItem,
+} from "@/components/grading/AppliedItems";
+import QuestionStats from "@/components/grading/QuestionStats";
+import RegradeResolve from "@/components/grading/RegradeResolve";
+import type {
+	AnswerDistribution as Distribution,
+	QuestionStats as Stats,
+} from "@/services/question-stats";
+import ComponentsPage from "./_ComponentsPage.astro";
+import { examTarget, selectVariants } from "./_fixtures";
+
+export const prerender = false;
+
+// Only the sortable statistics table hydrates: it calls no action and does not
+// poll. The other islands render on the server only (no `client:*`), so buttons
+// look real but do nothing.
+
+const regrades: { key: string; label: string; regrade: QuestionRegrade }[] = [
+	{
+		key: "open",
+		label: "Window open, no request",
+		regrade: { submission: "sub-1", canRequest: true, request: null },
+	},
+	{
+		key: "requested",
+		label: "Requested",
+		regrade: {
+			submission: "sub-2",
+			canRequest: false,
+			request: {
+				publicId: "req-2",
+				status: "OPEN",
+				message:
+					"My answer uses BFS, which also finds the shortest path in an unweighted graph.",
+				reply: null,
+			},
+		},
+	},
+	{
+		key: "accepted",
+		label: "Accepted",
+		regrade: {
+			submission: "sub-3",
+			canRequest: false,
+			request: {
+				publicId: "req-3",
+				status: "ACCEPTED",
+				message: "The key marks O(n) but the loop is O(log n).",
+				reply: "You are right, the key was wrong. Fixed for everyone.",
+			},
+		},
+	},
+	{
+		key: "rejected",
+		label: "Rejected",
+		regrade: {
+			submission: "sub-4",
+			canRequest: false,
+			request: {
+				publicId: "req-4",
+				status: "REJECTED",
+				message: "I think half credit is too harsh.",
+				reply: "The proof skips the base case, which the rubric requires.",
+			},
+		},
+	},
+];
+
+const appliedStudent: AppliedItem[] = [
+	{
+		text: "Correct base case",
+		value: "0.6",
+		feedback: "The recursion stops where it should.",
+	},
+	{ text: "Off-by-one on the loop bound", value: "-0.1", feedback: null },
+];
+const appliedInstructor: AppliedItem[] = appliedStudent.map((item, index) => ({
+	...item,
+	comment: ["Same approach as the key.", "Third time this term."][index],
+}));
+
+const statsTitles = new Map([
+	["bfs", "Breadth-first search"],
+	["dijkstra", "Dijkstra's invariant"],
+	["heap", "Heap order"],
+	["warmup", "Warm-up"],
+	["proof", "Proof of correctness"],
+]);
+
+const stats: Stats[] = [
+	{
+		question: "bfs",
+		answered: 40,
+		blank: 2,
+		average: 0.78,
+		correct: 0.7,
+		discrimination: 0.46,
+		discriminationGap: null,
+		pending: 0,
+		graded: 40,
+		notGraded: 0,
+	},
+	{
+		question: "dijkstra",
+		answered: 38,
+		blank: 4,
+		average: 0.55,
+		correct: 0.42,
+		discrimination: 0.12,
+		discriminationGap: null,
+		pending: 0,
+		graded: 38,
+		notGraded: 0,
+	},
+	{
+		question: "heap",
+		answered: 41,
+		blank: 1,
+		average: 0.61,
+		correct: 0.6,
+		discrimination: -0.18,
+		discriminationGap: null,
+		pending: 0,
+		graded: 41,
+		notGraded: 0,
+	},
+	{
+		question: "warmup",
+		answered: 42,
+		blank: 0,
+		average: 1,
+		correct: 1,
+		discrimination: null,
+		discriminationGap: "no-variance",
+		pending: 0,
+		graded: 42,
+		notGraded: 0,
+	},
+	{
+		question: "proof",
+		answered: 36,
+		blank: 6,
+		average: 0.5,
+		correct: 0.25,
+		discrimination: 0.31,
+		discriminationGap: null,
+		pending: 4,
+		graded: 32,
+		notGraded: 0,
+	},
+];
+
+const fewStats: Stats[] = [
+	{
+		question: "bfs",
+		answered: 3,
+		blank: 0,
+		average: 0.67,
+		correct: 0.67,
+		discrimination: null,
+		discriminationGap: "few-attempts",
+		pending: 0,
+		graded: 3,
+		notGraded: 0,
+	},
+	{
+		question: "proof",
+		answered: 2,
+		blank: 1,
+		average: null,
+		correct: null,
+		discrimination: null,
+		discriminationGap: "few-attempts",
+		pending: 2,
+		graded: 0,
+		notGraded: 0,
+	},
+];
+
+const singleStats: Stats[] = [
+	{
+		question: "proof",
+		answered: 12,
+		blank: 0,
+		average: 0.7,
+		correct: 0.5,
+		discrimination: null,
+		discriminationGap: "single-question",
+		pending: 0,
+		graded: 12,
+		notGraded: 0,
+	},
+];
+
+const emptyStats: Stats[] = [
+	{
+		question: "bfs",
+		answered: 0,
+		blank: 0,
+		average: null,
+		correct: null,
+		discrimination: null,
+		discriminationGap: "few-attempts",
+		pending: 0,
+		graded: 0,
+		notGraded: 0,
+	},
+];
+
+const statsStates: { key: string; label: string; stats: Stats[] }[] = [
+	{ key: "mixed", label: "Mixed flags", stats },
+	{ key: "few", label: "Too few attempts", stats: fewStats },
+	{ key: "single", label: "Single-question exam", stats: singleStats },
+	{ key: "empty", label: "No answers yet", stats: emptyStats },
+];
+
+const distributions: {
+	key: string;
+	label: string;
+	distribution: Distribution;
+}[] = [
+	{
+		key: "choice",
+		label: "Multiple choice, with a removed choice and blanks",
+		distribution: {
+			type: "multiple-choice",
+			answers: 40,
+			rows: [
+				{
+					kind: "choice",
+					id: "log-n",
+					text: "`O(log n)`",
+					correct: true,
+					count: 26,
+				},
+				{
+					kind: "choice",
+					id: "linear",
+					text: "`O(n)`",
+					correct: false,
+					count: 9,
+				},
+				{
+					kind: "choice",
+					id: "n-log-n",
+					text: "`O(n log n)`",
+					correct: false,
+					count: 2,
+				},
+				{ kind: "removed", id: "constant", count: 1 },
+				{ kind: "empty", count: 2 },
+			],
+		},
+	},
+	{
+		key: "selection",
+		label: "Multiple selection",
+		distribution: {
+			type: "multiple-selection",
+			answers: 30,
+			rows: [
+				{ kind: "choice", id: "two", text: "2", correct: true, count: 27 },
+				{ kind: "choice", id: "three", text: "3", correct: true, count: 25 },
+				{ kind: "choice", id: "four", text: "4", correct: false, count: 4 },
+				{ kind: "choice", id: "nine", text: "9", correct: false, count: 11 },
+				{ kind: "empty", count: 1 },
+			],
+		},
+	},
+	{
+		key: "true-false",
+		label: "True / false, with a removed statement",
+		distribution: {
+			type: "true-false",
+			answers: 30,
+			rows: [
+				{
+					kind: "statement",
+					id: "a",
+					text: "BFS visits nodes in order of distance.",
+					correct: true,
+					true: 24,
+					false: 4,
+					abstained: 2,
+				},
+				{
+					kind: "statement",
+					id: "b",
+					text: "DFS needs a priority queue.",
+					correct: false,
+					true: 6,
+					false: 22,
+					abstained: 2,
+				},
+				{ kind: "removed", id: "c", true: 3, false: 1, abstained: 26 },
+			],
+		},
+	},
+];
+
+/// The variants of each picker, keyed by its group, which is also its query parameter.
+const groups = {
+	regrades,
+	statistics: statsStates,
+	distribution: distributions,
+};
+const selected = selectVariants(Astro.url, groups);
+
+const sections = [
+	{ id: "regrades", label: "Regrades" },
+	{ id: "grading", label: "Applied items" },
+	{ id: "statistics", label: "Statistics" },
+];
+---
+
+<ComponentsPage href="/design/components/grading" sections={sections}>
+  <Fragment slot="intro">
+    What happens to an answer once it is submitted: the rubric items applied to it, the student's request for a
+    regrade, the instructor's reply and the statistics of the exam's questions. Buttons above each component switch
+    between the states worth a look; the choice goes to the URL, so a link opens the same state. The statistics
+    table is the exception to the server-only rendering: it hydrates, and its headers sort.
+  </Fragment>
+
+  <section id="regrades" class="mb-14 scroll-mt-6">
+    <h2 class="text-2xl font-bold">Regrades</h2>
+    <p class="mt-2 mb-6 text-sm text-muted">
+      <code class="font-mono">RegradeControls</code> under a question on the student's exam page, and{" "}
+      <code class="font-mono">RegradeResolve</code>, the instructor's form on an open request.
+    </p>
+    <h3 class="mb-3 text-xl font-semibold">Student</h3>
+    <VariantPicker group="regrades" variants={regrades} selected={selected.regrades} />
+    {
+      regrades.map((state) => (
+        <div
+          class="max-w-xl rounded-box border border-edge bg-base-100 p-4"
+          data-variant-group="regrades"
+          data-variant={state.key}
+          hidden={selected.regrades !== state.key}
+        >
+          <RegradeControls {...examTarget} regrade={state.regrade} />
+        </div>
+      ))
+    }
+    <h3 class="mt-10 mb-3 text-xl font-semibold">Instructor resolving a request</h3>
+    <div class="max-w-xl rounded-box border border-edge bg-base-100 p-4">
+      <RegradeResolve {...examTarget} request="req-2" />
+    </div>
+  </section>
+
+  <section id="grading" class="mb-14 scroll-mt-6">
+    <h2 class="text-2xl font-bold">Applied items</h2>
+    <p class="mt-2 mb-6 text-sm text-muted">
+      <code class="font-mono">AppliedItems</code>: the rubric items applied to an answer. The instructor also
+      sees the private comment of each item.
+    </p>
+    <div class="grid gap-6 md:grid-cols-2">
+      <div>
+        <h3 class="mb-1 text-xl font-semibold">Student</h3>
+        <AppliedItems items={appliedStudent} />
+      </div>
+      <div>
+        <h3 class="mb-1 text-xl font-semibold">Instructor</h3>
+        <AppliedItems items={appliedInstructor} />
+      </div>
+    </div>
+  </section>
+
+  <section id="statistics" class="mb-14 scroll-mt-6">
+    <h2 class="text-2xl font-bold">Statistics</h2>
+    <p class="mt-2 mb-6 text-sm text-muted">
+      <code class="font-mono">QuestionStats</code> on the exam's grading page and{" "}
+      <code class="font-mono">AnswerDistribution</code> on a question's. The mixed table has a healthy question, a weak
+      one, a negative discrimination, one with no variance and one still waiting for grades.
+    </p>
+    <h3 class="mb-3 text-xl font-semibold">Question statistics</h3>
+    <VariantPicker group="statistics" variants={statsStates} selected={selected.statistics} />
+    {
+      statsStates.map((state) => (
+        <div
+          class="[&>section]:mt-0"
+          data-variant-group="statistics"
+          data-variant={state.key}
+          hidden={selected.statistics !== state.key}
+        >
+          <QuestionStats client:load href="#" stats={state.stats} titles={statsTitles} points={state.stats.map(() => "10")} />
+        </div>
+      ))
+    }
+    <h3 class="mt-10 mb-3 text-xl font-semibold">Answer distribution</h3>
+    <VariantPicker group="distribution" variants={distributions} selected={selected.distribution} />
+    {
+      distributions.map((state) => (
+        <div
+          class="[&>section]:mt-0"
+          data-variant-group="distribution"
+          data-variant={state.key}
+          hidden={selected.distribution !== state.key}
+        >
+          <AnswerDistribution distribution={state.distribution} />
+        </div>
+      ))
+    }
+  </section>
+</ComponentsPage>

@@ -1,0 +1,359 @@
+---
+import {
+	type AttendanceView,
+	CheckInBlocked,
+	checkInMessage,
+} from "@/actions/check-in";
+import AttendanceRefused from "@/components/check-in/AttendanceRefused.astro";
+import AttendanceResult from "@/components/check-in/AttendanceResult.astro";
+import SignUpForm from "@/components/check-in/SignUpForm.astro";
+import VariantPicker from "@/components/dev/VariantPicker.astro";
+import OpenRollCallDialog from "@/components/roll-call/OpenRollCallDialog";
+import RollCallManager, {
+	type RollCallManagerProps,
+} from "@/components/roll-call/RollCallManager";
+import RollCallProjector, {
+	type RollCallProjectorProps,
+} from "@/components/roll-call/RollCallProjector";
+import { CheckInError } from "@/core/error";
+import { escapeHtml, m } from "@/i18n";
+import { checkInQrSvg } from "@/services/roll-call-qr";
+import ComponentsPage from "./_ComponentsPage.astro";
+import { clock, openClosed, selectVariants, target } from "./_fixtures";
+
+export const prerender = false;
+
+// The Solid islands here render on the server only (no `client:*`), so nothing
+// polls, ticks or calls an action. Buttons and dialogs look real but do
+// nothing, which is the point of a catalogue.
+
+const { now, minutes, seconds } = clock();
+
+//
+// Roll call: student. Fixtures for `AttendanceResult`, `AttendanceRefused` and
+// `SignUpForm`, kept together so a change in `AttendanceView` lands in one place.
+//
+
+const recorded: AttendanceView = {
+	title: "Lecture 12: Graph search",
+	startAt: minutes(-25),
+	recordedAt: minutes(-1),
+	repeat: false,
+	course: "Algorithms",
+	courseHref: "#",
+	joined: false,
+	student: "Ada Lovelace",
+};
+
+const results: {
+	key: string;
+	label: string;
+	note: string;
+	view: AttendanceView;
+	another?: boolean;
+}[] = [
+	{
+		key: "recorded",
+		label: "Recorded now",
+		note: "Scanned link, first check-in.",
+		view: recorded,
+	},
+	{
+		key: "joined",
+		label: "Joined the course",
+		note: "The roll call acts as an invite and enrolled the student.",
+		view: { ...recorded, joined: true },
+	},
+	{
+		key: "repeat",
+		label: "Already recorded",
+		note: "A second scan of the same roll call; no animation.",
+		view: { ...recorded, repeat: true, recordedAt: minutes(-12) },
+	},
+	{
+		key: "typed",
+		label: "Typed code",
+		note: "On /check-in, with the link to type another code.",
+		view: recorded,
+		another: true,
+	},
+];
+
+/// Refusals as the scanned link page shows them, worded by `checkInMessage`.
+const refusals: {
+	key: string;
+	label: string;
+	message: string;
+	loggedIn: boolean;
+	next: "retype" | "courses" | "start";
+}[] = [
+	{
+		key: "invalid-code",
+		label: "Wrong code",
+		message: checkInMessage(new CheckInError("invalid-code")) ?? "",
+		loggedIn: true,
+		next: "retype",
+	},
+	{
+		key: "expired",
+		label: "Expired code",
+		message: checkInMessage(new CheckInError("expired")) ?? "",
+		loggedIn: true,
+		next: "retype",
+	},
+	{
+		key: "closed",
+		label: "Closed roll call",
+		message: checkInMessage(new CheckInError("closed")) ?? "",
+		loggedIn: true,
+		next: "courses",
+	},
+	{
+		key: "not-enrolled",
+		label: "Not enrolled",
+		message: checkInMessage(new CheckInError("not-enrolled")) ?? "",
+		loggedIn: true,
+		next: "courses",
+	},
+	{
+		key: "dropped",
+		label: "Dropped the course",
+		message: checkInMessage(new CheckInError("dropped")) ?? "",
+		loggedIn: true,
+		next: "courses",
+	},
+	{
+		key: "not-student",
+		label: "Not a student",
+		message: checkInMessage(new CheckInError("not-student")) ?? "",
+		loggedIn: true,
+		next: "courses",
+	},
+	{
+		key: "blocked",
+		label: "Too many wrong codes",
+		message: checkInMessage(new CheckInBlocked()) ?? "",
+		loggedIn: true,
+		next: "courses",
+	},
+	{
+		key: "claim-expired",
+		label: "Sign-up took too long",
+		message: checkInMessage(new CheckInError("claim-expired")) ?? "",
+		loggedIn: false,
+		next: "start",
+	},
+	{
+		key: "malformed",
+		label: "Malformed link, logged out",
+		message: m.auth_check_in_invalid_code(),
+		loggedIn: false,
+		next: "start",
+	},
+];
+
+const logInLink = `<a class="link link-primary" href="#">${escapeHtml(m.auth_check_in_log_in())}</a>`;
+
+//
+// Roll call: instructor.
+//
+
+const students: RollCallManagerProps["students"] = [
+	{ username: "ana", name: "Ana Beatriz Souza", dropped: false },
+	{ username: "bruno", name: "Bruno Lima", dropped: false },
+	{ username: "carla", name: "Carla Nunes", dropped: false },
+	{ username: "davi", name: "Davi Rocha", dropped: true },
+	{ username: "elisa", name: "Elisa Martins", dropped: false },
+	{ username: "fabio", name: "Fábio Teixeira", dropped: false },
+	{ username: "gabi", name: "Gabriela Alves", dropped: false },
+];
+
+const attendances: RollCallManagerProps["initial"]["attendances"] = {
+	ana: { note: null, joined: null, sharedWith: [] },
+	carla: { note: "Arrived 20 minutes late", joined: null, sharedWith: [] },
+	elisa: { note: null, joined: "ENROLLMENT", sharedWith: [] },
+	fabio: { note: null, joined: null, sharedWith: ["gabi"] },
+	gabi: { note: null, joined: "ACCOUNT", sharedWith: ["fabio"] },
+};
+
+const manager = {
+	...target,
+	week: 6,
+	timeSlot: "mon-a",
+	pageHref: "#",
+	scheduleHref: "#",
+	students,
+	now: now.getTime(),
+} satisfies Omit<RollCallManagerProps, "initial">;
+
+const projectorCode = "K7Q2MX";
+const projector = {
+	...target,
+	week: 6,
+	timeSlot: "mon-a",
+	title: "Lecture 12: Graph search",
+	manageHref: "#",
+	now: now.getTime(),
+} satisfies Omit<RollCallProjectorProps, "initial">;
+const projected: RollCallProjectorProps["initial"] = {
+	code: projectorCode,
+	changedAt: seconds(-12),
+	nextChangeAt: seconds(18),
+	qr: checkInQrSvg(Astro.url.origin, 1, projectorCode),
+	present: 23,
+	closesAt: minutes(7),
+};
+
+/// The variants of each picker, keyed by its group, which is also its query parameter.
+const groups = {
+	recorded: results,
+	refused: refusals,
+	"roll-call": openClosed,
+	projection: openClosed,
+};
+const selected = selectVariants(Astro.url, groups);
+
+const sections = [
+	{ id: "check-in", label: "Check-in" },
+	{ id: "roll-call", label: "Roll call" },
+	{ id: "projection", label: "Projection" },
+	{ id: "open-roll-call", label: "Open a roll call" },
+];
+---
+
+<ComponentsPage href="/design/components/schedule" sections={sections}>
+  <Fragment slot="intro">
+    Meetings and attendance: what a student sees after scanning a roll call code, the instructor's roll call page, the
+    classroom projection and the button that starts a roll call. Buttons above each component switch between the
+    states worth a look; the choice goes to the URL, so a link opens the same state. The islands render on the
+    server only, so they do not poll, tick or call actions, and their buttons do nothing.
+  </Fragment>
+
+  <section id="check-in" class="mb-14 scroll-mt-6">
+    <h2 class="text-2xl font-bold">Check-in</h2>
+    <p class="mt-2 mb-6 text-sm text-muted">
+      What a student sees after scanning a roll call code or typing it on <code class="font-mono">/check-in</code>:{" "}
+      <code class="font-mono">AttendanceResult</code>, <code class="font-mono">AttendanceRefused</code> and{" "}
+      <code class="font-mono">SignUpForm</code>, each in the card the page puts it in.
+    </p>
+
+    <h3 class="mb-3 text-xl font-semibold">Recorded</h3>
+    <VariantPicker group="recorded" variants={results} selected={selected.recorded} />
+    {
+      results.map((state) => (
+        <div data-variant-group="recorded" data-variant={state.key} hidden={selected.recorded !== state.key}>
+          <p class="mb-3 text-sm text-muted">{state.note}</p>
+          <div class="card card-border w-full max-w-sm bg-base-100 shadow-sm">
+            <div class="card-body">
+              <h2 class="card-title">{m.auth_check_in_title()}</h2>
+              <AttendanceResult view={state.view} another={state.another} />
+            </div>
+          </div>
+        </div>
+      ))
+    }
+
+    <h3 class="mt-10 mb-3 text-xl font-semibold">Refused</h3>
+    <p class="mb-5 text-sm text-muted">
+      The scanned link page. On <code class="font-mono">/check-in</code> a wrong or expired code shows as an error on
+      the code field instead, and the rest in the form's alert.
+    </p>
+    <VariantPicker group="refused" variants={refusals} selected={selected.refused} />
+    {
+      refusals.map((state) => (
+        <div data-variant-group="refused" data-variant={state.key} hidden={selected.refused !== state.key}>
+          <p class="mb-3 text-sm text-muted">{state.loggedIn ? "Logged in." : "Logged out."}</p>
+          <div class="card card-border w-full max-w-sm bg-base-100 shadow-sm">
+            <div class="card-body">
+              <h2 class="card-title">{m.auth_check_in_title()}</h2>
+              <AttendanceRefused message={state.message} next={state.next} />
+            </div>
+          </div>
+        </div>
+      ))
+    }
+
+    <h3 class="mt-10 mb-3 text-xl font-semibold">Sign-up from a roll call invite</h3>
+    <p class="mb-5 text-sm text-muted">
+      A logged-out student who scans the code of a roll call that acts as an invite.
+    </p>
+    <div class="card card-border w-full max-w-sm bg-base-100 shadow-sm">
+      <div class="card-body">
+        <h2 class="card-title">{m.auth_check_in_join_class()}</h2>
+        <p class="text-sm text-base-content/70" set:html={m.auth_check_in_sign_up_intro({ link: logInLink })} />
+        <SignUpForm rollCallId={1} />
+      </div>
+    </div>
+  </section>
+
+  <section id="roll-call" class="mb-14 scroll-mt-6">
+    <h2 class="text-2xl font-bold">Roll call</h2>
+    <p class="mt-2 mb-6 text-sm text-muted">
+      <code class="font-mono">RollCallManager</code>, the instructor's roll call page. The roster covers a student
+      present, absent, with a note, dropped, new in class (enrolled and new account), and two who checked in from
+      the same device. The countdown is frozen at render time.
+    </p>
+    <VariantPicker group="roll-call" variants={openClosed} selected={selected["roll-call"]} />
+    <div data-variant-group="roll-call" data-variant="open" hidden={selected["roll-call"] !== "open"}>
+      <RollCallManager {...manager} initial={{ closesAt: minutes(7), attendances }} />
+    </div>
+    <div data-variant-group="roll-call" data-variant="closed" hidden={selected["roll-call"] !== "closed"}>
+      <RollCallManager {...manager} initial={{ closesAt: minutes(-20), attendances }} />
+    </div>
+  </section>
+
+  <section id="projection" class="mb-14 scroll-mt-6">
+    <h2 class="text-2xl font-bold">Projection</h2>
+    <p class="mt-2 mb-6 text-sm text-muted">
+      <code class="font-mono">RollCallProjector</code> fills the classroom screen. Here it runs in a 1280×720 box
+      shown at half size, with its <code class="font-mono">h-screen</code> replaced by the box's height. Closed, it
+      offers to reopen the roll call.
+    </p>
+    <VariantPicker group="projection" variants={openClosed} selected={selected.projection} />
+    {
+      [
+        { key: "open", initial: projected },
+        { key: "closed", initial: { ...projected, closesAt: minutes(-1) } },
+      ].map((state) => (
+        <div
+          class="overflow-x-auto"
+          data-variant-group="projection"
+          data-variant={state.key}
+          hidden={selected.projection !== state.key}
+        >
+          <div class="h-[360px] w-[640px] overflow-hidden rounded-box border border-edge">
+            <div class="h-[720px] w-[1280px] origin-top-left scale-50 [&>main]:h-full [&>main]:max-h-full">
+              <RollCallProjector {...projector} initial={state.initial} />
+            </div>
+          </div>
+        </div>
+      ))
+    }
+  </section>
+
+  <section id="open-roll-call" class="mb-14 scroll-mt-6">
+    <h2 class="text-2xl font-bold">Open a roll call</h2>
+    <p class="mt-2 mb-6 text-sm text-muted">
+      <code class="font-mono">OpenRollCallDialog</code>: the button that starts a meeting's roll call. The dialog
+      opens from the button on the real pages; here it is rendered closed.
+    </p>
+    <div class="flex gap-3">
+      <OpenRollCallDialog
+        discipline="algorithms"
+        course="ada_2026-2"
+        week={4}
+        timeSlot="tue-10"
+        href="/algorithms/ada_2026-2"
+      />
+      <OpenRollCallDialog
+        discipline="algorithms"
+        course="ada_2026-2"
+        week={4}
+        timeSlot="thu-10"
+        href="/algorithms/ada_2026-2"
+        label="Open roll call"
+        warning="The meeting starts in 2 hours."
+      />
+    </div>
+  </section>
+</ComponentsPage>

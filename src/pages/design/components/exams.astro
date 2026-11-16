@@ -1,0 +1,344 @@
+---
+import VariantPicker from "@/components/dev/VariantPicker.astro";
+import ExamExceptions, {
+	type ExceptionRow,
+} from "@/components/exam/ExamExceptions";
+import ExamRow from "@/components/exam/ExamRow.astro";
+import QuestionNumber from "@/components/exam/QuestionNumber";
+import QuestionNumberAstro from "@/components/exam/QuestionNumber.astro";
+import ReleaseGrades from "@/components/exam/ReleaseGrades";
+import ExamResults from "@/components/grading/ExamResults";
+import ReleasedScore from "@/components/ReleasedScore.astro";
+import type { Exam } from "@/db";
+import { m } from "@/i18n";
+import type { AttemptRow } from "@/services/grading";
+import {
+	formatDateTime,
+	formatDateTimeRange,
+	toLocalDateTimeInput,
+} from "@/utils/schedule-time";
+import ComponentsPage from "./_ComponentsPage.astro";
+import { clock, examTarget, selectVariants, someNone } from "./_fixtures";
+
+export const prerender = false;
+
+// Only the sortable results table hydrates: it calls no action and does not
+// poll. The other islands render on the server only (no `client:*`), so buttons
+// and dialogs look real but do nothing.
+
+const { now, minutes, hours } = clock();
+
+/// An exam as `ExamRow` reads it: only the fields the row uses, the rest absent.
+function exam(
+	fields: Pick<Exam, "slug" | "title" | "type" | "status"> & Partial<Exam>,
+) {
+	return {
+		scheduledAt: null,
+		duration: null,
+		extraTime: null,
+		gradesReleasedAt: null,
+		...fields,
+	} as Exam;
+}
+
+const examRows = [
+	{
+		label: "Scheduled",
+		exam: exam({
+			slug: "midterm",
+			title: "Midterm",
+			type: "EXAM",
+			status: "SCHEDULED",
+			scheduledAt: hours(72),
+			duration: { hours: 2 },
+		}),
+	},
+	{
+		label: "Ongoing",
+		exam: exam({
+			slug: "quiz-02",
+			title: "Quiz 2: Graphs",
+			type: "QUIZ",
+			status: "ONGOING",
+			scheduledAt: hours(-0.25),
+			duration: { minutes: 30 },
+		}),
+	},
+	{
+		label: "Completed, with a score",
+		score: "86%",
+		exam: exam({
+			slug: "quiz-01",
+			title: "Quiz 1: Complexity",
+			type: "QUIZ",
+			status: "COMPLETED",
+			scheduledAt: hours(-200),
+			duration: { minutes: 30 },
+		}),
+	},
+	{
+		label: "Instructor view, answers to grade",
+		pending: 12,
+		exam: exam({
+			slug: "final",
+			title: "Final",
+			type: "EXAM",
+			status: "COMPLETED",
+			scheduledAt: hours(-48),
+			duration: { hours: 3 },
+		}),
+	},
+	{
+		label: "Draft",
+		exam: exam({
+			slug: "practice",
+			title: "Practice: Trees",
+			type: "PRACTICE",
+			status: "DRAFT",
+		}),
+	},
+];
+
+const exceptionStudents = [
+	{ username: "ana", name: "Ana Beatriz Souza" },
+	{ username: "bruno", name: "Bruno Lima" },
+	{ username: "carla", name: "Carla Nunes" },
+];
+
+const rescheduled = minutes(60 * 24 * 2);
+const exceptionRows: ExceptionRow[] = [
+	{
+		username: "ana",
+		name: "Ana Beatriz Souza",
+		extra: m.exams_exceptions_extra({ minutes: 30 }),
+		date: null,
+		window: null,
+		note: "Accessibility plan",
+		extraMinutes: 30,
+		scheduledLocal: null,
+	},
+	{
+		username: "bruno",
+		name: "Bruno Lima",
+		extra: null,
+		date: formatDateTime(rescheduled),
+		window: formatDateTimeRange(
+			rescheduled,
+			new Date(rescheduled.getTime() + 120 * 60_000),
+		),
+		note: "Medical certificate",
+		extraMinutes: null,
+		scheduledLocal: toLocalDateTimeInput(rescheduled),
+	},
+	{
+		username: "carla",
+		name: "Carla Nunes",
+		extra: m.exams_exceptions_extra({ minutes: 45 }),
+		date: formatDateTime(rescheduled),
+		window: formatDateTimeRange(
+			rescheduled,
+			new Date(rescheduled.getTime() + 165 * 60_000),
+		),
+		note: null,
+		extraMinutes: 45,
+		scheduledLocal: toLocalDateTimeInput(rescheduled),
+	},
+];
+
+/// One attempt in each state the results table tells apart.
+const attempt = (
+	row: Partial<AttemptRow> & Pick<AttemptRow, "author" | "name">,
+): AttemptRow => ({
+	dropped: false,
+	state: "submitted",
+	answered: 5,
+	questions: 5,
+	pending: 0,
+	total: null,
+	startedAt: minutes(-90),
+	...row,
+});
+const resultRows: AttemptRow[] = [
+	attempt({ author: "ana", name: "Ana Beatriz Souza", total: 0.92 }),
+	attempt({ author: "bruno", name: "Bruno Lima", total: 0.48 }),
+	attempt({ author: "carla", name: "Carla Nunes", pending: 2 }),
+	attempt({
+		author: "davi",
+		name: "Davi Rocha",
+		state: "in-progress",
+		answered: 3,
+	}),
+	attempt({ author: "elisa", name: "Elisa Prado", answered: 4, total: -0.1 }),
+	attempt({
+		author: "fabio",
+		name: "Fábio Teixeira",
+		dropped: true,
+		answered: 2,
+		total: 0.2,
+	}),
+];
+const gradedRows = resultRows.map((row) =>
+	row.pending > 0 || row.state === "in-progress"
+		? { ...row, state: "submitted" as const, pending: 0, total: 0.7 }
+		: row,
+);
+const resultStates = [
+	{ key: "pending", label: "Answers waiting for grades", rows: resultRows },
+	{ key: "graded", label: "Everything graded", rows: gradedRows },
+	{ key: "none", label: "No attempts", rows: [] },
+];
+
+const releaseStates = [
+	{ key: "ready", label: "Ready to release" },
+	{ key: "released", label: "Released two days ago" },
+];
+const scoreStates = [
+	{ key: "good", label: "Above 70%", score: 0.85 },
+	{ key: "low", label: "Below 70%", score: 0.55 },
+	{ key: "negative", label: "Negative", score: -0.1 },
+];
+
+/// The variants of each picker, keyed by its group, which is also its query parameter.
+const groups = {
+	"exam-exceptions": someNone,
+	results: resultStates,
+	release: releaseStates,
+	score: scoreStates,
+};
+const selected = selectVariants(Astro.url, groups);
+
+const sections = [
+	{ id: "rows", label: "Exam rows" },
+	{ id: "labels", label: "Question labels" },
+	{ id: "exam-exceptions", label: "Exam exceptions" },
+	{ id: "results", label: "Exam results" },
+	{ id: "release", label: "Grade release" },
+];
+---
+
+<ComponentsPage href="/design/components/exams" sections={sections}>
+  <Fragment slot="intro">
+    The exam as the list, the instructor's exam page and the student's released score show it: rows, question labels,
+    exceptions, the results table and grade release. Buttons above each component switch between the states worth a
+    look; the choice goes to the URL, so a link opens the same state. The results table is the exception to the
+    server-only rendering: it hydrates, and its headers sort.
+  </Fragment>
+
+  <section id="rows" class="mb-14 scroll-mt-6">
+    <h2 class="text-2xl font-bold">Exam rows</h2>
+    <p class="mt-2 mb-6 text-sm text-muted">
+      <code class="font-mono">ExamRow</code> is a <code class="font-mono">ListRow</code> for an exam, in each
+      status and from the point of view of a student and of an instructor.
+    </p>
+    <div class="flex max-w-3xl flex-col gap-4">
+      {
+        examRows.map((row) => (
+          <div>
+            <p class="mb-1 text-xs text-muted">{row.label}</p>
+            <ExamRow exam={row.exam} href="#" score={row.score} pending={row.pending} />
+          </div>
+        ))
+      }
+    </div>
+  </section>
+
+  <section id="labels" class="mb-14 scroll-mt-6">
+    <h2 class="text-2xl font-bold">Question labels</h2>
+    <p class="mt-2 mb-6 text-sm text-muted">
+      <code class="font-mono">QuestionNumber</code> exists as an Astro component and as a Solid one; points are
+      out of 100.
+    </p>
+    <div class="grid max-w-xl gap-4 rounded-box border border-edge bg-base-100 p-5 sm:grid-cols-2">
+      <div>
+        <p class="mb-2 text-xs text-muted">Astro</p>
+        <p class="text-lg"><QuestionNumberAstro number={3} /></p>
+        <p class="text-lg"><QuestionNumberAstro number={12} points="12.5" /></p>
+      </div>
+      <div>
+        <p class="mb-2 text-xs text-muted">Solid</p>
+        <p class="text-lg"><QuestionNumber number={3} /></p>
+        <p class="text-lg"><QuestionNumber number={12} points="12.5" tone="text-primary" class="text-2xl" /></p>
+      </div>
+    </div>
+  </section>
+
+  <section id="exam-exceptions" class="mb-14 scroll-mt-6">
+    <h2 class="text-2xl font-bold">Exam exceptions</h2>
+    <p class="mt-2 mb-6 text-sm text-muted">
+      <code class="font-mono">ExamExceptions</code> on the instructor's exam page: extra time, a new date, both, and
+      the empty table.
+    </p>
+    <VariantPicker group="exam-exceptions" variants={someNone} selected={selected["exam-exceptions"]} />
+    {
+      [
+        { key: "some", rows: exceptionRows },
+        { key: "none", rows: [] },
+      ].map((state) => (
+        <div
+          data-variant-group="exam-exceptions"
+          data-variant={state.key}
+          hidden={selected["exam-exceptions"] !== state.key}
+        >
+          <ExamExceptions {...examTarget} students={exceptionStudents} rows={state.rows} />
+        </div>
+      ))
+    }
+  </section>
+
+  <section id="results" class="mb-14 scroll-mt-6">
+    <h2 class="text-2xl font-bold">Exam results</h2>
+    <p class="mt-2 mb-6 text-sm text-muted">
+      <code class="font-mono">ExamResults</code> on the instructor's exam page, one row per attempt: graded, waiting
+      for grades, in progress, a negative total and a dropped student. Everything graded adds the link to review.
+      Every column sorts.
+    </p>
+    <VariantPicker group="results" variants={resultStates} selected={selected.results} />
+    {
+      resultStates.map((state) => (
+        <div
+          class="[&>section]:mt-0"
+          data-variant-group="results"
+          data-variant={state.key}
+          hidden={selected.results !== state.key}
+        >
+          <ExamResults client:load href="#" rows={state.rows} />
+        </div>
+      ))
+    }
+  </section>
+
+  <section id="release" class="mb-14 scroll-mt-6">
+    <h2 class="text-2xl font-bold">Grade release</h2>
+    <p class="mt-2 mb-6 text-sm text-muted">
+      <code class="font-mono">ReleaseGrades</code> for the instructor and <code class="font-mono">ReleasedScore</code>{" "}
+      for the student once grades are out.
+    </p>
+    <h3 class="mb-3 text-xl font-semibold">Instructor</h3>
+    <VariantPicker group="release" variants={releaseStates} selected={selected.release} />
+    <div class="max-w-md" data-variant-group="release" data-variant="ready" hidden={selected.release !== "ready"}>
+      <ReleaseGrades {...examTarget} releasedAt={null} canRelease now={now} />
+    </div>
+    <div
+      class="max-w-md"
+      data-variant-group="release"
+      data-variant="released"
+      hidden={selected.release !== "released"}
+    >
+      <ReleaseGrades {...examTarget} releasedAt={minutes(-60 * 48)} canRelease={false} now={now} />
+    </div>
+    <h3 class="mt-10 mb-3 text-xl font-semibold">Student</h3>
+    <VariantPicker group="score" variants={scoreStates} selected={selected.score} />
+    {
+      scoreStates.map((state) => (
+        <div
+          class="max-w-md"
+          data-variant-group="score"
+          data-variant={state.key}
+          hidden={selected.score !== state.key}
+        >
+          <ReleasedScore score={state.score} releasedAt={minutes(-60 * 48)} />
+        </div>
+      ))
+    }
+  </section>
+</ComponentsPage>

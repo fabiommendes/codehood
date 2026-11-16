@@ -1,0 +1,32 @@
+---
+import PageKicker from "@/components/PageKicker.astro";
+import DesignLayout from "@/layouts/DesignLayout.astro";
+import { themes } from "./_themes";
+
+export const prerender = false;
+---
+
+<DesignLayout title="Components" active="components">
+  <div class="mb-10 max-w-2xl">
+    <PageKicker text="Reference" />
+    <h1 class="text-3xl font-bold">Components</h1>
+    <p class="mt-3 text-base-content/70">
+      Codehood components that more than one page uses, or that only show up in a specific flow: a roll call in
+      progress, a released exam, a regrade, a refused check-in. They are grouped by theme; each page renders its
+      components from fixture props, with buttons to switch between the states worth a look.
+    </p>
+  </div>
+
+  <div class="grid grid-cols-1 gap-5 sm:grid-cols-2">
+    {
+      themes.map((theme) => (
+        <a href={theme.href} class="card card-border bg-base-100 transition-colors hover:border-primary">
+          <div class="card-body">
+            <h2 class="card-title">{theme.label}</h2>
+            <p class="text-sm text-base-content/70">{theme.description}</p>
+          </div>
+        </a>
+      ))
+    }
+  </div>
+</DesignLayout>

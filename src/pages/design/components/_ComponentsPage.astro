@@ -1,0 +1,68 @@
+---
+import DesignLayout from "@/layouts/DesignLayout.astro";
+import { themes } from "./_themes";
+
+/**
+ * The frame of a theme page of the component catalogue: the theme tabs, a sidebar with its sections and the title.
+ *
+ * The `intro` slot holds the paragraph under the title; the default slot, the sections.
+ */
+interface Props {
+	/// Which theme this is: its `href` in `themes`.
+	href: (typeof themes)[number]["href"];
+	/// Anchors of the sections, in page order.
+	sections: readonly { id: string; label: string }[];
+}
+
+const { href, sections } = Astro.props;
+const theme = themes.find((t) => t.href === href);
+const label = theme?.label ?? "";
+---
+
+<DesignLayout title={`${label} components`} active="components">
+  <nav aria-label="Component themes" class="mb-8 flex flex-wrap gap-2">
+    <a href="/design/components" class="btn btn-sm btn-ghost">All</a>
+    {
+      themes.map((t) => (
+        <a
+          href={t.href}
+          class:list={["btn btn-sm", t.href === href ? "btn-active btn-primary" : "btn-ghost"]}
+          aria-current={t.href === href ? "page" : undefined}
+        >
+          {t.label}
+        </a>
+      ))
+    }
+  </nav>
+
+  <div class="lg:grid lg:grid-cols-[11rem_minmax(0,1fr)] lg:gap-10">
+    <nav aria-label={label} class="sticky top-6 self-start max-lg:hidden">
+      <p class="mb-3 text-xs font-semibold uppercase tracking-wide text-muted">{label}</p>
+      <ul class="flex flex-col gap-1 border-l border-edge">
+        {
+          sections.map((link) => (
+            <li>
+              <a
+                href={`#${link.id}`}
+                class="-ml-px block border-l-2 border-transparent py-1 pl-3 text-sm text-muted transition-colors hover:border-edge hover:text-base-content"
+              >
+                {link.label}
+              </a>
+            </li>
+          ))
+        }
+      </ul>
+    </nav>
+
+    <div class="min-w-0">
+      <section class="mb-14">
+        <h1 class="text-3xl font-bold">{label}</h1>
+        <p class="mt-3 max-w-2xl text-base-content/70">
+          <slot name="intro" />
+        </p>
+      </section>
+
+      <slot />
+    </div>
+  </div>
+</DesignLayout>

@@ -1,0 +1,112 @@
+---
+import VariantPicker from "@/components/dev/VariantPicker.astro";
+import ReportDialog from "@/components/report/ReportDialog";
+import ReportFilters from "@/components/report/ReportFilters.astro";
+import ReportQueue from "@/components/report/ReportQueue";
+import type { ReportRow } from "@/utils/report-row";
+import ComponentsPage from "./_ComponentsPage.astro";
+import { clock, selectVariants, someNone } from "./_fixtures";
+
+export const prerender = false;
+
+// The Solid islands here render on the server only (no `client:*`), so buttons
+// and dialogs look real but do nothing.
+
+const { now } = clock();
+
+const dialogStates = [
+	{ key: "empty", label: "Empty" },
+	{ key: "capture", label: "Capture" },
+	{ key: "sending", label: "Sending" },
+	{ key: "error", label: "Error" },
+] as const;
+
+/// The variants of each picker, keyed by its group, which is also its query parameter.
+const groups = {
+	"report-dialog": dialogStates,
+	"report-queue": someNone,
+};
+const selected = selectVariants(Astro.url, groups);
+
+const sections = [
+	{ id: "reports", label: "Reports" },
+	{ id: "report-filters", label: "Report filters" },
+];
+
+const pixel =
+	"data:image/gif;base64,R0lGODlhAQABAIAAAMLCwgAAACH5BAAAAAAALAAAAAABAAEAAAICRAEAOw==";
+const openReport: ReportRow = {
+	publicId: "report-open",
+	kind: "CONTENT",
+	status: "OPEN",
+	message: "The second option of question 3 is also correct.",
+	note: null,
+	url: "https://codehood.example/cs101/ada_2026-2/exams/midterm",
+	viewport: "1280x720",
+	author: "student",
+	course: "cs101 · ada_2026-2",
+	attachments: [{ filename: "screenshot.webp", url: pixel }],
+	createdAt: new Date(now).toISOString(),
+	updatedAt: new Date(now).toISOString(),
+};
+const triagedReport: ReportRow = {
+	...openReport,
+	publicId: "report-triaged",
+	kind: "BUG",
+	status: "TRIAGED",
+	message: "The roster table scrolls sideways on a phone.",
+	note: "Reproduced. Fix scheduled.",
+	attachments: [],
+};
+---
+
+<ComponentsPage href="/design/components/reports" sections={sections}>
+  <Fragment slot="intro">
+    Problem reports: the dialog that sends one, the triage queue of the admin and of a course's instructor, and the
+    filters of the queue. Buttons above each component switch between the states worth a look; the choice goes to
+    the URL, so a link opens the same state. The islands render on the server only, so their buttons do nothing.
+  </Fragment>
+
+  <section id="reports" class="mb-14 scroll-mt-6">
+    <h2 class="text-2xl font-bold">Reports</h2>
+    <p class="mt-2 mb-6 text-sm text-muted">
+      <code class="font-mono">ReportDialog</code>, the "Report a problem" dialog, and{" "}
+      <code class="font-mono">ReportQueue</code>, the triage queue of the admin and of a course's instructor.
+    </p>
+    <h3 class="mb-3 text-xl font-semibold">Dialog</h3>
+    <VariantPicker group="report-dialog" variants={dialogStates} selected={selected["report-dialog"]} />
+    {
+      dialogStates.map((state) => (
+        <div
+          class="max-w-md"
+          data-variant-group="report-dialog"
+          data-variant={state.key}
+          hidden={selected["report-dialog"] !== state.key}
+        >
+          <ReportDialog course={{ discipline: "cs101", course: "ada_2026-2" }} contentPage preview={state.key} />
+        </div>
+      ))
+    }
+    <h3 class="mt-10 mb-3 text-xl font-semibold">Queue</h3>
+    <VariantPicker group="report-queue" variants={someNone} selected={selected["report-queue"]} />
+    <div data-variant-group="report-queue" data-variant="some" hidden={selected["report-queue"] !== "some"}>
+      <ReportQueue reports={[openReport, triagedReport]} status={null} kind={null} />
+    </div>
+    <div data-variant-group="report-queue" data-variant="none" hidden={selected["report-queue"] !== "none"}>
+      <ReportQueue reports={[]} status="OPEN" kind={null} />
+    </div>
+  </section>
+
+  <section id="report-filters" class="mb-14 scroll-mt-6">
+    <h2 class="text-2xl font-bold">Report filters</h2>
+    <p class="mt-2 mb-6 text-sm text-muted">
+      <code class="font-mono">ReportFilters</code>: one button group per filter, each button a link that sets it
+      in the query string.
+    </p>
+    <div class="flex flex-col gap-6 rounded-box border border-edge bg-base-100 p-5">
+      <ReportFilters filters={{ status: "OPEN", kind: null }} />
+      <ReportFilters filters={{ status: null, kind: "BUG" }} />
+      <ReportFilters filters={{ status: "OPEN", kind: null }} hideKind />
+    </div>
+  </section>
+</ComponentsPage>

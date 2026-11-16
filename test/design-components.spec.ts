@@ -1,53 +1,99 @@
 import { expect, test } from "./fixtures";
 
-test("design/components renders every section without errors or action calls", async ({
-	page,
-}) => {
-	const errors: string[] = [];
-	const actionCalls: string[] = [];
-	page.on("console", (message) => {
-		if (message.type() === "error") errors.push(message.text());
-	});
-	page.on("pageerror", (error) => errors.push(error.message));
-	page.on("request", (request) => {
-		if (request.url().includes("/_actions/")) actionCalls.push(request.url());
-	});
+/// The theme pages of `/design/components`, the sections each one shows and the islands that hydrate.
+const pages: {
+	path: string;
+	sections: string[];
+	islands: string[];
+}[] = [
+	{
+		path: "ui",
+		sections: ["Empty states", "Fields", "Password", "Files", "Glass wall"],
+		islands: [],
+	},
+	{
+		path: "course",
+		sections: ["Headers", "Course tiles and rows"],
+		islands: [],
+	},
+	{
+		path: "schedule",
+		sections: ["Check-in", "Roll call", "Projection", "Open a roll call"],
+		islands: [],
+	},
+	{
+		path: "exams",
+		sections: [
+			"Exam rows",
+			"Question labels",
+			"Exam exceptions",
+			"Exam results",
+			"Grade release",
+		],
+		// Only the sortable table hydrates; it calls no action and does not poll.
+		islands: ["ExamResults"],
+	},
+	{
+		path: "grading",
+		sections: ["Regrades", "Applied items", "Statistics"],
+		islands: ["QuestionStats"],
+	},
+	{
+		path: "reports",
+		sections: ["Reports", "Report filters"],
+		islands: [],
+	},
+];
 
+for (const { path, sections, islands } of pages) {
+	test(`design/components/${path} renders every section without errors or action calls`, async ({
+		page,
+	}) => {
+		const errors: string[] = [];
+		const actionCalls: string[] = [];
+		page.on("console", (message) => {
+			if (message.type() === "error") errors.push(message.text());
+		});
+		page.on("pageerror", (error) => errors.push(error.message));
+		page.on("request", (request) => {
+			if (request.url().includes("/_actions/")) actionCalls.push(request.url());
+		});
+
+		const response = await page.goto(`/design/components/${path}`);
+		expect(response?.status()).toBe(200);
+
+		for (const title of sections) {
+			await expect(
+				page.getByRole("heading", { level: 2, name: title, exact: true }),
+			).toBeVisible();
+		}
+		const names = await page
+			.locator("astro-island")
+			.evaluateAll((nodes) =>
+				nodes.map((node) => JSON.parse(node.getAttribute("opts") ?? "{}").name),
+			);
+		expect(new Set(names)).toEqual(new Set(islands));
+
+		await page.waitForTimeout(1000);
+		expect(errors).toEqual([]);
+		expect(actionCalls).toEqual([]);
+	});
+}
+
+test("design/components links every theme page", async ({ page }) => {
 	const response = await page.goto("/design/components");
 	expect(response?.status()).toBe(200);
-
-	for (const title of [
-		"Check-in",
-		"Roll call",
-		"Projection",
-		"Exam exceptions",
-		"Exam results",
-		"Grade release",
-		"Regrades",
-		"Statistics",
-	]) {
+	for (const { path } of pages) {
 		await expect(
-			page.getByRole("heading", { level: 2, name: title, exact: true }),
-		).toBeVisible();
+			page.locator(`main a[href="/design/components/${path}"]`),
+		).toHaveCount(1);
 	}
-	// Only the sortable tables hydrate; they call no action and do not poll.
-	const islands = await page
-		.locator("astro-island")
-		.evaluateAll((nodes) =>
-			nodes.map((node) => JSON.parse(node.getAttribute("opts") ?? "{}").name),
-		);
-	expect(islands.length).toBeGreaterThan(0);
-	expect(new Set(islands)).toEqual(new Set(["ExamResults", "QuestionStats"]));
-
-	await page.waitForTimeout(1000);
-	expect(errors).toEqual([]);
-	expect(actionCalls).toEqual([]);
 });
 
 test("a table sorts only with two rows or more and says when it is empty", async ({
 	page,
 }) => {
-	await page.goto("/design/components");
+	await page.goto("/design/components/exams");
 	const variant = (key: string) =>
 		page.locator(`[data-variant-group="results"][data-variant="${key}"]`);
 
@@ -57,7 +103,7 @@ test("a table sorts only with two rows or more and says when it is empty", async
 	await many.getByRole("button", { name: "Student" }).click();
 	await expect(firstStudent).toHaveText("Fábio Teixeira");
 
-	await page.goto("/design/components?results=none");
+	await page.goto("/design/components/exams?results=none");
 	const none = variant("none").getByRole("table");
 	await expect(
 		none.getByRole("columnheader", { name: "Student" }),
@@ -69,7 +115,7 @@ test("a table sorts only with two rows or more and says when it is empty", async
 test("design/components shows one variant at a time and keeps it in the URL", async ({
 	page,
 }) => {
-	await page.goto("/design/components");
+	await page.goto("/design/components/exams");
 	const section = page.locator("#results");
 	const variant = (key: string) =>
 		section.locator(`[data-variant-group="results"][data-variant="${key}"]`);

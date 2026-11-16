@@ -1,0 +1,95 @@
+---
+import AdminHeader from "@/components/AdminHeader.astro";
+import CliSetupLink from "@/components/CliSetupLink.astro";
+import CountRow from "@/components/CountRow.astro";
+import CourseTile from "@/components/CourseTile.astro";
+import SectionHeader from "@/components/SectionHeader.astro";
+import ComponentsPage from "./_ComponentsPage.astro";
+
+export const prerender = false;
+
+const sections = [
+	{ id: "headers", label: "Headers" },
+	{ id: "course", label: "Course tiles and rows" },
+];
+---
+
+<ComponentsPage href="/design/components/course" sections={sections}>
+  <Fragment slot="intro">
+    What heads a page and what stands for a course: headers, course tiles and the rows that lead with a number that
+    asks for action. Each renders from fixture props.
+  </Fragment>
+
+  <section id="headers" class="mb-14 scroll-mt-6">
+    <h2 class="text-2xl font-bold">Headers</h2>
+    <p class="mt-2 mb-6 text-sm text-muted">
+      <code class="font-mono">AdminHeader</code> opens every page under <code class="font-mono">/admin</code>;{" "}
+      <code class="font-mono">SectionHeader</code> heads a block of a page, with an optional link;{" "}
+      <code class="font-mono">CliSetupLink</code> is the link an empty section of the instructor's course shows.
+    </p>
+    <h3 class="mb-3 text-xl font-semibold">AdminHeader</h3>
+    <div class="rounded-box border border-edge bg-base-100 p-5">
+      <AdminHeader active="users" />
+    </div>
+    <h3 class="mt-10 mb-3 text-xl font-semibold">SectionHeader</h3>
+    <div class="flex max-w-xl flex-col gap-6 rounded-box border border-edge bg-base-100 p-5">
+      <SectionHeader title="Upcoming" href="#" />
+      <SectionHeader title="Resources" href="#" linkText="Open the library" />
+      <SectionHeader title="Without a link" />
+    </div>
+    <h3 class="mt-10 mb-3 text-xl font-semibold">CliSetupLink</h3>
+    <div class="rounded-box border border-edge bg-base-100 p-5">
+      <p class="text-sm text-muted">Nothing published yet. <CliSetupLink /></p>
+    </div>
+  </section>
+
+  <section id="course" class="mb-14 scroll-mt-6">
+    <h2 class="text-2xl font-bold">Course tiles and rows</h2>
+    <p class="mt-2 mb-6 text-sm text-muted">
+      <code class="font-mono">CourseTile</code> draws the same tile for the same seed, in both themes.{" "}
+      <code class="font-mono">CountRow</code> leads with the number that asks for action.
+    </p>
+    <h3 class="mb-3 text-xl font-semibold">CourseTile</h3>
+    <div class="flex flex-wrap items-end gap-4 rounded-box border border-edge bg-base-100 p-5">
+      {
+        [14, 20, 32, 48, 72].map((size) => (
+          <figure class="text-center">
+            <CourseTile seed="/algorithms/ada_2026-2" size={size} />
+            <figcaption class="mt-1 font-mono text-xs text-muted">{size}</figcaption>
+          </figure>
+        ))
+      }
+      <span class="mx-2 h-12 border-l border-edge"></span>
+      {
+        ["/algorithms/ada_2026-2", "/databases/ada_2026-2", "/compilers/turing_2026-1", "/os/hopper_2026-1"].map(
+          (seed) => (
+            <figure class="text-center">
+              <CourseTile seed={seed} size={48} />
+              <figcaption class="mt-1 font-mono text-xs text-muted">{seed.split("/")[1]}</figcaption>
+            </figure>
+          ),
+        )
+      }
+    </div>
+    <h3 class="mt-10 mb-3 text-xl font-semibold">CountRow</h3>
+    <div class="grid max-w-3xl gap-3 sm:grid-cols-2">
+      <CountRow
+        href="#"
+        count={5}
+        unit="to grade"
+        label="5 answers to grade"
+        title="Quiz 2: Graphs"
+        course={{ href: "/algorithms/ada_2026-2", code: "algorithms", edition: "2026-2" }}
+      />
+      <CountRow
+        href="#"
+        count={3}
+        of={10}
+        unit="graded"
+        label="3 of 10 answers graded"
+        title="Midterm"
+        course={{ href: "/databases/ada_2026-2", code: "databases", edition: "2026-2" }}
+      />
+    </div>
+  </section>
+</ComponentsPage>
