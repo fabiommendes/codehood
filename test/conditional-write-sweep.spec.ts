@@ -779,6 +779,8 @@ const UNGUARDED: Record<string, string> = {
 		"derived write: moves the version of the attempts it grades, takes no expectation",
 	"response.settleExpired":
 		"derived write: moves the version of the attempts it grades, takes no expectation",
+	"response.restartPreview":
+		"the instructor's own simulation: it replaces the row with a new one and carries no expectation",
 	"rollCall.checkIn":
 		"the student's own call: it carries no expectation, and bumps the roll call only when it adds an attendance",
 	"rollCall.checkInClaim":

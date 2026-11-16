@@ -292,7 +292,13 @@ export async function promoteExpiredSends(
 
 	const responses = await tx.response.findMany({
 		where: { id: { in: candidates.map((row) => Number(row.id)) } },
-		select: { id: true, createdAt: true, examId: true, authorId: true },
+		select: {
+			id: true,
+			createdAt: true,
+			examId: true,
+			authorId: true,
+			preview: true,
+		},
 	});
 	const examOf = new Map(exams.map((exam) => [exam.id, exam]));
 	for (const response of responses) {
@@ -306,7 +312,7 @@ export async function promoteExpiredSends(
 			);
 			if (
 				!attemptTimedOut(
-					{ createdAt: response.createdAt, exam },
+					{ createdAt: response.createdAt, preview: response.preview, exam },
 					now,
 					exception,
 				)

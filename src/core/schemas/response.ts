@@ -39,6 +39,9 @@ export const responseSchema = z.object({
 
 	acceptingSubmissions: z.boolean(),
 
+	/// Whether this is the course instructor's simulation of the exam. Server state: never written by a client.
+	preview: z.boolean(),
+
 	/// When the attempt was closed, or `null` while it is open or when it was closed before the server recorded it. Server state: never written by a client.
 	closedAt: z.date().nullable(),
 
@@ -60,6 +63,7 @@ export const responseCreate = responseSchema
 		practiceSession: true,
 		submissions: true,
 		closedAt: true,
+		preview: true,
 		createdAt: true,
 		updatedAt: true,
 	})
@@ -132,6 +136,12 @@ export const responseSettleExpired = z.object({
 
 	/// Every attempt of the exam when absent; a student may only name themselves.
 	author: username.optional(),
+});
+
+/// Opens the instructor's simulation of an exam anew, in place of the one they have.
+export const responseRestartPreview = z.object({
+	course: courseRef,
+	exam: slug,
 });
 
 export const responseSubmit = z.object({

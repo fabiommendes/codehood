@@ -887,6 +887,11 @@ model Response {
   /// distinct from every other null, and would let duplicates through.
   slotKey Int @default(0)
 
+  /// Whether this is the course instructor's simulation of the exam. It is
+  /// never graded, counted or queued for review; see `response.service.ts`.
+  /// Only the service writes it, once, at creation.
+  preview Boolean @default(false)
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 

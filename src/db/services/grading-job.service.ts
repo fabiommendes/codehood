@@ -439,6 +439,7 @@ export const makeGradingJobService = defineService()((client) => {
 					select: {
 						id: true,
 						authorId: true,
+						preview: true,
 						exam: {
 							select: { id: true, ...examReleaseSelect() },
 						},
@@ -482,7 +483,8 @@ export const makeGradingJobService = defineService()((client) => {
 				question,
 			});
 			const visibility = {
-				mode: exam.type,
+				// A simulation shows its grades like a practice exam does.
+				mode: response.preview ? "PRACTICE" : exam.type,
 				attempts,
 				released: releasedToStudents(exam, new Date()),
 			};
@@ -494,7 +496,7 @@ export const makeGradingJobService = defineService()((client) => {
 			return {
 				attempts,
 				attemptsLeft:
-					exam.type === "PRACTICE"
+					response.preview || exam.type === "PRACTICE"
 						? null
 						: Math.max(0, attempts - spentAttempts(sent)),
 				submissions: rows.map((row) => {

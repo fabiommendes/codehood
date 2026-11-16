@@ -66,18 +66,14 @@ import {
 	effectiveAnswerHistory,
 	isHistoryField,
 } from "@/services/answer-history";
-import {
-	attemptClosedAt,
-	attemptDeadline,
-	viewerTiming,
-} from "@/services/exam-state";
+import { attemptClosedAt, attemptDeadline } from "@/services/exam-state";
 import { courseHref } from "@/urls";
 import { logEvent } from "@/utils/log";
 import type { Prisma, PrismaClient, PrismaTx } from "../client";
 import { courseRefMatch } from "../utils";
 import {
 	assertAcceptingSubmissions,
-	examTimingFromDb,
+	attemptTiming,
 	examTimingSelect,
 	loadExceptionTiming,
 } from "./submission.service";
@@ -686,6 +682,7 @@ const attemptSelect = {
 	authorId: true,
 	acceptingSubmissions: true,
 	closedAt: true,
+	preview: true,
 	createdAt: true,
 	updatedAt: true,
 	exam: { select: { ...examTimingSelect, answerHistory: true } },
@@ -719,7 +716,7 @@ async function loadContext(
 
 	const now = ref.now ?? new Date();
 	const exception = await loadExceptionTiming(tx, row.examId, row.authorId);
-	const timing = viewerTiming(examTimingFromDb(row.exam), exception);
+	const timing = attemptTiming(row, exception);
 	let accepting = true;
 	try {
 		assertAcceptingSubmissions(row, now, exception);

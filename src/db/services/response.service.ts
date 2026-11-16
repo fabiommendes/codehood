@@ -28,6 +28,7 @@ import {
 	responseFinish,
 	responseGradeObjectives,
 	responsePK,
+	responseRestartPreview,
 	responseSchema,
 	responseSettleExpired,
 	responseSubmit,
@@ -81,6 +82,7 @@ export type Response = z.infer<typeof responseSchema>;
 export type ResponseCreate = z.infer<typeof responseCreate>;
 export type ResponseFilter = z.infer<typeof responseFilter>;
 export type ResponseFinish = z.infer<typeof responseFinish>;
+export type ResponseRestartPreview = z.infer<typeof responseRestartPreview>;
 export type ResponseGradeObjectives = z.infer<typeof responseGradeObjectives>;
 export type ResponseSettleExpired = z.infer<typeof responseSettleExpired>;
 
@@ -157,10 +159,13 @@ export const makeResponseService = defineService<ResponseT>()(() => {
 	 * `InvalidData`, and a second `create` for a practice exam opens a second
 	 * attempt regardless of the reuse window.
 	 *
+	 * The course's instructor creating an attempt for themself opens their
+	 * simulation of the exam instead, see {@link isSimulation}.
+	 *
 	 * @throws {@link NotFound} If the course or exam does not exist.
 	 * @throws {@link InvalidData}
-	 * If the author is not enrolled, or a practice session is named on a
-	 * graded exam.
+	 * If the author is not enrolled and is not opening a simulation, or a
+	 * practice session is named on a graded exam.
 	 * @throws {@link NotAllowed} If `actor` may not write the author's work.
 	 */
 	const create = op({
@@ -171,20 +176,22 @@ export const makeResponseService = defineService<ResponseT>()(() => {
 			input: ResponseCreate,
 			opts: ServiceOptsWithoutTx,
 		): Promise<Response> => {
-			const { exam, authorId } = await prepareAttempt(
+			const { exam, authorId, preview } = await prepareAttempt(
 				tx,
 				input,
 				opts.actor,
 				"response.create",
 			);
-			assertExamOpen(
-				exam,
-				new Date(),
-				await loadExceptionTiming(tx, exam.id, authorId),
-			);
+			if (!preview) {
+				assertExamOpen(
+					exam,
+					new Date(),
+					await loadExceptionTiming(tx, exam.id, authorId),
+				);
+			}
 
 			const slotKey =
-				exam.type === "PRACTICE"
+				exam.type === "PRACTICE" && !preview
 					? dateToSlotKey(input.practiceSession ?? new Date())
 					: 0;
 
@@ -194,6 +201,7 @@ export const makeResponseService = defineService<ResponseT>()(() => {
 					authorId,
 					examId: exam.id,
 					slotKey,
+					preview,
 					acceptingSubmissions: input.acceptingSubmissions ?? true,
 					closedAt: input.acceptingSubmissions === false ? new Date() : null,
 				},
@@ -643,6 +651,52 @@ export const makeResponseService = defineService<ResponseT>()(() => {
 	});
 
 	/**
+	 * Deletes the actor's simulation of an exam, with everything it holds, and opens another.
+	 *
+	 * The new simulation has a new `publicId`, so its shuffling seed changes with it. With no simulation to delete it only opens one.
+	 *
+	 * @throws {@link NotFound} If the course or exam does not exist.
+	 * @throws {@link NotAllowed} If the actor does not teach the course.
+	 */
+	const restartPreview = op({
+		args: [responseRestartPreview],
+		returns: responseSchema,
+		run: async (
+			tx: PrismaTx,
+			input: ResponseRestartPreview,
+			opts: ServiceOptsWithoutTx,
+		): Promise<Response> => {
+			const { exam, authorId, preview } = await prepareAttempt(
+				tx,
+				input,
+				opts.actor,
+				"response.create",
+			);
+			if (!preview) throw new NotAllowed("response.create");
+
+			const old = await tx.response.findFirst({
+				where: { authorId, examId: exam.id, preview: true },
+				select: { id: true },
+			});
+			if (old) {
+				await tx.submission.deleteMany({ where: { responseId: old.id } });
+				await guardedDelete(tx, "response", { id: old.id }, {});
+			}
+			return fromDb(
+				await invalidIfExists(tx.response.create, {
+					data: {
+						publicId: generateToken(9),
+						authorId,
+						examId: exam.id,
+						preview: true,
+					},
+					include: responseInclude(),
+				}),
+			);
+		},
+	});
+
+	/**
 	 * Resolves the attempt and appends one submission to it, in one call.
 	 *
 	 * This is what a client answering a question actually does; `upsert` then
@@ -700,7 +754,7 @@ export const makeResponseService = defineService<ResponseT>()(() => {
 						responseId: row.id,
 						questionId: question.id,
 						attempts: question.attempts,
-						practice: row.exam.type === "PRACTICE",
+						practice: isPractice(row),
 					},
 					question.worker,
 					{
@@ -748,6 +802,7 @@ export const makeResponseService = defineService<ResponseT>()(() => {
 		finish,
 		gradeObjectives,
 		settleExpired,
+		restartPreview,
 		submit,
 	};
 });
@@ -757,9 +812,21 @@ export type ResponseService = ReturnType<typeof makeResponseService>;
 
 // Private utilities -----------------------------------------------------------
 
-/// The attempt as {@link promoteFinalSends} reads it.
-function sendsOf(row: { id: ResponseId; exam: { type: string } }) {
-	return { id: row.id, practice: row.exam.type === "PRACTICE" };
+/// The attempt as {@link promoteFinalSends} reads it. A simulation sends as a practice attempt does.
+function sendsOf(row: {
+	id: ResponseId;
+	preview: boolean;
+	exam: { type: string };
+}) {
+	return { id: row.id, practice: isPractice(row) };
+}
+
+/// Whether the code sends of `row` are unlimited and its grades visible: a practice exam's attempt, or a simulation.
+function isPractice(row: {
+	preview: boolean;
+	exam: { type: string };
+}): boolean {
+	return row.preview || row.exam.type === "PRACTICE";
 }
 
 /// The `where` matching whichever of the primary keys `filter` carries, within its course if it names one.
@@ -921,9 +988,9 @@ interface AttemptInput {
 
 /**
  * Resolves the course, exam and author of an attempt write, enforcing that
- * the author holds an active enrollment, that a practice session is never
- * named on a graded exam, and the `response.create`/`response.submit`
- * permission.
+ * the author holds an active enrollment (a simulation needs none), that a
+ * practice session is never named on a graded exam, and the
+ * `response.create`/`response.submit` permission.
  *
  * A `DRAFT` or `ARCHIVED` exam does not exist for anyone but whoever may
  * write the course's contents, exactly as in `exam.service.ts`: an attempt
@@ -966,7 +1033,8 @@ async function prepareAttempt(
 		course,
 	});
 
-	if (!course.enrollments.some((e) => e.username === authorId)) {
+	const preview = isSimulation(actor, authorId, course);
+	if (!preview && !course.enrollments.some((e) => e.username === authorId)) {
 		throw new InvalidData({
 			author: [
 				{
@@ -988,7 +1056,24 @@ async function prepareAttempt(
 		});
 	}
 
-	return { course, exam, authorId };
+	return { course, exam, authorId, preview };
+}
+
+/**
+ * Whether an attempt `actor` writes as `authorId` is the instructor's simulation.
+ *
+ * It is when whoever teaches the course writes for themself: the instructor is never a student of their own course, so no other attempt of theirs exists. SYSTEM, an admin who does not teach it, and the instructor writing for a student are not simulating.
+ */
+function isSimulation(
+	actor: Actor,
+	authorId: string,
+	course: { instructor: { username: string } },
+): boolean {
+	return (
+		actor !== SYSTEM &&
+		actor.username === authorId &&
+		hasPerm(actor, "course.update-contents", course)
+	);
 }
 
 /**
@@ -1005,7 +1090,7 @@ async function resolveOrCreateAttempt(
 	perm: "response.create" | "response.submit",
 	expected: Date | null | undefined,
 ): Promise<DbResponse> {
-	const { course, exam, authorId } = await prepareAttempt(
+	const { course, exam, authorId, preview } = await prepareAttempt(
 		tx,
 		input,
 		actor,
@@ -1020,7 +1105,8 @@ async function resolveOrCreateAttempt(
 		);
 	}
 
-	if (exam.type !== "PRACTICE") {
+	// A simulation has one slot on any exam, and no session window.
+	if (exam.type !== "PRACTICE" || preview) {
 		const existing = await tx.response.findUnique({
 			where: {
 				authorId_examId_slotKey: { authorId, examId: exam.id, slotKey: 0 },
@@ -1034,7 +1120,7 @@ async function resolveOrCreateAttempt(
 
 		checkExpectedUpdatedAt(null, expected);
 		return invalidIfExists(tx.response.create, {
-			data: { publicId: generateToken(9), authorId, examId: exam.id },
+			data: { publicId: generateToken(9), authorId, examId: exam.id, preview },
 			include: responseInclude(),
 		});
 	}
@@ -1096,6 +1182,7 @@ function fromDb(row: DbResponse): Response {
 		practiceSession: slotKeyToDate(row.slotKey),
 		acceptingSubmissions: row.acceptingSubmissions,
 		closedAt: row.closedAt,
+		preview: row.preview,
 		submissions: row.submissions.map(submissionFromDb),
 		createdAt: row.createdAt,
 		updatedAt: row.updatedAt,

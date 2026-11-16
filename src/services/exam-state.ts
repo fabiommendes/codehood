@@ -43,6 +43,8 @@ export interface ExceptionTiming {
 export interface AttemptTiming {
 	createdAt: Date;
 	acceptingSubmissions: boolean;
+	/// Whether it is the instructor's simulation, which {@link previewTiming} times.
+	preview?: boolean;
 }
 
 /**
@@ -174,6 +176,18 @@ export function personalTiming<T extends BaseTiming>(
 	return marked(personal);
 }
 
+/**
+ * The timing under which the instructor's simulation of `exam` runs.
+ *
+ * The exam is open whatever its status, date or type, so the clock is the
+ * attempt's own: its start plus the exam's `duration + extraTime`, or none for an untimed exam. No exception applies.
+ */
+export function previewTiming<T extends BaseTiming>(
+	exam: T,
+): PersonalTiming<T> {
+	return marked({ ...exam, status: "ONGOING", scheduledAt: null });
+}
+
 /// `timing` as a {@link PersonalTiming}; the mark exists only in the type, so the value is untouched.
 function marked<T extends BaseTiming>(timing: T): PersonalTiming<T> {
 	return timing as unknown as PersonalTiming<T>;
@@ -209,7 +223,9 @@ export function canReopenAttempt(
 	attempt: AttemptTiming,
 	now: Date,
 ): boolean {
-	const personal = personalTiming(exam, exception);
+	const personal = attempt.preview
+		? previewTiming(exam)
+		: personalTiming(exam, exception);
 	if (examPhase(personal, now) === "closed") return false;
 	const deadline = attemptDeadline(personal, attempt);
 	return !deadline || now <= deadline;
@@ -473,6 +489,19 @@ export function released(schedule: ExamSchedule, now: Date): boolean {
 	return resultsReleased(schedule.base, now, [...schedule.exceptions.values()]);
 }
 
+/**
+ * What the instructor's simulation of `exam`, or none yet, may do at `now`.
+ *
+ * The simulation is never held back by the exam's status or date, and its results show as soon as it is delivered.
+ */
+export function previewAttemptState(
+	exam: BaseTiming,
+	attempt: AttemptTiming | null,
+	now: Date,
+): AttemptState {
+	return attemptState(previewTiming(exam), attempt, now, { released: true });
+}
+
 /** What `author`, holding `attempt` or none, may do with the schedule's exam at `now`. */
 export function attemptOf(
 	schedule: ExamSchedule,
@@ -480,6 +509,7 @@ export function attemptOf(
 	attempt: AttemptTiming | null,
 	now: Date,
 ): AttemptState {
+	if (attempt?.preview) return previewAttemptState(schedule.base, attempt, now);
 	return attemptState(timingFor(schedule, author), attempt, now, {
 		released: released(schedule, now),
 	});

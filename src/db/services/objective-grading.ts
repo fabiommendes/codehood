@@ -119,6 +119,7 @@ export async function gradeExpiredObjectives(
 			id: true,
 			createdAt: true,
 			authorId: true,
+			preview: true,
 			acceptingSubmissions: true,
 		},
 		orderBy: { id: "asc" },
@@ -130,7 +131,7 @@ export async function gradeExpiredObjectives(
 		if (
 			response.acceptingSubmissions &&
 			!attemptTimedOut(
-				{ createdAt: response.createdAt, exam },
+				{ createdAt: response.createdAt, preview: response.preview, exam },
 				now,
 				await loadExceptionTiming(tx, exam.id, response.authorId),
 			)

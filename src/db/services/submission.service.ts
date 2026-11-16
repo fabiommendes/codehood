@@ -34,6 +34,8 @@ import {
 	type ExamTiming,
 	type ExceptionTiming,
 	examPhase,
+	type PersonalTiming,
+	previewTiming,
 	viewerTiming,
 } from "@/services/exam-state";
 import type { Prisma, PrismaTx } from "../client";
@@ -56,6 +58,26 @@ export type SubmissionCreate = z.infer<typeof submissionCreate>;
 export type SubmissionFilter = z.infer<typeof submissionFilter>;
 export type SubmissionPK = z.infer<typeof submissionPK>;
 export type SubmissionUpdate = z.infer<typeof submissionUpdate>;
+
+/// The part of an attempt row its timing depends on.
+type TimedAttempt = {
+	createdAt: Date;
+	preview: boolean;
+	exam: Prisma.ExamGetPayload<{ select: typeof examTimingSelect }>;
+};
+
+/**
+ * The timing an attempt runs under: the exam's as `exception` adjusts it, or the simulation's own.
+ *
+ * The simulation ignores the exam's status, date and exceptions, see {@link previewTiming}.
+ */
+export function attemptTiming(
+	attempt: TimedAttempt,
+	exception: ExceptionTiming | null,
+): PersonalTiming {
+	const exam = examTimingFromDb(attempt.exam);
+	return attempt.preview ? previewTiming(exam) : viewerTiming(exam, exception);
+}
 
 /// The exam columns {@link examTimingFromDb} reads.
 export const examTimingSelect = {
@@ -524,14 +546,11 @@ export function assertExamOpen(
  * It applies the clock rules of {@link assertAcceptingSubmissions}, and is false for an exam that is not open yet or has no deadline.
  */
 export function attemptTimedOut(
-	response: {
-		createdAt: Date;
-		exam: Prisma.ExamGetPayload<{ select: typeof examTimingSelect }>;
-	},
+	response: TimedAttempt,
 	now: Date,
 	exception: ExceptionTiming | null = null,
 ): boolean {
-	const timing = viewerTiming(examTimingFromDb(response.exam), exception);
+	const timing = attemptTiming(response, exception);
 	const graced = new Date(now.getTime() - EXAM_ANSWER_GRACE_MS);
 	switch (examPhase(timing, now)) {
 		case "closed":
@@ -551,15 +570,12 @@ export function attemptTimedOut(
 /**
  * Refuses a submission against a closed response, an exam that is not open,
  * or a response whose deadline passed more than {@link EXAM_ANSWER_GRACE_MS} ago.
+ * A simulation is held back only by its closing and its deadline.
  *
  * @throws {@link InvalidData}
  */
 export function assertAcceptingSubmissions(
-	response: {
-		acceptingSubmissions: boolean;
-		createdAt: Date;
-		exam: Prisma.ExamGetPayload<{ select: typeof examTimingSelect }>;
-	},
+	response: TimedAttempt & { acceptingSubmissions: boolean },
 	now: Date,
 	exception: ExceptionTiming | null = null,
 ): void {
@@ -573,10 +589,13 @@ export function assertAcceptingSubmissions(
 			],
 		});
 	}
-	assertExamOpen(response.exam, now, exception, EXAM_ANSWER_GRACE_MS);
+	// A simulation is open whatever the exam's status and date: only its clock runs.
+	if (!response.preview) {
+		assertExamOpen(response.exam, now, exception, EXAM_ANSWER_GRACE_MS);
+	}
 
 	const deadline = attemptDeadline(
-		viewerTiming(examTimingFromDb(response.exam), exception),
+		attemptTiming(response, exception),
 		response,
 	);
 	if (deadline && now.getTime() > deadline.getTime() + EXAM_ANSWER_GRACE_MS) {

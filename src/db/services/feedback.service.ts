@@ -140,7 +140,8 @@ export const makeFeedbackService = defineService<FeedbackT>()(() => {
 	 * If neither or both of `graderId` and `botId` are given, or if the
 	 * submission already carries a pass under `input.ref`.
 	 * @throws {@link NotAllowed}
-	 * If `actor` may read the submission but not grade it.
+	 * If `actor` may read the submission but not grade it, or a user grades the
+	 * submission of a simulation.
 	 */
 	const create = op({
 		args: [feedbackCreate],
@@ -157,6 +158,10 @@ export const makeFeedbackService = defineService<FeedbackT>()(() => {
 			);
 
 			const { graderId, botId } = resolveGrader(input, opts.actor);
+			// The simulation is the instructor's own: the worker grades its code, nobody grades it by hand.
+			if (graderId !== null && submission.response.preview) {
+				throw new NotAllowed("feedback.create");
+			}
 			const grade = await resolveNewGrade(tx, submission, input);
 
 			const row = await invalidIfExists(tx.feedback.create, {
