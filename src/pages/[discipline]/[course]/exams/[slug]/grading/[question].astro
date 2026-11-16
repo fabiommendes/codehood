@@ -221,7 +221,7 @@ const shown = (
         hasKey ? (
           <section class="mt-6">
             <h3 class="text-lg font-semibold">{m.grades_question_correct_answer()}</h3>
-            <div class="mt-3 rounded-box border border-base-300 bg-base-100 p-6">
+            <div class="mt-3 rounded-box border border-edge bg-base-100 p-6">
               {doc.type === "code" ? <CodeAnswerKey question={doc} /> : <AnswerKey client:load question={doc} codeBlocks={keyBlocks} />}
             </div>
           </section>
