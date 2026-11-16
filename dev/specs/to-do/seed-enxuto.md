@@ -399,6 +399,15 @@ Cuidados para S2 a S5:
   aberto numa objetiva (`stack-facts`), que não muda nota nem estatística.
   `test-07`, `seedWeightedExam` e `seedRegradeExam` saíram, e com eles as
   questões `weighted-*`.
+- S5: `elm-soma` passou a ser criada por `seedElmQuestion`, antes de
+  `seedGradingShowcase`. `seedExternalGradingExams` roda depois do showcase,
+  porque `test-03` precisa de `js-double-it`, e cria a prova. Os envios que
+  ficam `QUEUED` seguem sendo feitos por último ali, e o `claim` dos envios de
+  `practice` e `final` mantém o filtro `exam`.
+- S5: `seedHistoryOffExam` agora digita o JS de hopper na tentativa aberta de
+  `test-03` e desliga o histórico. Hopper não entrega, para a prova seguir com
+  tentativa em andamento. `js-double-it` herdou o epílogo e o link de
+  `js-sum-of-evens`.
 
 ## Riscos
 

@@ -1346,16 +1346,7 @@ async function createDemoCoursesIfMissing(): Promise<void> {
 		FULL_ACCESS,
 	);
 	await seedReleasedQuiz(cs101, { hopper, hamilton });
-	await seedExternalGradingExams(cs101.id, ada, {
-		hopper,
-		hamilton,
-		liskov,
-		bob,
-		knuth: cohort[0] as User,
-		ritchie: cohort[1] as User,
-		thompson: cohort[2] as User,
-		backus: cohort[3] as User,
-	});
+	await seedElmQuestion(cs101.id);
 	await seedGradingShowcase(cs101.id, ada, {
 		hopper,
 		hamilton,
@@ -1366,8 +1357,17 @@ async function createDemoCoursesIfMissing(): Promise<void> {
 		thompson: cohort[2] as User,
 		backus: cohort[3] as User,
 	});
+	await seedExternalGradingExams(cs101.id, ada, {
+		hopper,
+		hamilton,
+		liskov,
+		bob,
+		knuth: cohort[0] as User,
+		ritchie: cohort[1] as User,
+		thompson: cohort[2] as User,
+		backus: cohort[3] as User,
+	});
 	await seedHistoryOffExam(cs101.id, hopper);
-	await seedCodeAnswerExams(cs101.id);
 	await seedGradeColumns(cs101.id, { hopper, hamilton, liskov, dijkstra });
 	await seedRollCalls(cs101.id, {
 		hopper,
@@ -2296,45 +2296,6 @@ async function seedReleasedQuiz(
 	);
 }
 
-/// Seeds `test-js`, an EXAM that turns running code on explicitly.
-async function seedCodeAnswerExams(course: Course["id"]): Promise<void> {
-	await db.question.create(
-		{
-			course,
-			slug: "js-sum-of-evens",
-			status: "PUBLISHED",
-			version: "v1",
-			question: {
-				type: "essay",
-				title: "Sum of the even numbers",
-				stem: "Write a program that prints the sum of the even numbers from 1 to 100.\n\nStart from [the loop reference](https://developer.mozilla.org/docs/Web/JavaScript/Guide/Loops_and_iteration).",
-				epilogue:
-					"Print only the number. Anything else on the output is ignored.",
-				tags: ["javascript"],
-				content: "code",
-				highlight: "javascript",
-			},
-		},
-		FULL_ACCESS,
-	);
-	const questions = [{ slug: "js-sum-of-evens", version: "v1" }];
-	await db.exam.create(
-		{
-			course,
-			slug: "test-js",
-			type: "EXAM",
-			status: "ONGOING",
-			title: "Test: JavaScript loops",
-			description: "A graded exam that allows running code.",
-			duration: { hours: 1 },
-			allowCodeRun: true,
-			tags: ["javascript"],
-			questions,
-		},
-		FULL_ACCESS,
-	);
-}
-
 /// The Elm question whose tests are an examples block: `{example}`, `{public}` and private regions.
 const ELM_EXAMPLES_QUESTION = [
 	"---",
@@ -2743,50 +2704,37 @@ async function seedOpenQuiz(course: Course["id"], knuth: User): Promise<void> {
 	});
 }
 
-/// Seeds `history-off`, an exam whose edit history was recorded and then switched off.
+/// Has hopper type the JavaScript answer of `test-03` with the edit history on, then switches the history off for the exam.
 async function seedHistoryOffExam(
 	course: Course["id"],
 	hopper: User,
 ): Promise<void> {
-	const exam = "history-off";
-	const question = "explain-recursion";
-	const text =
-		"A recursive function calls itself, so without a base case it never stops.";
-	await db.exam.create(
-		{
-			course,
-			slug: exam,
-			type: "EXAM",
-			status: "ONGOING",
-			title: "Edit history: recording switched off",
-			description: "Open answers whose typing the browser records.",
-			duration: { hours: 2 },
-			questions: [{ slug: question, version: "v1" }],
+	const exam = "test-03";
+	const question = "js-double-it";
+	const attempt = await prisma.response.findFirstOrThrow({
+		where: {
+			authorId: hopper.username,
+			exam: { slug: exam, courseId: course },
 		},
-		FULL_ACCESS,
-	);
-	const opened = await db.response.create(
-		{ course, exam, author: hopper.username },
-		{ actor: hopper },
-	);
+	});
 	await prisma.response.update({
-		where: { publicId: opened.publicId },
+		where: { publicId: attempt.publicId },
 		data: { createdAt: new Date(Date.now() - 40 * 60_000) },
 	});
 	const typed = new SeededTyping(
 		hopper,
-		{ course, exam, attempt: opened.publicId },
+		{ course, exam, attempt: attempt.publicId },
 		question,
 	);
+	const line = 'const n = Number(prompt("Number?"));';
 	await typed.type("tab-1", new Date(Date.now() - 30 * 60_000), [
-		...typingEdits(1000, text, 0),
-		...typingEdits(50_000, " It is the exit.", text.length),
+		...typingEdits(1000, line, 0),
+		...typingEdits(50_000, "\nconsole.log(n * 2);", line.length),
 	]);
 	await db.response.submit(
 		{ course, exam, question, payload: typed.text },
 		{ actor: hopper },
 	);
-	await db.response.finish({ course, exam }, { actor: hopper });
 	await db.exam.setAnswerHistory({ course, slug: exam }, false, FULL_ACCESS);
 }
 
@@ -2984,7 +2932,9 @@ async function seedGradingShowcase(
 		{
 			slug: js,
 			title: "Double the number",
-			stem: "Read a number and print its double.",
+			stem: "Read a number and print its double.\n\nStart from [the loop reference](https://developer.mozilla.org/docs/Web/JavaScript/Guide/Loops_and_iteration).",
+			epilogue:
+				"Print only the number. Anything else on the output is ignored.",
 			language: "javascript",
 			weight: 2,
 		},
@@ -3009,6 +2959,7 @@ async function seedGradingShowcase(
 					content: "code",
 					highlight: question.language,
 					...(question.weight ? { weight: question.weight } : {}),
+					...(question.epilogue ? { epilogue: question.epilogue } : {}),
 				} as never,
 			},
 			FULL_ACCESS,
@@ -3547,8 +3498,22 @@ function elmReport(verdicts: {
 	};
 }
 
+/// Creates `elm-soma`, the Elm question corrected by the external worker.
+async function seedElmQuestion(course: Course["id"]): Promise<void> {
+	await db.question.create(
+		{
+			course,
+			slug: "elm-soma",
+			status: "PUBLISHED",
+			version: "v1",
+			question: { ...elmExampleQuestion(), weight: 3 } as CodeQuestion,
+		},
+		FULL_ACCESS,
+	);
+}
+
 /**
- * Seeds an open `EXAM` that sends an Elm question to a grading worker, with a student in each state of the queue.
+ * Seeds `test-03`, an open `EXAM` that runs code and sends an Elm question to a grading worker, with a student in each state of the queue.
  *
  * The bot `runner` (`ada`'s key) grades through the job service, so scores,
  * feedback and statuses come from the real code. Exam: `bob` waits in the
@@ -3571,31 +3536,26 @@ async function seedExternalGradingExams(
 		backus: User;
 	},
 ): Promise<void> {
-	const exam = "test-elm";
+	const exam = "test-03";
 	const question = "elm-soma";
 	const worker = "elm-test";
 	const bot = { actor: { ...instructor, bot: "runner" } };
 
-	await db.question.create(
-		{
-			course,
-			slug: question,
-			status: "PUBLISHED",
-			version: "v1",
-			question: { ...elmExampleQuestion(), weight: 3 } as CodeQuestion,
-		},
-		FULL_ACCESS,
-	);
 	await db.exam.create(
 		{
 			course,
 			slug: exam,
 			type: "EXAM",
 			status: "ONGOING",
-			title: "Test 7: Elm",
-			description: "A code answer corrected by an external worker.",
-			tags: ["elm"],
-			questions: [{ slug: question, version: "v1" }],
+			title: "Test 3: code",
+			description:
+				"An open exam that allows running code and sends Elm to a worker.",
+			allowCodeRun: true,
+			tags: ["elm", "javascript"],
+			questions: [
+				{ slug: "elm-soma", version: "v1" },
+				{ slug: "js-double-it", version: "v1" },
+			],
 		},
 		FULL_ACCESS,
 	);
