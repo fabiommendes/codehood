@@ -51,7 +51,7 @@ test("the instructor's exam page keeps the answer key toggle and has no student 
 	});
 
 	await logInAs(page, course.instructor);
-	await page.goto(`${href}/exams/midterm`);
+	await page.goto(`${href}/exams/midterm/questions`);
 
 	await expect(page.getByText("Student view")).toBeVisible();
 	await expect(page.getByText("Correct answer")).toBeVisible();
@@ -70,7 +70,7 @@ test("the instructor's student view frames the question as the attempt does and 
 	});
 
 	await logInAs(page, course.instructor);
-	await page.goto(`${href}/exams/midterm`);
+	await page.goto(`${href}/exams/midterm/questions`);
 
 	const question = page.getByRole("region", { name: "Question 1" });
 	await expect(
@@ -109,7 +109,7 @@ test("the instructor's exam page shows a pinned ordering question", async ({
 	});
 
 	await logInAs(page, course.instructor);
-	const response = await page.goto(`${href}/exams/midterm`);
+	const response = await page.goto(`${href}/exams/midterm/questions`);
 
 	expect(response?.status()).toBe(200);
 	await expect(page.getByText("x, y = y, x + y")).toBeVisible();

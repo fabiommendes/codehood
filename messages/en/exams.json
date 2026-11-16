@@ -76,6 +76,29 @@
 	"exams_badge_missed": "Missed",
 	"exams_cancel": "Cancel",
 	"exams_close_backdrop": "close",
+	"exams_release_status_released": "Results released.",
+	"exams_release_status_ready": "Ready to release: the exam is closed and every answer has a grade.",
+	"exams_release_status_blocked": "Results not released yet. {reason}",
+	"exams_release_status_pending": [
+		{
+			"declarations": ["input count", "local countPlural = count: plural"],
+			"selectors": ["countPlural"],
+			"match": {
+				"countPlural=one": "{count} answer without a grade blocks the release.",
+				"countPlural=other": "{count} answers without a grade block the release."
+			}
+		}
+	],
+	"exams_release_status_exceptions": [
+		{
+			"declarations": ["input count", "local countPlural = count: plural"],
+			"selectors": ["countPlural"],
+			"match": {
+				"countPlural=one": "{count} student with an exception can still answer.",
+				"countPlural=other": "{count} students with an exception can still answer."
+			}
+		}
+	],
 	"exams_release_button": "Release results",
 	"exams_release_released": "Released {when}",
 	"exams_release_title": "Release results?",

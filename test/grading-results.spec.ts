@@ -497,9 +497,9 @@ test("results: a submitted attempt with one pending answer reads its progress, a
 	await grade(first, "1");
 	await logInAs(page, teacher);
 
-	await page.goto(`${href}/exams/midterm`);
+	await page.goto(`${href}/exams/midterm/results`);
 
-	await expect(page).toHaveURL(`${href}/exams/midterm`);
+	await expect(page).toHaveURL(`${href}/exams/midterm/results`);
 	await expect(resultsHeading(page)).toBeVisible();
 	for (const header of [
 		"Student",
@@ -546,9 +546,9 @@ test("results: with no attempt the table says so, with no sorting and no grading
 	await complete(exam.id);
 	await logInAs(page, teacher);
 
-	await page.goto(`${href}/exams/midterm`);
+	await page.goto(`${href}/exams/midterm/results`);
 
-	await expect(page).toHaveURL(`${href}/exams/midterm`);
+	await expect(page).toHaveURL(`${href}/exams/midterm/results`);
 	await expect(resultsHeading(page)).toBeVisible();
 	const results = page.getByRole("table", { name: "Results" });
 	await expect(results.getByRole("cell")).toHaveText("No attempts yet.");
@@ -577,9 +577,9 @@ test("results: the grading link counts the pending answers across students, and 
 	await logInAs(page, teacher);
 
 	await test.step("with pending answers", async () => {
-		await page.goto(`${href}/exams/midterm`);
+		await page.goto(`${href}/exams/midterm/results`);
 
-		await expect(page).toHaveURL(`${href}/exams/midterm`);
+		await expect(page).toHaveURL(`${href}/exams/midterm/results`);
 		await expect(resultsHeading(page)).toBeVisible();
 		await expect(page.getByText("3 answers wait for a grade")).toBeVisible();
 		const link = page.getByRole("link", { name: "Grade answers" });
@@ -627,9 +627,9 @@ test("results: a dropped student who attempted the exam is still listed, and row
 	});
 	await logInAs(page, teacher);
 
-	await page.goto(`${href}/exams/midterm`);
+	await page.goto(`${href}/exams/midterm/results`);
 
-	await expect(page).toHaveURL(`${href}/exams/midterm`);
+	await expect(page).toHaveURL(`${href}/exams/midterm/results`);
 	await expect(resultsHeading(page)).toBeVisible();
 	await expect(resultsTable(page).getByRole("link")).toHaveText([
 		"Alice Souza",
@@ -652,9 +652,9 @@ test("results: an attempt still in progress reads In progress with a dash for a 
 	await grade(graded, "1");
 	await logInAs(page, teacher);
 
-	await page.goto(`${href}/exams/${exam.slug}`);
+	await page.goto(`${href}/exams/${exam.slug}/results`);
 
-	await expect(page).toHaveURL(`${href}/exams/midterm`);
+	await expect(page).toHaveURL(`${href}/exams/midterm/results`);
 	await expect(resultsHeading(page)).toBeVisible();
 	const row = rowOf(page, "Ana Prado");
 	await expect(row).toContainText("In progress");
@@ -685,8 +685,8 @@ test("results: a student never sees the section, and a practice exam has none fo
 
 	await test.step("the instructor sees it on a graded exam but not on a practice exam", async () => {
 		await logInAs(page, teacher);
-		await page.goto(`${href}/exams/midterm`);
-		await expect(page).toHaveURL(`${href}/exams/midterm`);
+		await page.goto(`${href}/exams/midterm/results`);
+		await expect(page).toHaveURL(`${href}/exams/midterm/results`);
 		await expect(resultsHeading(page)).toBeVisible();
 
 		await page.goto(`${href}/exams/drill`);

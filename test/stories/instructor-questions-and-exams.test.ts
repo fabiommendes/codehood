@@ -142,12 +142,14 @@ test("instructor: preview the files attached to a question and an exam", async (
 	});
 
 	await test.step("the exam preview offers the files of the version the exam pinned", async () => {
+		await page.goto(`${href}/exams/files-exam/questions`);
+
 		const list = attachmentsWith(page, "data.csv");
 		await expect(list).toBeVisible();
 		// The question without files adds no list of its own.
 		await expect(
 			page.getByRole("region", { name: "Attachments", exact: true }),
-		).toHaveCount(2);
+		).toHaveCount(1);
 
 		const saved = await download(page, list, "data.csv");
 		expect(saved.filename).toBe("data.csv");
@@ -460,9 +462,8 @@ test("instructor: Give a student extra time or a makeup exam", async ({
 
 	await logInAs(page, course.instructor);
 	const examUrl = `${href}/exams/${exam.slug}`;
-	const exceptions = page.locator("section").filter({
-		has: page.getByRole("heading", { name: "Exceptions", exact: true }),
-	});
+	const exceptionsUrl = `${examUrl}/exceptions`;
+	const exceptions = page.locator("main");
 	const dialog = page.getByRole("dialog");
 	const releaseButton = page.getByRole("button", { name: "Release results" });
 
@@ -482,6 +483,7 @@ test("instructor: Give a student extra time or a makeup exam", async ({
 	await test.step("with no exceptions, the closed exam can be released", async () => {
 		await page.goto(examUrl);
 		await expect(releaseButton).toBeVisible();
+		await page.goto(exceptionsUrl);
 		await expect(
 			exceptions.getByRole("button", { name: "Add exception" }),
 		).toBeVisible();
@@ -530,9 +532,9 @@ test("instructor: Give a student extra time or a makeup exam", async ({
 	});
 
 	await test.step("while personal windows are pending, the release is blocked and the page says why", async () => {
-		await page.reload();
+		await page.goto(examUrl);
 		await expect(
-			page.getByText("A student with an exception can still answer this exam"),
+			page.getByText("2 students with an exception can still answer."),
 		).toBeVisible();
 		await expect(releaseButton).toHaveCount(0);
 	});
@@ -556,7 +558,7 @@ test("instructor: Give a student extra time or a makeup exam", async ({
 	});
 
 	await test.step("removing an exception asks for confirmation and takes the student back to the exam's timing", async () => {
-		await page.goto(examUrl);
+		await page.goto(exceptionsUrl);
 		for (const name of ["Ana Accommodated", "Bia Absent"]) {
 			await exceptions
 				.getByRole("row")
@@ -575,7 +577,7 @@ test("instructor: Give a student extra time or a makeup exam", async ({
 		expect(await exceptionOf(ana.username)).toBeNull();
 		expect(await exceptionOf(bia.username)).toBeNull();
 
-		await page.reload();
+		await page.goto(examUrl);
 		await expect(releaseButton).toBeVisible();
 	});
 });

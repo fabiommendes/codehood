@@ -43,11 +43,25 @@ test.describe("examNav", () => {
 		).toBeUndefined();
 	});
 
+	test("the manager's entries are pages of their own", () => {
+		const [exam, after] = manager(false).sections;
+		expect(exam?.entries.map((e) => e.href)).toEqual([
+			href,
+			`${href}/questions`,
+		]);
+		expect(after?.entries.map((e) => e.href)).toEqual([
+			`${href}/exceptions`,
+			`${href}/grading`,
+			`${href}/regrades`,
+			`${href}/results`,
+		]);
+	});
+
 	test("results fold into the by-student and by-question blocks", () => {
 		const results = manager(false).sections[1]?.entries.at(-1);
 		expect(results?.children?.map((c) => c.href)).toEqual([
-			`${href}#by-student`,
-			`${href}#by-question`,
+			`${href}/results#by-student`,
+			`${href}/results#by-question`,
 		]);
 	});
 

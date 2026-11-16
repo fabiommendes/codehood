@@ -1,0 +1,86 @@
+---
+import CourseHeader from "@/components/CourseHeader.astro";
+import ExamResults from "@/components/grading/ExamResults";
+import QuestionStatsTable from "@/components/grading/QuestionStats";
+import { db } from "@/db";
+import { m } from "@/i18n";
+import AppLayout from "@/layouts/AppLayout.astro";
+import {
+	examPhase,
+	examPhaseLabels,
+	examSchedule,
+	timingFor,
+} from "@/services/exam-state";
+import { breadcrumbs } from "@/utils/breadcrumbs";
+import { examNav } from "@/utils/exam-nav";
+import { loadExamStaff } from "@/utils/load-exam-staff";
+
+export const prerender = false;
+
+const { discipline, course: courseSegment, slug } = Astro.params;
+const result = await loadExamStaff(Astro, discipline, courseSegment, slug);
+if ("redirect" in result) return result.redirect;
+const { course, href, exam, exceptions, data } = result;
+
+// biome-ignore lint/style/noNonNullAssertion: loadExamStaff already redirected an anonymous visitor.
+const actor = Astro.locals.actor!;
+
+// The question titles, by slug, for the per-question table.
+const pinned = new Set(exam.questions.map((question) => question.slug));
+const titles = new Map<string, string>();
+for (const stored of await db.question.findMany(
+	{ course: course.id, public: false },
+	{ actor },
+)) {
+	if (pinned.has(stored.slug) && stored.question.title) {
+		titles.set(stored.slug, stored.question.title);
+	}
+}
+const phase = examPhase(
+	timingFor(examSchedule(exam, exceptions), null),
+	new Date(),
+);
+const examHref = `${href}/exams/${exam.slug}`;
+---
+
+<AppLayout title={`${m.grades_results_title()} · ${exam.title}`}
+  trail={breadcrumbs(Astro.url, { course, item: exam.title, page: m.grades_results_title() })}
+  nav={examNav({
+    href: examHref,
+    title: exam.title,
+    manage: true,
+    pending: data.pending,
+    regrades: data.openRegrades,
+  })}
+>
+  <main class="mx-auto max-w-4xl px-4 py-10">
+    <CourseHeader course={course} active="exams" />
+
+    <a href={examHref} class="text-sm text-muted hover:text-primary">← {exam.title}</a>
+    {
+      data.pending > 0 && (
+        <div
+          role="status"
+          class="mt-4 flex items-center justify-between gap-4 rounded-box border border-base-300 bg-base-200 p-4 text-sm"
+        >
+          <span>{m.exams_detail_pending_banner({ phase: examPhaseLabels[phase], count: data.pending })}</span>
+          <a href={`${examHref}/grading`} class="btn btn-primary btn-sm">{m.exams_detail_grade_answers()}</a>
+        </div>
+      )
+    }
+    {
+      exam.type === "EXAM" && (
+        <p class="mt-2 text-sm text-muted">
+          <a href={`${examHref}#release-status`} class="link">{m.exams_release_button()}</a>
+        </p>
+      )
+    }
+
+    <div id="by-student" class="scroll-mt-20">
+      <ExamResults client:load href={examHref} rows={data.resultRows} />
+    </div>
+    <div id="by-question" class="scroll-mt-20">
+      <QuestionStatsTable client:load href={examHref} stats={data.statsRows} titles={titles} />
+    </div>
+  </main>
+</AppLayout>

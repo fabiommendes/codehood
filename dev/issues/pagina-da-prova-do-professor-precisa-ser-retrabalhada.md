@@ -24,6 +24,9 @@ A versão em produção é a `v0.3.2` ou anterior; conferir cada item na `main`.
    (`releaseBlocker` igual a `pending`, `not-closed`, `exception-open` ou
    `not-an-exam`), o professor não vê nem o botão nem o motivo. Na `lista1-elm`,
    ele procurou e não achou onde liberar as notas.
+   **Resolvido:** a visão geral mostra sempre o estado (liberada, liberável
+   ou bloqueada) e o motivo do bloqueio, com a contagem das respostas sem nota
+   ou dos alunos com exceção em aberto.
 2. **Questões objetivas ficam `PENDING_GRADE` para sempre.** As 6 questões
    objetivas da prova (`elm-if-e-let`, `elm-imutabilidade`,
    `elm-operador-append`, `elm-tipos-basicos`, `elm-andthen-encadeado`,
@@ -31,21 +34,29 @@ A versão em produção é a `v0.3.2` ou anterior; conferir cada item na `main`.
    de cada uma estão `PENDING_GRADE` depois de a prova fechar. Isso dá o
    bloqueio `pending` do item 1. Não há na página ação para corrigir
    automaticamente as objetivas.
+   **Pendente.**
 3. **A página não mostra quantas respostas faltam corrigir por questão.**
    Para chegar ao número acima foi preciso ler a REST.
+   **Resolvido:** `exams/[slug]/results#by-question` tem a coluna "A corrigir"
+   por questão, a lista de `grading` mostra as pendentes de cada uma e o card
+   da prova mostra o total em Correção.
 4. **A prova ficou `ONGOING` sem prazo** muito depois de aplicada, e três
    tentativas continuaram abertas. Ela foi fechada pela REST
    (`PATCH exam` com `status: COMPLETED`, `PATCH response` com
    `acceptingSubmissions: false`). A página poderia avisar que há uma prova
    aberta sem prazo e oferecer encerrar tudo.
+   **Pendente.**
 5. **Liberar notas não existe na REST.** Na `v0.3.2` só existe a action
    `exam.releaseGrades`. Clientes como o chalk e o worker não conseguem fechar o
    ciclo sem passar pela web.
+   **Pendente.**
 
 6. **A página junta informação demais e sem relação.** Configuração da prova,
    exceções, resultados, estatísticas por questão, liberação de notas e a
    visão do estudante convivem na mesma página. Ela precisa ser dividida em
    páginas (ou abas com rota própria), cada uma com um propósito.
+   **Resolvido:** dividida em visão geral, `questions`, `exceptions` e
+   `results` (spec `card-de-navegacao-do-curso`, T2).
 7. **A "visão do estudante" não é a do estudante.** A renderização que o
    professor vê não usa o mesmo componente que o estudante usa ao fazer a
    prova, então o que o professor confere não garante o que o aluno vai ver.
@@ -56,6 +67,7 @@ A versão em produção é a `v0.3.2` ou anterior; conferir cada item na `main`.
    poder fazer a prova como um estudante (mesmo componente, mesmos widgets,
    envio e correção automática), sem afetar notas nem estatísticas, para saber
    se ela funciona antes de abrir para a turma.
+   **Pendente.**
 
 ## Direção
 

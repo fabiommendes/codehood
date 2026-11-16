@@ -113,7 +113,7 @@ function courseSteps(
 	return steps;
 }
 
-/// Steps below an exam: the grading pages, or a student's attempt.
+/// Steps below an exam: the grading pages, a student's attempt, or one of the instructor's pages.
 function examSteps(
 	url: URL,
 	segments: string[],
@@ -134,6 +134,15 @@ function examSteps(
 			steps.push({ label: labels.question, path: `${path}/${leaf}` });
 		}
 		return steps;
+	}
+	const pageLabel = {
+		questions: m.exams_detail_questions_heading(),
+		exceptions: m.exams_exceptions_heading(),
+		results: m.grades_results_title(),
+		regrades: m.grades_regrade_page_title(),
+	}[kind as string];
+	if (pageLabel !== undefined && leaf === undefined) {
+		return [{ label: pageLabel, path: `${examPath}/${kind}` }];
 	}
 	if (kind === "attempts" && leaf !== undefined) {
 		return [{ label: labels.student, path: `${examPath}/attempts/${leaf}` }];

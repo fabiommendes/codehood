@@ -945,7 +945,7 @@ test("question statistics: the instructor reads each question's numbers, a stude
 
 	await test.step("the instructor sees one row per question, in exam order", async () => {
 		await logInAs(page, teacher);
-		await page.goto(`${href}/exams/midterm`);
+		await page.goto(`${href}/exams/midterm/results`);
 
 		await expect(statsHeading(page)).toBeVisible();
 		for (const header of [
@@ -1046,7 +1046,7 @@ test("question statistics: with no answers the section says so, with no table", 
 	});
 	await logInAs(page, teacher);
 
-	await page.goto(`${hrefOf(course)}/exams/midterm`);
+	await page.goto(`${hrefOf(course)}/exams/midterm/results`);
 
 	await expect(statsHeading(page)).toBeVisible();
 	await expect(page.getByText("No answers yet.")).toBeVisible();

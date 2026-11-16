@@ -76,6 +76,29 @@
 	"exams_badge_missed": "Perdida",
 	"exams_cancel": "Cancelar",
 	"exams_close_backdrop": "fechar",
+	"exams_release_status_released": "Resultados liberados.",
+	"exams_release_status_ready": "Pronto para liberar: a prova está encerrada e todas as respostas têm nota.",
+	"exams_release_status_blocked": "Resultados ainda não liberados. {reason}",
+	"exams_release_status_pending": [
+		{
+			"declarations": ["input count", "local countPlural = count: plural"],
+			"selectors": ["countPlural"],
+			"match": {
+				"countPlural=one": "{count} resposta sem nota impede a liberação.",
+				"countPlural=other": "{count} respostas sem nota impedem a liberação."
+			}
+		}
+	],
+	"exams_release_status_exceptions": [
+		{
+			"declarations": ["input count", "local countPlural = count: plural"],
+			"selectors": ["countPlural"],
+			"match": {
+				"countPlural=one": "{count} aluno com exceção ainda pode responder.",
+				"countPlural=other": "{count} alunos com exceção ainda podem responder."
+			}
+		}
+	],
 	"exams_release_button": "Liberar resultados",
 	"exams_release_released": "Liberado {when}",
 	"exams_release_title": "Liberar resultados?",

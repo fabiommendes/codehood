@@ -756,7 +756,7 @@ test("instructor: find the questions that need rework", async ({ page }) => {
 		page.getByRole("region", { name: "Answer distribution", exact: true });
 
 	await test.step("on the small exam the discrimination is a dash that says why", async () => {
-		await page.goto(`${href}/exams/pop-quiz`);
+		await page.goto(`${href}/exams/pop-quiz/results`);
 
 		for (const header of ["Blank", "Discrimination"]) {
 			await expect(
@@ -772,7 +772,7 @@ test("instructor: find the questions that need rework", async ({ page }) => {
 	});
 
 	await test.step("on the large exam only the question the strong students miss is marked for review", async () => {
-		await page.goto(`${href}/exams/final`);
+		await page.goto(`${href}/exams/final/results`);
 
 		// Question, Answered, Blank, Average, Correct, Discrimination, To grade.
 		await expect(cells("Best fruit")).toHaveText([

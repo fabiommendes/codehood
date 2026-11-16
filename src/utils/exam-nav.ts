@@ -11,7 +11,7 @@ export interface ExamNavInput {
 	href: string;
 	title: string;
 	/// Sections of the exam page a student sees, in page order.
-	sections: readonly { id: string; label: string }[];
+	sections?: readonly { id: string; label: string }[];
 	/// The actor manages the course: the card gets its two sections of links.
 	manage: boolean;
 	/// Practice exams have no grading nor regrades pages.
@@ -30,17 +30,12 @@ export interface ExamNavInput {
  * of the exam page.
  */
 export function examNav(input: ExamNavInput): CourseNav {
-	const anchor = (id: string, label: string, meta?: number): NavEntry => ({
-		label,
-		href: `${input.href}#${id}`,
-		meta,
-	});
 	if (!input.manage) {
 		return {
 			context: input.title,
 			sections: [
 				{
-					entries: input.sections.map((s) => ({
+					entries: (input.sections ?? []).map((s) => ({
 						label: s.label,
 						href: `${input.href}#${s.id}`,
 					})),
@@ -50,12 +45,18 @@ export function examNav(input: ExamNavInput): CourseNav {
 	}
 	const exam: NavEntry[] = [
 		{ label: m.nav_exam_overview(), href: input.href },
-		anchor("questions", m.exams_detail_questions_heading()),
+		{
+			label: m.exams_detail_questions_heading(),
+			href: `${input.href}/questions`,
+		},
 	];
 	if (input.practice)
 		return { context: input.title, sections: [{ entries: exam }] };
 	const after: NavEntry[] = [
-		anchor("exceptions", m.exams_exceptions_heading()),
+		{
+			label: m.exams_exceptions_heading(),
+			href: `${input.href}/exceptions`,
+		},
 		{
 			label: m.nav_crumb_grading(),
 			href: `${input.href}/grading`,
@@ -67,15 +68,16 @@ export function examNav(input: ExamNavInput): CourseNav {
 			meta: input.regrades || undefined,
 		},
 		{
-			...anchor("results", m.grades_results_title()),
+			label: m.grades_results_title(),
+			href: `${input.href}/results`,
 			children: [
 				{
 					label: m.nav_exam_by_student(),
-					href: `${input.href}#by-student`,
+					href: `${input.href}/results#by-student`,
 				},
 				{
 					label: m.nav_exam_by_question(),
-					href: `${input.href}#by-question`,
+					href: `${input.href}/results#by-question`,
 				},
 			],
 		},

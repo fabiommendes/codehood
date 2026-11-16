@@ -183,7 +183,7 @@ const stateLabel = (status: string, score: number | null): string => {
           <span class="font-medium">{m.exams_attempt_exception()}:</span>{" "}
           {[exceptionExtra, exceptionDate && m.exams_detail_new_date({ date: exceptionDate })].filter(Boolean).join(" · ")}
           {" · "}
-          <a class="link" href={`${href}/exams/${exam.slug}#exceptions`}>{m.exams_attempt_edit_exception()}</a>
+          <a class="link" href={`${href}/exams/${exam.slug}/exceptions`}>{m.exams_attempt_edit_exception()}</a>
         </p>
       )
     }
