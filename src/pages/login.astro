@@ -14,6 +14,13 @@ import CenteredLayout from "@/layouts/CenteredLayout.astro";
 const localPath = (value: unknown) =>
 	typeof value === "string" && /^\/(?![/\\])/.test(value) ? value : "/";
 
+// The user menu posts the logout action here, so the redirect that ends it
+// lives in one page instead of in every page that has the menu.
+const loggedOut = Astro.getActionResult(actions.auth.logout);
+if (loggedOut && !loggedOut.error) {
+	return Astro.redirect("/login");
+}
+
 // The action posts back to `?_action=...`, which drops the query string, so the
 // form carries `next` along.
 const result = Astro.getActionResult(actions.auth.login);

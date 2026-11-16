@@ -41,3 +41,25 @@ for (const next of [
 		await expect(page.locator("input[name=next]")).toHaveValue("/");
 	});
 }
+
+test.describe("user menu", () => {
+	test.use({ javaScriptEnabled: true });
+
+	test("Log out from the menu ends the session and lands on /login", async ({
+		page,
+	}) => {
+		const user = await seedUser({ role: "STUDENT" });
+		await page.goto("/login");
+		await fillField(page, "Email or username", user.username);
+		await fillField(page, "Password", user.password);
+		await page.getByRole("button", { name: "Log in" }).click();
+		await expect(page).toHaveURL(/\/$/);
+
+		await page.locator("details.dropdown > summary").first().click();
+		await page.getByRole("button", { name: "Log out" }).click();
+
+		await expect(page).toHaveURL(/\/login$/);
+		await page.goto("/profile");
+		await expect(page).toHaveURL(/\/login$/);
+	});
+});
