@@ -4,7 +4,7 @@ import { prisma } from "@/db/client";
 import { persistedCourseFactory } from "@/fixtures/course.factory";
 import { persistedExamFactory } from "@/fixtures/exam.factory";
 import { courseHref } from "@/urls";
-import { expect, type Page, test } from "./fixtures";
+import { expect, type Locator, type Page, test } from "./fixtures";
 import { logInAs, resetDatabase, seedUser } from "./stories/helpers";
 
 // Code answers on the grading pages: highlighted, runnable when the language
@@ -106,6 +106,15 @@ async function closedSitting(
 
 const frames = (page: Page) => page.locator("iframe[data-runner-frame]");
 
+/// The terminal of `widget`, scrolled into view: xterm.js draws nothing while
+/// its terminal is outside the viewport, so output that arrives there never
+/// reaches the DOM.
+async function terminalOf(widget: Locator): Promise<Locator> {
+	const terminal = widget.locator("[data-terminal]");
+	await terminal.scrollIntoViewIfNeeded();
+	return terminal;
+}
+
 test("a code answer is highlighted on the question page, with Run", async ({
 	page,
 }) => {
@@ -133,7 +142,7 @@ test("the attempt page shows the code answer highlighted and runnable", async ({
 	await expect(widget).toHaveCount(1);
 	await expect(widget.locator(".shiki")).toContainText('console.log("hello");');
 	await widget.locator("[data-action=run]").click();
-	await expect(widget.locator("[data-terminal]")).toContainText("hello");
+	await expect(await terminalOf(widget)).toContainText("hello");
 });
 
 test("a language without a driver is highlighted with no Run", async ({
@@ -183,7 +192,7 @@ test("a page with many answers creates no iframe and loads no editor until a cli
 	).not.toHaveAttribute("ssr", "", { timeout: 15_000 });
 	await first.locator("[data-action=run]").click();
 	await expect(frames(page)).toHaveCount(1);
-	await expect(first.locator("[data-terminal]")).toContainText("0");
+	await expect(await terminalOf(first)).toContainText("0");
 });
 
 test("running and editing a code answer changes no grade or comment", async ({
@@ -198,11 +207,11 @@ test("running and editing a code answer changes no grade or comment", async ({
 	await page.goto(`${sitting.href}/grading/code?view=list`);
 	const widget = page.locator(`#answer-${submission} [data-code-runner]`);
 	await widget.locator("[data-action=run]").click();
-	await expect(widget.locator("[data-terminal]")).toContainText("hello");
+	await expect(await terminalOf(widget)).toContainText("hello");
 	await widget.locator("[data-action=edit]").click();
 	await widget.locator(".cm-content").fill('console.log("edited");');
 	await widget.locator("[data-action=run]").click();
-	await expect(widget.locator("[data-terminal]")).toContainText("edited");
+	await expect(await terminalOf(widget)).toContainText("edited");
 	await widget.locator("[data-action=back]").click();
 	expect(await passes()).toBe(before);
 	await expect(

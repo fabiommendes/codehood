@@ -252,8 +252,12 @@ O molde está pronto; copiar, não reinventar.
 - **Tudo que lê tentativas** precisa ignorar a simulação do professor
   (`realAttempt`, `realAttemptSql` em `src/db/preview-filter.ts`).
 - **Instáveis sob carga, passam sozinhos:** `island-conditional-write`
-  (issue aberta), `grading-code-answer.spec.ts:189`,
-  `exam-answer-edit-isolation.spec.ts:483`, `exam-delivery.spec.ts:247`.
+  (issue aberta), `exam-answer-edit-isolation.spec.ts:483`,
+  `exam-delivery.spec.ts:247`.
+- **O xterm não desenha fora da viewport.** Um teste que lê a saída do
+  runner rola até o terminal antes (`terminalOf` em
+  `grading-code-answer.spec.ts`); sem isso só passa quando a saída chega no
+  primeiro segundo.
 - **O checkout vizinho `../mdq`** precisa acompanhar o remoto dele e ser
   reconstruído (`pnpm run build` em `mdq-js`) quando o typecheck reclamar de
   `mdq/solid`.
@@ -266,4 +270,7 @@ O molde está pronto; copiar, não reinventar.
 - Listar os feedbacks de um curso grande custa ~100 ms fora do SQLite, pelos
   `include` de cada linha.
 - `GET /openapi.json` gasta ~460 ms de CPU síncrona por chamada, sem cache.
-- `grading-code-answer.spec.ts:126` também falha sob carga, no banco do seed.
+- Os outros specs que leem `[data-terminal]` (`runner-widget`,
+  `runner-review`, `runner-markdown-blocks`, `exam-code-answer` e duas
+  stories) não rolam até o terminal; não falharam, mas têm a mesma
+  exposição se o terminal ficar abaixo da dobra.
