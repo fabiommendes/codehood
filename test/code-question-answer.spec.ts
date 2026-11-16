@@ -231,3 +231,21 @@ test("a send is refused with the reason once the attempts are spent", async ({
 	await expect(submitStatus(page)).toContainText("1 of 1");
 	await expect(submitButton(page)).toBeDisabled();
 });
+
+test("sending the same code twice shows the earlier result and spends nothing", async ({
+	page,
+}) => {
+	const meta = { worker: "elm-test", attempts: 2 };
+	await page.goto(await setup(page, { type: "QUIZ", meta }));
+	await write(page, CORRECT);
+	await submitButton(page).click();
+	await expect(submitStatus(page)).toContainText("waiting to be graded");
+	await prisma.gradingJob.updateMany({ data: { state: "DONE" } });
+
+	await submitButton(page).click();
+	await expect(submitStatus(page)).toContainText("already sent");
+	await expect(submitStatus(page)).toContainText("1 of 2");
+	await expect(page.locator("[data-send]")).toHaveCount(1);
+	expect(await prisma.gradingJob.count()).toBe(1);
+	expect(await prisma.submission.count({ where: { kind: "SUBMIT" } })).toBe(1);
+});
