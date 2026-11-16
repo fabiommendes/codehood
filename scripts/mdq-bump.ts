@@ -38,6 +38,9 @@ for (const command of [["install", "--frozen-lockfile"], ["build"]]) {
 	const { status } = spawnSync("pnpm", command, {
 		cwd: path.join(MDQ_DIR, "mdq-js"),
 		stdio: "inherit",
+		// CI=true keeps pnpm from waiting on a prompt that has no TTY to answer.
+		env: { ...process.env, CI: "true" },
+		timeout: 5 * 60_000,
 	});
 	if (status !== 0) fail(`pnpm ${command.join(" ")} failed in ../mdq/mdq-js.`);
 }

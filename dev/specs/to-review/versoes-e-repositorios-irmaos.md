@@ -42,8 +42,9 @@ codehood usa: um release saía com o que `../mdq` tivesse (sujo, sem push,
 
 `check-siblings` verifica: `../mdq` no commit de `.mdq-ref`; mdq-js, mdq-py e
 schema sem alterações não commitadas; commit em algum branch remoto
-(`git branch -r --contains`, sem rede salvo `--fetch`); `mdq-js/dist` mais novo
-que o arquivo mais novo de `src/`, `package.json` e `tsconfig*.json`; e o
+(`git branch -r --contains`, sem rede salvo `--fetch`); `mdq-js/dist/.build-sha`
+(gravado pelo `build` do mdq-js: SHA do HEAD, com `-dirty` se havia alterações)
+igual a `.mdq-ref` e sem `-dirty`; e o
 MAJOR.MINOR de mdq-js, mdq-py, schema e do `mdq>=` da CLI.
 
 Para adotar um mdq novo: commit e push em `../mdq`, `pnpm run mdq:bump`,
@@ -75,4 +76,3 @@ mdq: <sha> (mdq-js A, mdq-py B, spec C)
 
 - O worker com `--no-sources` no CI: o pin `codehood-cli==X` só existe no PyPI
   depois da tag.
-- Um carimbo de build em `mdq-js` (hoje o `dist` é comparado por mtime).

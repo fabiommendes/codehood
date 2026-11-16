@@ -3,10 +3,9 @@
  * into the snapshot `scripts/lib/siblings.ts` judges.
  */
 import { spawnSync } from "node:child_process";
-import { existsSync, readdirSync, readFileSync, statSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import path from "node:path";
 import {
-	distState,
 	type MdqSnapshot,
 	packageJsonVersion,
 	pyprojectLowerBound,
@@ -54,34 +53,6 @@ export function mdqFetch(): boolean {
 	return mdqGit("fetch", "--quiet", "origin") !== null;
 }
 
-/// Newest mtime in ms of the files under `entries`, or null when there are none.
-function newestMtime(entries: string[]): number | null {
-	let newest: number | null = null;
-	const visit = (entry: string) => {
-		if (!existsSync(entry)) return;
-		const stat = statSync(entry);
-		if (stat.isDirectory()) {
-			for (const child of readdirSync(entry)) visit(path.join(entry, child));
-		} else if (newest === null || stat.mtimeMs > newest) {
-			newest = stat.mtimeMs;
-		}
-	};
-	for (const entry of entries) visit(entry);
-	return newest;
-}
-
-/** Whether the build output of `mdq-js` is newer than everything it is built from. */
-export function mdqDist(): MdqSnapshot["dist"] {
-	const js = path.join(MDQ_DIR, "mdq-js");
-	const sources = newestMtime([
-		path.join(js, "src"),
-		path.join(js, "package.json"),
-		path.join(js, "tsconfig.build.json"),
-		path.join(js, "tsconfig.json"),
-	]);
-	return distState(newestMtime([path.join(js, "dist")]), sources ?? 0);
-}
-
 /// The text of a file, or null when it does not exist.
 function readOrNull(file: string): string | null {
 	return existsSync(file) ? readFileSync(file, "utf8") : null;
@@ -104,4 +75,11 @@ export function mdqVersions(): MdqSnapshot["versions"] {
 /** The content of `.mdq-ref`, trimmed; null when the file is missing. */
 export function readMdqRef(): string | null {
 	return readOrNull(MDQ_REF_FILE)?.trim() ?? null;
+}
+
+/** The content of the mdq-js build stamp, trimmed; null when the file is missing. */
+export function mdqBuildStamp(): string | null {
+	return (
+		readOrNull(path.join(MDQ_DIR, "mdq-js/dist/.build-sha"))?.trim() ?? null
+	);
 }

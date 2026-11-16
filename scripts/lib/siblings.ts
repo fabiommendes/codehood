@@ -86,8 +86,8 @@ export interface MdqSnapshot {
 	dirty: string[];
 	/// Whether HEAD is contained in a remote branch; null when not checked.
 	pushed: boolean | null;
-	/// State of the `mdq-js` build output against its sources.
-	dist: "fresh" | "stale" | "missing";
+	/// Content of `../mdq/mdq-js/dist/.build-sha`, trimmed; null when the file is missing.
+	buildStamp: string | null;
 	/// Versions of the three mdq packages and the lower bound the CLI requires.
 	versions: {
 		js: string | null;
@@ -95,15 +95,6 @@ export interface MdqSnapshot {
 		schema: string | null;
 		cliBound: string | null;
 	};
-}
-
-/** State of a build output given the newest mtime of its files and of its sources, in ms. */
-export function distState(
-	distNewest: number | null,
-	sourceNewest: number,
-): "fresh" | "stale" | "missing" {
-	if (distNewest === null) return "missing";
-	return distNewest >= sourceNewest ? "fresh" : "stale";
 }
 
 /** The problems of a snapshot, each saying what to run to fix it. */
@@ -132,9 +123,18 @@ export function mdqProblems(snapshot: MdqSnapshot): string[] {
 			`../mdq ${short(snapshot.head)} is not on a remote branch. Push it from ../mdq.`,
 		);
 	}
-	if (snapshot.dist !== "fresh") {
+	const rebuild = "Run `pnpm run build` in ../mdq/mdq-js";
+	if (snapshot.buildStamp === null) {
 		problems.push(
-			`../mdq/mdq-js/dist is ${snapshot.dist}. Run \`pnpm build\` in ../mdq/mdq-js.`,
+			`../mdq/mdq-js/dist/.build-sha is missing: rebuild mdq-js (\`pnpm run build\` in ../mdq/mdq-js).`,
+		);
+	} else if (snapshot.buildStamp.endsWith("-dirty")) {
+		problems.push(
+			`../mdq/mdq-js/dist was built from uncommitted changes (${snapshot.buildStamp.slice(0, 12)}-dirty). Commit them. ${rebuild}.`,
+		);
+	} else if (snapshot.ref !== null && snapshot.buildStamp !== snapshot.ref) {
+		problems.push(
+			`../mdq/mdq-js/dist was built at ${short(snapshot.buildStamp)}, \`.mdq-ref\` says ${short(snapshot.ref)}. ${rebuild}.`,
 		);
 	}
 	const { js, py, schema, cliBound } = snapshot.versions;

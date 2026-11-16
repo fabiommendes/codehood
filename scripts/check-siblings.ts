@@ -5,7 +5,7 @@
  *
  * - `.mdq-ref` holds the mdq commit codehood is built and tested against.
  *   `../mdq` must be at it, with mdq-js, mdq-py and schema clean, the commit
- *   pushed, `mdq-js/dist` built after the last change to its sources, and the
+ *   pushed, `mdq-js/dist/.build-sha` equal to `.mdq-ref` and not `-dirty`, and the
  *   mdq-js, mdq-py and schema versions and the CLI's `mdq>=` bound sharing
  *   MAJOR.MINOR.
  * - Default (lenient): problems are printed as warnings and the exit code is
@@ -22,8 +22,8 @@
 import { parseArgs } from "node:util";
 import {
 	MDQ_DIR,
+	mdqBuildStamp,
 	mdqDirty,
-	mdqDist,
 	mdqFetch,
 	mdqHead,
 	mdqPushed,
@@ -55,7 +55,7 @@ const problems = mdqProblems({
 	head,
 	dirty: mdqDirty(),
 	pushed: args.ci ? null : mdqPushed(head),
-	dist: mdqDist(),
+	buildStamp: mdqBuildStamp(),
 	versions: mdqVersions(),
 });
 

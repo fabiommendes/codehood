@@ -1,7 +1,6 @@
 import { expect, test } from "@playwright/test";
 import {
 	compareVersions,
-	distState,
 	isCommitSha,
 	lockstepProblems,
 	type MdqSnapshot,
@@ -39,7 +38,7 @@ function healthy(overrides: Partial<MdqSnapshot> = {}): MdqSnapshot {
 		head: SHA,
 		dirty: [],
 		pushed: true,
-		dist: "fresh",
+		buildStamp: SHA,
 		versions: { js: "0.2.0", py: "0.2.1", schema: "0.2.0", cliBound: "0.2.0" },
 		...overrides,
 	};
@@ -93,13 +92,6 @@ test("isCommitSha wants the full lowercase SHA", () => {
 	expect(isCommitSha("main")).toBe(false);
 });
 
-test("distState compares the newest output with the newest source", () => {
-	expect(distState(null, 10)).toBe("missing");
-	expect(distState(9, 10)).toBe("stale");
-	expect(distState(10, 10)).toBe("fresh");
-	expect(distState(11, 10)).toBe("fresh");
-});
-
 test("a healthy snapshot has no problems", () => {
 	expect(mdqProblems(healthy())).toEqual([]);
 });
@@ -120,8 +112,18 @@ test("mdqProblems flags dirty trees, unpushed commits and a bad build, and skips
 		"not on a remote",
 	);
 	expect(mdqProblems(healthy({ pushed: null }))).toEqual([]);
-	expect(mdqProblems(healthy({ dist: "stale" }))[0]).toContain("pnpm build");
-	expect(mdqProblems(healthy({ dist: "missing" }))[0]).toContain("missing");
+	expect(mdqProblems(healthy({ buildStamp: null }))[0]).toContain(
+		"rebuild mdq-js (`pnpm run build` in ../mdq/mdq-js)",
+	);
+	expect(mdqProblems(healthy({ buildStamp: `${SHA}-dirty` }))[0]).toContain(
+		"uncommitted",
+	);
+	expect(mdqProblems(healthy({ buildStamp: "unknown" }))[0]).toContain(
+		"pnpm run build",
+	);
+	expect(mdqProblems(healthy({ buildStamp: OTHER }))[0]).toContain(
+		SHA.slice(0, 12),
+	);
 });
 
 test("mdqProblems flags a MAJOR.MINOR mismatch and unreadable versions", () => {
