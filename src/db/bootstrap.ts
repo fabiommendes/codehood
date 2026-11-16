@@ -1305,9 +1305,9 @@ async function createDemoCoursesIfMissing(): Promise<void> {
 			status: "SCHEDULED",
 			title: "Midterm exam",
 			description: "Everything from weeks 1 to 7.",
-			// A week ahead: a scheduled exam waiting to start.
+			// Under a week ahead, so a seed run in the morning still lists it as coming up.
 			scheduledAt: toInstant(
-				localDateOf(new Date(Date.now() + 7 * 24 * 3600 * 1000)),
+				localDateOf(new Date(Date.now() + 6 * 24 * 3600 * 1000)),
 				14 * 60,
 			),
 			duration: { hours: 2 },
@@ -1364,10 +1364,7 @@ async function createDemoCoursesIfMissing(): Promise<void> {
 		{ hopper, hamilton, liskov, bob },
 		cohort,
 	);
-	await seedOpenQuiz(cs101.id);
-	await seedAttachments(cs101.id);
 	await seedCodeAnswerExams(cs101.id);
-	await seedElmPretestExam(cs101.id);
 	await seedAnswerEditHistoryExams(cs101.id, {
 		hopper,
 		hamilton,
@@ -1395,7 +1392,9 @@ async function createDemoCoursesIfMissing(): Promise<void> {
 
 	await seedRegradeExam(cs101.id, ada, { hopper, hamilton });
 	await seedWeightedExam(cs101.id, { hopper, hamilton });
-	await seedSimulatedExams(cs101.id, ada);
+	await seedAttachments(cs101.id);
+	await seedOpenQuiz(cs101.id, cohort[0] as User);
+	await seedPracticeAndSimulations(cs101.id, ada);
 	await seedRepositories(cs101.id);
 	await seedClassroomInvites(cs101.id, ada);
 
@@ -1460,8 +1459,6 @@ async function seedAttachments(course: Course["id"]): Promise<void> {
 	const csvV2Hash = hashBytes(csvV2);
 	const pdf = minimalPdf("Reference sheet: recursion lab");
 	const pdfHash = hashBytes(pdf);
-	const values = Buffer.from("n,fact\n0,1\n1,1\n2,2\n3,6\n", "utf8");
-	const valuesHash = hashBytes(values);
 	const schedule = Buffer.from("day,room\n1,A1\n2,B2\n", "utf8");
 	const scheduleHash = hashBytes(schedule);
 
@@ -1556,52 +1553,16 @@ async function seedAttachments(course: Course["id"]): Promise<void> {
 		FULL_ACCESS,
 	);
 
-	await db.exam.create(
+	// The exam has not opened: its file stays 404 until it does.
+	await db.exam.update(
+		{ course, slug: "midterm" },
 		{
-			course,
-			slug: "quiz-attachments",
-			type: "QUIZ",
-			status: "ONGOING",
-			title: "Quiz 4: reading data",
-			description: "Questions that come with files, and the exam's own files.",
-			preamble: "Download the files before you answer.",
-			duration: { minutes: 45 },
-			tags: ["attachments"],
 			questions: [
+				{ slug: "recursion-basics", version: "v1" },
+				{ slug: "loop-invariants", version: "v1" },
+				{ slug: "factorial-of-five", version: "v1" },
 				{ slug: "csv-attachments", version: "v1" },
-				{ slug: "pdf-attachment", version: "v1" },
 			],
-			attachments: [
-				{
-					name: "formulas.txt",
-					format: "txt",
-					text: "factorial(n) = n * factorial(n - 1), with factorial(0) = 1.",
-				},
-				{ name: "values.csv", format: "csv", origin: "values.csv" },
-			],
-			files: { "values.csv": valuesHash },
-			blobs: { [valuesHash]: values },
-		},
-		FULL_ACCESS,
-	);
-
-	// Two weeks out: the attachments stay 404 until it opens.
-	await db.exam.create(
-		{
-			course,
-			slug: "quiz-scheduled-attachments",
-			type: "QUIZ",
-			status: "SCHEDULED",
-			title: "Quiz 5: scheduled files",
-			description:
-				"Opens in a week; its files are not downloadable before that.",
-			scheduledAt: toInstant(
-				localDateOf(new Date(Date.now() + 7 * 24 * 3600 * 1000)),
-				14 * 60,
-			),
-			duration: { minutes: 30 },
-			tags: ["attachments"],
-			questions: [{ slug: "csv-attachments", version: "v1" }],
 			attachments: [
 				{ name: "schedule.csv", format: "csv", origin: "schedule.csv" },
 			],
@@ -2340,13 +2301,7 @@ async function seedReleasedQuiz(
 	);
 }
 
-/**
- * Seeds three open exams with the same JavaScript code question, one per way
- * the code-run setting can come out.
- *
- * `practice-js` runs code by the PRACTICE default, `quiz-js` does not run it
- * by the QUIZ default, and `test-js` is an EXAM that turns it on explicitly.
- */
+/// Seeds `test-js`, an EXAM that turns running code on explicitly.
 async function seedCodeAnswerExams(course: Course["id"]): Promise<void> {
 	await db.question.create(
 		{
@@ -2367,58 +2322,7 @@ async function seedCodeAnswerExams(course: Course["id"]): Promise<void> {
 		},
 		FULL_ACCESS,
 	);
-	await db.question.create(
-		{
-			course,
-			slug: "ts-sum-of-squares",
-			status: "PUBLISHED",
-			version: "v1",
-			question: {
-				type: "essay",
-				title: "Sum of squares, typed",
-				stem: "Write a TypeScript function `sumOfSquares(n: number): number` and print `sumOfSquares(10)`.",
-				epilogue: "Print only the number.",
-				tags: ["typescript"],
-				content: "code",
-				highlight: "typescript",
-			},
-		},
-		FULL_ACCESS,
-	);
 	const questions = [{ slug: "js-sum-of-evens", version: "v1" }];
-	await db.exam.create(
-		{
-			course,
-			slug: "practice-js",
-			type: "PRACTICE",
-			status: "ONGOING",
-			title: "Practice: JavaScript loops",
-			description: "Code runs in the browser by the practice default.",
-			tags: ["javascript", "practice"],
-			questions: [...questions, { slug: "ts-sum-of-squares", version: "v1" }],
-		},
-		FULL_ACCESS,
-	);
-	await db.exam.create(
-		{
-			course,
-			slug: "quiz-js",
-			type: "QUIZ",
-			status: "ONGOING",
-			title: "Quiz: JavaScript loops",
-			description: "Running code is off by the quiz default.",
-			duration: { minutes: 30 },
-			tags: ["javascript"],
-			questions,
-		},
-		FULL_ACCESS,
-	);
-	// The quiz default records the edit history; this one switches it off, so the toggle shows both states.
-	await db.exam.setAnswerHistory(
-		{ course, slug: "quiz-js" },
-		false,
-		FULL_ACCESS,
-	);
 	await db.exam.create(
 		{
 			course,
@@ -2564,7 +2468,7 @@ const ELM_MODULE_TESTS = {
 };
 
 /**
- * Adds two Elm questions whose pretests run in the browser to the Elm practice exam.
+ * Creates two Elm questions whose pretests run in the browser.
  *
  * One takes an examples block (`{example}`, a scored `{public}` and a private
  * region) and the other linked test modules. The answer keys are, for the
@@ -2582,7 +2486,7 @@ const ELM_MODULE_TESTS = {
  *
  * and for the modules, a fold over `String.toList` that counts the vowels.
  */
-async function seedElmPretestExam(course: Course["id"]): Promise<void> {
+async function seedElmPretestQuestions(course: Course["id"]): Promise<void> {
 	const examples = parse(ELM_EXAMPLES_QUESTION, {
 		kind: "question",
 	}) as CodeQuestion;
@@ -2599,19 +2503,6 @@ async function seedElmPretestExam(course: Course["id"]): Promise<void> {
 			FULL_ACCESS,
 		);
 	}
-	await db.exam.update(
-		{ course, slug: "practice-elm" },
-		{
-			description:
-				"Send as many times as you like. Two questions run their pretests in the browser: an examples block and linked test modules.",
-			questions: [
-				{ slug: "elm-soma", version: "v1" },
-				{ slug: "elm-sequences", version: "v1" },
-				{ slug: "elm-vowels", version: "v1" },
-			],
-		},
-		FULL_ACCESS,
-	);
 }
 
 /// One edit of a seeded history, at `startMs` of its session.
@@ -2957,7 +2848,9 @@ async function seedAnswerEditHistoryExams(
  * they start, and the taking screen, its countdown and autosave can be tried
  * on any day.
  */
-async function seedOpenQuiz(course: Course["id"]): Promise<void> {
+async function seedOpenQuiz(course: Course["id"], knuth: User): Promise<void> {
+	const values = Buffer.from("n,fact\n0,1\n1,1\n2,2\n3,6\n", "utf8");
+	const valuesHash = hashBytes(values);
 	await db.question.create(
 		{
 			course,
@@ -3045,10 +2938,44 @@ async function seedOpenQuiz(course: Course["id"]): Promise<void> {
 				{ slug: "recursive-sum", version: "v1" },
 				{ slug: "factorial-lines", version: "v1" },
 				{ slug: "explain-recursion", version: "v1" },
+				{ slug: "n-log-n", version: "v1" },
+				{ slug: "js-double-it", version: "v1" },
+				{ slug: "csv-attachments", version: "v1" },
+				{ slug: "pdf-attachment", version: "v1" },
+				{ slug: "csv-versions", version: "v1" },
 			],
+			attachments: [
+				{
+					name: "formulas.txt",
+					format: "txt",
+					text: "factorial(n) = n * factorial(n - 1), with factorial(0) = 1.",
+				},
+				{ name: "values.csv", format: "csv", origin: "values.csv" },
+			],
+			files: { "values.csv": valuesHash },
+			blobs: { [valuesHash]: values },
 		},
 		FULL_ACCESS,
 	);
+
+	// Knuth opened an attempt two hours ago and never delivered it: the 45
+	// minutes ran out with two answers saved.
+	for (const [question, payload] of [
+		["recursion-basics", "base-case"],
+		["stack-overflow-name", "stack overflow"],
+	] as const) {
+		await db.response.submit(
+			{ course, exam: "quiz-02", question, payload },
+			{ actor: knuth },
+		);
+	}
+	await prisma.response.updateMany({
+		where: {
+			authorId: knuth.username,
+			exam: { slug: "quiz-02", courseId: course },
+		},
+		data: { createdAt: new Date(Date.now() - 2 * 3_600_000) },
+	});
 }
 
 /**
@@ -3301,7 +3228,7 @@ function elmReport(verdicts: {
 }
 
 /**
- * Seeds an open `EXAM` and a `PRACTICE` that send an Elm question to a grading worker, with a student in each state of the queue.
+ * Seeds an open `EXAM` that sends an Elm question to a grading worker, with a student in each state of the queue.
  *
  * The bot `runner` (`ada`'s key) grades through the job service, so scores,
  * feedback and statuses come from the real code. Exam: `bob` waits in the
@@ -3309,7 +3236,6 @@ function elmReport(verdicts: {
  * `hopper` has a partial grade and then a full one, `hamilton` failed the
  * pretest, `knuth` hit the worker failure limit, `ritchie` replaced a
  * cancelled send, `thompson` spent every send, and `backus` only autosaved.
- * The dev student has several corrected sends in the practice.
  */
 async function seedExternalGradingExams(
 	course: Course["id"],
@@ -3326,14 +3252,8 @@ async function seedExternalGradingExams(
 	},
 ): Promise<void> {
 	const exam = "test-elm";
-	const practice = "practice-elm";
 	const question = "elm-soma";
 	const worker = "elm-test";
-	const devStudent = await db.user.findOne(
-		{ username: DEV_STUDENT_USERNAME },
-		FULL_ACCESS,
-	);
-	if (!devStudent) throw new Error("The dev student account is missing.");
 	const bot = { actor: { ...instructor, bot: "runner" } };
 
 	await db.question.create(
@@ -3359,20 +3279,6 @@ async function seedExternalGradingExams(
 		},
 		FULL_ACCESS,
 	);
-	await db.exam.create(
-		{
-			course,
-			slug: practice,
-			type: "PRACTICE",
-			status: "ONGOING",
-			title: "Practice: Elm",
-			description: "Send as many times as you like.",
-			tags: ["elm", "practice"],
-			questions: [{ slug: question, version: "v1" }],
-		},
-		FULL_ACCESS,
-	);
-
 	/// Sends `payload` and returns the new submission's id.
 	const send = async (
 		examSlug: string,
@@ -3451,14 +3357,6 @@ async function seedExternalGradingExams(
 		[ELM_ANSWERS.positivesAgain, partial],
 	] as const) {
 		await sendAndGrade(exam, students.thompson, payload, verdicts);
-	}
-
-	for (const [payload, verdicts] of [
-		[ELM_ANSWERS.firstOnly, noHidden],
-		[ELM_ANSWERS.positives, partial],
-		[ELM_ANSWERS.correct, all("pass")],
-	] as const) {
-		await sendAndGrade(practice, devStudent, payload, verdicts);
 	}
 
 	const crashing = await send(exam, students.knuth, ELM_ANSWERS.correct);
@@ -4332,50 +4230,86 @@ async function seedWeightedExam(
 }
 
 /**
- * Seeds two draft exams that the instructor simulated: one still being answered, one delivered.
+ * Seeds the `practice` exam and the instructor's two simulations.
  *
- * `simulation-open` holds objective and essay answers plus a code send that
- * waits for a worker. In `simulation-done` the objective answers are graded
- * on delivery, the essay shows as manual correction and the code send was
- * corrected by the bot. Both are drafts, which students never see, and the
- * simulations are written by the service as the instructor would.
+ * The dev student sent `elm-soma` three times in the practice, each one
+ * corrected by the bot. The instructor's simulation of `practice` is
+ * delivered: the objective answers are graded on delivery, the code answer
+ * waits for manual correction and the Elm send was corrected by the bot. The
+ * simulation of the draft `final` is under way, with an Elm send waiting for a
+ * worker. Students see neither simulation.
  */
-async function seedSimulatedExams(
+async function seedPracticeAndSimulations(
 	course: Course["id"],
 	instructor: User,
 ): Promise<void> {
 	const worker = "elm-test";
 	const bot = { actor: { ...instructor, bot: "runner" } };
-	const questions = [
-		{ slug: "recursion-basics", version: "v1" },
-		{ slug: "factorial-of-five", version: "v1" },
-		{ slug: "explain-recursion", version: "v1" },
-		{ slug: "elm-soma", version: "v1" },
-	];
+	const devStudent = await db.user.findOne(
+		{ username: DEV_STUDENT_USERNAME },
+		FULL_ACCESS,
+	);
+	if (!devStudent) throw new Error("The dev student account is missing.");
 	const essay =
 		"A base case is where the recursion stops; without it the calls never return.";
-	for (const [slug, title] of [
-		["simulation-open", "Test 9: simulation in progress"],
-		["simulation-done", "Test 10: simulation delivered"],
-	] as const) {
-		await db.exam.create(
-			{
-				course,
-				slug,
-				type: "EXAM",
-				status: "DRAFT",
-				title,
-				description: "A draft the instructor answers as a student would.",
-				duration: { hours: 1 },
-				tags: ["recursion"],
-				questions,
-			},
-			FULL_ACCESS,
-		);
-	}
 
-	/// Answers one question of a simulation as the instructor; returns the submission id.
+	await db.question.create(
+		{
+			course,
+			slug: "ts-sum-of-squares",
+			status: "PUBLISHED",
+			version: "v1",
+			question: {
+				type: "essay",
+				title: "Sum of squares, typed",
+				stem: "Write a TypeScript function `sumOfSquares(n: number): number` and print `sumOfSquares(10)`.",
+				epilogue: "Print only the number.",
+				tags: ["typescript"],
+				content: "code",
+				highlight: "typescript",
+			},
+		},
+		FULL_ACCESS,
+	);
+	await seedElmPretestQuestions(course);
+	await db.exam.create(
+		{
+			course,
+			slug: "practice",
+			type: "PRACTICE",
+			status: "ONGOING",
+			title: "Practice: code and recursion",
+			description:
+				"Send as many times as you like. Code runs in the browser by the practice default, and two Elm questions run their pretests there: an examples block and linked test modules.",
+			tags: ["practice", "javascript", "elm"],
+			questions: [
+				{ slug: "js-double-it", version: "v1" },
+				{ slug: "ts-sum-of-squares", version: "v1" },
+				{ slug: "recursion-basics", version: "v1" },
+				{ slug: "factorial-of-five", version: "v1" },
+				{ slug: "elm-soma", version: "v1" },
+				{ slug: "elm-sequences", version: "v1" },
+				{ slug: "elm-vowels", version: "v1" },
+			],
+		},
+		FULL_ACCESS,
+	);
+	await db.exam.update(
+		{ course, slug: "final" },
+		{
+			questions: [
+				{ slug: "big-o-warmup", version: "v1" },
+				{ slug: "recursion-basics", version: "v1" },
+				{ slug: "explain-recursion", version: "v1" },
+				{ slug: "elm-soma", version: "v1" },
+			],
+		},
+		FULL_ACCESS,
+	);
+
+	/// Answers one question as `actor`; returns the submission id.
 	const answer = async (
+		actor: User,
 		exam: string,
 		question: string,
 		payload: QuestionResponse,
@@ -4383,44 +4317,84 @@ async function seedSimulatedExams(
 	): Promise<string> => {
 		const response = await db.response.submit(
 			{ course, exam, question, payload, ...(kind ? { kind } : {}) },
-			{ actor: instructor },
+			{ actor },
 		);
 		return response.submissions.at(-1)?.publicId ?? "";
 	};
+	/// Has the bot claim the queued job of `exam`, which must be `submission`'s.
+	const claim = async (exam: string, submission: string): Promise<void> => {
+		const [job] = await db.gradingJob.claim(
+			{ workers: [worker], limit: 1, exam },
+			bot,
+		);
+		if (job?.submission !== submission) {
+			throw new Error(
+				`[seed] the bot claimed ${job?.submission}, not ${submission}.`,
+			);
+		}
+	};
+	const partial = {
+		empty: "pass",
+		one: "pass",
+		long: "pass",
+		negatives: "fail",
+	} as const;
+	const noHidden = {
+		empty: "pass",
+		one: "pass",
+		long: "fail",
+		negatives: "fail",
+	} as const;
+	const pass = {
+		empty: "pass",
+		one: "pass",
+		long: "pass",
+		negatives: "pass",
+	} as const;
 
-	await answer("simulation-open", "recursion-basics", "base-case");
-	await answer("simulation-open", "explain-recursion", essay);
-	await answer("simulation-open", "elm-soma", ELM_ANSWERS.positives, "SUBMIT");
+	for (const [code, verdicts] of [
+		[ELM_ANSWERS.firstOnly, noHidden],
+		[ELM_ANSWERS.positives, partial],
+		[ELM_ANSWERS.correct, pass],
+	] as const) {
+		const sent = await answer(
+			devStudent,
+			"practice",
+			"elm-soma",
+			code,
+			"SUBMIT",
+		);
+		await claim("practice", sent);
+		await db.gradingJob.complete(sent, elmReport(verdicts), bot);
+	}
 
-	await answer("simulation-done", "recursion-basics", "tail-call");
-	await answer("simulation-done", "factorial-of-five", 120);
-	await answer("simulation-done", "explain-recursion", essay);
+	await answer(instructor, "practice", "recursion-basics", "tail-call");
+	await answer(instructor, "practice", "factorial-of-five", 120);
+	await answer(
+		instructor,
+		"practice",
+		"js-double-it",
+		"const n = Number(prompt('Number?'));\nconsole.log(n * 2);",
+	);
 	const sent = await answer(
-		"simulation-done",
+		instructor,
+		"practice",
 		"elm-soma",
 		ELM_ANSWERS.positives,
 		"SUBMIT",
 	);
-	const [job] = await db.gradingJob.claim(
-		{ workers: [worker], limit: 1, exam: "simulation-done" },
-		bot,
-	);
-	if (job?.submission !== sent) {
-		throw new Error(`[seed] the bot claimed ${job?.submission}, not ${sent}.`);
-	}
-	await db.gradingJob.complete(
-		sent,
-		elmReport({
-			empty: "pass",
-			one: "pass",
-			long: "pass",
-			negatives: "fail",
-		}),
-		bot,
-	);
-	await db.response.finish(
-		{ course, exam: "simulation-done" },
-		{ actor: instructor },
+	await claim("practice", sent);
+	await db.gradingJob.complete(sent, elmReport(partial), bot);
+	await db.response.finish({ course, exam: "practice" }, { actor: instructor });
+
+	await answer(instructor, "final", "recursion-basics", "base-case");
+	await answer(instructor, "final", "explain-recursion", essay);
+	await answer(
+		instructor,
+		"final",
+		"elm-soma",
+		ELM_ANSWERS.positives,
+		"SUBMIT",
 	);
 }
 

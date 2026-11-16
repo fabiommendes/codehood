@@ -163,7 +163,7 @@ test("an open exam has an attempt in progress", () => {
 	);
 });
 
-test.fixme("an open exam has an expired attempt nobody delivered", () => {
+test("an open exam has an expired attempt nobody delivered", () => {
 	const now = Date.now();
 	expectSome(
 		exams.filter(
@@ -734,7 +734,7 @@ test("the dev student's home: open exams, today's events, results and reviews", 
 	expectSome(home.regrades);
 });
 
-test.fixme("the dev student's home announces an exam that opens soon", () => {
+test("the dev student's home announces an exam that opens soon", () => {
 	expectSome(reports.homes.student?.upcoming);
 });
 

@@ -363,6 +363,25 @@ Cuidados para S2 a S5:
   tabela de alunos.
 - `src/db/bootstrap.ts` tem até 3600 linhas.
 
+## Decisões da implementação
+
+- S1: a home e as estatísticas são verificadas num processo filho
+  (`test/seed-reports.ts`), porque os loaders usam o `prisma` global.
+- S1: a linha "Esta semana" da home do curso fica só para o e2e.
+- S2: `quiz-02` nasce depois de `seedQuestionStatsExam`, porque `n-log-n` é
+  criada ali, e depois de `seedAttachments` e `seedRunnableCodeExam`
+  (`csv-attachments`, `pdf-attachment`, `js-double-it`). `seedAttachments` só
+  cria as questões e põe o anexo do `midterm`.
+- S2: `practice` e as duas simulações ficam numa função só
+  (`seedPracticeAndSimulations`), depois de `elm-soma` e dos trabalhos de
+  `test-elm`. O `claim` desses envios leva o filtro `exam`, porque a fila de
+  `test-elm` ainda tem trabalhos `QUEUED`. S3 a S5 devem manter o filtro ou
+  mover esta função para depois da fila.
+- S2: o `final` ganha as questões da simulação por `db.exam.update`, depois de
+  `elm-soma` existir.
+- S2: o histórico de `quiz-js` (desligado, sem dados) sai com a prova. O caso
+  de histórico desligado fica por conta de `test-03` (S5).
+
 ## Riscos
 
 - `test-02` concentra seis fluxos. Um erro de ordem (resposta depois da
