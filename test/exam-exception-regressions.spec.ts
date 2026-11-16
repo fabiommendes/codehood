@@ -52,7 +52,7 @@ async function enroll(courseId: schema.CourseId) {
 	return student;
 }
 
-/// A course with its instructor, two students and a question.
+/// A course with its instructor, two students and an essay question, which only an instructor grades.
 async function setup() {
 	const instructor = await persistedUserFactory.create({
 		role: "INSTRUCTOR",
@@ -64,10 +64,10 @@ async function setup() {
 	});
 	const student = await enroll(course.id);
 	const classmate = await enroll(course.id);
-	const question = await persistedQuestionFactory.create({
-		course: course.id,
-		slug: tag("q-"),
-	});
+	const question = await persistedQuestionFactory.create(
+		{ course: course.id, slug: tag("q-") },
+		{ transient: { type: "essay" } },
+	);
 	return { course, instructor, student, classmate, question };
 }
 
@@ -121,6 +121,7 @@ async function answered(
 	const submission = await persistedSubmissionFactory.create({
 		response: { publicId: response.publicId },
 		question: ctx.question.slug,
+		payload: "An essay answer.",
 	});
 	await db.response.update(
 		{ publicId: response.publicId },

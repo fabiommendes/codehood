@@ -3,7 +3,7 @@ import { db, type schema } from "@/db";
 import { prisma } from "@/db/client";
 import { persistedCourseFactory } from "@/fixtures/course.factory";
 import { persistedExamFactory } from "@/fixtures/exam.factory";
-import { brasiliaFillIn, capitalChoice } from "@/mdq/fixtures";
+import { brasiliaFillIn, capitalShortAnswerManual } from "@/mdq/fixtures";
 import { courseHref } from "@/urls";
 import { expect, type Page, test } from "../fixtures";
 import { logInAs, resetDatabase, seedUser } from "./helpers";
@@ -413,7 +413,7 @@ async function question(course: Course, slug: string): Promise<string> {
 			slug,
 			status: "PUBLISHED",
 			version: "1",
-			question: capitalChoice,
+			question: capitalShortAnswerManual,
 		},
 		FULL_ACCESS,
 	);
@@ -433,7 +433,7 @@ async function answer(
 			course: course.id,
 			exam,
 			question: questionSlug,
-			payload: "brasilia",
+			payload: "unsure",
 		},
 		{ actor: student },
 	);

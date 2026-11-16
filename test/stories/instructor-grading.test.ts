@@ -3,7 +3,12 @@ import { db } from "@/db";
 import { prisma } from "@/db/client";
 import { persistedCourseFactory } from "@/fixtures/course.factory";
 import { persistedExamFactory } from "@/fixtures/exam.factory";
-import { capitalShortAnswer, multipleChoice, trueFalse } from "@/mdq/fixtures";
+import {
+	capitalShortAnswer,
+	capitalShortAnswerManual,
+	multipleChoice,
+	trueFalse,
+} from "@/mdq/fixtures";
 import { courseHref } from "@/urls";
 import { expect, test } from "../fixtures";
 import { logInAs, resetDatabase, seedUser } from "./helpers";
@@ -33,7 +38,7 @@ test("instructor: grade submissions by hand", async ({ page }) => {
 			status: "PUBLISHED",
 			version: "1",
 			question: {
-				...capitalShortAnswer,
+				...capitalShortAnswerManual,
 				id: "q-short",
 				title: "Typed capital",
 			},
@@ -232,7 +237,7 @@ test("instructor: see the whole class's results", async ({ page }) => {
 			status: "PUBLISHED",
 			version: "1",
 			question: {
-				...capitalShortAnswer,
+				...capitalShortAnswerManual,
 				id: "q-short",
 				title: "Typed capital",
 			},

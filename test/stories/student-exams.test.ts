@@ -3,7 +3,11 @@ import { db, type schema } from "@/db";
 import { prisma } from "@/db/client";
 import { persistedCourseFactory } from "@/fixtures/course.factory";
 import { persistedExamFactory } from "@/fixtures/exam.factory";
-import { capitalChoice, capitalShortAnswer } from "@/mdq/fixtures";
+import {
+	capitalChoice,
+	capitalShortAnswer,
+	capitalShortAnswerManual,
+} from "@/mdq/fixtures";
 import { courseHref } from "@/urls";
 import { expect, type Page, test } from "../fixtures";
 import { logInAs, resetDatabase, seedUser } from "./helpers";
@@ -272,7 +276,7 @@ test("student: see my grades and feedback", async ({ page }) => {
 	for (const [slug, question] of [
 		["q-capital", capitalChoice],
 		["q-planet", planetChoice],
-		["q-typed", capitalShortAnswer],
+		["q-typed", capitalShortAnswerManual],
 	] as const) {
 		await db.question.create(
 			{ course: course.id, slug, status: "PUBLISHED", version: "1", question },
@@ -307,6 +311,15 @@ test("student: see my grades and feedback", async ({ page }) => {
 			{ course: course.id, exam: slug },
 			{ actor: student },
 		);
+		// Closing graded the objective answers; the passes the test writes next
+		// are an instructor revising them, so the automatic ones are the oldest.
+		await prisma.feedback.updateMany({
+			where: {
+				ref: "auto",
+				submission: { publicId: { in: Object.values(submissions) } },
+			},
+			data: { updatedAt: new Date(Date.now() - 24 * 60 * MINUTE) },
+		});
 		await prisma.exam.update({
 			where: { id: exam.id },
 			data: { status: "COMPLETED" },
@@ -344,7 +357,7 @@ test("student: see my grades and feedback", async ({ page }) => {
 	const midterm = await sitExam("midterm", "Midterm", [
 		["q-capital", "brasilia"],
 		["q-planet", "mercury"],
-		["q-typed", "Brasilia"],
+		["q-typed", "Brasilia, DF"],
 	]);
 	await grade(
 		midterm.submissions["q-capital"] ?? "",
@@ -439,7 +452,7 @@ test("student: see my grades and feedback", async ({ page }) => {
 		await expect(page.getByRole("radio", { name: "Mercury" })).toBeDisabled();
 		// Reviewed with its marks: the typed answer sits in a disabled field.
 		await expect(page.getByRole("textbox")).toBeDisabled();
-		await expect(page.getByRole("textbox")).toHaveValue("Brasilia");
+		await expect(page.getByRole("textbox")).toHaveValue("Brasilia, DF");
 	});
 
 	await test.step("once the last question is graded the total appears", async () => {
@@ -447,7 +460,7 @@ test("student: see my grades and feedback", async ({ page }) => {
 			midterm.submissions["q-typed"] ?? "",
 			"pass-1",
 			"1/2",
-			"Mind the accent",
+			"Say the state",
 			{ grader },
 			5,
 		);
@@ -455,7 +468,7 @@ test("student: see my grades and feedback", async ({ page }) => {
 
 		await expect(page.getByText(/Your score.*67%/)).toBeVisible();
 		await expect(page.getByText("Waiting to be graded")).toHaveCount(0);
-		await expect(page.getByText("Mind the accent")).toBeVisible();
+		await expect(page.getByText("Say the state")).toBeVisible();
 	});
 
 	await test.step("the Exams tab shows the total of each released exam and nothing for an unreleased one", async () => {
