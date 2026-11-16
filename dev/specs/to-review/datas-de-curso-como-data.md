@@ -53,7 +53,9 @@ ao transformar "dia + horário" num instante (`slotInstant`), como já acontece.
 4. REST e OpenAPI: os campos renomeados com `format: date`. Regenerar com
    `pnpm run openapi:cli`.
 5. CLI (a CLI já trabalha com `datetime.date`; só o transporte converte para
-   instante). Testes com `uv run pytest` em `cli/`.
+   instante). O servidor regenera o snapshot e o client (`pnpm run
+   openapi:cli`) e faz o commit deles; a sessão da CLI faz o código Python
+   abaixo num commit seguinte.
    - `cli/codehood/push/wire.py:76-96`: `course_payload` manda
      `startDate`/`endDate` com `date.isoformat()`; `instant(day)` sai se não
      sobrar outro uso de curso.
@@ -68,12 +70,11 @@ ao transformar "dia + horário" num instante (`slotInstant`), como já acontece.
    - `push/exam.py:245` (`scheduledAt` de prova) e `startAt` de evento não
      mudam.
    - **Base antiga:** a base salva em `.local/codehood/base/` guarda o payload
-     do curso com `startAt`/`endAt` em instante. Ao carregar a base, um payload
-     de curso com as chaves antigas é normalizado para `startDate`/`endDate`
-     (data UTC do instante), para que o primeiro push depois da atualização
-     não acuse drift ou conflito falso. Teste: uma base antiga e um curso sem
-     mudança resultam em push sem conflito.
-   - Entrada no `cli/CHANGELOG.md`.
+     do curso com `startAt`/`endAt` em instante. Ela não é convertida: o
+     primeiro push depois da atualização pode acusar conflito no curso, que se
+     resolve com `codehood push --ours course/course`.
+   - Entrada no `cli/CHANGELOG.md` (Unreleased) com a troca para
+     `startDate`/`endDate` e a instrução do conflito acima.
 6. Formulários: o input `type="date"` já entrega `YYYY-MM-DD`; o valor vai
    direto, sem conversão.
 
