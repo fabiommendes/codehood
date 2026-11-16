@@ -65,7 +65,10 @@ const [
 	db.discipline.findPage({ limit: SAMPLE_SIZE }, { actor }),
 	db.edition.count({}, { actor }),
 	db.edition.count({ active: true }, { actor }),
-	db.invite.findMany({ kind: "PERSONAL" }, { actor }),
+	db.invite.findMany(
+		{ kind: "PERSONAL", invitedRole: "INSTRUCTOR" },
+		{ actor },
+	),
 ]);
 
 const userCount = userCounts.ADMIN + userCounts.INSTRUCTOR + userCounts.STUDENT;
@@ -79,9 +82,7 @@ const disciplineSample =
 			})
 		: sampleList;
 
-const pendingInvites: Invite[] = invites.filter(
-	(invite) => invite.invitedRole === "INSTRUCTOR",
-);
+const pendingInvites: Invite[] = invites;
 const [disciplineExampleBefore, disciplineExampleAfter] = splitAtSlot(
 	m.admin_overview_discipline_text({ example: SLOT }),
 );

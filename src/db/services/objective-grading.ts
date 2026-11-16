@@ -45,7 +45,6 @@ export async function gradeObjectives(
 					status: true,
 					payload: true,
 					question: { select: { id: true, latestId: true } },
-					_count: { select: { feedbacks: true } },
 				},
 			},
 		},
@@ -59,9 +58,17 @@ export async function gradeObjectives(
 		}
 	}
 
+	// Read apart from the submissions: a `_count` of the relation makes Prisma
+	// aggregate the whole `Feedback` table before joining.
+	const passes = await tx.feedback.findMany({
+		where: { submissionId: { in: [...counting.values()].map((s) => s.id) } },
+		select: { submissionId: true },
+	});
+	const alreadyGraded = new Set(passes.map((pass) => pass.submissionId));
+
 	let graded = 0;
 	for (const submission of counting.values()) {
-		if (submission._count.feedbacks > 0) continue;
+		if (alreadyGraded.has(submission.id)) continue;
 		if (submission.status === "WILL_NOT_GRADE") continue;
 
 		const score = objectiveScore(

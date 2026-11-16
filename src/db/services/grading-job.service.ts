@@ -349,7 +349,10 @@ export const makeGradingJobService = defineService()((client) => {
 		): Promise<{ requeued: number }> => {
 			const course = await managedCourse(tx, input, opts.actor);
 			const { count } = await tx.gradingJob.updateMany({
-				where: { state: "FAILED", submission: queueMatch(course.id, input) },
+				where: {
+					state: "FAILED",
+					id: { in: await failedJobIds(tx, course.id, input) },
+				},
 				data: {
 					state: "QUEUED",
 					attempts: 0,
@@ -378,15 +381,18 @@ export const makeGradingJobService = defineService()((client) => {
 			opts: ServiceOptsWithoutTx,
 		): Promise<GradingJobSummary> => {
 			const course = await managedCourse(tx, input, opts.actor);
-			const where = { submission: queueMatch(course.id, input) };
 			const [grouped, failed, keys] = await Promise.all([
-				tx.gradingJob.groupBy({
-					by: ["state"],
-					where,
-					_count: { _all: true },
-				}),
+				tx.$queryRawUnsafe<
+					{ state: keyof GradingJobSummary["counts"]; n: number | bigint }[]
+				>(
+					`SELECT j.state AS state, COUNT(*) AS n ${QUEUE_JOBS_SQL} GROUP BY j.state`,
+					...queueParams(course.id, input),
+				),
 				tx.gradingJob.findMany({
-					where: { ...where, state: "FAILED" },
+					where: {
+						state: "FAILED",
+						id: { in: await failedJobIds(tx, course.id, input) },
+					},
 					select: {
 						attempts: true,
 						lastError: true,
@@ -412,7 +418,7 @@ export const makeGradingJobService = defineService()((client) => {
 				FAILED: 0,
 				CANCELLED: 0,
 			};
-			for (const row of grouped) counts[row.state] = row._count._all;
+			for (const row of grouped) counts[row.state] = Number(row.n);
 			return {
 				counts,
 				failures: failed.map((row) => ({
@@ -886,15 +892,36 @@ async function toJob(tx: PrismaTx, row: DbJob, leaseUntil: Date): Promise<Job> {
 	};
 }
 
-/// The submissions of one question of one exam in a course.
-function queueMatch(
+/// The jobs of one question of one exam in a course, as `FROM … WHERE`.
+///
+/// Raw SQL that walks from the question down to its jobs: the relation filter
+/// of Prisma starts at `GradingJob` and reads the whole table.
+const QUEUE_JOBS_SQL = `FROM QuestionRef q
+	CROSS JOIN Submission s ON s.questionId = q.id
+	CROSS JOIN ResponseRef r ON r.id = s.responseId
+	CROSS JOIN Exam e ON e.id = r.examId
+	CROSS JOIN GradingJob j ON j.submissionId = s.id
+	WHERE q.courseId = ? AND q.slug = ? AND e.courseId = ? AND e.slug = ?`;
+
+/// The parameters of {@link QUEUE_JOBS_SQL}.
+function queueParams(
 	courseId: number,
 	input: { exam: string; question: string },
-): Prisma.SubmissionWhereInput {
-	return {
-		question: { courseId, slug: input.question },
-		response: { exam: { courseId, slug: input.exam } },
-	};
+): (number | string)[] {
+	return [courseId, input.question, courseId, input.exam];
+}
+
+/// The ids of the failed jobs of one question of one exam in a course.
+async function failedJobIds(
+	tx: PrismaTx,
+	courseId: number,
+	input: { exam: string; question: string },
+): Promise<number[]> {
+	const rows = await tx.$queryRawUnsafe<{ id: number | bigint }[]>(
+		`SELECT j.id AS id ${QUEUE_JOBS_SQL} AND j.state = 'FAILED'`,
+		...queueParams(courseId, input),
+	);
+	return rows.map((row) => Number(row.id));
 }
 
 /// The course of a queue, which the actor must teach.

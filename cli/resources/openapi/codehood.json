@@ -16118,6 +16118,19 @@
           },
           {
             "schema": {
+              "type": "string",
+              "enum": [
+                "STUDENT",
+                "INSTRUCTOR",
+                "ADMIN"
+              ]
+            },
+            "required": false,
+            "name": "invitedRole",
+            "in": "query"
+          },
+          {
+            "schema": {
               "type": "object",
               "properties": {
                 "discipline": {

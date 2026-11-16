@@ -45,9 +45,8 @@ export type InviteUpdate = z.infer<typeof inviteUpdate>;
 
 type DbInvite = Prisma.InviteGetPayload<{ include: typeof inviteInclude }>;
 
-/** The creator, redemption count and course every returned invite carries. */
+/** The creator and course every returned invite carries. */
 const inviteInclude = {
-	_count: { select: { redemptions: true } },
 	createdBy: { select: { username: true, name: true } },
 	course: {
 		select: { disciplineSlug: true, instructorId: true, editionSlug: true },
@@ -129,7 +128,7 @@ export const makeInviteService = defineService<InviteT>()(() => {
 				},
 				include: inviteInclude,
 			});
-			const result = fromDb(invite);
+			const result = fromDb(invite, 0);
 			result.token = token; // only here, never in the database
 			return result;
 		},
@@ -167,7 +166,7 @@ export const makeInviteService = defineService<InviteT>()(() => {
 			if (invite == null) return null;
 			if (!by.token) ensurePerm(opts.actor, "invite.read", invite);
 
-			return fromDb(invite);
+			return fromDb(invite, await redemptionsOf(tx, invite.id));
 		},
 	});
 
@@ -203,6 +202,7 @@ export const makeInviteService = defineService<InviteT>()(() => {
 					AND: [
 						filter.createdBy ? { createdById: filter.createdBy } : {},
 						filter.kind ? { kind: filter.kind } : {},
+						filter.invitedRole ? { invitedRole: filter.invitedRole } : {},
 						course ? { courseId: course.id } : {},
 						filter.active ? { expiresAt: { gt: new Date() } } : {},
 						inviteWhere(opts.actor),
@@ -211,7 +211,13 @@ export const makeInviteService = defineService<InviteT>()(() => {
 				include: inviteInclude,
 				orderBy: { createdAt: "desc" },
 			});
-			const result = invites.map(fromDb);
+			const redemptions = await countRedemptions(
+				tx,
+				invites.map((invite) => invite.id),
+			);
+			const result = invites.map((invite) =>
+				fromDb(invite, redemptions.get(invite.id) ?? 0),
+			);
 			for (const invite of result)
 				ensurePerm(opts.actor, "invite.read", invite);
 			return result;
@@ -248,7 +254,7 @@ export const makeInviteService = defineService<InviteT>()(() => {
 				},
 				include: inviteInclude,
 			});
-			return fromDb(updated);
+			return fromDb(updated, await redemptionsOf(tx, updated.id));
 		},
 	});
 
@@ -353,9 +359,36 @@ export function inviteWhere(actor: Actor): Prisma.InviteWhereInput {
 	return { createdById: actor.username };
 }
 
-function fromDb(db: DbInvite): Invite {
+/// How many invites one redemption count reads at a time.
+const REDEMPTION_CHUNK = 500;
+
+/// How many times each of `ids` was redeemed; an invite never redeemed is absent.
+///
+/// Counted apart from the invites: a `_count` of the relation makes Prisma
+/// aggregate the whole `InviteRedemption` table before joining.
+async function countRedemptions(
+	tx: PrismaTx,
+	ids: number[],
+): Promise<Map<number, number>> {
+	const counts = new Map<number, number>();
+	for (let start = 0; start < ids.length; start += REDEMPTION_CHUNK) {
+		const groups = await tx.inviteRedemption.groupBy({
+			by: ["inviteId"],
+			where: { inviteId: { in: ids.slice(start, start + REDEMPTION_CHUNK) } },
+			_count: { _all: true },
+		});
+		for (const group of groups) counts.set(group.inviteId, group._count._all);
+	}
+	return counts;
+}
+
+/// How many times the invite `id` was redeemed.
+function redemptionsOf(tx: PrismaTx, id: number): Promise<number> {
+	return tx.inviteRedemption.count({ where: { inviteId: id } });
+}
+
+function fromDb(db: DbInvite, redemptions: number): Invite {
 	const {
-		_count,
 		createdById: _createdById,
 		tokenHash: _tokenHash,
 		course,
@@ -363,7 +396,7 @@ function fromDb(db: DbInvite): Invite {
 	} = db;
 	return {
 		...rest,
-		redemptions: _count.redemptions,
+		redemptions,
 		course: course
 			? {
 					discipline: course.disciplineSlug,

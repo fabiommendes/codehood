@@ -154,6 +154,39 @@ test("classroom invite: redeemable up to maxUses, then exhausted", async () => {
 	).rejects.toMatchObject({
 		code: "exhausted",
 	});
+
+	const one = await db.invite.findOne({ token: inviteToken }, FULL_ACCESS);
+	expect(one?.redemptions).toBe(2);
+	const listed = await db.invite.findMany(
+		{ course: course.id, kind: "CLASSROOM" },
+		FULL_ACCESS,
+	);
+	expect(listed.map((invite) => invite.redemptions)).toEqual([2]);
+});
+
+test("findMany filters by the invited role", async () => {
+	const admin = await makeAdmin("role-filter-admin@codehood.test");
+	for (const invitedRole of ["STUDENT", "INSTRUCTOR"] as const) {
+		await db.invite.create(
+			{
+				kind: "PERSONAL",
+				email: `role-filter-${invitedRole.toLowerCase()}@codehood.test`,
+				invitedRole,
+				maxUses: 1,
+			},
+			{ actor: admin },
+		);
+	}
+
+	const mine = { createdBy: admin.username, kind: "PERSONAL" } as const;
+	const instructors = await db.invite.findMany(
+		{ ...mine, invitedRole: "INSTRUCTOR" },
+		FULL_ACCESS,
+	);
+	expect(instructors.map((invite) => invite.email)).toEqual([
+		"role-filter-instructor@codehood.test",
+	]);
+	expect(await db.invite.findMany(mine, FULL_ACCESS)).toHaveLength(2);
 });
 
 test("one student redeems invites to two courses, but each only once", async () => {

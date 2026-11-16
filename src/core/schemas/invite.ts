@@ -70,6 +70,7 @@ export const invitePK = z.union([
 export const inviteFilter = z.object({
 	createdBy: username.optional(),
 	kind: inviteSchema.shape.kind.optional(),
+	invitedRole: inviteSchema.shape.invitedRole.optional(),
 	course: courseRef.optional(),
 	// Only invites that have not expired yet.
 	active: z.boolean().optional(),
