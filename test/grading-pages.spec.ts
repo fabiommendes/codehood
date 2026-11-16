@@ -3,7 +3,8 @@ import { db, type schema } from "@/db";
 import { prisma } from "@/db/client";
 import { persistedCourseFactory } from "@/fixtures/course.factory";
 import { persistedExamFactory } from "@/fixtures/exam.factory";
-import { capitalChoice } from "@/mdq/fixtures";
+import type { QuestionDocument } from "@/mdq";
+import { capitalChoice, capitalShortAnswerManual } from "@/mdq/fixtures";
 import { courseHref } from "@/urls";
 import { expect, type Page, test } from "./fixtures";
 import { logInAs, resetDatabase, seedUser } from "./stories/helpers";
@@ -48,15 +49,20 @@ async function enrolledStudent(
 	return student;
 }
 
-/// A published multiple-choice question whose title is `title`.
-async function question(course: Course, slug: string, title: string) {
+/// A published question titled `title`: a short answer graded by hand unless `document` says otherwise.
+async function question(
+	course: Course,
+	slug: string,
+	title: string,
+	document: QuestionDocument = capitalShortAnswerManual,
+) {
 	await db.question.create(
 		{
 			course: course.id,
 			slug,
 			status: "PUBLISHED",
 			version: "1",
-			question: { ...capitalChoice, id: slug, title },
+			question: { ...document, id: slug, title },
 		},
 		FULL_ACCESS,
 	);
@@ -72,6 +78,7 @@ async function attempt(
 	student: Student,
 	questions: string[],
 	finish: boolean,
+	payloads: Record<string, string> = {},
 ): Promise<Record<string, string>> {
 	const ids: Record<string, string> = {};
 	for (const slug of questions) {
@@ -80,7 +87,7 @@ async function attempt(
 				course: course.id,
 				exam,
 				question: slug,
-				payload: "brasilia",
+				payload: payloads[slug] ?? "unsure",
 			},
 			{ actor: student },
 		);
@@ -247,7 +254,7 @@ test("grading queue: lists the questions in exam order with their counts and lin
 }) => {
 	const { teacher, course, href } = await setup("queue1");
 	await question(course, "q-essay", "Essay prompt");
-	await question(course, "q-mc", "Choice prompt");
+	await question(course, "q-mc", "Choice prompt", capitalChoice);
 	await question(course, "q-none", "Unanswered prompt");
 	// Exam order is neither the order the questions were created in, nor the
 	// alphabetical order of their slugs or titles.
@@ -267,8 +274,9 @@ test("grading queue: lists the questions in exam order with their counts and lin
 			student,
 			["q-essay", "q-mc"],
 			true,
+			{ "q-mc": "brasilia" },
 		);
-		await grade(teacher, ids["q-mc"] ?? "");
+		expect(ids["q-mc"]).toBeTruthy();
 	}
 	await complete(exam.id);
 	await logInAs(page, teacher);

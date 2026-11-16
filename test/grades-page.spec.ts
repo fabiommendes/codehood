@@ -3,7 +3,7 @@ import { db } from "@/db";
 import { prisma } from "@/db/client";
 import { persistedCourseFactory } from "@/fixtures/course.factory";
 import { persistedExamFactory } from "@/fixtures/exam.factory";
-import { capitalShortAnswer } from "@/mdq/fixtures";
+import { capitalShortAnswerManual } from "@/mdq/fixtures";
 import { courseHref } from "@/urls";
 import { expect, type Locator, type Page, test } from "./fixtures";
 import { logInAs, resetDatabase, seedUser } from "./stories/helpers";
@@ -31,7 +31,11 @@ async function setup(prefix: string) {
 			slug: "q-one",
 			status: "PUBLISHED",
 			version: "1",
-			question: { ...capitalShortAnswer, id: "q-one", title: "Only question" },
+			question: {
+				...capitalShortAnswerManual,
+				id: "q-one",
+				title: "Only question",
+			},
 		},
 		FULL_ACCESS,
 	);

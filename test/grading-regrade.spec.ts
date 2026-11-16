@@ -3,7 +3,7 @@ import { db, type schema } from "@/db";
 import { prisma } from "@/db/client";
 import { persistedCourseFactory } from "@/fixtures/course.factory";
 import { persistedExamFactory } from "@/fixtures/exam.factory";
-import { capitalShortAnswer } from "@/mdq/fixtures";
+import { capitalShortAnswerManual } from "@/mdq/fixtures";
 import { courseHref } from "@/urls";
 import { expect, type Locator, type Page, test } from "./fixtures";
 import { logInAs, resetDatabase, seedUser } from "./stories/helpers";
@@ -63,7 +63,7 @@ async function shortQuestion(course: Course, slug: string, title: string) {
 			status: "PUBLISHED",
 			version: "1",
 			question: {
-				...capitalShortAnswer,
+				...capitalShortAnswerManual,
 				id: slug,
 				title,
 				stem: `Stem of ${slug}: what is the capital?`,

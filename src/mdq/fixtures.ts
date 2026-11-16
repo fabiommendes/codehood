@@ -172,6 +172,13 @@ export const capitalShortAnswer: ShortAnswerQuestion = shortAnswer({
 	incorrectFeedback: "Sorry, that is not the correct answer.",
 });
 
+/// The same question, but a response that matches no pattern goes to the
+/// instructor, so a typed answer stays pending until someone grades it.
+export const capitalShortAnswerManual: ShortAnswerQuestion = shortAnswer({
+	...capitalShortAnswer,
+	unmatched: "manual",
+});
+
 /// One blank of each kind, all three referenced by the stem, which is what
 /// the model rules check and the schema cannot.
 export const brasiliaFillIn: FillInQuestion = fillIn({

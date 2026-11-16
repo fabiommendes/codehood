@@ -4,7 +4,7 @@ import { db, type schema } from "@/db";
 import { prisma } from "@/db/client";
 import { persistedCourseFactory } from "@/fixtures/course.factory";
 import { persistedExamFactory } from "@/fixtures/exam.factory";
-import { capitalShortAnswer } from "@/mdq/fixtures";
+import { capitalShortAnswerManual } from "@/mdq/fixtures";
 import { unweighted } from "@/services/exam-result";
 import type { ExamTiming, ExceptionTiming } from "@/services/exam-state";
 import {
@@ -416,7 +416,7 @@ async function shortQuestion(course: Course, slug: string, title: string) {
 			slug,
 			status: "PUBLISHED",
 			version: "1",
-			question: { ...capitalShortAnswer, id: slug, title },
+			question: { ...capitalShortAnswerManual, id: slug, title },
 		},
 		FULL_ACCESS,
 	);
@@ -718,7 +718,7 @@ test("results: a student never sees the section, and a practice exam has none fo
 			page.getByRole("heading", { name: "Practice drill" }).first(),
 		).toBeVisible();
 		await expect(resultsHeading(page)).toHaveCount(0);
-		await expect(page.getByRole("table")).toHaveCount(0);
+		await expect(resultsTable(page)).toHaveCount(0);
 	});
 
 	await test.step("a student of the course sees neither heading nor table", async () => {

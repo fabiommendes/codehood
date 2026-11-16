@@ -6,6 +6,7 @@ import { persistedExamFactory } from "@/fixtures/exam.factory";
 import {
 	brasiliaFillIn,
 	capitalShortAnswer,
+	capitalShortAnswerManual,
 	idempotenceEssay,
 	multipleChoice,
 	multipleSelection,
@@ -824,7 +825,7 @@ async function shortQuestion(course: Course, slug: string, title: string) {
 			slug,
 			status: "PUBLISHED",
 			version: "1",
-			question: { ...capitalShortAnswer, id: slug, title },
+			question: { ...capitalShortAnswerManual, id: slug, title },
 		},
 		FULL_ACCESS,
 	);
