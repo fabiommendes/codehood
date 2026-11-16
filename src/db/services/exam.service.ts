@@ -37,7 +37,16 @@ import { loadResultPolicy } from "@/db/result-policy";
 import type { AttachmentService } from "@/db/services/attachment.service";
 import type { BlobService } from "@/db/services/blob.service";
 import { courseContentsWhere } from "@/db/services/course.service";
-import { gradeExpiredObjectives } from "@/db/services/objective-grading";
+import { promoteFinalSends } from "@/db/services/grading-job-queue";
+import {
+	gradeExpiredObjectives,
+	gradeObjectives,
+} from "@/db/services/objective-grading";
+import {
+	examTimingFromDb,
+	examTimingSelect,
+	loadExceptionTiming,
+} from "@/db/services/submission.service";
 import { m } from "@/i18n";
 import { attachmentProblems } from "@/mdq";
 import {
@@ -446,6 +455,10 @@ const buildExamService = (deps: Deps) =>
 					opts,
 					{ include: examInclude() },
 				);
+				// Completing the exam ends the attempts, whoever completes it.
+				if (fields.status === "COMPLETED" && exam.status !== "COMPLETED") {
+					await closeOpenAttempts(tx, exam.id as ExamId);
+				}
 				if (attachments) {
 					const owner = { type: "EXAM" as const, id: exam.id as ExamId };
 					await deps.attachments.attachFiles(
@@ -460,6 +473,60 @@ const buildExamService = (deps: Deps) =>
 					});
 				}
 
+				return fromDb(
+					row,
+					"full",
+					(await loadWeights(tx, [row])).get(row.id) ?? [],
+				);
+			},
+		});
+
+		/**
+		 * Ends an exam now: completes it and closes the attempts still taking answers.
+		 *
+		 * The attempts close as if their time had run out: what was saved counts
+		 * and the objective answers are graded. The instructor's simulation stays
+		 * as it is, and so does the attempt of a student whose exception keeps
+		 * their own window open. Closing a completed exam changes nothing.
+		 * `update` with `status: "COMPLETED"` does the same.
+		 *
+		 * @throws {@link NotFound} If the exam does not exist or `actor` may not see it.
+		 * @throws {@link NotAllowed} If `actor` may not write the course's contents.
+		 * @throws {@link InvalidData} If the exam is a draft or archived.
+		 */
+		const close = op({
+			args: [examPK],
+			returns: examFullSchema,
+			run: async (
+				tx: PrismaTx,
+				filter: ExamPK,
+				opts: ServiceOptsWithoutTx,
+			): Promise<Exam> => {
+				const exam = await writableExam(tx, filter, opts, "exam.update");
+				await checkVersion(tx, "exam", { id: exam.id }, opts);
+				if (hiddenFromStudents(exam.status)) {
+					throw new InvalidData({
+						exam: [{ code: "invalid", message: m.errors_exam_close_hidden() }],
+					});
+				}
+
+				let row: DbExam;
+				if (exam.status === "COMPLETED") {
+					row = await tx.exam.findUniqueOrThrow({
+						where: { id: exam.id },
+						include: examInclude(),
+					});
+				} else {
+					row = await guardedUpdate(
+						tx,
+						"exam",
+						{ id: exam.id },
+						{ status: "COMPLETED" },
+						opts,
+						{ include: examInclude() },
+					);
+					await closeOpenAttempts(tx, exam.id as ExamId);
+				}
 				return fromDb(
 					row,
 					"full",
@@ -738,6 +805,7 @@ const buildExamService = (deps: Deps) =>
 			findManyInCourses,
 			update,
 			upsert,
+			close,
 			releaseGrades,
 			setAnswerHistory,
 			attachment,
@@ -774,6 +842,39 @@ const releaseRefusals: Record<
 	"exception-open": m.errors_release_exception_open,
 	pending: m.errors_release_pending,
 };
+
+/// Closes the real attempts of the exam `examId` still taking answers, as if their time had run out. The attempt of a student whose exception keeps their personal window open stays as it is.
+async function closeOpenAttempts(tx: PrismaTx, examId: ExamId): Promise<void> {
+	const exam = await tx.exam.findUniqueOrThrow({
+		where: { id: examId },
+		select: examTimingSelect,
+	});
+	const completed = { ...examTimingFromDb(exam), status: "COMPLETED" as const };
+	const now = new Date();
+	const attempts = await tx.response.findMany({
+		where: { ...realAttempt, examId, acceptingSubmissions: true },
+		select: { id: true, authorId: true },
+		orderBy: { id: "asc" },
+	});
+	for (const attempt of attempts) {
+		const exception = await loadExceptionTiming(tx, examId, attempt.authorId);
+		const phase = examPhase(viewerTiming(completed, exception), now);
+		if (phase === "open" || phase === "upcoming") continue;
+
+		await promoteFinalSends(tx, {
+			id: attempt.id,
+			practice: completed.type === "PRACTICE",
+		});
+		await guardedUpdate(
+			tx,
+			"response",
+			{ id: attempt.id },
+			{ acceptingSubmissions: false, closedAt: now },
+			{},
+		);
+		await gradeObjectives(tx, attempt.id);
+	}
+}
 
 /// The result of every attempt at `exam`, with all feedback as the instructor sees it.
 async function attemptResults(

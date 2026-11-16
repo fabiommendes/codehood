@@ -1,5 +1,8 @@
+import { CodeBlock } from "mdq/solid";
 import { For, type JSX, Show } from "solid-js";
 import { m } from "@/i18n";
+import type { CodeBlocksHtml } from "@/utils/code-blocks";
+import { CodeBlocks } from "./CodeBlocks";
 
 /// An attachment as a page receives it: a fenced block carries its `text`, a link only its name.
 export interface AttachmentItem {
@@ -14,6 +17,8 @@ export interface AttachmentListProps {
 	attachments: readonly AttachmentItem[] | undefined;
 	/// The download URL of the attachment `name`, or null for a list without download links.
 	url: (name: string) => string | null;
+	/// The highlighted code of the attachments, from `highlightQuestionCodeBlocks`, for a list outside an island that has them.
+	codeBlocks?: CodeBlocksHtml;
 }
 
 /**
@@ -22,6 +27,19 @@ export interface AttachmentListProps {
  * A fenced attachment also shows its code in a block that starts closed.
  */
 export function AttachmentList(props: AttachmentListProps): JSX.Element {
+	return (
+		<Show when={props.codeBlocks} fallback={<Attachments {...props} />}>
+			{(html) => (
+				<CodeBlocks html={html()}>
+					<Attachments {...props} />
+				</CodeBlocks>
+			)}
+		</Show>
+	);
+}
+
+/// The list of `AttachmentList`, its code drawn by the nearest `CodeBlocks`.
+function Attachments(props: AttachmentListProps): JSX.Element {
 	return (
 		<Show when={props.attachments && props.attachments.length > 0}>
 			<section
@@ -61,9 +79,7 @@ export function AttachmentList(props: AttachmentListProps): JSX.Element {
 										<summary class="cursor-pointer px-3 py-1 text-xs text-muted">
 											{m.common_attachment_show_code()}
 										</summary>
-										<pre class="overflow-x-auto p-3 text-xs">
-											<code>{item.text}</code>
-										</pre>
+										<CodeBlock code={item.text ?? ""} lang={item.format} />
 									</details>
 								</Show>
 							</li>

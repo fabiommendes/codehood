@@ -4,6 +4,18 @@
 
 ### Changed
 
+- Um só estilo de código no site, para ver e para editar. Os temas de
+  `src/utils/code-themes.ts` (Cerrado claro, Floresta escuro) são a fonte
+  única: o Shiki do servidor, o editor CodeMirror (runner e resposta de
+  código) e o terminal do runner tiram as cores deles e seguem o tema do
+  Codehood. Saem o `dark-plus` fixo do runner e dos exemplos, o `mockup-code`
+  dos blocos do mdq e os `<pre>` sem realce. Blocos estáticos usam
+  `CodeBlock.astro` ou `CodeBlocks` (ilha) dentro do quadro `code-block`. A
+  caixa "Your answer" da revisão, o gabarito do mdq, os exemplos de teste e os
+  anexos de código passam a ser realçados (o `CodeBlock` do mdq-js usa o
+  `CodeBlockProvider`). Notas e READMEs em Markdown, preâmbulos de prova e o
+  "Getting started" também.
+
 - Seed de dev enxuto. As 23 provas de `cs101` viraram 8 (`quiz-01`, `test-01`
   liberada, `test-02` em correção, `test-03` aberta, `quiz-02`, `midterm`,
   `final`, `practice`), mais `cs201/test-trees`, pronta para liberar. Os

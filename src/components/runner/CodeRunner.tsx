@@ -70,7 +70,7 @@ export interface CodeRunnerProps {
 	/// `script` runs the file once; `repl` loads it and opens the toplevel.
 	runMode?: RunMode;
 	/// Server-highlighted HTML of `code` (Shiki, `highlightCode` with the
-	/// `vscode` theme, `dark-plus` like the editor),
+	/// site's code themes, like the editor),
 	/// shown until the editor mounts and in server rendering. Trusted: never
 	/// user HTML.
 	highlightedHtml?: string;
@@ -150,7 +150,7 @@ function phaseText(
  * Renders the widget.
  *
  * Server rendering and first paint show `highlightedHtml` (or the plain
- * code) in a `<pre>`. CodeMirror (VS Code theme and keymap) is loaded with
+ * code) in a `<pre>`. CodeMirror (site code theme, VS Code keymap) is loaded with
  * dynamic `import()` and mounted when the editor is first focused or made
  * editable, and right away in `answer` mode; xterm.js likewise on the first
  * run. Neither is ever imported statically. The first focus or edit calls
@@ -794,14 +794,14 @@ export function CodeRunner(props: CodeRunnerProps): JSX.Element {
 			    In a snippet the wrapper is daisyUI's code mockup, with its dots
 			    and without the gap it puts before each `pre`. */}
 			<div
-				class={`${EDITOR_FOCUS_RING} ${minimal ? `${terminalShown() ? "rounded-b-none" : ""} mockup-code overflow-hidden bg-[#1e1e1e] pt-3 pb-1 text-[#d4d4d4] before:mb-2 before:ml-1 [&_pre]:before:hidden` : ""}`}
+				class={`${EDITOR_FOCUS_RING} ${minimal ? `${terminalShown() ? "rounded-b-none" : ""} mockup-code overflow-hidden bg-(--code-bg) pt-3 pb-1 text-(--code-fg) before:mb-2 before:ml-1 [&_pre]:before:hidden` : ""}`}
 			>
 				<Show when={minimal}>
 					<div class="absolute top-1.5 right-2 z-10 flex items-center gap-1">
 						<Show when={!editing()}>
 							<button
 								type="button"
-								class="btn btn-ghost btn-xs btn-square text-[#a0a0a0] hover:bg-[#ffffff14] hover:text-[#d4d4d4]"
+								class="btn btn-ghost btn-xs btn-square text-(--code-muted) hover:bg-(--code-selection) hover:text-(--code-fg)"
 								data-action="edit"
 								aria-label={m.runner_edit()}
 								title={m.runner_edit_hint()}
@@ -819,7 +819,7 @@ export function CodeRunner(props: CodeRunnerProps): JSX.Element {
 						<Show when={editing()}>
 							<button
 								type="button"
-								class="btn btn-ghost btn-xs btn-square text-[#a0a0a0] hover:bg-[#ffffff14] hover:text-[#d4d4d4]"
+								class="btn btn-ghost btn-xs btn-square text-(--code-muted) hover:bg-(--code-selection) hover:text-(--code-fg)"
 								data-action="reset"
 								aria-label={m.runner_reset()}
 								title={m.runner_reset()}
@@ -965,9 +965,9 @@ export function CodeRunner(props: CodeRunnerProps): JSX.Element {
 				inert={!terminalShown()}
 			>
 				<div
-					class={`min-h-0 overflow-hidden bg-[#181818] font-mono text-[13px] leading-5 ${minimal ? "rounded-b-box" : ""} border-t border-[#3c3c3c]`}
+					class={`min-h-0 overflow-hidden bg-(--code-bg) font-mono text-[13px] leading-5 text-(--code-fg) ${minimal ? "rounded-b-box" : ""} border-t border-(--code-border)`}
 				>
-					<div class="flex items-center gap-2 bg-[#252526] px-3 py-1 text-[11px] tracking-wide text-[#a0a0a0] uppercase">
+					<div class="flex items-center gap-2 bg-(--code-panel) px-3 py-1 text-[11px] tracking-wide text-(--code-muted) uppercase">
 						<span>{m.runner_terminal()}</span>
 						<span
 							role="status"
@@ -992,13 +992,13 @@ export function CodeRunner(props: CodeRunnerProps): JSX.Element {
 									<span
 										class={`flex items-center gap-1.5 ${
 											state().phase === "running"
-												? "text-[#89d185]"
+												? "text-success"
 												: state().phase === "waiting-input" ||
 														state().phase === "truncated"
-													? "text-[#e5c07b]"
+													? "text-warning"
 													: state().phase === "error"
-														? "text-[#f48771]"
-														: "text-[#858585]"
+														? "text-error"
+														: "text-(--code-muted)"
 										}`}
 									>
 										{/* Not while waiting for input: the program waits on
@@ -1016,13 +1016,13 @@ export function CodeRunner(props: CodeRunnerProps): JSX.Element {
 								)}
 							</Show>
 							<Show when={duration()}>
-								{(text) => <span class="text-[#858585]">· {text()}</span>}
+								{(text) => <span class="text-(--code-muted)">· {text()}</span>}
 							</Show>
 						</span>
 						<Show when={minimal}>
 							<button
 								type="button"
-								class="btn btn-ghost btn-xs btn-square -my-1 -mr-2 text-[#a0a0a0] hover:bg-[#ffffff14] hover:text-[#d4d4d4]"
+								class="btn btn-ghost btn-xs btn-square -my-1 -mr-2 text-(--code-muted) hover:bg-(--code-selection) hover:text-(--code-fg)"
 								data-action="hide-terminal"
 								aria-label={m.runner_hide_terminal()}
 								title={m.runner_hide_terminal()}
@@ -1042,12 +1042,12 @@ export function CodeRunner(props: CodeRunnerProps): JSX.Element {
 						<div class="p-3">
 							<div
 								role="alert"
-								class="flex flex-wrap items-center gap-3 rounded-box border border-[#f48771]/40 bg-[#f48771]/10 px-3 py-2 text-sm text-[#f48771]"
+								class="flex flex-wrap items-center gap-3 rounded-box border border-error/40 bg-error/10 px-3 py-2 text-sm text-error"
 							>
 								<span class="flex-1">{m.runner_load_failed()}</span>
 								<button
 									type="button"
-									class="btn btn-outline btn-sm border-[#d4d4d4]/60 text-[#d4d4d4]"
+									class="btn btn-outline btn-sm border-(--code-border) text-(--code-fg)"
 									data-action="retry"
 									onClick={() => void run()}
 								>
@@ -1058,7 +1058,7 @@ export function CodeRunner(props: CodeRunnerProps): JSX.Element {
 					</Show>
 					<div class="relative">
 						<Show when={!terminalReady()}>
-							<p class="absolute inset-x-0 top-0 px-3 py-2 text-[#858585] italic">
+							<p class="absolute inset-x-0 top-0 px-3 py-2 text-(--code-muted) italic">
 								{m.runner_terminal_empty()}
 							</p>
 						</Show>
@@ -1074,13 +1074,13 @@ export function CodeRunner(props: CodeRunnerProps): JSX.Element {
 					<Show when={coarse() && state().phase === "waiting-input"}>
 						<div class="h-14" aria-hidden="true" />
 						<form
-							class="fixed inset-x-0 z-50 flex gap-2 border-t border-[#3c3c3c] bg-[#252526] p-2"
+							class="fixed inset-x-0 z-50 flex gap-2 border-t border-(--code-border) bg-(--code-panel) p-2"
 							style={{ bottom: `${keyboardInset()}px` }}
 							onSubmit={sendLine}
 						>
 							<input
 								ref={lineInput}
-								class="input input-sm flex-1 border-[#3c3c3c] bg-[#1e1e1e] font-mono text-[#d4d4d4]"
+								class="input input-sm flex-1 border-(--code-border) bg-(--code-bg) font-mono text-(--code-fg)"
 								aria-label={m.runner_input_label()}
 								placeholder={m.runner_input_placeholder()}
 								autocomplete="off"
@@ -1090,7 +1090,7 @@ export function CodeRunner(props: CodeRunnerProps): JSX.Element {
 							/>
 							<button
 								type="submit"
-								class="btn btn-outline btn-sm border-[#d4d4d4]/60 text-[#d4d4d4]"
+								class="btn btn-outline btn-sm border-(--code-border) text-(--code-fg)"
 								data-action="send"
 							>
 								{m.runner_send()}

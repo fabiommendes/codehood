@@ -252,7 +252,7 @@
 		@apply whitespace-pre-wrap text-sm;
 	}
 	.mdq-code {
-		@apply mockup-code w-full text-sm;
+		@apply code-block w-full;
 	}
 
 	/* A tall line: every control is taller than a line of text. */

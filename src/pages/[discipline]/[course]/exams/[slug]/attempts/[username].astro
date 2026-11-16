@@ -27,6 +27,7 @@ import { reviewResult } from "@/services/review";
 import { questionAttachmentUrl } from "@/urls";
 import { breadcrumbs } from "@/utils/breadcrumbs";
 import { gradingHref } from "@/utils/grading-urls";
+import { highlightQuestionCodeBlocks } from "@/utils/highlight-code-blocks";
 import {
 	gradingExamNav,
 	loadGrading,
@@ -153,6 +154,10 @@ const rows = outcomes.questions.map((outcome, index) => {
 				: undefined,
 	};
 });
+/// The highlighted code of the attachments of every question.
+const attachmentBlocks = await highlightQuestionCodeBlocks(
+	rows.map((entry) => ({ attachments: entry.asked?.attachments })),
+);
 
 const stateLabel = (status: string, score: number | null): string => {
 	if (status === "not-graded") return m.exams_attempt_not_graded();
@@ -224,7 +229,7 @@ const stateLabel = (status: string, score: number | null): string => {
             <div class="card-body">
               <p class="text-sm"><QuestionNumber number={number} points={points} /></p>
               <h3 class="text-lg font-semibold">{title}</h3>
-              <AttachmentList attachments={asked?.attachments} url={attachmentUrl} />
+              <AttachmentList attachments={asked?.attachments} url={attachmentUrl} codeBlocks={attachmentBlocks} />
               {counting && answeredAfterDeadline(deadline, counting.createdAt) && (
                 <span class="badge badge-warning badge-sm">{m.exams_attempt_answered_late({ seconds: Math.round((counting.createdAt.getTime() - deadline!.getTime()) / 1000) })}</span>
               )}

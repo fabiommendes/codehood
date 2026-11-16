@@ -1,4 +1,5 @@
 ---
+import CodeBlock from "@/components/CodeBlock.astro";
 import DesignLayout from "@/layouts/DesignLayout.astro";
 
 export const prerender = false;
@@ -139,9 +140,17 @@ const headings = [
           Inline code, like <code class="rounded bg-base-200 px-1.5 py-0.5 font-mono text-sm">codehood push</code>,
           sits inside a sentence with a subtle background. Course codes and timers use the same face: <span class="font-mono text-sm">MAT-101</span>, <span class="font-mono text-sm">00:42:10</span>.
         </p>
-        <pre class="overflow-x-auto rounded-box bg-neutral p-4 font-mono text-sm text-neutral-content"><code>$ codehood push
+        <p>
+          Blocks of code, read or edited, use the site's code themes (<span class="font-mono text-sm">src/utils/code-themes.ts</span>)
+          and follow the light/dark toggle: <span class="font-mono text-sm">CodeBlock.astro</span> on the server,
+          <span class="font-mono text-sm">CodeBlocks</span> in an island, the CodeMirror editor in the runner and in code answers.
+        </p>
+        <CodeBlock lang="shellsession" code={`$ codehood push
   syncing content/questions/*.q.md
-  live for your students</code></pre>
+  live for your students`} />
+        <CodeBlock lang="python" code={`def factorial(n: int) -> int:
+    """Product of 1..n."""
+    return 1 if n <= 1 else n * factorial(n - 1)  # recursion`} />
       </div>
     </div>
   </section>

@@ -12,10 +12,11 @@ import { examSchedule, previewAttemptState } from "@/services/exam-state";
 import { examAttachmentUrl } from "@/urls";
 import { breadcrumbs } from "@/utils/breadcrumbs";
 import { examNav } from "@/utils/exam-nav";
+import { highlightQuestionCodeBlocks } from "@/utils/highlight-code-blocks";
 import { loadAttemptView } from "@/utils/load-attempt-view";
 import { loadExamQuestions } from "@/utils/load-exam-questions";
 import { loadExamStaff } from "@/utils/load-exam-staff";
-import { renderMarkdown } from "@/utils/markdown";
+import { highlightCodeBlocks, renderMarkdown } from "@/utils/markdown";
 
 export const prerender = false;
 
@@ -50,7 +51,7 @@ const view = await loadAttemptView({
 
 const preambleHtml =
 	exam.preamble && exam.format === "MARKDOWN"
-		? renderMarkdown(exam.preamble)
+		? await highlightCodeBlocks(renderMarkdown(exam.preamble))
 		: null;
 const codeRun = effectiveCodeRun(exam);
 ---
@@ -87,6 +88,7 @@ const codeRun = effectiveCodeRun(exam);
     <div class="mt-4">
       <AttachmentList
         attachments={exam.attachments}
+        codeBlocks={await highlightQuestionCodeBlocks({ attachments: exam.attachments })}
         url={(name) => examAttachmentUrl(`${discipline}/${courseSegment}`, slug!, name)}
       />
     </div>

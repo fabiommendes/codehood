@@ -1,5 +1,6 @@
 ---
 import Avatar from "@/components/Avatar.astro";
+import CodeBlock from "@/components/CodeBlock.astro";
 import Logo from "@/components/Logo.astro";
 import AppFooter from "@/components/nav/AppFooter.astro";
 import AppSidebar, {
@@ -123,8 +124,7 @@ const layouts = [
               <span class="text-xs text-muted">{layout.path}</span>
             </div>
             <p class="text-base-content/70">{layout.description}</p>
-              <!-- prettier-ignore -->
-              <pre class="mt-2 overflow-x-auto rounded-box bg-neutral p-4 font-mono text-sm text-neutral-content"><code>{layout.usage}</code></pre>
+              <CodeBlock class="mt-2" lang="astro" code={layout.usage} />
             <div class="card-actions mt-1">
               <a href={layout.demo} class="btn btn-sm btn-outline">
                 View demo →

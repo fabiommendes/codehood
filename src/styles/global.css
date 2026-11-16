@@ -551,17 +551,69 @@ h6 {
 /* Shiki (src/utils/highlight-code.ts) renders both themes' colors into CSS
    variables per token (defaultColor: false) instead of picking one at
    render time, so a snippet page doesn't need to re-highlight on toggle —
-   these two rules just switch which variable each token's color reads from. */
+   these rules just switch which variable each token reads from. The tokens
+   of the code editor (`.cm-shiki`, src/components/runner/shiki-highlight.ts)
+   carry the same variables. */
 .shiki,
 .shiki span {
 	color: var(--shiki-light);
 	background-color: var(--shiki-light-bg);
 }
 
+.shiki span,
+.cm-shiki {
+	color: var(--shiki-light);
+	font-style: var(--shiki-light-font-style);
+	font-weight: var(--shiki-light-font-weight);
+}
+
 [data-theme="codehood-dark"] .shiki,
 [data-theme="codehood-dark"] .shiki span {
 	color: var(--shiki-dark);
 	background-color: var(--shiki-dark-bg);
+}
+
+[data-theme="codehood-dark"] :is(.shiki span, .cm-shiki) {
+	color: var(--shiki-dark);
+	font-style: var(--shiki-dark-font-style);
+	font-weight: var(--shiki-dark-font-weight);
+}
+
+/* The frame of every block of code the site shows: the background and text
+   of the code themes (`--code-*`, src/utils/code-themes.ts), with or without
+   Shiki's tokens inside. */
+@utility code-block {
+	display: block;
+	overflow-x: auto;
+	border: 1px solid var(--code-border);
+	border-radius: var(--radius-box);
+	padding: 0.75rem 1rem;
+	background-color: var(--code-bg);
+	color: var(--code-fg);
+	font-family: var(--font-mono);
+	font-size: 13px;
+	line-height: 1.25rem;
+	font-variant-ligatures: none;
+
+	& pre {
+		margin: 0;
+		padding: 0;
+		overflow: visible;
+		background-color: transparent;
+		font-size: inherit;
+		line-height: inherit;
+	}
+}
+
+/* Fenced blocks of rendered Markdown that no highlighter reached still sit
+   on the code themes' colors. */
+:is(.prose, .mdq-markdown:not([data-inline])) {
+	--tw-prose-pre-bg: var(--code-bg);
+	--tw-prose-pre-code: var(--code-fg);
+}
+
+:is(.prose, .mdq-markdown:not([data-inline])) pre:not(.code-runner-block *) {
+	border: 1px solid var(--code-border);
 }
 
 /* Runnable blocks of a rendered note are widgets, not paragraphs: keep them
@@ -585,7 +637,7 @@ h6 {
 	padding: 0 3px 0 5px;
 	margin-right: 0.75rem;
 	text-align: right;
-	color: #858585;
+	color: var(--code-muted);
 	user-select: none;
 }
 

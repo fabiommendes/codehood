@@ -20,7 +20,11 @@ import { breadcrumbs } from "@/utils/breadcrumbs";
 import { resourcesNav } from "@/utils/course-tabs-nav";
 import { highlightCode } from "@/utils/highlight-code";
 import { loadCourse } from "@/utils/load-course";
-import { renderMarkdown, renderMarkdownBody } from "@/utils/markdown";
+import {
+	highlightCodeBlocks,
+	renderMarkdown,
+	renderMarkdownBody,
+} from "@/utils/markdown";
 import {
 	type FileView,
 	fileView,
@@ -96,7 +100,9 @@ if (readme) {
 	);
 	if (attachment) {
 		const text = await textOf(attachment);
-		readmeHtml = path ? renderMarkdown(text) : renderMarkdownBody(text);
+		readmeHtml = await highlightCodeBlocks(
+			path ? renderMarkdown(text) : renderMarkdownBody(text),
+		);
 	}
 }
 
@@ -106,7 +112,7 @@ let fileHtml = "";
 if (file) {
 	view = fileView(path, file.size);
 	if (view.kind === "markdown") {
-		fileHtml = renderMarkdown(await textOf(file));
+		fileHtml = await highlightCodeBlocks(renderMarkdown(await textOf(file)));
 	} else if (view.kind === "code") {
 		fileHtml = await highlightCode(await textOf(file), view.language);
 	}
@@ -221,7 +227,7 @@ function code(text: string): string {
         )}
         {view.kind === "code" && (
           <div
-            class="overflow-x-auto rounded-box bg-base-200 p-4 text-sm text-base-content [&_.shiki]:!m-0 [&_.shiki]:!bg-transparent [&_.shiki_span]:!bg-transparent"
+            class="code-block"
             set:html={fileHtml}
           />
         )}

@@ -1,7 +1,11 @@
 /**
- * Syntax colors for the runner's CodeMirror editor taken from Shiki, with
- * the `dark-plus` theme and the grammars the server uses for the read-only
- * view, so a snippet keeps its colors when it turns into an editor.
+ * Syntax colors for the CodeMirror editor taken from Shiki, with the site's
+ * code themes (`CODE_THEMES`) and the grammars the server uses for the
+ * read-only view, so a snippet keeps its colors when it turns into an editor.
+ *
+ * Each token carries the colors of both themes as `--shiki-light` and
+ * `--shiki-dark`, like the server's HTML, and `src/styles/global.css` picks
+ * one for the site's theme (`.cm-shiki`), so a theme change needs no new pass.
  *
  * Only `createEditor` imports this module, with a dynamic `import()`.
  */
@@ -11,28 +15,22 @@ import type { Extension } from "@codemirror/state";
 import type { DecorationSet, ViewUpdate } from "@codemirror/view";
 import type { HighlighterCore, ThemedToken } from "shiki/core";
 import { runnerInfo } from "@/runner/languages";
+import { CODE_THEMES } from "@/utils/code-themes";
 
-const THEME = "dark-plus";
+/// The theme names of `CODE_THEMES`, by the color names of the server's HTML.
+const THEMES = {
+	light: CODE_THEMES.light.name ?? "light",
+	dark: CODE_THEMES.dark.name ?? "dark",
+};
 
 /// One highlighter for every editor of the page; grammars load on first use.
 let highlighter: Promise<HighlighterCore> | undefined;
 
-/// Font style bits of a Shiki token.
-const ITALIC = 1;
-const BOLD = 2;
-const UNDERLINE = 4;
-
-/// The CSS of a token, or `""` when it has the theme's default look.
-function tokenStyle(token: ThemedToken, foreground: string): string {
-	const parts: string[] = [];
-	if (token.color && token.color.toLowerCase() !== foreground) {
-		parts.push(`color:${token.color}`);
-	}
-	const font = token.fontStyle ?? 0;
-	if (font & ITALIC) parts.push("font-style:italic");
-	if (font & BOLD) parts.push("font-weight:bold");
-	if (font & UNDERLINE) parts.push("text-decoration:underline");
-	return parts.join(";");
+/// The inline style of a token: its `--shiki-*` variables.
+function tokenStyle(token: ThemedToken): string {
+	return Object.entries(token.htmlStyle ?? {})
+		.map(([name, value]) => `${name}:${value}`)
+		.join(";");
 }
 
 /**
@@ -51,7 +49,7 @@ export async function shikiHighlighting(
 		import("@codemirror/state"),
 	]);
 	highlighter ??= core.createHighlighterCore({
-		themes: [import("shiki/themes/dark-plus.mjs")],
+		themes: [CODE_THEMES.light, CODE_THEMES.dark],
 		langs: [],
 		engine: engine.createJavaScriptRegexEngine(),
 	});
@@ -61,7 +59,6 @@ export async function shikiHighlighting(
 			(await grammar.load()) as Parameters<HighlighterCore["loadLanguage"]>[0],
 		);
 	}
-	const foreground = (shiki.getTheme(THEME).fg ?? "").toLowerCase();
 
 	const { Decoration, ViewPlugin } = view;
 	/// Mark decorations by style, so equal tokens share one.
@@ -69,7 +66,7 @@ export async function shikiHighlighting(
 	const markOf = (style: string) => {
 		let mark = marks.get(style);
 		if (!mark) {
-			mark = Decoration.mark({ attributes: { style } });
+			mark = Decoration.mark({ class: "cm-shiki", attributes: { style } });
 			marks.set(style, mark);
 		}
 		return mark;
@@ -77,21 +74,22 @@ export async function shikiHighlighting(
 
 	const decorate = (code: string): DecorationSet => {
 		const builder = new state.RangeSetBuilder<ReturnType<typeof markOf>>();
-		const lines = shiki.codeToTokensBase(code, {
+		const { tokens } = shiki.codeToTokens(code, {
 			lang: grammar.name,
-			theme: THEME,
+			themes: THEMES,
+			defaultColor: false,
 		});
-		for (const line of lines) {
+		let lineStart = 0;
+		for (const line of tokens) {
+			let offset = lineStart;
 			for (const token of line) {
-				const style = tokenStyle(token, foreground);
+				const style = tokenStyle(token);
 				if (style && token.content.length > 0) {
-					builder.add(
-						token.offset,
-						token.offset + token.content.length,
-						markOf(style),
-					);
+					builder.add(offset, offset + token.content.length, markOf(style));
 				}
+				offset += token.content.length;
 			}
+			lineStart = offset + 1;
 		}
 		return builder.finish();
 	};

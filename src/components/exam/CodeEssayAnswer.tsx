@@ -290,9 +290,7 @@ function ConflictPanel(props: {
 				<span class="font-semibold">{title}</span>
 				<span class="text-muted">{time}</span>
 			</div>
-			<pre class="max-h-28 overflow-auto bg-base-200 px-3 py-2 font-mono text-xs leading-5">
-				{code}
-			</pre>
+			<pre class="code-block max-h-28 overflow-auto rounded-none">{code}</pre>
 			<div class="p-2">
 				<button type="button" class="btn btn-sm btn-block" onClick={pick}>
 					{label}

@@ -12,7 +12,10 @@ import type { AttemptState, ExamSchedule } from "@/services/exam-state";
 import { regradeBlocker } from "@/services/regrade";
 import type { ReviewResult } from "@/services/review";
 import type { CodeBlocksHtml } from "./code-blocks";
-import { highlightQuestionCodeBlocks } from "./highlight-code-blocks";
+import {
+	answerSnippets,
+	highlightQuestionCodeBlocks,
+} from "./highlight-code-blocks";
 import { highlightExamples } from "./highlight-examples";
 import { loadReviews } from "./load-review";
 import type { PretestSource } from "./pretest-sources";
@@ -190,6 +193,9 @@ export async function loadAttemptView(
 		exampleHtml,
 		codeBlocks: await highlightQuestionCodeBlocks(
 			questions.map((entry) => entry.question),
+			questions.flatMap(({ slug, question }) =>
+				answerSnippets(question, [answers[slug]]),
+			),
 		),
 		codeSends,
 	};

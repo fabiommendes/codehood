@@ -4,6 +4,7 @@
 export const prerender = false;
 
 import { actions } from "astro:actions";
+import CodeBlock from "@/components/CodeBlock.astro";
 import FormAlert from "@/components/form/FormAlert";
 import PageKicker from "@/components/PageKicker.astro";
 import { db } from "@/db";
@@ -55,10 +56,9 @@ const profileLink = `<a href="/profile" class="link">${m.auth_gs_profile_link()}
             class="text-sm text-muted"
             set:html={m.auth_gs_step1_body({ mdq: codeTag("mdq"), uv: codeTag("uv") })}
           />
-          <pre
-            class="overflow-x-auto rounded-box bg-neutral p-4 font-mono text-sm text-neutral-content"><code>$ git clone https://github.com/fabiommendes/codehood.git
+          <CodeBlock lang="shellsession" code={`$ git clone https://github.com/fabiommendes/codehood.git
 $ git clone https://github.com/fabiommendes/mdq-spec.git mdq
-$ uv tool install --editable codehood/cli</code></pre>
+$ uv tool install --editable codehood/cli`} />
         </div>
       </li>
 
@@ -72,12 +72,11 @@ $ uv tool install --editable codehood/cli</code></pre>
             <p class="font-medium">{m.auth_gs_step2()}</p>
           </div>
           <p class="text-sm text-muted" set:html={m.auth_gs_step2_body({ init: codeTag("codehood init") })} />
-          <pre
-            class="overflow-x-auto rounded-box bg-neutral p-4 font-mono text-sm text-neutral-content"><code>$ codehood init cs101
+          <CodeBlock lang="shellsession" code={`$ codehood init cs101
 Discipline slug: cs101
-Instructor username: {username}
+Instructor username: ${username}
 Edition: 2026-1
-Server URL: {server}
+Server URL: ${server}
   created  codehood.toml
   created  README.md
   created  calendar.md
@@ -91,7 +90,7 @@ Server URL: {server}
   created  exams/example.md
   created  .git/
 next: codehood login
-$ cd cs101</code></pre>
+$ cd cs101`} />
         </div>
       </li>
 
@@ -105,19 +104,17 @@ $ cd cs101</code></pre>
             <p class="font-medium">{m.auth_gs_step3()}</p>
           </div>
           <p class="text-sm text-muted" set:html={m.auth_gs_step3_body({ login: codeTag("codehood login") })} />
-          <pre
-            class="overflow-x-auto rounded-box bg-neutral p-4 font-mono text-sm text-neutral-content"><code>$ codehood login
-Login [{username}]:
+          <CodeBlock lang="shellsession" code={`$ codehood login
+Login [${username}]:
 Password:
-logged in to {server} as {username}</code></pre>
+logged in to ${server} as ${username}`} />
 
           <p
             class="text-sm text-muted"
             set:html={m.auth_gs_step3_alt({ file: codeTag("~/.codehood/credentials.toml") })}
           />
-          <pre
-            class="overflow-x-auto rounded-box bg-neutral p-4 font-mono text-sm text-neutral-content"><code>[servers]
-"{server}" = "&lt;key&gt;"</code></pre>
+          <CodeBlock lang="toml" code={`[servers]
+"${server}" = "<key>"`} />
 
           <FormAlert error={createApiKeyResult?.error && errorMessage(createApiKeyResult.error)} />
           {
@@ -186,13 +183,12 @@ logged in to {server} as {username}</code></pre>
             >
             <p class="font-medium">{m.auth_gs_step5()}</p>
           </div>
-          <pre
-            class="overflow-x-auto rounded-box bg-neutral p-4 font-mono text-sm text-neutral-content"><code>$ codehood push
-    ok  course cs101/{username}_2026-1: upserted course cs101/{username}_2026-1
+          <CodeBlock lang="shellsession" code={`$ codehood push
+    ok  course cs101/${username}_2026-1: upserted course cs101/${username}_2026-1
     ok  time slot mon: upserted mon
     ok  event 0/mon (REGULAR): upserted 0/mon
     ok  question example: upserted example
-summary: 4 operation(s) executed, 0 failed, 0 skipped</code></pre>
+summary: 4 operation(s) executed, 0 failed, 0 skipped`} />
         </div>
       </li>
     </ol>

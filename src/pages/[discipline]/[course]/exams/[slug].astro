@@ -30,12 +30,13 @@ import {
 	formatDuration,
 } from "@/utils/exam-display";
 import { examNav } from "@/utils/exam-nav";
+import { highlightQuestionCodeBlocks } from "@/utils/highlight-code-blocks";
 import { loadAttemptView } from "@/utils/load-attempt-view";
 import { loadCourse } from "@/utils/load-course";
 import { loadCourseExceptions } from "@/utils/load-exam-exceptions";
 import { loadExamQuestions } from "@/utils/load-exam-questions";
 import { type ExamStaffData, loadExamStaffData } from "@/utils/load-exam-staff";
-import { renderMarkdown } from "@/utils/markdown";
+import { highlightCodeBlocks, renderMarkdown } from "@/utils/markdown";
 import { questionTypeLabels } from "@/utils/question-display";
 import {
 	durationToMinutes,
@@ -74,11 +75,11 @@ const phase = examPhase(shown, now);
 // than interpreted, since neither is safe to trust with raw markup.
 const descriptionHtml =
 	exam.description && exam.format === "MARKDOWN"
-		? renderMarkdown(exam.description)
+		? await highlightCodeBlocks(renderMarkdown(exam.description))
 		: null;
 const preambleHtml =
 	exam.preamble && exam.format === "MARKDOWN"
-		? renderMarkdown(exam.preamble)
+		? await highlightCodeBlocks(renderMarkdown(exam.preamble))
 		: null;
 
 // Each question at the version the exam pins, in its public form. A slug that
@@ -288,6 +289,7 @@ const examOutcome = view.result;
     <div class="mt-4">
       <AttachmentList
         attachments={exam.attachments}
+        codeBlocks={await highlightQuestionCodeBlocks({ attachments: exam.attachments })}
         url={(name) => examAttachmentUrl(`${discipline}/${courseSegment}`, slug, name)}
       />
     </div>

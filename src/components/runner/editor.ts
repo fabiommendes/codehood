@@ -1,6 +1,6 @@
 /**
  * The code editor of the runner widget: CodeMirror 6 with the VS Code keymap
- * and Shiki's `dark-plus` colors (the ones of the read-only view), behind a
+ * and the site's code themes (the ones of the read-only view), behind a
  * small interface.
  *
  * Everything from CodeMirror is loaded with dynamic `import()` inside
@@ -102,45 +102,47 @@ export async function createEditor(
 		EditorView.contentAttributes.of({ "aria-readonly": String(value) }),
 	];
 
-	const theme = EditorView.theme(
-		{
-			"&": {
-				backgroundColor: "#1e1e1e",
-				color: "#d4d4d4",
-				fontSize: "inherit",
-			},
-			".cm-scroller": {
-				fontFamily: "inherit",
-				lineHeight: "1.25rem",
-				overflow: "auto",
-			},
-			".cm-content": { caretColor: "#aeafad", padding: "0.5rem 0" },
-			".cm-line": { padding: "0 0.75rem" },
-			// The focus ring is drawn by the widget, above the sticky gutter.
-			"&.cm-focused": { outline: "none" },
-			".cm-cursor, .cm-dropCursor": { borderLeftColor: "#aeafad" },
-			".cm-activeLine": { backgroundColor: "#ffffff0a" },
-			"&.cm-focused > .cm-scroller > .cm-selectionLayer .cm-selectionBackground, .cm-selectionBackground, ::selection":
-				{ backgroundColor: "#264f78" },
-			".cm-gutters": {
-				backgroundColor: "#1e1e1e",
-				color: "#858585",
-				border: "none",
-			},
-			".cm-activeLineGutter": {
-				backgroundColor: "transparent",
-				color: "#c6c6c6",
-			},
-			".cm-panels": { backgroundColor: "#252526", color: "#d4d4d4" },
-			".cm-tooltip": {
-				backgroundColor: "#252526",
-				color: "#d4d4d4",
-				border: "1px solid #454545",
-			},
-			".cm-diagnostic": { fontFamily: "inherit", whiteSpace: "pre-wrap" },
+	// The colors are the `--code-*` properties of the site's code themes
+	// (`CODE_THEME_CSS`), so the editor follows the site's theme toggle.
+	const theme = EditorView.theme({
+		"&": {
+			backgroundColor: "var(--code-bg)",
+			color: "var(--code-fg)",
+			fontSize: "inherit",
 		},
-		{ dark: true },
-	);
+		".cm-scroller": {
+			fontFamily: "inherit",
+			lineHeight: "1.25rem",
+			overflow: "auto",
+		},
+		".cm-content": { caretColor: "var(--code-fg)", padding: "0.5rem 0" },
+		".cm-line": { padding: "0 0.75rem" },
+		// The focus ring is drawn by the widget, above the sticky gutter.
+		"&.cm-focused": { outline: "none" },
+		".cm-cursor, .cm-dropCursor": { borderLeftColor: "var(--code-fg)" },
+		".cm-activeLine": { backgroundColor: "var(--code-active-line)" },
+		"&.cm-focused > .cm-scroller > .cm-selectionLayer .cm-selectionBackground, .cm-selectionBackground, ::selection":
+			{ backgroundColor: "var(--code-selection)" },
+		".cm-gutters": {
+			backgroundColor: "var(--code-bg)",
+			color: "var(--code-muted)",
+			border: "none",
+		},
+		".cm-activeLineGutter": {
+			backgroundColor: "transparent",
+			color: "var(--code-fg)",
+		},
+		".cm-panels": {
+			backgroundColor: "var(--code-panel)",
+			color: "var(--code-fg)",
+		},
+		".cm-tooltip": {
+			backgroundColor: "var(--code-panel)",
+			color: "var(--code-fg)",
+			border: "1px solid var(--code-border)",
+		},
+		".cm-diagnostic": { fontFamily: "inherit", whiteSpace: "pre-wrap" },
+	});
 
 	const hintId = `runner-editor-hint-${++hints}`;
 	const hint = document.createElement("span");

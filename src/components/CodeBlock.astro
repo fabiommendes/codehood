@@ -1,0 +1,21 @@
+---
+/**
+ * A block of code highlighted on the server with the site's code themes, in
+ * the `code-block` frame. An island draws the same blocks through
+ * `CodeBlocks` (src/components/question/CodeBlocks.tsx).
+ */
+import { highlightCode } from "@/utils/highlight-code";
+
+interface Props {
+	code: string;
+	/// A Shiki language or alias; plaintext when unknown or absent.
+	lang?: string | null;
+	class?: string;
+	[attribute: `data-${string}`]: string | undefined;
+}
+
+const { code, lang, class: className, ...attributes } = Astro.props;
+const html = await highlightCode(code, lang);
+---
+
+<div class:list={["code-block", className]} {...attributes} set:html={html} />

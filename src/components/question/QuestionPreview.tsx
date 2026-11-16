@@ -298,7 +298,7 @@ function TypePreview(props: TypePreviewProps): JSX.Element {
 									{m.grades_code_model_answer()}
 								</p>
 								<div
-									class="mt-2 overflow-x-auto rounded-box bg-base-200 p-4 text-sm text-base-content [&_.shiki]:!m-0 [&_.shiki]:!bg-transparent [&_.shiki_span]:!bg-transparent"
+									class="code-block mt-2"
 									data-model-answer
 									innerHTML={html()}
 								/>

@@ -3,6 +3,7 @@ import "../styles/fonts.css";
 import "../styles/global.css";
 import DraftSession from "@/components/exam/DraftSession.astro";
 import { locale } from "@/i18n";
+import { CODE_THEME_CSS } from "@/utils/code-themes";
 
 interface Props {
 	title?: string;
@@ -44,6 +45,7 @@ const { title = "Codehood" } = Astro.props;
 		<link rel="icon" href="/favicon.ico" />
 		<meta name="generator" content={Astro.generator} />
 		<title>{title}</title>
+		<style is:inline set:html={CODE_THEME_CSS}></style>
 	</head>
 	<body>
 		<slot />

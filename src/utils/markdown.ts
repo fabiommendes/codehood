@@ -83,10 +83,13 @@ function createParser(html: boolean): InstanceType<typeof MarkdownIt> {
 			);
 		}
 		const nonce = nonceOf(env);
-		const pre = `<pre><code>${parser.utils.escapeHtml(token.content)}</code></pre>`;
+		const code = parser.utils.escapeHtml(token.content);
+		const pre = `<pre><code>${code}</code></pre>`;
 		const language = runnerLanguage(tag);
 		if (language === null) {
-			return `<div class="${nonce}${RUNNER_UNAVAILABLE_CLASS}">${pre}<p class="${nonce}text-xs ${nonce}text-muted">${parser.utils.escapeHtml(m.runner_block_unavailable())}</p></div>\n`;
+			// A plain fenced block for `highlightCodeBlocks`, in the fence's language.
+			const plain = `<pre><code${tag ? ` class="language-${parser.utils.escapeHtml(tag)}"` : ""}>${code}</code></pre>`;
+			return `<div class="${nonce}${RUNNER_UNAVAILABLE_CLASS}">${plain}<p class="${nonce}text-xs ${nonce}text-muted">${parser.utils.escapeHtml(m.runner_block_unavailable())}</p></div>\n`;
 		}
 		return `<div class="${nonce}${RUNNER_BLOCK_CLASS}" data-${nonce}language="${language}">${pre}</div>\n`;
 	};
@@ -226,14 +229,14 @@ function unescapeHtml(text: string): string {
 }
 
 /**
- * Highlights the code of the runnable blocks of rendered Markdown with VS
- * Code's themes, the ones of the editor that replaces them.
+ * Highlights the code of the runnable blocks of rendered Markdown with the
+ * site's code themes, the ones of the editor that replaces them.
  */
 export async function highlightRunnerBlocks(html: string): Promise<string> {
 	const blocks = [...html.matchAll(RUNNER_BLOCK_PATTERN)];
 	const highlighted = await Promise.all(
 		blocks.map(([, language, escaped]) =>
-			highlightCode(unescapeHtml(escaped ?? ""), language, { theme: "vscode" }),
+			highlightCode(unescapeHtml(escaped ?? ""), language),
 		),
 	);
 	let index = 0;
@@ -245,9 +248,9 @@ export async function highlightRunnerBlocks(html: string): Promise<string> {
 }
 
 /// A code block of rendered and sanitized Markdown, with its language when
-/// the fence gave one. The blocks of a runner wrapper stay out of it.
+/// the fence gave one. The blocks of a runnable wrapper stay out of it.
 const CODE_BLOCK_PATTERN =
-	/(?<!<div class="code-runner-[^>]*>)<pre><code(?: class="language-([^"\s]*)")?>([\s\S]*?)<\/code><\/pre>/g;
+	/(?<!<div class="code-runner-block"[^>]*>)<pre><code(?: class="language-([^"\s]*)")?>([\s\S]*?)<\/code><\/pre>/g;
 
 /**
  * Highlights the code blocks of rendered Markdown with the site's code

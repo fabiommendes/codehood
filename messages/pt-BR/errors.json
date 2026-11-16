@@ -83,6 +83,7 @@
 	"errors_event_has_roll_call": "A aula tem uma chamada; exclua a chamada primeiro",
 	"errors_time_slot_wrong_course": "O horário {slot} não pertence à turma {course}.",
 	"errors_exam_not_open": "Esta avaliação não está aberta no momento",
+	"errors_exam_close_hidden": "Uma prova em rascunho ou arquivada não tem o que encerrar",
 	"errors_response_closed": "Esta resposta não aceita novos envios",
 	"errors_response_time_out": "O tempo para responder esta avaliação acabou",
 	"errors_response_malformed": "Esta resposta não corresponde à questão: {detail}",

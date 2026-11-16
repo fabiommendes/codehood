@@ -13,6 +13,7 @@
  */
 
 import { m } from "@/i18n";
+import { terminalTheme } from "@/utils/code-themes";
 
 /** What the widget needs from a terminal. */
 export interface RunnerTerminal {
@@ -45,13 +46,19 @@ export interface RunnerTerminal {
 	dispose(): void;
 }
 
-/// ANSI sequences for the colors the widget uses.
+/// ANSI sequences for the colors the widget uses: palette colors, which
+/// `terminalTheme` sets, so they follow the site's theme.
 const SGR = {
 	reset: "\x1b[0m",
-	error: "\x1b[38;2;244;135;113m",
-	input: "\x1b[38;2;156;220;254m",
-	dim: "\x1b[2;38;2;133;133;133m",
+	error: "\x1b[31m",
+	input: "\x1b[36m",
+	dim: "\x1b[2;90m",
 };
+
+/// Whether the site shows its dark theme.
+function siteIsDark(): boolean {
+	return document.documentElement.dataset.theme === "codehood-dark";
+}
 
 /// The result of feeding input to a `LineEditor`.
 export interface LineEditResult {
@@ -286,11 +293,7 @@ export async function createTerminal(
 		fontFamily: "ui-monospace, SFMono-Regular, Menlo, Consolas, monospace",
 		fontSize: 13,
 		rows: 8,
-		theme: {
-			background: "#181818",
-			foreground: "#d4d4d4",
-			cursor: "#aeafad",
-		},
+		theme: terminalTheme(siteIsDark()),
 		linkHandler: {
 			activate: (_event, uri) => {
 				openOutputLink(uri);
@@ -331,6 +334,13 @@ export async function createTerminal(
 	refit();
 	const observer = new ResizeObserver(refit);
 	observer.observe(container);
+	const themeObserver = new MutationObserver(() => {
+		terminal.options.theme = terminalTheme(siteIsDark());
+	});
+	themeObserver.observe(document.documentElement, {
+		attributes: true,
+		attributeFilter: ["data-theme"],
+	});
 	const written = terminal.onWriteParsed(resize);
 
 	const editor = new LineEditor();
@@ -391,6 +401,7 @@ export async function createTerminal(
 			data.dispose();
 			written.dispose();
 			observer.disconnect();
+			themeObserver.disconnect();
 			terminal.dispose();
 		},
 	};

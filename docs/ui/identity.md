@@ -201,6 +201,14 @@ Keywords take the accent, strings success, constants secondary (dark) or
 error (light), functions primary, types info, and comments muted. Every token
 is 4.5:1 or more on its background.
 
+These themes are the only colors of code on the site, read or edited, and
+they follow the light/dark toggle. `CODE_THEMES` feeds Shiki on the server
+and in the CodeMirror editor; `CODE_THEME_CSS` (set in `Layout.astro`) gives
+the `--code-*` properties of the frame, the editor chrome and the runner
+terminal, whose ANSI colors come from the same roles. A static block goes
+through `CodeBlock.astro`, or `CodeBlocks` in an island, inside the
+`code-block` frame.
+
 ### CLI
 
 The CLI maps the same roles onto the 16 ANSI colors and its Textual theme:

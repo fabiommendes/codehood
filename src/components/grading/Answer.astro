@@ -5,6 +5,7 @@
  * highlighted, and runnable when its language has a runner and the answer's
  * submission is known.
  */
+import CodeBlock from "@/components/CodeBlock.astro";
 import type { AnswerPayload } from "@/components/exam/answer-payload";
 import CodeRunner from "@/components/runner/CodeRunner";
 import { RUNNER_ORIGIN } from "@/core/constants";
@@ -51,12 +52,8 @@ const runLanguage =
 		? runnerLanguage(shown.highlight)
 		: null;
 const codeHtml =
-	shown.kind === "code"
-		? await highlightCode(
-				shown.text,
-				shown.highlight,
-				runLanguage ? { theme: "vscode" } : {},
-			)
+	shown.kind === "code" && runLanguage
+		? await highlightCode(shown.text, shown.highlight)
 		: "";
 const viewBlocks =
 	shown.kind === "view"
@@ -88,11 +85,7 @@ const viewBlocks =
 }
 {
   shown.kind === "code" && !runLanguage && (
-    <div
-      class="overflow-x-auto rounded-box bg-base-200 p-4 text-sm text-base-content [&_.shiki]:!m-0 [&_.shiki]:!bg-transparent [&_.shiki_span]:!bg-transparent"
-      data-answer-code
-      set:html={codeHtml}
-    />
+    <CodeBlock code={shown.text} lang={shown.highlight} data-answer-code="" />
   )
 }
 {shown.kind === "view" && <AnswerView client:load question={question} payload={payload} result={result} codeBlocks={viewBlocks} />}

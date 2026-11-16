@@ -83,6 +83,7 @@
 	"errors_event_has_roll_call": "The event has a roll call; delete the roll call first",
 	"errors_time_slot_wrong_course": "Time slot {slot} does not belong to course {course}.",
 	"errors_exam_not_open": "This exam is not currently open",
+	"errors_exam_close_hidden": "A draft or archived exam has nothing to close",
 	"errors_response_closed": "This response is not accepting new submissions",
 	"errors_response_time_out": "The time to answer this exam has run out",
 	"errors_response_malformed": "This answer does not fit the question: {detail}",

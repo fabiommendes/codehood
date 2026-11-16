@@ -2,7 +2,11 @@ import { FULL_ACCESS } from "@/auth/actor";
 import { db } from "@/db";
 import { persistedCourseFactory } from "@/fixtures/course.factory";
 import { courseHref } from "@/urls";
-import { highlightRunnerBlocks, renderMarkdown } from "@/utils/markdown";
+import {
+	highlightCodeBlocks,
+	highlightRunnerBlocks,
+	renderMarkdown,
+} from "@/utils/markdown";
 import { expect, test } from "./fixtures";
 import { logInAs, resetDatabase, seedUser } from "./stories/helpers";
 
@@ -24,7 +28,7 @@ test.describe("rendering", () => {
 		const html = renderMarkdown("```haskell run\nmain = pure ()\n```\n");
 		expect(html).not.toContain("code-runner-block");
 		expect(html).toMatch(
-			/<div class="code-runner-unavailable"><pre><code>main = pure \(\)\n<\/code><\/pre><p [^>]*>[^<]+<\/p><\/div>/,
+			/<div class="code-runner-unavailable"><pre><code class="language-haskell">main = pure \(\)\n<\/code><\/pre><p [^>]*>[^<]+<\/p><\/div>/,
 		);
 	});
 
@@ -44,15 +48,27 @@ test.describe("rendering", () => {
 });
 
 test.describe("highlighting", () => {
-	test("the static view uses the dark palette in both site themes", async () => {
+	test("the static view uses the site's code themes, light and dark", async () => {
 		const html = await highlightRunnerBlocks(
 			renderMarkdown('```js run\nconst x = "a"; // c\n```\n'),
 		);
+		expect(html).toContain("codehood-cerrado");
+		expect(html).toContain("codehood-forest");
 		const pairs = [
 			...html.matchAll(/--shiki-light:(#\w+);--shiki-dark:(#\w+)/g),
 		];
 		expect(pairs.length).toBeGreaterThan(0);
-		for (const [, light, dark] of pairs) expect(light).toBe(dark);
+		expect(pairs.some(([, light, dark]) => light !== dark)).toBe(true);
+	});
+
+	test("a run block without a driver is highlighted in its language", async () => {
+		const html = await highlightCodeBlocks(
+			renderMarkdown("```haskell run\nmain = pure ()\n```\n"),
+		);
+		expect(html).toContain(
+			'<div class="code-runner-unavailable"><pre class="shiki',
+		);
+		expect(html).not.toContain("language-haskell");
 	});
 });
 
