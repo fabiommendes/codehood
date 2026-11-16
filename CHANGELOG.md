@@ -282,7 +282,8 @@
   leitura de convite agregava `InviteRedemption`. As três partem agora das
   linhas lidas. `/admin` pede só os convites de professor
   (`invitedRole`, filtro novo em `GET /api/invite`) e `User` tem índice em
-  `role`.
+  `role`. Abrir uma prova que só fixa versões varria `QuestionData` (até
+  24 ms): o filtro vazio de ids virava `1=0 OR …` e desligava o índice.
 
 - Os blocos de código cercados (```` ```python ````) do enunciado e dos demais
   textos de uma questão saem com o realce do Shiki, nos temas claro e escuro do

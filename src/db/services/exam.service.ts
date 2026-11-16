@@ -1246,7 +1246,10 @@ async function loadWeights(
 	if (latestIds.length === 0 && pinned.length === 0) return new Map();
 
 	const versions = await tx.questionData.findMany({
-		where: { OR: [{ id: { in: latestIds } }, ...pinned] },
+		// An empty `in` renders as `1=0 OR …`, which SQLite answers with a scan.
+		where: {
+			OR: [...(latestIds.length ? [{ id: { in: latestIds } }] : []), ...pinned],
+		},
 		select: {
 			id: true,
 			refId: true,

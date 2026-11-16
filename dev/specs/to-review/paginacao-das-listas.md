@@ -234,6 +234,10 @@ O molde está pronto; copiar, não reinventar.
 
 ### Armadilhas vistas
 
+- **`in: []` dentro de um `OR` do Prisma** vira `1=0 OR …`, e o SQLite
+  responde com uma varredura em vez do índice dos outros ramos
+  (`loadWeights` em `exam.service.ts`). Deixar o ramo vazio de fora.
+
 - **`_count` de relação no `select`/`include` do Prisma** junta com um
   `GROUP BY` da tabela filha inteira, mesmo em `findUnique`. Contar à parte,
   com `where` nos ids lidos.
@@ -262,6 +266,4 @@ O molde está pronto; copiar, não reinventar.
 - Listar os feedbacks de um curso grande custa ~100 ms fora do SQLite, pelos
   `include` de cada linha.
 - `GET /openapi.json` gasta ~460 ms de CPU síncrona por chamada, sem cache.
-- `exam.findOne` lê `QuestionData` por `refId` e `versionHash` com máximo de
-  24 ms só no banco cheio (`GET /<curso>/exams/<prova>`). Não investigado.
 - `grading-code-answer.spec.ts:126` também falha sob carga, no banco do seed.
