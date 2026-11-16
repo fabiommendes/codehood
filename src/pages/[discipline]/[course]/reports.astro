@@ -2,12 +2,15 @@
 import CourseHeader from "@/components/CourseHeader.astro";
 import ReportFilters from "@/components/report/ReportFilters.astro";
 import ReportQueue from "@/components/report/ReportQueue";
+import { CursorPagination } from "@/components/ui/Pagination";
 import { db } from "@/db";
 import { m } from "@/i18n";
 import AppLayout from "@/layouts/AppLayout.astro";
 import { breadcrumbs } from "@/utils/breadcrumbs";
 import { homeNav } from "@/utils/course-tabs-nav";
+import { listUrl, readPage } from "@/utils/list-page";
 import { loadCourse } from "@/utils/load-course";
+import { pageLinks } from "@/utils/page-links";
 import { parseReportFilters } from "@/utils/report-filters";
 import { toReportRow } from "@/utils/report-row";
 
@@ -24,14 +27,17 @@ const { course, href } = result;
 const actor = Astro.locals.actor!;
 
 const filters = parseReportFilters(Astro.url.searchParams);
-const reports = await db.report.findMany(
-	{
-		course: course.id,
-		kind: ["CONTENT"],
-		status: filters.status ? [filters.status] : undefined,
-	},
-	{ actor },
-);
+const filter = {
+	course: course.id,
+	kind: ["CONTENT" as const],
+	status: filters.status ? [filters.status] : undefined,
+};
+const [page, total] = await Promise.all([
+	readPage(Astro.url, (params) =>
+		db.report.findPage({ ...filter, ...params }, { actor }),
+	),
+	db.report.count(filter, { actor }),
+]);
 ---
 
 <AppLayout
@@ -47,9 +53,10 @@ const reports = await db.report.findMany(
 		<ReportFilters filters={filters} hideKind />
 		<ReportQueue
 			client:load
-			reports={reports.map(toReportRow)}
+			reports={page.items.map(toReportRow)}
 			status={filters.status}
 			kind="CONTENT"
 		/>
+		<CursorPagination {...pageLinks(listUrl(Astro.url), page)} total={total} />
 	</main>
 </AppLayout>

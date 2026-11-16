@@ -218,6 +218,17 @@
 - **Muda a API REST:** a lista `GET` de questões de um curso é paginada por cursor,
   com `limit`, `after` e `before`, em ordem de slug.
 
+- As filas de relatos, `/admin/reports` e `[course]/reports`, leem uma página
+  do servidor por cursor (`report.findPage` e `report.count`, por `id`
+  crescente), com anterior/próxima e o total abaixo dos cartões. A regra de
+  `report.read` já estava inteira no `where` da consulta, então as páginas
+  vêm cheias; `findPage` lança `NotAllowed` se a consulta devolver um relato
+  que o ator não lê. Os filtros de status e tipo mantêm `limit` e voltam à
+  primeira página. O seed ganhou um relato `CONTENT` aberto.
+
+- **Muda a API REST:** `GET /api/report` é paginada por cursor, com `limit`,
+  `after` e `before`, em ordem de id (antes, de `createdAt`).
+
 - A "Visão do estudante" da página da prova do professor usa a moldura
   (`QuestionFrame`) e os campos de resposta (`AnswerField`) da tentativa do
   aluno, extraídos de `ExamAttempt`, com a forma pública e o embaralhamento

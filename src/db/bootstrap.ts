@@ -1469,6 +1469,16 @@ async function seedReports(instructor: User, edition: string): Promise<void> {
 	);
 	await db.report.create(
 		{
+			kind: "CONTENT",
+			course,
+			message:
+				"The slides of lecture 6 link to a reading list that returns a 404.",
+			url: sent.url,
+		},
+		{ actor: student },
+	);
+	await db.report.create(
+		{
 			kind: "BUG",
 			message:
 				"Saving my profile with an empty bio returns an error page instead of a message.",

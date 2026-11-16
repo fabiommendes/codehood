@@ -18,13 +18,17 @@ interface Props {
 
 const { filters, hideKind = false } = Astro.props;
 
-/// The queue's URL with `status` and `kind` replaced; `kind` is left out when unset or hidden.
+/// The page size the queue's URL asks for, kept across filters.
+const limit = Astro.url.searchParams.get("limit");
+
+/// The first page of the queue with `status` and `kind` replaced; `kind` is left out when unset or hidden.
 function hrefWith(
 	status: ReportStatus | null,
 	kind: ReportKind | null,
 ): string {
 	const params = new URLSearchParams({ status: status ?? ALL_REPORTS });
 	if (kind && !hideKind) params.set("kind", kind);
+	if (limit) params.set("limit", limit);
 	return `?${params}`;
 }
 

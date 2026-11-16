@@ -4,9 +4,12 @@ export const prerender = false;
 import AdminHeader from "@/components/AdminHeader.astro";
 import ReportFilters from "@/components/report/ReportFilters.astro";
 import ReportQueue from "@/components/report/ReportQueue";
+import { CursorPagination } from "@/components/ui/Pagination";
 import { db } from "@/db";
 import { m } from "@/i18n";
 import AppLayout from "@/layouts/AppLayout.astro";
+import { listUrl, readPage } from "@/utils/list-page";
+import { pageLinks } from "@/utils/page-links";
 import { parseReportFilters } from "@/utils/report-filters";
 import { toReportRow } from "@/utils/report-row";
 
@@ -16,13 +19,16 @@ if (!Astro.locals.actor) return Astro.redirect("/login");
 const actor = Astro.locals.actor;
 
 const filters = parseReportFilters(Astro.url.searchParams);
-const reports = await db.report.findMany(
-	{
-		status: filters.status ? [filters.status] : undefined,
-		kind: filters.kind ? [filters.kind] : undefined,
-	},
-	{ actor },
-);
+const filter = {
+	status: filters.status ? [filters.status] : undefined,
+	kind: filters.kind ? [filters.kind] : undefined,
+};
+const [page, total] = await Promise.all([
+	readPage(Astro.url, (params) =>
+		db.report.findPage({ ...filter, ...params }, { actor }),
+	),
+	db.report.count(filter, { actor }),
+]);
 ---
 
 <AppLayout title={m.report_admin_title()}>
@@ -34,9 +40,10 @@ const reports = await db.report.findMany(
 		<ReportFilters filters={filters} />
 		<ReportQueue
 			client:load
-			reports={reports.map(toReportRow)}
+			reports={page.items.map(toReportRow)}
 			status={filters.status}
 			kind={filters.kind}
 		/>
+		<CursorPagination {...pageLinks(listUrl(Astro.url), page)} total={total} />
 	</main>
 </AppLayout>

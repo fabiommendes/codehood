@@ -8,6 +8,7 @@ import { courseHref } from "@/urls";
 import { localDateOf } from "@/utils/schedule-time";
 import { expect, type Locator, type Page, test } from "./fixtures";
 import { logInAs, seedUser } from "./stories/helpers";
+import { sendReport } from "./stories/report-support";
 
 /**
  * The lists that grow with the instance show one page read by the server,
@@ -411,4 +412,109 @@ test("the admin overview counts disciplines and editions without listing them", 
 	await expect(stat("Courses").locator(".stat-value")).toHaveText(
 		String(await db.course.count({}, FULL_ACCESS)),
 	);
+});
+
+/// The message of every report the queue shows.
+const reportMessages = (page: Page) => () =>
+	page.getByRole("article").locator("p").allInnerTexts();
+
+test("the admin reports queue pages through the open reports and its filters start over", async ({
+	page,
+}) => {
+	const admin = await seedUser({ role: "ADMIN" });
+	const student = await seedUser({ role: "STUDENT" });
+	for (let i = 0; i < 5; i++)
+		await sendReport(student, {
+			kind: i % 2 ? "BUG" : "SUGGESTION",
+			message: `Paged admin report ${i} of ${student.username}`,
+		});
+	await logInAs(page, admin);
+
+	const open = { status: ["OPEN" as const] };
+	const expected = await firstPages(
+		(params) => db.report.findPage({ ...open, ...params }, FULL_ACCESS),
+		(report) => report.message,
+	);
+	const messages = reportMessages(page);
+	await stepThrough(
+		page,
+		"/admin/reports",
+		messages,
+		expected,
+		await db.report.count(open, FULL_ACCESS),
+	);
+
+	await test.step("a triaged report is saved without leaving the page", async () => {
+		const [target = "", kept = ""] = expected[1] ?? [];
+		const item = page.getByRole("article").filter({ hasText: target });
+		await group(item, "Status").locator("select").selectOption("TRIAGED");
+		await item.getByRole("button", { name: "Save" }).click();
+		await expect(page.getByText("Report updated.")).toBeVisible();
+		await expect(page).toHaveURL(/[?&]after=/);
+		expect(await messages()).toEqual([kept]);
+	});
+
+	await test.step("a filter keeps the page size and goes back to the first page", async () => {
+		const bugs = { status: ["OPEN" as const], kind: ["BUG" as const] };
+		const { items } = await db.report.findPage(
+			{ ...bugs, limit: 2 },
+			FULL_ACCESS,
+		);
+		await group(page, "Filter by type")
+			.getByRole("link", { name: "Bug", exact: true })
+			.click();
+		await expect(page).toHaveURL(/[?&]limit=2/);
+		await expect(page).not.toHaveURL(/[?&](after|before)=/);
+		await expect.poll(messages).toEqual(items.map((report) => report.message));
+		await expect(pager(page)).toContainText(
+			`${(await db.report.count(bugs, FULL_ACCESS)).toLocaleString("en")} in all`,
+		);
+	});
+});
+
+test("the reports queue of a course pages through its content reports", async ({
+	page,
+}) => {
+	const instructor = await seedUser({ role: "INSTRUCTOR" });
+	const student = await seedUser({ role: "STUDENT" });
+	const course = await persistedCourseFactory.create({
+		instructor: instructor.username,
+	});
+	for (let i = 0; i < 5; i++) {
+		await sendReport(student, {
+			kind: "CONTENT",
+			course: course.id,
+			message: `Paged content report ${i} of ${student.username}`,
+		});
+		await sendReport(student, {
+			kind: "BUG",
+			course: course.id,
+			message: `Bug the instructor never sees ${i} of ${student.username}`,
+		});
+	}
+	await logInAs(page, instructor);
+
+	const actor = {
+		actor: {
+			username: instructor.username,
+			name: instructor.name,
+			role: instructor.role,
+		},
+	};
+	const queue = { course: course.id, status: ["OPEN" as const] };
+	const expected = await firstPages(
+		(params) => db.report.findPage({ ...queue, ...params }, actor),
+		(report) => report.message,
+	);
+	expect(expected.flat()).toEqual(
+		[0, 1, 2, 3, 4].map(
+			(i) => `Paged content report ${i} of ${student.username}`,
+		),
+	);
+	const path = `${courseHref({
+		discipline: course.discipline.slug,
+		instructor: course.instructor.username,
+		edition: course.edition.slug,
+	})}/reports`;
+	await stepThrough(page, path, reportMessages(page), expected, 5);
 });

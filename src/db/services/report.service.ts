@@ -5,7 +5,7 @@
  * every report and a course's instructor the `CONTENT` reports of that course.
  */
 import { randomBytes } from "node:crypto";
-import type { z } from "zod";
+import { z } from "zod";
 import { type Actor, SYSTEM } from "@/auth/actor";
 import { ensurePerm, hasPerm, type ReportTarget } from "@/auth/permissions";
 import {
@@ -17,6 +17,10 @@ import {
 import {
 	type CourseId,
 	type CourseRef,
+	type Page,
+	type PageParams,
+	pageOf,
+	pageParams,
 	REPORT_DAILY_LIMIT,
 	REPORT_MAX_ATTACHMENT_BYTES,
 	type ReportId,
@@ -35,6 +39,7 @@ import {
 } from "@/db/conditional-write";
 import { defineService, op } from "@/db/define-service";
 import { m } from "@/i18n";
+import { cutPage, decodeCursor, encodeCursor, seekOf } from "@/utils/cursor";
 import { sanitizeFilename } from "@/utils/filename";
 import { extensionOf } from "@/utils/mime";
 import {
@@ -219,17 +224,7 @@ export function makeReportService(
 				opts: ServiceOptsWithoutTx,
 			): Promise<Report[]> => {
 				const rows = await tx.report.findMany({
-					where: {
-						AND: [
-							visibleWhere(opts.actor),
-							filter.status?.length ? { status: { in: filter.status } } : {},
-							filter.kind?.length ? { kind: { in: filter.kind } } : {},
-							filter.course != null
-								? { course: courseRefMatch(filter.course) }
-								: {},
-							filter.author ? { authorId: filter.author } : {},
-						],
-					},
+					where: listWhere(filter, opts.actor),
 					include: reportInclude,
 					orderBy: [{ createdAt: "asc" }, { id: "asc" }],
 				});
@@ -240,6 +235,73 @@ export function makeReportService(
 					readable.map((row) => toReport(tx, row, opts.actor)),
 				);
 			},
+		});
+
+		/**
+		 * Lists one page of the reports matching `filter` that the actor may read, oldest first.
+		 *
+		 * The query alone decides what the actor reads, so a page is only short
+		 * at the end of the list. An empty `status` or `kind` list does not filter.
+		 *
+		 * @throws {@link InvalidData} When `filter.after` or `filter.before` is not a cursor of this list.
+		 * @throws {@link NotAllowed} If the query returns a report the actor may not read.
+		 */
+		const findPage = op({
+			transaction: false,
+			args: [reportFilter.extend(pageParams.shape)],
+			returns: pageOf(reportSchema),
+			run: async (
+				tx: PrismaTx,
+				filter: ReportFilter & PageParams,
+				opts: ServiceOptsWithoutTx,
+			): Promise<Page<Report>> => {
+				const seek = seekOf(filter);
+				const id =
+					seek.cursor === undefined
+						? undefined
+						: decodeCursor(seek.cursor, seek.back ? "before" : "after");
+				const rows = await tx.report.findMany({
+					where: {
+						AND: [
+							listWhere(filter, opts.actor),
+							id === undefined
+								? {}
+								: { id: seek.back ? { lt: id } : { gt: id } },
+						],
+					},
+					include: reportInclude,
+					orderBy: { id: seek.back ? "desc" : "asc" },
+					take: seek.limit + 1,
+				});
+				for (const row of rows) {
+					if (!hasPerm(opts.actor, "report.read", targetOf(row))) {
+						throw new NotAllowed("report.read");
+					}
+				}
+				const { page, next, prev } = cutPage(rows, seek, (row) =>
+					encodeCursor(row.id),
+				);
+				return {
+					items: await Promise.all(
+						page.map((row) => toReport(tx, row, opts.actor)),
+					),
+					next,
+					prev,
+				};
+			},
+		});
+
+		/** Counts the reports {@link findPage} lists for `filter`, across every page. */
+		const count = op({
+			transaction: false,
+			args: [reportFilter],
+			returns: z.number().int(),
+			run: async (
+				tx: PrismaTx,
+				filter: ReportFilter,
+				opts: ServiceOptsWithoutTx,
+			): Promise<number> =>
+				tx.report.count({ where: listWhere(filter, opts.actor) }),
 		});
 
 		/** Triages a report: changes its status, kind or note. */
@@ -392,6 +454,8 @@ export function makeReportService(
 			create,
 			findOne,
 			findMany,
+			findPage,
+			count,
 			update,
 			delete: remove,
 			attachment,
@@ -469,6 +533,22 @@ function visibleWhere(actor: Actor): Prisma.ReportWhereInput {
 		OR: [
 			{ authorId: actor.username },
 			{ kind: "CONTENT", course: { instructorId: actor.username } },
+		],
+	};
+}
+
+/// A `where` matching the reports of `filter` that `actor` may read.
+function listWhere(
+	filter: ReportFilter,
+	actor: Actor,
+): Prisma.ReportWhereInput {
+	return {
+		AND: [
+			visibleWhere(actor),
+			filter.status?.length ? { status: { in: filter.status } } : {},
+			filter.kind?.length ? { kind: { in: filter.kind } } : {},
+			filter.course != null ? { course: courseRefMatch(filter.course) } : {},
+			filter.author ? { authorId: filter.author } : {},
 		],
 	};
 }

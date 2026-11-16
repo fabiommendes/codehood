@@ -144,8 +144,22 @@ intervalo de datas dos eventos do `/calendar`.
 Itens 4 a 8 feitos em 2026-11-15. Testes em `test/admin-list-pages.spec.ts`
 e `test/list-pagination.spec.ts`.
 
-9. `/admin/reports` e `[course]/reports`: o service descarta linhas por
-   permissão depois da consulta, então uma página pode vir curta.
+9. [x] `/admin/reports` e `[course]/reports`: `report.findPage` e
+   `report.count`, por `id` crescente (a fila sai da mais antiga para a
+   mais nova, como antes), com `CursorPagination` abaixo dos cartões. O
+   descarte por permissão depois da consulta era redundante: `visibleWhere`
+   já expressa a regra inteira de `report.read` (admin e SYSTEM leem tudo;
+   os demais, os próprios relatos e os `CONTENT` dos cursos que lecionam),
+   então o banco devolve só linhas visíveis e as páginas vêm cheias. O
+   `findPage` ainda confere cada linha com `hasPerm` e lança `NotAllowed`
+   se a consulta e a regra divergirem, como em `course.findPage`: falha em
+   vez de vazar ou encurtar a página. `count` usa o mesmo `where`. Os
+   filtros de status e tipo já ficavam na URL; os links deles mantêm
+   `limit` e largam o cursor. A triagem é uma action chamada pela ilha, sem
+   navegação, então fica na mesma página; um relato que deixa de casar com
+   o filtro some da página carregada sem puxar o seguinte. Também paginou
+   `GET /api/report`. Feito em 2026-11-16. Testes em
+   `test/report-service.spec.ts` e `test/admin-list-pages.spec.ts`.
 
 **Dentro de um curso.**
 

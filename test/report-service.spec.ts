@@ -733,3 +733,163 @@ test("countOpen counts the OPEN CONTENT reports of a course", async () => {
 		await db.report.countOpen(ctx.course.id, actorOf(ctx.instructor)),
 	).toBe(1);
 });
+
+// -----------------------------------------------------------------------------
+// findPage and count
+
+/// Walks every page of `find` forward, then back from the last one, and checks both walks agree.
+async function walkPages(
+	find: (params: {
+		limit: number;
+		after?: string;
+		before?: string;
+	}) => Promise<{
+		items: Report[];
+		next: string | null;
+		prev: string | null;
+	}>,
+	limit: number,
+): Promise<string[][]> {
+	const ids = (items: Report[]) => items.map((item) => item.publicId);
+	let current = await find({ limit });
+	expect(current.prev).toBeNull();
+	const forward = [ids(current.items)];
+	while (current.next !== null) {
+		current = await find({ limit, after: current.next });
+		forward.push(ids(current.items));
+	}
+	const backward = [ids(current.items)];
+	while (current.prev !== null) {
+		current = await find({ limit, before: current.prev });
+		backward.unshift(ids(current.items));
+	}
+	expect(backward).toEqual(forward);
+	return forward;
+}
+
+/// Reports of `ctx.student` where the ones the instructor may read alternate with ones they may not.
+async function arrangeInterleaved(ctx: Ctx) {
+	const visible: Report[] = [];
+	const hidden: Report[] = [];
+	for (let i = 0; i < 5; i++) {
+		visible.push(
+			await send(ctx.student, { kind: "CONTENT", course: ctx.course.id }),
+		);
+		hidden.push(
+			await send(ctx.student, { kind: "BUG", course: ctx.course.id }),
+		);
+	}
+	return { visible, hidden };
+}
+
+test("findPage gives an actor full pages of only what they may read, and count agrees", async () => {
+	const ctx = await setup();
+	const { visible, hidden } = await arrangeInterleaved(ctx);
+	const own = await send(ctx.instructor, { kind: "SUGGESTION" });
+	const asInstructor = actorOf(ctx.instructor);
+	const readable = [...visible, own].map((report) => report.publicId);
+
+	const pages = await walkPages(
+		(params) => db.report.findPage(params, asInstructor),
+		2,
+	);
+	expect(pages.map((page) => page.length)).toEqual([2, 2, 2]);
+	expect(pages.flat()).toEqual(readable);
+	expect(await db.report.count({}, asInstructor)).toBe(readable.length);
+	expect(
+		(await db.report.findMany({}, asInstructor)).map((x) => x.publicId),
+	).toEqual(readable);
+
+	const asStudent = actorOf(ctx.student);
+	const mine = await walkPages(
+		(params) => db.report.findPage(params, asStudent),
+		3,
+	);
+	expect(mine.map((page) => page.length)).toEqual([3, 3, 3, 1]);
+	expect(mine.flat()).toHaveLength(visible.length + hidden.length);
+	expect(await db.report.count({}, asStudent)).toBe(10);
+	const first = await db.report.findPage({ limit: 3 }, asStudent);
+	expect(first.items.every((item) => !("note" in item))).toBe(true);
+
+	const asOutsider = actorOf(ctx.outsider);
+	expect(await db.report.findPage({ limit: 2 }, asOutsider)).toEqual({
+		items: [],
+		next: null,
+		prev: null,
+	});
+	expect(await db.report.count({}, asOutsider)).toBe(0);
+});
+
+test("findPage keeps the filter on every page, and count agrees with it", async () => {
+	const ctx = await setup();
+	const { visible, hidden } = await arrangeInterleaved(ctx);
+	const author = ctx.student.username;
+	const asAdmin = actorOf(ctx.admin);
+	for (const report of [visible[1], visible[3], hidden[0]]) {
+		await triage(ctx.admin, (report as Report).publicId, {
+			status: "RESOLVED",
+		});
+	}
+
+	const filters = [
+		{ author },
+		{ author, kind: ["CONTENT" as const] },
+		{ author, status: ["OPEN" as const] },
+		{ author, status: ["RESOLVED" as const], kind: ["CONTENT" as const] },
+		{ author, course: ctx.course.id, kind: ["BUG" as const] },
+		{ author, status: ["DISMISSED" as const] },
+	];
+	for (const filter of filters) {
+		const expected = (await db.report.findMany(filter, asAdmin)).map(
+			(report) => report.publicId,
+		);
+		const pages = await walkPages(
+			(params) => db.report.findPage({ ...filter, ...params }, asAdmin),
+			2,
+		);
+		expect(pages.flat()).toEqual(expected);
+		expect(pages.slice(0, -1).every((page) => page.length === 2)).toBe(true);
+		expect(await db.report.count(filter, asAdmin)).toBe(expected.length);
+	}
+
+	const instructorQueue = { course: ctx.course.id, status: ["OPEN" as const] };
+	const queue = await walkPages(
+		(params) =>
+			db.report.findPage(
+				{ ...instructorQueue, ...params },
+				actorOf(ctx.instructor),
+			),
+		2,
+	);
+	expect(queue.flat()).toEqual(
+		[visible[0], visible[2], visible[4]].map((r) => (r as Report).publicId),
+	);
+	expect(await db.report.count(instructorQueue, actorOf(ctx.instructor))).toBe(
+		3,
+	);
+});
+
+test("findPage refuses a cursor it did not make, and after together with before", async () => {
+	const ctx = await setup();
+	await send(ctx.student);
+	await send(ctx.student);
+	const asAdmin = actorOf(ctx.admin);
+
+	await expect(
+		db.report.findPage({ after: "not a cursor" }, asAdmin),
+	).rejects.toThrow(InvalidData);
+	await expect(
+		db.report.findPage({ before: "not a cursor" }, asAdmin),
+	).rejects.toThrow(InvalidData);
+	const { next } = await db.report.findPage(
+		{ author: ctx.student.username, limit: 1 },
+		asAdmin,
+	);
+	expect(next).not.toBeNull();
+	await expect(
+		db.report.findPage(
+			{ after: next as string, before: next as string },
+			asAdmin,
+		),
+	).rejects.toThrow(InvalidData);
+});
