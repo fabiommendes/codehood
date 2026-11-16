@@ -163,7 +163,7 @@ pnpm run package v0.2.0 --out build/ --config deploy/codehood.config.ts \
   the tag message. Before the gate it requires `../mdq` to be the commit in
   `.mdq-ref`, clean and pushed (`pnpm run mdq:bump` adopts a new one), and the
   `mdq` release the CLI needs to be on PyPI. Pushing the tag publishes the CLI
-  to PyPI; the worker is not published. It stops
+  and then the worker to PyPI. It stops
   when a migration drops tables or columns; edit the migration to keep the
   data, or pass `--allow-data-loss`.
 - `pnpm run package <tag>` builds the tag from a clean export, with the
