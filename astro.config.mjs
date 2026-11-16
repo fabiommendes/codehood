@@ -84,6 +84,24 @@ export default defineConfig({
 		ssr: { noExternal: ["mdq", /^@codehood\//] },
 		// The linked `mdq` has its own node_modules; one copy of each peer.
 		resolve: { dedupe: ["zod", "solid-js"] },
+		// The runner loads these with `import()` on first use. Found that late,
+		// Vite re-optimizes and the page's stale request fails with 504
+		// ("Outdated Optimize Dep"), which the runner shows as a load failure.
+		optimizeDeps: {
+			include: [
+				"@xterm/xterm",
+				"@xterm/addon-web-links",
+				"@xterm/addon-fit",
+				"@codemirror/state",
+				"@codemirror/view",
+				"@codemirror/commands",
+				"@codemirror/language",
+				"@codemirror/lint",
+				"@replit/codemirror-vscode-keymap",
+				"shiki/core",
+				"shiki/engine/javascript",
+			],
+		},
 		// Nothing under these is served by the dev server. `cli/` alone carries a
 		// Python virtualenv of ~9k files, and walking it slowed every dev start.
 		// `storage/` and the databases change at runtime and must not trigger reloads.
