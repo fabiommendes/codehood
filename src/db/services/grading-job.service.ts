@@ -55,6 +55,7 @@ import {
 	examResult,
 	newestPassesFirst,
 	resultPolicy,
+	unweighted,
 } from "@/services/exam-result";
 import { parseCourseParams } from "@/urls";
 import type { Prisma, PrismaTx } from "../client";
@@ -611,7 +612,7 @@ export const makeGradingJobService = defineService()((client) => {
 						: { [input.question]: Number(question.penalty) }),
 				});
 				const [outcome] = examResult(
-					[input.question],
+					unweighted([input.question]),
 					own.map((row) => ({ ...row, question: input.question })),
 					own.flatMap((row) =>
 						row.feedbacks.map((pass) => ({
@@ -755,7 +756,7 @@ async function giveUp(
 }
 
 /// The private document of the version of the question that the exam pins, or the latest.
-async function privateDocument(
+export async function privateDocument(
 	tx: PrismaTx,
 	examId: number,
 	question: { id: number; latestId: number | null },
@@ -845,7 +846,7 @@ function parseUrl(url: string) {
 }
 
 /// A score as the exact decimal text a pass stores, without float noise or an exponent.
-function scoreText(value: number): string {
+export function scoreText(value: number): string {
 	if (Math.abs(value) < 5e-10) return "0";
 	return value.toFixed(9).replace(/\.?0+$/, "");
 }

@@ -26,6 +26,7 @@ import {
 	responseCreate,
 	responseFilter,
 	responseFinish,
+	responseGradeObjectives,
 	responsePK,
 	responseSchema,
 	responseSubmit,
@@ -55,9 +56,11 @@ import {
 } from "../utils";
 import { loggingAnswerHistoryRemoval } from "./answer-edit.service";
 import { enqueueGradingJob, promoteFinalSends } from "./grading-job-queue";
+import { gradeObjectives as gradeAttempt } from "./objective-grading";
 import {
 	assertAcceptingSubmissions,
 	assertExamOpen,
+	attemptTimedOut,
 	examTimingFromDb,
 	examTimingSelect,
 	loadExceptionTiming,
@@ -75,6 +78,18 @@ export type Response = z.infer<typeof responseSchema>;
 export type ResponseCreate = z.infer<typeof responseCreate>;
 export type ResponseFilter = z.infer<typeof responseFilter>;
 export type ResponseFinish = z.infer<typeof responseFinish>;
+export type ResponseGradeObjectives = z.infer<typeof responseGradeObjectives>;
+
+/// What `gradeObjectives` did to the attempts of one exam.
+export interface ObjectiveGradingLine {
+	exam: string;
+	/// The closed or timed-out attempts it looked at.
+	attempts: number;
+	/// The answers it graded, or would grade on a dry run.
+	graded: number;
+	/// Whether the exam had released its grades.
+	released: boolean;
+}
 export type ResponsePK = z.infer<typeof responsePK>;
 export type ResponseSubmit = z.infer<typeof responseSubmit>;
 export type ResponseUpdate = z.infer<typeof responseUpdate>;
@@ -334,6 +349,9 @@ export const makeResponseService = defineService<ResponseT>()(() => {
 				{ include: responseInclude() },
 			);
 
+			if (fields.acceptingSubmissions === false) {
+				return fromDb(await gradeOnClose(tx, row));
+			}
 			return fromDb(row);
 		},
 	});
@@ -390,7 +408,9 @@ export const makeResponseService = defineService<ResponseT>()(() => {
 				{},
 				{ include: responseInclude() },
 			);
-			return fromDb(updated);
+			return fromDb(
+				input.acceptingSubmissions ? updated : await gradeOnClose(tx, updated),
+			);
 		},
 	});
 
@@ -498,7 +518,87 @@ export const makeResponseService = defineService<ResponseT>()(() => {
 				{},
 				{ include: responseInclude() },
 			);
-			return fromDb(updated);
+			return fromDb(await gradeOnClose(tx, updated));
+		},
+	});
+
+	/**
+	 * Grades the objective answers of the attempts that were closed, or ran out of time, without being graded.
+	 *
+	 * It is the catch-up for attempts closed before the server graded on closing. Exams whose grades were released are left out unless `released`, and an attempt still open is never touched. With `dryRun` nothing is written. Returns one line per exam that has such attempts.
+	 *
+	 * @throws {@link NotAllowed} When the actor lacks `system.manage`.
+	 * @throws {@link NotFound} If the course does not exist.
+	 */
+	const gradeObjectives = op({
+		args: [responseGradeObjectives],
+		run: async (
+			tx: PrismaTx,
+			input: ResponseGradeObjectives,
+			opts: ServiceOptsWithoutTx,
+		): Promise<ObjectiveGradingLine[]> => {
+			ensurePerm(opts.actor, "system.manage");
+			const course = valueOrNotFound(
+				"course",
+				await tx.course.findUnique({
+					where: courseRefWhere(input.course),
+					select: { id: true },
+				}),
+			);
+			const exams = await tx.exam.findMany({
+				where: {
+					courseId: course.id,
+					...(input.exam ? { slug: input.exam } : {}),
+					...(input.released ? {} : { gradesReleasedAt: null }),
+				},
+				select: {
+					id: true,
+					slug: true,
+					gradesReleasedAt: true,
+					...examTimingSelect,
+				},
+				orderBy: { id: "asc" },
+			});
+			const now = new Date();
+			const lines: ObjectiveGradingLine[] = [];
+			for (const exam of exams) {
+				const responses = await tx.response.findMany({
+					where: { examId: exam.id },
+					select: {
+						id: true,
+						createdAt: true,
+						authorId: true,
+						acceptingSubmissions: true,
+					},
+					orderBy: { id: "asc" },
+				});
+				let attempts = 0;
+				let graded = 0;
+				for (const response of responses) {
+					if (
+						response.acceptingSubmissions &&
+						!attemptTimedOut(
+							{ createdAt: response.createdAt, exam },
+							now,
+							await loadExceptionTiming(tx, exam.id, response.authorId),
+						)
+					) {
+						continue;
+					}
+					attempts += 1;
+					graded += await gradeAttempt(tx, response.id, {
+						dryRun: input.dryRun,
+					});
+				}
+				if (attempts === 0) continue;
+				lines.push({
+					exam: exam.slug,
+					attempts,
+					graded,
+					released: exam.gradesReleasedAt !== null,
+				});
+			}
+			return lines;
 		},
 	});
 
@@ -606,6 +706,7 @@ export const makeResponseService = defineService<ResponseT>()(() => {
 		upsert,
 		delete: remove,
 		finish,
+		gradeObjectives,
 		submit,
 	};
 });
@@ -958,4 +1059,19 @@ function fromDb(row: DbResponse): Response {
 		createdAt: row.createdAt,
 		updatedAt: row.updatedAt,
 	};
+}
+
+/// Grades the objective answers of the attempt `row` just closed, and returns the row as it reads afterwards.
+async function gradeOnClose(
+	tx: PrismaTx,
+	row: DbResponse,
+): Promise<DbResponse> {
+	if ((await gradeAttempt(tx, row.id)) === 0) return row;
+	return valueOrNotFound(
+		"response",
+		await tx.response.findUnique({
+			where: { id: row.id },
+			include: responseInclude(),
+		}),
+	);
 }

@@ -4,6 +4,7 @@ import { checkInstructorEnrollmentsCommand } from "./check-instructor-enrollment
 import { createCourseCommand } from "./create-course";
 import { createEditionCommand } from "./create-edition";
 import { createUserCommand } from "./create-user";
+import { gradeObjectivesCommand } from "./grade-objectives";
 import { importCalendarCommand } from "./import-calendar";
 import { importResourcesCommand } from "./import-resources";
 import { recomputeEventTimesCommand } from "./recompute-event-times";
@@ -24,5 +25,6 @@ manage.addCommand(recomputeEventTimesCommand);
 manage.addCommand(upgradeQuestionsCommand);
 manage.addCommand(answerHistoryStatsCommand);
 manage.addCommand(checkInstructorEnrollmentsCommand);
+manage.addCommand(gradeObjectivesCommand);
 
 await manage.parseAsync(process.argv);

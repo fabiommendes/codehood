@@ -775,6 +775,8 @@ const UNGUARDED: Record<string, string> = {
 		"derived write: moves the version of the events it recomputes, takes no expectation",
 	"question.upgradeLegacyVersions":
 		"derived write: moves the version of the questions it rewrites, takes no expectation",
+	"response.gradeObjectives":
+		"derived write: moves the version of the attempts it grades, takes no expectation",
 	"rollCall.checkIn":
 		"the student's own call: it carries no expectation, and bumps the roll call only when it adds an attendance",
 	"rollCall.checkInClaim":

@@ -67,6 +67,18 @@ Whenever a new command is created, document it in this file.
   alone; running it again changes nothing. Exits with 1 when a version cannot
   be converted, naming it.
 
+### Grading
+
+`manage grade-objectives --course <course> [--exam <exam>] [--dry-run] [--released]`
+: Grades the objective answers (multiple choice, selection, numeric and the
+  like) of the attempts that are closed or out of time and have no grade yet,
+  which is what the server does when an attempt closes. Essays, code and
+  fill-ins with a blank for the instructor stay as they are. It looks at
+  exams whose grades were not released, plus the released ones with
+  `--released`, whose students would see a grade appear. `--dry-run` prints
+  what it would grade and writes nothing. Run it per exam, with `--dry-run`
+  first.
+
 ### Enrollments
 
 `manage check-instructor-enrollments [--fix]`

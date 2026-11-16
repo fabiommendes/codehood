@@ -111,6 +111,20 @@ export const responseFinish = z.object({
 	author: username.optional(),
 });
 
+/// Which closed attempts `response.gradeObjectives` grades.
+export const responseGradeObjectives = z.object({
+	course: courseRef,
+
+	/// Every exam of the course when absent.
+	exam: slug.optional(),
+
+	/// Counts what would be graded and writes nothing.
+	dryRun: z.boolean().optional(),
+
+	/// Includes exams whose grades were already released.
+	released: z.boolean().optional(),
+});
+
 export const responseSubmit = z.object({
 	course: courseRef,
 	exam: slug,
