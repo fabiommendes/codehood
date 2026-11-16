@@ -75,6 +75,17 @@
   `blob/missing` por push e só manda os blobs que faltam. A mdq-js ganhou o
   porte dos anexos e o slot `afterStem`.
 
+- Card de navegação do curso na sidebar em toda página de curso, com a mesma
+  lista de entradas em cada aba (só muda a entrada marcada e as abertas):
+  Materiais e Repositórios, Turma, Notas e Frequência, a agenda também em
+  `roll-call` e no recurso de evento, e o título ou nome da entidade sob a
+  aba. Uma entrada com filhos é um link para a página, e as âncoras são filhas
+  dela. A página da prova do instrutor se divide em Visão geral, Questões,
+  Exceções, Resultados (por questão e por aluno), com Correção, Revisões e a
+  tentativa de um aluno no mesmo card. A lista de provas decide "instrutor"
+  por `enrollment.manage`, como o detalhe (spec
+  `dev/specs/to-review/card-de-navegacao-do-curso.md`).
+
 ### Changed
 
 - A aba "Estudantes" do professor reúne turma, notas e presença: a aba
