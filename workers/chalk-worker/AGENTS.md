@@ -26,13 +26,10 @@ systemd-run --user --scope --quiet --collect -p Delegate=yes \
 
 ## Contexto
 
-- Repositório próprio, incluído no codehood como subtree em
-  `workers/chalk-worker/`. Depende de `codehood-cli` por caminho
-  (`../../cli`), então só resolve dentro do checkout do codehood. Sincronizar
-  com o repositório próprio só quando o humano pedir, a partir da raiz do
-  codehood:
-  `git subtree push --prefix=workers/chalk-worker git@github.com:fabiommendes/chalk-worker.git main`
-  (ou `subtree pull` com os mesmos argumentos).
+- Vive só no monorepo do codehood, em `workers/chalk-worker/` (o antigo
+  repositório próprio, `fabiommendes/chalk-worker`, está arquivado). Depende
+  de `codehood-cli` por caminho (`../../cli`), então só resolve dentro do
+  checkout do codehood.
 - Desenho: RFC "Worker de correção do codehood (modelo pull)" no repositório
   do chalk (`dev/rfc/worker-de-correcao-do-codehood-modelo-pull.md`) e RFC
   `dev/rfc/fila-de-correcao-externa.md` do codehood (fila `GradingJob`,

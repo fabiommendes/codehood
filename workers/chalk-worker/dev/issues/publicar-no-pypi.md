@@ -43,13 +43,13 @@ no PyPI em 2026-11-13.
 ## Proposta
 
 - Trocar a dependência `codehood-cli` por `mdq` e `httpx` diretos, com versão
-  mínima. Manter `[tool.uv.sources]` só para o desenvolvimento no subtree
+  mínima. Manter `[tool.uv.sources]` só para o desenvolvimento no monorepo
   (`mdq` por caminho), para que um `uv build` gere metadados que resolvam no
   PyPI.
 - Conferir se o `mdq` do PyPI tem os modelos que o worker usa. Se não tiver,
   publicar uma versão nova do `mdq` antes.
 - Publicar o `chalk-worker` no PyPI, com um fluxo de release (tag → build →
-  publish) no repositório próprio, como o `chalk-grader` já faz.
+  publish) no codehood, como o `chalk-grader` já faz.
 - Atualizar o `README.md`: `uvx chalk-worker ...` e `pip install chalk-worker`.
 - Fora do escopo, mas relacionado: publicar o `codehood-cli` também, para que
   o professor instale o CLI sem clonar o codehood.
@@ -58,5 +58,5 @@ no PyPI em 2026-11-13.
 
 - [ ] `uvx chalk-worker --help` funciona numa máquina sem nenhum checkout.
 - [ ] `pip install chalk-worker` num venv limpo instala e roda `--help`.
-- [ ] `uv run ruff check && uv run pytest` continua passando no subtree.
+- [ ] `uv run ruff check && uv run pytest` continua passando no monorepo.
 - [ ] O `README.md` mostra a instalação pelo PyPI.

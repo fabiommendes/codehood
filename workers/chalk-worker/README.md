@@ -138,8 +138,7 @@ Caches live in `$XDG_CACHE_HOME/chalk-worker`.
 
 ## Development
 
-The worker lives in the codehood repository as a git subtree in
-`workers/chalk-worker/`, and depends on `codehood-cli` from `../../cli` and
+The worker lives in the codehood repository, in `workers/chalk-worker/`, and depends on `codehood-cli` from `../../cli` and
 on `chalk-grader` from PyPI.
 
 ```sh
