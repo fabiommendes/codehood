@@ -26,6 +26,14 @@
 
 ### Added
 
+- Liberar as notas de uma prova pela REST: `POST
+  /api/course/[discipline]/[course]/exam/[slug]/release` (`examRelease`) chama
+  `db.exam.releaseGrades` e devolve a prova com `gradesReleasedAt`. Repetir a
+  chamada responde 200 e mantém a data da primeira liberação. Quando não dá,
+  responde 409 (`code: "invalid-data"`) com `reason` (`not-an-exam`,
+  `not-closed`, `exception-open`, `pending`), `pendingAnswers` e
+  `openExceptions`. Só o professor do curso, por sessão ou chave CLI; chave
+  BOT recebe 403 (permissão `exam.release-grades`).
 - Encerrar uma prova sem prazo. A visão geral da prova avisa quando ela está
   aberta sem data ou sem duração e mostra quantas tentativas estão em
   andamento. O botão "Encerrar prova" (`exam.close`, com confirmação) põe a

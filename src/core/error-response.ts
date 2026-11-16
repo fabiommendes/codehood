@@ -8,6 +8,7 @@ export type { JSONable, JSONValue } from "@/typing/concrete-types";
  */
 export type ErrorResponse =
 	| InvalidDataResponse
+	| GradeReleaseRefusedResponse
 	| NotAllowedResponse
 	| NotFoundResponse
 	| RuleViolationResponse
@@ -36,9 +37,26 @@ export interface BaseErrorResponse {
  */
 export interface InvalidDataResponse extends BaseErrorResponse {
 	code: "invalid-data";
-	status: 400 | 422;
+	status: 400 | 409 | 422;
 	data?: JSONable;
 	errors: { [key: string]: { code: InvalidDataCode; message?: string }[] };
+}
+
+/// Why an exam's grades cannot be released, see `gradeReleaseBlocker`.
+export type GradeReleaseRefusal =
+	| "not-an-exam"
+	| "not-closed"
+	| "exception-open"
+	| "pending";
+
+/// The refusal to release an exam's grades, with the numbers behind it.
+export interface GradeReleaseRefusedResponse extends InvalidDataResponse {
+	status: 409;
+	reason: GradeReleaseRefusal;
+	/// Answers still waiting for a grade; 0 unless `reason` is `pending`.
+	pendingAnswers: number;
+	/// Personal windows (makeups, extra time) not over yet.
+	openExceptions: number;
 }
 
 export type InvalidDataCode =

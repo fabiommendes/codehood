@@ -10,8 +10,13 @@ import type { Attachment } from "mdq";
 import { z } from "zod";
 import { accessError, examAccess, requireAccess } from "@/auth/access";
 import { type Actor, SYSTEM } from "@/auth/actor";
-import { hasPerm } from "@/auth/permissions";
-import { InvalidData, NotAllowed, NotFound } from "@/core/error";
+import { ensurePerm, hasPerm } from "@/auth/permissions";
+import {
+	GradeReleaseRefused,
+	InvalidData,
+	NotAllowed,
+	NotFound,
+} from "@/core/error";
 import type { CourseId, ExamId, QuestionRefId } from "@/core/schemas";
 import {
 	courseExamSchema,
@@ -66,6 +71,8 @@ import {
 	type GradeReleaseBlocker,
 	hiddenExamStatuses,
 	hiddenFromStudents,
+	openExceptionCount,
+	pendingAnswerCount,
 	releaseBlocker,
 	viewerTiming,
 } from "@/services/exam-state";
@@ -583,9 +590,10 @@ const buildExamService = (deps: Deps) =>
 		 * release on their own schedule.
 		 *
 		 * @throws {@link NotFound} If the exam does not exist or `actor` may not see it.
-		 * @throws {@link NotAllowed} If `actor` may not write the course's contents.
-		 * @throws {@link InvalidData}
-		 * If the exam is not an `EXAM`, is not closed, or has an answer waiting for a grade.
+		 * @throws {@link NotAllowed}
+		 * If `actor` may not write the course's contents, or authenticated with a BOT key.
+		 * @throws {@link GradeReleaseRefused}
+		 * If the exam is not an `EXAM`, is not closed, has a personal window still open, or has an answer waiting for a grade.
 		 */
 		const releaseGrades = op({
 			args: [examPK],
@@ -607,6 +615,7 @@ const buildExamService = (deps: Deps) =>
 					"exam.update",
 					opts,
 				);
+				ensurePerm(opts.actor, "exam.release-grades", row.course);
 				// An exam that is already released is returned as it is, but not to a stale caller.
 				await checkVersion(tx, "exam", { id: row.id }, opts);
 
@@ -625,18 +634,17 @@ const buildExamService = (deps: Deps) =>
 					row.course.enrollments.map((enrollment) => enrollment.username),
 				);
 				let blocker = releaseBlocker(schedule, [], now);
+				let results: ExamResult[] = [];
 				if (!blocker) {
 					await gradeExpiredObjectives(tx, { examId: row.id });
-					blocker = releaseBlocker(
-						schedule,
-						await attemptResults(tx, row),
-						now,
-					);
+					results = await attemptResults(tx, row);
+					blocker = releaseBlocker(schedule, results, now);
 				}
 				if (blocker === "released") return exam;
 				if (blocker) {
-					throw new InvalidData({
-						exam: [{ code: "invalid", message: releaseRefusals[blocker]() }],
+					throw new GradeReleaseRefused(blocker, releaseRefusals[blocker](), {
+						pendingAnswers: pendingAnswerCount(results),
+						openExceptions: openExceptionCount(schedule, now),
 					});
 				}
 

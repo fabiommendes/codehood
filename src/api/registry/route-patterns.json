@@ -141,6 +141,12 @@
 		]
 	},
 	{
+		"pattern": "/api/course/[discipline]/[course]/exam/[slug]/release",
+		"methods": [
+			"post"
+		]
+	},
+	{
 		"pattern": "/api/course/[discipline]/[course]/grade-column",
 		"methods": [
 			"get",

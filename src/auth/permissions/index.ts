@@ -56,6 +56,7 @@ type ExtraPerms =
 	| "report.triage"
 	| "roll-call.manage"
 	| "exam.manage-exceptions"
+	| "exam.release-grades"
 	| "rubric.read"
 	| "rubric.write"
 	| "grading-job.work"
@@ -373,6 +374,15 @@ const PERMISSIONS = {
 	"exam.manage-exceptions": {
 		admin: true,
 		other: (actor, target) => isCourseOwner(actor, target),
+		audit: auditCourse,
+	} satisfies PermDef<CourseTarget>,
+
+	// Rule: SYSTEM or the course's own instructor releases an exam's grades, as
+	// a session or a CLI key. An actor authenticated by a BOT API key never
+	// does, even when its owner teaches the course: a grading bot grades, it
+	// does not publish.
+	"exam.release-grades": {
+		other: (actor, target) => isCourseOwner(actor, target) && !actor.bot,
 		audit: auditCourse,
 	} satisfies PermDef<CourseTarget>,
 

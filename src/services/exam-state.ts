@@ -376,17 +376,43 @@ export function releaseMoment(schedule: ExamSchedule, now: Date): Date | null {
 	}
 }
 
+/// How many exceptions have a personal phase still `upcoming` or `open` at `now`, those of dropped students aside.
+function countOpenExceptions(
+	exam: BaseTiming,
+	now: Date,
+	exceptions: readonly ExceptionTiming[],
+): number {
+	return exceptions.filter((exception) => {
+		if (exception.dropped) return false;
+		const phase = examPhase(personalTiming(exam, exception), now);
+		return phase === "upcoming" || phase === "open";
+	}).length;
+}
+
 /// Whether some exception's personal phase is still `upcoming` or `open` at `now`, those of dropped students aside.
 function hasOpenException(
 	exam: BaseTiming,
 	now: Date,
 	exceptions: readonly ExceptionTiming[],
 ): boolean {
-	return exceptions.some((exception) => {
-		if (exception.dropped) return false;
-		const phase = examPhase(personalTiming(exam, exception), now);
-		return phase === "upcoming" || phase === "open";
-	});
+	return countOpenExceptions(exam, now, exceptions) > 0;
+}
+
+/** How many exceptions of `schedule` keep a personal window open at `now`, see {@link gradeReleaseBlocker}. */
+export function openExceptionCount(schedule: ExamSchedule, now: Date): number {
+	return countOpenExceptions(schedule.base, now, [
+		...schedule.exceptions.values(),
+	]);
+}
+
+/** How many answers in `results` still wait for a grade, see {@link gradeReleaseBlocker}. */
+export function pendingAnswerCount(results: ExamResult[]): number {
+	return results.reduce(
+		(total, result) =>
+			total +
+			result.questions.filter((outcome) => outcome.status === "pending").length,
+		0,
+	);
 }
 
 /// Why an instructor may not release an exam's grades, see {@link gradeReleaseBlocker}.

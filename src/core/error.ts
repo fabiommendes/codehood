@@ -5,6 +5,8 @@ import type { z } from "zod";
 import { m } from "@/i18n";
 import {
 	type BaseErrorResponse,
+	type GradeReleaseRefusal,
+	type GradeReleaseRefusedResponse,
 	type InternalErrorResponse,
 	type InvalidDataCode,
 	type InvalidDataResponse,
@@ -193,6 +195,40 @@ export class InvalidData extends BaseSerializableError<InvalidDataResponse> {
 }
 
 export type InvalidDataErrors = InvalidDataResponse["errors"];
+
+/**
+ * Thrown when an exam's grades cannot be released yet.
+ *
+ * An {@link InvalidData} the REST API answers with 409, adding why and by how
+ * much: the counts are those the release checked, `pendingAnswers` is 0 unless
+ * `reason` is `pending`.
+ */
+export class GradeReleaseRefused extends InvalidData {
+	readonly reason: GradeReleaseRefusal;
+	readonly pendingAnswers: number;
+	readonly openExceptions: number;
+
+	constructor(
+		reason: GradeReleaseRefusal,
+		message: string,
+		counts: { pendingAnswers: number; openExceptions: number },
+	) {
+		super({ exam: [{ code: "invalid", message }] }, { message, status: 409 });
+		this.reason = reason;
+		this.pendingAnswers = counts.pendingAnswers;
+		this.openExceptions = counts.openExceptions;
+	}
+
+	override toJSON(): GradeReleaseRefusedResponse {
+		return {
+			...super.toJSON(),
+			status: 409,
+			reason: this.reason,
+			pendingAnswers: this.pendingAnswers,
+			openExceptions: this.openExceptions,
+		};
+	}
+}
 
 /// One reason a password fails the strength checks.
 export type PasswordIssue = {

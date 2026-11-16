@@ -118,14 +118,17 @@ function inlineBlobs<B>(body: B, files: Record<string, Buffer>): B {
 	return { ...body, blobs: files };
 }
 
+/// The exam as the REST reads it.
+const examEntity = schema.examFullSchema.omit({ id: true }).extend({
+	questions: z.array(schema.examQuestionSchema.omit({ id: true })),
+});
+
 export const examApi = CRUD("/api/course/[discipline]/[course]/exam", {
 	name: "Exam",
 	plural: "Exams",
 	keySegment: "/[slug]",
 
-	entity: schema.examFullSchema.omit({ id: true }).extend({
-		questions: z.array(schema.examQuestionSchema.omit({ id: true })),
-	}),
+	entity: examEntity,
 	create: schema.examWriteCreate.omit({ course: true, blobs: true }),
 	update: schema.examWriteUpdate.omit({ blobs: true }),
 	filter: schema.examFilterBase,
@@ -144,6 +147,60 @@ export const examApi = CRUD("/api/course/[discipline]/[course]/exam", {
 		return { course: parseCourseParams(params) };
 	},
 });
+
+/// The 409 of `releaseGrades`: the error format of the REST plus why and by how much.
+const gradeReleaseRefusedSchema = z
+	.object({
+		type: z.literal("error"),
+		code: z.literal("invalid-data"),
+		status: z.literal(409),
+		message: z.string(),
+		timestamp: z.string(),
+		errors: z.record(
+			z.string(),
+			z.array(z.object({ code: z.string(), message: z.string().optional() })),
+		),
+		reason: z
+			.enum(["not-an-exam", "not-closed", "exception-open", "pending"])
+			.openapi({
+				description:
+					"Why the grades cannot be released: `not-an-exam` (a quiz or practice exam releases on its own), `not-closed` (the exam is still open or scheduled), `exception-open` (a personal window of a student is not over) or `pending` (an answer waits for a grade).",
+			}),
+		pendingAnswers: z.number().int().openapi({
+			description:
+				"Answers still waiting for a grade. 0 unless `reason` is `pending`.",
+		}),
+		openExceptions: z.number().int().openapi({
+			description:
+				"Exceptions whose personal window (makeup or extra time) is not over.",
+		}),
+	})
+	.openapi("GradeReleaseRefused", {
+		description: "The exam's grades cannot be released yet.",
+	});
+
+export const examReleaseApi = POST(
+	"/api/course/[discipline]/[course]/exam/[slug]/release",
+	{
+		out: examEntity,
+		summary: "Release the grades of an exam to its students.",
+		description:
+			"Stamps `gradesReleasedAt` and answers the exam. Idempotent: releasing an exam already released answers 200 and keeps the date of the first release. Only the course's instructor, by session or CLI key; a BOT key gets 403. A release that is not possible answers 409 with the reason and the counts.",
+		operationId: "examRelease",
+		tags: ["Exams"],
+		errors: {
+			409: {
+				description: "The grades cannot be released yet.",
+				schema: gradeReleaseRefusedSchema,
+			},
+		},
+		handler: async ({ actor, params }) =>
+			db.exam.releaseGrades(
+				{ course: parseCourseParams(params), slug: params.slug as string },
+				{ actor },
+			),
+	},
+);
 
 export const examExceptionApi = CRUD(
 	"/api/course/[discipline]/[course]/exam/[slug]/exception",
