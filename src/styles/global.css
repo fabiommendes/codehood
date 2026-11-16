@@ -602,6 +602,13 @@ h6 {
 	box-shadow: var(--code-shadow);
 }
 
+/* The editor where a student writes an answer: a stronger edge than the code
+   samples of the statement around it. */
+[data-code-runner][data-mode="answer"],
+[data-code-editor] {
+	--code-border: color-mix(in oklab, var(--color-base-content) 40%, transparent);
+}
+
 @utility code-block {
 	@apply code-surface;
 	display: block;
