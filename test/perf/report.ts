@@ -223,16 +223,21 @@ export function reportRun(lines: Line[], limit = 25): string {
  * The report of a base run against a run on a full database, in Markdown.
  *
  * A route is listed as suspect when its median time in SQLite at least
- * doubled; `threshold` changes that factor.
+ * doubled and reached 10 ms on the full database; `threshold` and `floor`
+ * change the factor and the time. Below the floor a fraction of a
+ * millisecond of jitter is enough to double a route.
  */
 export function reportComparison(
 	base: Line[],
 	full: Line[],
 	threshold = 2,
+	floor = 10,
 	limit = 40,
 ): string {
 	const changes = compareRoutes(routeStats(base), routeStats(full));
-	const suspects = changes.filter((change) => change.ratio >= threshold);
+	const suspects = changes.filter(
+		(change) => change.ratio >= threshold && change.full.db >= floor,
+	);
 	const row = (change: RouteChange) => [
 		`\`${change.route}\``,
 		`${change.base.n}/${change.full.n}`,
@@ -256,7 +261,7 @@ export function reportComparison(
 
 	return [
 		`# Base database against full database\n`,
-		`${changes.length} routes hit in both runs; ${suspects.length} grew ${threshold}× or more in median SQLite time (ms).\n`,
+		`${changes.length} routes hit in both runs; ${suspects.length} grew ${threshold}× or more in median SQLite time, to ${floor} ms or more.\n`,
 		`## Routes that grew\n`,
 		suspects.length
 			? table(header, suspects.slice(0, limit).map(row))

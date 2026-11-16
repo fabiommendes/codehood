@@ -118,3 +118,26 @@ test("the comparison lists the routes that grew and the statements slow only on 
 	expect(report).toContain("SELECT * FROM Submission WHERE x = ?");
 	expect(report).toContain("submission.findMany");
 });
+
+test("a route that doubled but stays under the floor is not listed as grown", () => {
+	const report = reportComparison(
+		[...hits("GET /quick", 1), ...hits("GET /scan", 2)],
+		[...hits("GET /quick", 4), ...hits("GET /scan", 40)],
+	);
+
+	expect(report).toContain("2 routes hit in both runs; 1 grew 2× or more");
+	const grew = report.slice(
+		report.indexOf("## Routes that grew"),
+		report.indexOf("## Statements slow only"),
+	);
+	expect(grew).toContain("`GET /scan`");
+	expect(grew).not.toContain("GET /quick");
+
+	const noFloor = reportComparison(
+		hits("GET /quick", 1),
+		hits("GET /quick", 4),
+		2,
+		0,
+	);
+	expect(noFloor).toContain("1 grew 2× or more");
+});

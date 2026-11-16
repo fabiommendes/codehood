@@ -1,8 +1,7 @@
 ---
 type: spec
-status: doing
+status: to-review
 tags: [api, performance, pagination]
-relatedTo: [consultas-que-crescem-com-o-banco]
 created: 2026-11-14
 creator: claude
 ---
@@ -12,8 +11,8 @@ creator: claude
 ## Problema
 
 As listas da API e das páginas carregam a tabela inteira. `GET /api/course`,
-`GET /api/user` e as páginas de admin crescem com o banco (ver
-`dev/issues/consultas-que-crescem-com-o-banco.md`).
+`GET /api/user` e as páginas de admin crescem com o banco (issue
+`consultas-que-crescem-com-o-banco`, fechada em 2026-11-16).
 
 ## Contrato da API
 
@@ -135,8 +134,9 @@ intervalo de datas dos eventos do `/calendar`.
    `user.countByRole`.
 7. [x] `/admin`: disciplinas e edições por `count` (edições abertas com
    `edition.count({ active: true })`) e amostra de três slugs com
-   `discipline.findPage({ limit: 3 })`. Os convites ainda são filtrados em
-   JS: `inviteFilter` não tem `invitedRole`, e incluí-lo muda a API.
+   `discipline.findPage({ limit: 3 })`. Os convites pendentes vêm de
+   `invite.findMany({ kind: "PERSONAL", invitedRole: "INSTRUCTOR" })`
+   (`invitedRole` entrou em `inviteFilter` em 2026-11-16).
 8. [x] `/admin/disciplines` e `/admin/editions`: `findPage` e `count` nos
    dois services, o que também paginou `GET /api/discipline` e
    `GET /api/edition`.
@@ -182,45 +182,35 @@ testar se é vazia.
 Peças de UI existentes: `src/components/ui/Table.tsx` e
 `src/components/ui/table-sort.ts`, que guarda a ordenação na URL.
 
-## Retomada (handoff de 2026-11-16)
+## Estado e trabalho futuro
 
-Estado: itens 1 a 10 feitos e enviados ao remoto. `test:perf` inteiro (antes
-do último rebase) deixou 3 de 249 rotas acima de 2×, todas abaixo de 7 ms;
-ver o andamento em `dev/issues/consultas-que-crescem-com-o-banco.md`.
+Itens 1 a 10 da fila feitos. A issue `consultas-que-crescem-com-o-banco` foi
+fechada em 2026-11-16: no `test:perf` inteiro (251 rotas) nenhuma rota
+cresceu 2× ou mais chegando a 10 ms no banco cheio, que é o que o relatório
+passou a acusar (`--floor`). Abaixo desse piso, uma oscilação de fração de
+milissegundo dobra uma rota de 1 a 3 ms e o conjunto muda a cada rodada. A
+mesma medição achou três consultas fora da paginação (`gradeObjectives`,
+`gradingJob.summary`, contagem de resgates de `invite`), corrigidas, e
+`/admin` ganhou `invitedRole` no filtro de convites e índice em `User.role`.
 
-### O que falta, na ordem sugerida
+Fica como trabalho futuro, sem medição que o exija (segue o tamanho de um
+curso, não o do banco):
 
-1. **Medir antes de mexer.** Rodar `rtk pnpm run test:perf` de novo: os
-   números são de antes do rebase sobre 20 commits do remoto. Guardar a saída
-   inteira num arquivo (o relatório fica em `.perf/<hora>/report.md`, mas os
-   nomes dos specs que falham só aparecem na saída do Playwright).
-2. **`GET /<curso>/attendance` (3,8×, 1,5 → 5,7 ms) e `POST /admin` (2,4×,
-   2,6 → 6,3 ms).** São as duas rotas que ainda descumprem o critério da
-   issue. Não investigadas. Em `/admin`, os convites pessoais são carregados
-   e filtrados em JS porque `inviteFilter` não tem `invitedRole`; incluí-lo
-   muda a API. Em `/attendance`, achar a consulta que cresce com
-   `test:perf test/<spec de attendance>` e a seção "Statements slow only on
-   the full database".
-3. **Item 11, `/roster` e `/attendance`.** O CSV e os totais precisam do
+1. **Item 11, `/roster` e `/attendance`.** O CSV e os totais precisam do
    conjunto inteiro. Caminho provável: a tabela pagina com `findPage`, os
    totais vêm de `count`/agregações no service e o CSV continua usando
-   `findMany`. Decidir com o humano se vale: a lista é limitada pelo tamanho
-   da turma, não do banco.
-4. **Item 12, `/resources`.** Agrupado por tipo e por evento; paginar grupos
-   não é óbvio. Mesma ressalva de tamanho.
-5. **Item 13, `/exams`.** `ExamsTable` ordena no cliente. Segue o molde de
+   `findMany`.
+2. **Item 12, `/resources`.** Agrupado por tipo e por evento; paginar grupos
+   não é óbvio.
+3. **Item 13, `/exams`.** `ExamsTable` ordena no cliente. Segue o molde de
    `/questions` (cursor composto, `sort` na URL).
-6. **`/calendar`:** os eventos ainda vêm sem intervalo de datas. Não é
+4. **`/calendar`:** os eventos ainda vêm sem intervalo de datas. Não é
    tabela: falta um filtro de datas no service de eventos. A rota REST de
    `calendar-event` já tem um parâmetro de filtro chamado `limit`, que vai
    colidir com o `limit` da paginação quando ela for paginada.
-7. **Consultas mais estreitas** (último parágrafo da fila): correção, notas,
+5. **Consultas mais estreitas** (último parágrafo da fila): correção, notas,
    revisões, `attempts/[username].astro`, `CourseHeader.astro`,
    `getting-started.astro`.
-
-Os itens 3 a 5 seguem o tamanho de um curso, não o do banco. Se a medição do
-passo 1 não os acusar, a issue pode ser fechada sem eles e este spec vai para
-`to-review/` com a fila restante registrada como trabalho futuro.
 
 ### Como fazer cada página
 
@@ -243,6 +233,10 @@ O molde está pronto; copiar, não reinventar.
   briefing; revisar o diff, rodar lint e os specs tocados, e só então commitar.
 
 ### Armadilhas vistas
+
+- **`_count` de relação no `select`/`include` do Prisma** junta com um
+  `GROUP BY` da tabela filha inteira, mesmo em `findUnique`. Contar à parte,
+  com `where` nos ids lidos.
 
 - **Testes que supõem banco pequeno** falham só no banco cheio: não afirmar
   "cabe em uma página" nem percorrer a lista inteira de usuários de 2 em 2.
@@ -268,3 +262,6 @@ O molde está pronto; copiar, não reinventar.
 - Listar os feedbacks de um curso grande custa ~100 ms fora do SQLite, pelos
   `include` de cada linha.
 - `GET /openapi.json` gasta ~460 ms de CPU síncrona por chamada, sem cache.
+- `exam.findOne` lê `QuestionData` por `refId` e `versionHash` com máximo de
+  24 ms só no banco cheio (`GET /<curso>/exams/<prova>`). Não investigado.
+- `grading-code-answer.spec.ts:126` também falha sob carga, no banco do seed.

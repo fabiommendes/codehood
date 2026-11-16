@@ -7,6 +7,7 @@
  * pnpm run test:perf                              # the whole e2e scope, scale 1
  * pnpm run test:perf --scale 0.2 test/foo.spec.ts # some specs, less data
  * pnpm run test:perf --base .perf/<run>/base      # reuse a base run
+ * pnpm run test:perf --threshold 3 --floor 5      # growth factor and ms that make a suspect
  * ```
  *
  * Everything after the options is forwarded to `test/run.ts`. The logs and
@@ -30,6 +31,8 @@ function option(name: string): string | undefined {
 const scale = option("scale") ?? "1";
 const reusedBase = option("base");
 const threshold = Number(option("threshold") ?? 2);
+/// Median SQLite time, in ms, below which a route that grew is not reported.
+const floor = Number(option("floor") ?? 10);
 /// Statements at or above it are logged with their SQL, in both runs.
 const slowQueryMs = option("slow-query-ms") ?? "5";
 
@@ -66,7 +69,12 @@ if (!reusedBase) {
 console.log(`[perf] full run (scale ${scale}) → ${fullDir}`);
 const fullStatus = runSuite(fullDir, { TEST_FILL: scale });
 
-const report = reportComparison(readLog(baseDir), readLog(fullDir), threshold);
+const report = reportComparison(
+	readLog(baseDir),
+	readLog(fullDir),
+	threshold,
+	floor,
+);
 const reportFile = path.join(out, "report.md");
 writeFileSync(reportFile, report);
 console.log(`\n${report}`);

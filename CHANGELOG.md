@@ -165,7 +165,9 @@
   (`test/fill/`, ~827 mil linhas em 7 s na escala 1, em cursos `bulk-*`
   próprios), e relata as rotas cujo tempo de SQLite cresceu e as SQL lentas
   só no banco cheio (`test/perf/`). `TEST_PERF_LOG` e `TEST_FILL` fazem cada
-  metade à parte. Achados em `dev/issues/consultas-que-crescem-com-o-banco.md`.
+  metade à parte. Uma rota só é acusada quando cresce 2× ou mais e chega a
+  10 ms no banco cheio (`--threshold`, `--floor`): abaixo disso uma oscilação
+  trivial dobra uma rota rápida.
 
 ### Changed
 
@@ -193,7 +195,7 @@
   (`src/utils/cursor.ts`), o de usuário é o `username`. `GET /api/user` não
   aceita mais `take`. Os services paginados ganham `findPage` e `count`;
   `findMany` continua devolvendo array. A CLI segue `next` em toda lista.
-  Contrato em `dev/specs/to-do/paginacao-das-listas.md`.
+  Contrato em `dev/specs/to-review/paginacao-das-listas.md`.
 
 - `/admin/courses`, `/admin/users`, `/admin/disciplines`, `/admin/editions` e
   `/courses` mostram uma página de 50 linhas lida pelo servidor
@@ -270,6 +272,17 @@
   `dev/specs/to-review/datas-de-curso-como-data.md`.
 
 ### Fixed
+
+- Consultas cujo custo crescia com o banco inteiro, achadas por
+  `pnpm run test:perf` (issue `consultas-que-crescem-com-o-banco`, fechada).
+  A correção automática de objetivas (`exam.releaseGrades`,
+  `response.settleExpired`) contava os feedbacks de cada submissão agregando
+  `Feedback` inteira (172 ms com 168 mil feedbacks); `gradingJob.summary` e
+  `requeueFailed` filtravam a fila a partir de `GradingJob` (141 ms); toda
+  leitura de convite agregava `InviteRedemption`. As três partem agora das
+  linhas lidas. `/admin` pede só os convites de professor
+  (`invitedRole`, filtro novo em `GET /api/invite`) e `User` tem índice em
+  `role`.
 
 - Os blocos de código cercados (```` ```python ````) do enunciado e dos demais
   textos de uma questão saem com o realce do Shiki, nos temas claro e escuro do

@@ -250,7 +250,9 @@ rtk pnpm run test:unit --only-changed              # the same, without building 
 the directory must exist. `TEST_FILL=<scale>` adds bulk data in courses of its
 own (`test/fill/`) to the seeded database before the run. `pnpm run test:perf`
 does both runs and reports the routes whose time in SQLite grew, with the
-statements that were slow only on the full database: a route that grows
+statements that were slow only on the full database. A route is reported
+when it grows 2× or more and reaches 10 ms on the full database (`--floor`),
+since jitter alone doubles a route of 1 to 3 ms. A route that grows
 depends on the size of a whole table, which usually means a missing index.
 Results go to `.perf/<time>/`. Run it after adding a query, a table or an index.
 
