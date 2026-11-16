@@ -2,6 +2,7 @@
 import { hasPerm } from "@/auth/permissions";
 import CourseHeader from "@/components/CourseHeader.astro";
 import AnswerHistorySwitch from "@/components/exam/AnswerHistorySwitch";
+import CloseExam from "@/components/exam/CloseExam";
 import ExamAttempt from "@/components/exam/ExamAttempt";
 import ExamQuestionsTable from "@/components/exam/ExamQuestionsTable.astro";
 import ReleaseGrades from "@/components/exam/ReleaseGrades";
@@ -20,6 +21,7 @@ import {
 	examSchedule,
 	type GradeReleaseBlocker,
 	timingFor,
+	windowEnd,
 } from "@/services/exam-state";
 import type { QuestionStats } from "@/services/question-stats";
 import { examAttachmentUrl } from "@/urls";
@@ -167,8 +169,12 @@ const blockedReason =
 		: releaseBlocker === "exception-open"
 			? m.exams_release_status_exceptions({ count: staff?.openExceptions ?? 0 })
 			: releaseBlocker === "not-closed"
-				? m.errors_release_not_closed()
+				? phase === "open"
+					? m.exams_release_status_open()
+					: m.errors_release_not_closed()
 				: "";
+// An open exam is closed by hand, and one with no end date only closes that way.
+const canClose = canManage && exam.type !== "PRACTICE" && phase === "open";
 const openRegrades = staff?.openRegrades ?? 0;
 // The student's own extra time, which the exam's line shows next to its duration.
 const personalExtra = ownException?.extraTime ?? null;
@@ -320,6 +326,21 @@ const examOutcome = view.result;
             {m.grades_regrade_banner({ count: openRegrades })}
           </a>
         </p>
+      )
+    }
+
+    {
+      canClose && (
+        <section id="close-exam" class="mt-6 scroll-mt-20">
+          <CloseExam
+            client:load
+            discipline={discipline!}
+            course={courseSegment!}
+            exam={slug}
+            inProgress={staff?.inProgress ?? 0}
+            noDeadline={windowEnd(exam) === null}
+          />
+        </section>
       )
     }
 

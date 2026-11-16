@@ -39,6 +39,8 @@ export interface ExamStaffData {
 	openRegrades: number;
 	/// Exceptions whose personal window has not closed, dropped students aside.
 	openExceptions: number;
+	/// Attempts still taking answers.
+	inProgress: number;
 }
 
 /**
@@ -63,6 +65,7 @@ export async function loadExamStaffData(
 			pending: 0,
 			openRegrades: 0,
 			openExceptions: 0,
+			inProgress: 0,
 		};
 	}
 	await db.response.settleExpired({ course, exam: exam.slug }, { actor });
@@ -113,6 +116,7 @@ export async function loadExamStaffData(
 		releaseBlocker: blockerOf(schedule, results, now),
 		pending: resultRows.reduce((sum, row) => sum + row.pending, 0),
 		openRegrades: regrades.length,
+		inProgress: attempts.filter((entry) => entry.acceptingSubmissions).length,
 		openExceptions: [...exceptions].filter(([username, exception]) => {
 			if (exception.dropped) return false;
 			const phase = examPhase(timingFor(schedule, username), now);

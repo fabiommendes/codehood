@@ -26,6 +26,15 @@
 
 ### Added
 
+- Encerrar uma prova sem prazo. A visão geral da prova avisa quando ela está
+  aberta sem data ou sem duração e mostra quantas tentativas estão em
+  andamento. O botão "Encerrar prova" (`exam.close`, com confirmação) põe a
+  prova em `COMPLETED` e fecha as tentativas abertas como se o tempo tivesse
+  acabado: vale o que estava salvo, as objetivas são corrigidas e o último
+  rascunho de código vai para a fila. A simulação do professor fica como está,
+  e o aluno com exceção ainda aberta mantém a própria janela. O `PATCH` da
+  prova com `status: COMPLETED` faz o mesmo, então a CLI e a web ficam iguais.
+
 - Pesos nas provas. O peso de uma questão é o `weight` do payload mdq da
   versão que a prova usa (1 sem ele), `ExamQuestion.weight` sai na leitura da
   prova e na REST, e o total é `Σ wᵢ·sᵢ / Σ wᵢ` na tabela de notas, no CSV e

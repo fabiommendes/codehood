@@ -436,6 +436,10 @@ const HONORED: Record<string, Record<string, Case>> = {
 				const { exam } = await row();
 				return db.exam.delete({ id: exam.id }, opts(exam, v));
 			},
+			close: async (v) => {
+				const { exam } = await row();
+				return db.exam.close({ id: exam.id }, opts(exam, v));
+			},
 			releaseGrades: async (v) => {
 				const { course } = await makeCourse();
 				const exam = await makeExam(course.id, { status: "COMPLETED" });

@@ -716,3 +716,76 @@ test("instructor: Give a student extra time or a makeup exam", async ({
 		await expect(releaseButton).toBeVisible();
 	});
 });
+
+test("instructor: Close an exam with no deadline", async ({ page }) => {
+	const course = await persistedCourseFactory.create();
+	const href = courseHref({
+		discipline: course.discipline.slug,
+		instructor: course.instructor.username,
+		edition: course.edition.slug,
+	});
+	const students = [
+		await seedUser({ role: "STUDENT", username: "cls-ana" }),
+		await seedUser({ role: "STUDENT", username: "cls-bia" }),
+	];
+	for (const student of students) {
+		await db.enrollment.create(
+			{ course: course.id, username: student.username },
+			FULL_ACCESS,
+		);
+	}
+	const exam = await persistedExamFactory.create({
+		course: course.id,
+		slug: "cls-midterm",
+		title: "Midterm with no end",
+		type: "EXAM",
+		status: "ONGOING",
+	});
+	for (const student of students) {
+		await db.response.create(
+			{ course: course.id, exam: exam.slug, author: student.username },
+			FULL_ACCESS,
+		);
+	}
+
+	await logInAs(page, course.instructor);
+	const dialog = page.getByRole("dialog");
+	const closeButton = page.getByRole("button", { name: "Close exam" });
+
+	await test.step("the page warns that the exam has no deadline and counts the attempts in progress", async () => {
+		await page.goto(`${href}/exams/${exam.slug}`);
+		await expect(page.getByTestId("no-deadline")).toContainText(
+			"no deadline and stays open until you close it. 2 attempts in progress.",
+		);
+		await expect(page.getByTestId("release-status")).toContainText(
+			"Close it with the",
+		);
+	});
+
+	await test.step("cancelling the confirmation changes nothing", async () => {
+		await closeButton.click();
+		await expect(dialog).toContainText("2 attempts in progress will be closed");
+		await dialog.getByRole("button", { name: "Cancel" }).click();
+		await expect(dialog).toBeHidden();
+		await expect(
+			prisma.response.count({ where: { acceptingSubmissions: true } }),
+		).resolves.toBe(2);
+	});
+
+	await test.step("confirming ends the exam and its attempts, and the grades can be released", async () => {
+		await closeButton.click();
+		await dialog.getByRole("button", { name: "Close exam" }).click();
+		await expect(page.getByTestId("no-deadline")).toHaveCount(0);
+		await expect(
+			page.getByRole("button", { name: "Release results" }),
+		).toBeVisible();
+		const closed = await prisma.response.findMany({
+			where: { exam: { slug: exam.slug } },
+		});
+		expect(closed).toHaveLength(2);
+		for (const attempt of closed) {
+			expect(attempt.acceptingSubmissions).toBe(false);
+			expect(attempt.closedAt).not.toBeNull();
+		}
+	});
+});

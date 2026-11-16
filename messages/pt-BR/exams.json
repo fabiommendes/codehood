@@ -104,6 +104,29 @@
 			}
 		}
 	],
+	"exams_close_no_deadline": [
+		{
+			"declarations": ["input count", "local countPlural = count: plural"],
+			"selectors": ["countPlural"],
+			"match": {
+				"countPlural=one": "Esta prova não tem prazo e fica aberta até você encerrar. {count} tentativa em andamento.",
+				"countPlural=other": "Esta prova não tem prazo e fica aberta até você encerrar. {count} tentativas em andamento."
+			}
+		}
+	],
+	"exams_close_button": "Encerrar prova",
+	"exams_close_title": "Encerrar esta prova?",
+	"exams_close_body": [
+		{
+			"declarations": ["input count", "local countPlural = count: plural"],
+			"selectors": ["countPlural"],
+			"match": {
+				"countPlural=one": "{count} tentativa em andamento será encerrada agora: vale o que estava salvo e as respostas objetivas são corrigidas. Estudantes com exceção mantêm a própria janela. Não dá para desfazer.",
+				"countPlural=other": "{count} tentativas em andamento serão encerradas agora: vale o que estava salvo e as respostas objetivas são corrigidas. Estudantes com exceção mantêm a própria janela. Não dá para desfazer."
+			}
+		}
+	],
+	"exams_release_status_open": "A prova ainda está aberta. Encerre-a com o botão \"Encerrar prova\".",
 	"exams_release_button": "Liberar resultados",
 	"exams_release_released": "Liberado {when}",
 	"exams_release_title": "Liberar resultados?",

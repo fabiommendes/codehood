@@ -104,6 +104,29 @@
 			}
 		}
 	],
+	"exams_close_no_deadline": [
+		{
+			"declarations": ["input count", "local countPlural = count: plural"],
+			"selectors": ["countPlural"],
+			"match": {
+				"countPlural=one": "This exam has no deadline and stays open until you close it. {count} attempt in progress.",
+				"countPlural=other": "This exam has no deadline and stays open until you close it. {count} attempts in progress."
+			}
+		}
+	],
+	"exams_close_button": "Close exam",
+	"exams_close_title": "Close this exam?",
+	"exams_close_body": [
+		{
+			"declarations": ["input count", "local countPlural = count: plural"],
+			"selectors": ["countPlural"],
+			"match": {
+				"countPlural=one": "{count} attempt in progress will be closed now: what is saved counts and objective answers are graded. Students with an exception keep their own window. You can't undo this.",
+				"countPlural=other": "{count} attempts in progress will be closed now: what is saved counts and objective answers are graded. Students with an exception keep their own window. You can't undo this."
+			}
+		}
+	],
+	"exams_release_status_open": "The exam is still open. Close it with the \"Close exam\" button.",
 	"exams_release_button": "Release results",
 	"exams_release_released": "Released {when}",
 	"exams_release_title": "Release results?",

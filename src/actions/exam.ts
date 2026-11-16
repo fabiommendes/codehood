@@ -81,6 +81,18 @@ export const exam = {
 		}),
 	}),
 
+	/** Ends the exam now: completes it and closes the attempts in progress (instructor only). */
+	close: defineAction({
+		input: examParams,
+		handler: withServiceErrors(async (input, context) => {
+			const actor = requireUser(context);
+			await db.exam.close(
+				{ course: parseCourseParams(input), slug: input.exam },
+				{ actor },
+			);
+		}),
+	}),
+
 	/** Releases the exam's grades to its students (instructor only). */
 	releaseGrades: defineAction({
 		input: examParams,

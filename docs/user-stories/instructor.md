@@ -449,6 +449,21 @@ released and every student sees their grade and feedback. Quizzes need no such
 step: their grades come out on their own once the quiz closes.
 
 
+### Close an exam with no deadline
+
+    status: implemented
+    url: /<discipline>/<course>/exams/<exam>
+
+Instructor opened an exam with no date or no duration, so nothing closes it and
+its grades cannot be released. The exam page warns that it stays open until
+they close it, and says how many attempts are in progress. "Close exam" asks
+for a confirmation that repeats the number. After it, the exam is completed and
+the attempts in progress end as if their time had run out: what was saved
+counts and the objective answers are graded. A student with an exception whose
+window is still open keeps answering inside it. The same happens when the
+instructor completes the exam through the REST API.
+
+
 ### Let a bot grade for me
 
     status: implemented

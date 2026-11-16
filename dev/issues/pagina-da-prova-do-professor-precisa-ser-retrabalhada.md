@@ -48,7 +48,7 @@ A versão em produção é a `v0.3.2` ou anterior; conferir cada item na `main`.
    (`PATCH exam` com `status: COMPLETED`, `PATCH response` com
    `acceptingSubmissions: false`). A página poderia avisar que há uma prova
    aberta sem prazo e oferecer encerrar tudo.
-   **Pendente.**
+   **Resolvido:** a visão geral avisa da prova sem prazo e tem o botão "Encerrar prova" (`exam.close`, também aplicado pelo `PATCH` com `COMPLETED`).
 5. **Liberar notas não existe na REST.** Na `v0.3.2` só existe a action
    `exam.releaseGrades`. Clientes como o chalk e o worker não conseguem fechar o
    ciclo sem passar pela web.
