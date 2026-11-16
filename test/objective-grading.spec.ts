@@ -182,6 +182,23 @@ test("an answer the library refuses scores 0", async () => {
 	expect(scoreValue(choice.feedbacks[0]?.score ?? "")).toBe(0);
 });
 
+test("a blank answer scores 0 on any kind of question, skipped or not", async () => {
+	for (const blank of [null, "", "   "]) {
+		const sitting = await makeSitting();
+		await answer(sitting, SLUGS.essay, blank);
+		// A fill-in takes a mapping, so only a skip can be blank.
+		if (blank === null) await answer(sitting, SLUGS.fillIn, blank);
+		await finish(sitting);
+
+		const slugs = blank === null ? [SLUGS.essay, SLUGS.fillIn] : [SLUGS.essay];
+		for (const slug of slugs) {
+			const row = await only(sitting, slug);
+			expect(row.status).toBe("GRADED_AUTOMATICALLY");
+			expect(scoreValue(row.feedbacks[0]?.score ?? "")).toBe(0);
+		}
+	}
+});
+
 test("closing twice does not grade again", async () => {
 	const sitting = await makeSitting();
 	await answer(sitting, SLUGS.choice, "brasilia");

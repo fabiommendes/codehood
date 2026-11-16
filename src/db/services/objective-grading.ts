@@ -145,13 +145,14 @@ export async function gradeExpiredObjectives(
 	return { attempts, graded };
 }
 
-/// The library's score of `payload`, 0 when it refuses it, or `null` when only an instructor can score it.
+/// The library's score of `payload`, 0 when it is blank or the library refuses it, or `null` when only an instructor can score it.
 function objectiveScore(
 	question: Parameters<typeof scoreResponse>[0],
 	payload: unknown,
 ): number | null {
 	// A code question is scored from a runner report, never from the response.
 	if (question.type === "code") return null;
+	if (isBlank(payload)) return 0;
 	try {
 		return scoreResponse(question, payload).score;
 	} catch (error) {
@@ -159,4 +160,9 @@ function objectiveScore(
 		if (error instanceof NotAutoGradable) return null;
 		throw error;
 	}
+}
+
+/// Whether `payload` is a skipped answer: `null`, or text with nothing but whitespace.
+function isBlank(payload: unknown): boolean {
+	return payload === null || (typeof payload === "string" && !payload.trim());
 }
