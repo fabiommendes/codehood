@@ -6,6 +6,7 @@ import { persistedCourseFactory } from "@/fixtures/course.factory";
 import { persistedExamFactory } from "@/fixtures/exam.factory";
 import { persistedResourceFactory } from "@/fixtures/resource.factory";
 import { persistedTimeSlotFactory } from "@/fixtures/time-slot.factory";
+import { weekOf } from "@/services/course-schedule";
 import { courseHref } from "@/urls";
 import { localDateOf, SERVER_TZ } from "@/utils/schedule-time";
 import { expect, type Page, test } from "../fixtures";
@@ -91,7 +92,7 @@ test("student: read the course home page", async ({ page }) => {
 	});
 	await enroll(course.id, student.username);
 
-	const { day } = futureDate(2);
+	const { day } = futureDate(0);
 	const slot = await persistedTimeSlotFactory.create({
 		course: course.id,
 		day,
@@ -100,7 +101,8 @@ test("student: read the course home page", async ({ page }) => {
 	await persistedCalendarEventFactory.create({
 		course: course.id,
 		timeSlot: slot.id,
-		week: 1,
+		// The week of the calendar that contains today, which the home shows.
+		week: weekOf(new Date(), course.startAt),
 		title: "Introduction to recursion",
 	});
 
@@ -151,7 +153,90 @@ test("student: read the course home page", async ({ page }) => {
 	await expect(page.getByText(course.description as string)).toBeVisible();
 	await expect(page.getByText("Introduction to recursion")).toBeVisible();
 
-	await test.step("the Resources section lists at most three real resources, each linking to its page", async () => {
+	await test.step("This week shows this week's exam, Open exams the ones open from before it, and a later week's exam is nowhere", async () => {
+		const other = await persistedCourseFactory.create();
+		await enroll(other.id, student.username);
+		const DAY = 24 * 60 * 60_000;
+		await persistedExamFactory.create({
+			course: other.id,
+			slug: "always-open",
+			title: "Always open",
+			type: "EXAM",
+			status: "ONGOING",
+		});
+		await persistedExamFactory.create({
+			course: other.id,
+			slug: "this-week",
+			title: "This week exam",
+			type: "EXAM",
+			status: "SCHEDULED",
+			scheduledAt: new Date(),
+			duration: { hours: 1 },
+		});
+		await persistedExamFactory.create({
+			course: other.id,
+			slug: "much-later",
+			title: "Much later exam",
+			type: "EXAM",
+			status: "SCHEDULED",
+			scheduledAt: new Date(Date.now() + 21 * DAY),
+			duration: { hours: 2 },
+		});
+		await page.goto(hrefOf(other));
+
+		const week = section(page, "This week");
+		const open = section(page, "Open exams");
+		await expect(week.getByText("This week exam")).toBeVisible();
+		await expect(week.getByText("Always open")).toHaveCount(0);
+		await expect(open.getByText("Always open")).toBeVisible();
+		await expect(open.getByText("This week exam")).toHaveCount(0);
+		await expect(page.getByText("Much later exam")).toHaveCount(0);
+	});
+
+	await test.step("Open exams stops at three and links to the rest of the list below only when there are more", async () => {
+		const crowded = await persistedCourseFactory.create();
+		await enroll(crowded.id, student.username);
+		for (const n of [1, 2, 3]) {
+			await persistedExamFactory.create({
+				course: crowded.id,
+				slug: `open-${n}`,
+				title: `Open ${n}`,
+				type: "EXAM",
+				status: "ONGOING",
+			});
+		}
+		await page.goto(hrefOf(crowded));
+		const open = section(page, "Open exams");
+		await expect(open.getByRole("link", { name: /Open \d/ })).toHaveCount(3);
+		await expect(
+			open.getByRole("link", { name: /more open exam/ }),
+		).toHaveCount(0);
+
+		await persistedExamFactory.create({
+			course: crowded.id,
+			slug: "open-4",
+			title: "Open 4",
+			type: "EXAM",
+			status: "ONGOING",
+		});
+		await page.goto(hrefOf(crowded));
+		await expect(open.getByRole("link", { name: /Open \d/ })).toHaveCount(3);
+		await expect(
+			open.getByRole("link", { name: "1 more open exam →", exact: true }),
+		).toHaveAttribute("href", `${hrefOf(crowded)}/exams`);
+		await page.goto(hrefOf(course));
+	});
+
+	await test.step("a student's home has no Exams nor Resources section, their tabs lead there", async () => {
+		for (const title of ["Exams", "Resources"]) {
+			await expect(section(page, title)).toHaveCount(0);
+		}
+		await page.context().clearCookies();
+		await logInAs(page, course.instructor);
+		await page.goto(hrefOf(course));
+	});
+
+	await test.step("the instructor's Resources section lists at most three real resources, each linking to its page", async () => {
 		const resources = section(page, "Resources");
 
 		await expect(resources.locator('a[href*="/resources/"]')).toHaveCount(3);
@@ -178,13 +263,14 @@ test("student: read the course home page", async ({ page }) => {
 		await expect(page.getByText("codehood-cs101/coursework")).toHaveCount(0);
 	});
 
-	await test.step("a course without resources says so and lists no rows", async () => {
-		const bare = await persistedCourseFactory.create();
-		await enroll(bare.id, student.username);
+	await test.step("a course without resources says so to its instructor and lists no rows", async () => {
+		const bare = await persistedCourseFactory.create({
+			instructor: course.instructor.username,
+		});
 		await page.goto(hrefOf(bare));
 
 		const resources = section(page, "Resources");
-		await expect(resources).toContainText("No resources yet");
+		await expect(resources).toContainText("No resources pushed yet");
 		await expect(resources.locator('a[href*="/resources/"]')).toHaveCount(0);
 		await expect(page.getByText("Syllabus")).toHaveCount(0);
 	});
@@ -382,12 +468,18 @@ test("student: follow the course schedule", async ({ page }) => {
 		).toBeVisible();
 	});
 
-	await test.step("an upcoming meeting on the course home leads to its row on the schedule", async () => {
+	await test.step("the course home shows only this week, so a later week's meeting is not there, and the link leads to the full schedule", async () => {
 		await page.goto(hrefOf(course));
-		await page.getByRole("link", { name: /Kickoff/ }).click();
+		const week = section(page, "This week");
+		// The course starts within a day, so week 1 is still ahead.
+		await expect(week.getByText("Kickoff")).toHaveCount(0);
+		await expect(
+			week.getByText("Nothing on the calendar this week."),
+		).toBeVisible();
 
-		await expect(page).toHaveURL(/\/schedule#event-\d+$/);
-		await expect(page.locator(":target")).toContainText("Kickoff");
+		await week.getByRole("link", { name: "View all" }).click();
+		await expect(page).toHaveURL(`${hrefOf(course)}/schedule`);
+		await expect(page.getByText("Kickoff")).toBeVisible();
 	});
 
 	await test.step("a meeting the instructor cancelled stays on the list, visibly cancelled", async () => {

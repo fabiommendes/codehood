@@ -127,7 +127,11 @@ test("instructor: check a course's settings", async ({ page }) => {
 	await test.step("a student of the course does not reach the settings", async () => {
 		await logInAs(page, student);
 		await page.goto(href);
-		await expect(page.locator("[data-course-card]")).toHaveCount(0);
+		await expect(
+			page
+				.locator("[data-course-card]")
+				.getByRole("link", { name: "Settings", exact: true }),
+		).toHaveCount(0);
 		const response = await page.goto(`${href}/settings`);
 		expect(response?.status()).not.toBe(200);
 	});

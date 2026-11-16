@@ -1,23 +1,31 @@
 ---
 import { hasPerm } from "@/auth/permissions";
-import AttendanceSummary from "@/components/attendance/AttendanceSummary.astro";
+import AttendanceTable from "@/components/attendance/AttendanceTable";
 import CliSetupLink from "@/components/CliSetupLink.astro";
 import CourseHeader from "@/components/CourseHeader.astro";
 import ExamRow from "@/components/exam/ExamRow.astro";
 import ListRow from "@/components/ListRow.astro";
 import OpenRollCallDialog from "@/components/roll-call/OpenRollCallDialog";
 import SectionHeader from "@/components/SectionHeader.astro";
+import ScheduleWeek from "@/components/schedule/ScheduleWeek.astro";
 import Alert from "@/components/ui/Alert";
 import { db } from "@/db";
 import { escapeHtml, m } from "@/i18n";
 import AppLayout from "@/layouts/AppLayout.astro";
+import { calendarEntries } from "@/services/calendar-entries";
 import { courseHomeExams } from "@/services/course-home";
+import { courseSchedule, weekOf } from "@/services/course-schedule";
 import { splitByEvent } from "@/services/event-resources";
-import type { ExceptionTiming } from "@/services/exam-state";
+import {
+	type ExceptionTiming,
+	examPhase,
+	viewerTiming,
+} from "@/services/exam-state";
 import { formatGradeValue } from "@/services/grades-table";
 import { breadcrumbs } from "@/utils/breadcrumbs";
 import { eventKindLabel } from "@/utils/calendar-event-display";
-import { homeNav } from "@/utils/course-tabs-nav";
+import { formatAttendancePercent } from "@/utils/course-grades";
+import { homeNav, studentHomeNav } from "@/utils/course-tabs-nav";
 import { loadCourse } from "@/utils/load-course";
 import { loadCourseExceptions } from "@/utils/load-exam-exceptions";
 import { loadInstructorHome } from "@/utils/load-instructor-home";
@@ -59,6 +67,8 @@ const ownEnrollment = await db.enrollment.findOne(
 );
 const isEnrolled = ownEnrollment?.status === "ACTIVE";
 const canWrite = hasPerm(actor, "course.update-contents", course);
+/// The student's home: description, schedule, grades and attendance. Whoever manages the course sees the full one.
+const studentView = !hasPerm(actor, "enrollment.manage", course);
 
 function formatDate(date: Date): string {
 	return formatDateTime(date, {
@@ -130,10 +140,12 @@ const newestResources = resources
 // meeting happening now.
 const rollCalls = await db.rollCall.findMany({ course: course.id }, { actor });
 const openRollCall = rollCalls.some((r) => r.closesAt > now);
-const attendanceStudent =
+const attendanceReport =
 	isEnrolled && !canWrite && rollCalls.length > 0
-		? (await db.rollCall.courseAttendance(course.id, { actor })).students[0]
+		? await db.rollCall.courseAttendance(course.id, { actor })
 		: undefined;
+/// The student's own row, once a meeting counts for them.
+const attendanceStudent = attendanceReport?.students.find((s) => s.total > 0);
 const meetingNow = canWrite
 	? (
 			await db.calendarEvent.findMany(
@@ -161,22 +173,78 @@ const meetingNowRollCall = meetingNow
 
 const justJoined = Astro.url.searchParams.has("joined");
 
-const nextEvents = await db.calendarEvent.findMany(
-	{ courseIds: [course.id], from: startOfLocalDay(now), limit: 3 },
-	{ actor },
+// The current week of the Schedule tab, in the same format: the first week
+// with something ending today or later. A student's exams move with their own
+// exceptions.
+const { past, ahead, next } = courseSchedule(
+	calendarEntries(
+		await db.calendarEvent.findMany({ courseIds: [course.id] }, { actor }),
+		exams.map((exam) => ({
+			courseId: course.id,
+			exam,
+			exception: ownExceptions.get(exam.slug) ?? null,
+		})),
+	),
+	course.startAt,
+	now,
 );
+/// This week of the Schedule tab, absent when nothing falls in it. It may
+/// count as past already, when every meeting in it is over.
+const thisWeek = [...past, ...ahead].find(
+	({ week }) => week === weekOf(now, course.startAt),
+);
+/// Exams already listed in this week, which the open exams leave out.
+const thisWeekExams = new Set(
+	thisWeek?.entries.flatMap((entry) =>
+		entry.kind === "exam" ? [entry.exam.slug] : [],
+	),
+);
+/// How many open exams the student's home lists; the Exams tab lists them all.
+const OPEN_EXAMS_SHOWN = 3;
+const openExams = studentView
+	? exams.filter(
+			(exam) =>
+				exam.type !== "PRACTICE" &&
+				!thisWeekExams.has(exam.slug) &&
+				examPhase(viewerTiming(exam, ownExceptions.get(exam.slug)), now) ===
+					"open",
+		)
+	: [];
+const rollCallKeys = new Set(rollCalls.map((r) => `${r.week}/${r.timeSlot}`));
+/// A student's own result in the meetings with a roll call.
+const attendanceCells = new Map<string, "present" | "absent">();
+for (const [key, cell] of Object.entries(attendanceStudent?.cells ?? {})) {
+	if (cell === "present" || cell === "absent") attendanceCells.set(key, cell);
+}
 
-// The instructor's sidebar links to the sections the page shows, in page order.
-const sectionLinks = [
-	{ id: "schedule", label: m.nav_course_tab_schedule() },
-	...(shownExams.length > 0 ? [{ id: "exams", label: examPreview.title }] : []),
-	{ id: "resources", label: m.nav_course_tab_resources() },
-];
+// The sidebar links to the sections the page shows, in page order.
+const sectionLinks = studentView
+	? [
+			{ id: "this-week", label: m.courses_home_this_week() },
+			...(openExams.length > 0
+				? [{ id: "open-exams", label: m.courses_home_open_exams() }]
+				: []),
+			...(gradeColumns.length > 0
+				? [{ id: "grades", label: m.nav_course_tab_grades() }]
+				: []),
+			...(attendanceStudent
+				? [{ id: "attendance", label: m.attendance_page_heading() }]
+				: []),
+		]
+	: [
+			{ id: "this-week", label: m.courses_home_this_week() },
+			...(shownExams.length > 0
+				? [{ id: "exams", label: examPreview.title }]
+				: []),
+			{ id: "resources", label: m.nav_course_tab_resources() },
+		];
 ---
 
 <AppLayout title={course.discipline.name}
   trail={breadcrumbs(Astro.url, { course })}
-  nav={hasPerm(actor, "enrollment.manage", course) ? homeNav(href, sectionLinks) : undefined}
+  nav={studentView
+    ? studentHomeNav(sectionLinks)
+    : homeNav(href, { page: "home", sections: sectionLinks })}
 >
   <main class="mx-auto max-w-4xl px-4 py-10">
     {
@@ -223,23 +291,18 @@ const sectionLinks = [
     }
 
     {
-      isEnrolled && !canWrite && (openRollCall || attendanceStudent) && (
-        <div class="mt-6 flex flex-wrap items-center gap-4">
-          {openRollCall && (
-            <a href="/check-in" class="btn btn-primary btn-sm">{m.courses_home_check_in()}</a>
-          )}
-          {attendanceStudent && (
-            <AttendanceSummary href={href} student={attendanceStudent} />
-          )}
+      isEnrolled && !canWrite && openRollCall && (
+        <div class="mt-6">
+          <a href="/check-in" class="btn btn-primary btn-sm">{m.courses_home_check_in()}</a>
         </div>
       )
     }
 
-    <section id="schedule" class="mt-10 scroll-mt-20">
-      <SectionHeader title={m.nav_course_tab_schedule()} href={`${href}/schedule`} />
+    <section id="this-week" class="mt-10 scroll-mt-20">
+      <SectionHeader title={m.courses_home_this_week()} href={`${href}/schedule`} />
 
       {
-        slots.length === 0 ? (
+        slots.length === 0 && !thisWeek ? (
           <p class="mt-4 text-sm text-muted">
             {canWrite ? (
               <>
@@ -251,7 +314,7 @@ const sectionLinks = [
           </p>
         ) : (
           <>
-            <p class="mt-3 text-sm text-base-content/70">
+            {slots.length > 0 && <p class="mt-3 text-sm text-base-content/70">
               {slots
                 .map(
                   (slot) =>
@@ -265,35 +328,48 @@ const sectionLinks = [
                     }),
                 )
                 .join(", ")}
-            </p>
-            <div class="mt-4 flex flex-col gap-3">
-              {nextEvents.length === 0 ? (
-                <p class="text-sm text-muted">
-                  {m.courses_home_nothing_on_calendar()}
-                </p>
-              ) : (
-                nextEvents.map((event) => (
-                  <ListRow href={`${href}/schedule#event-${event.id}`}>
-                    <p class="font-medium">{event.title}</p>
-                    {eventKindLabel(event.kind) && (
-                      <p class="text-sm text-muted">
-                        {eventKindLabel(event.kind)}
-                      </p>
-                    )}
-                    <span slot="trailing" class="text-sm text-muted">
-                      {formatDateTime(event.startAt)}
-                    </span>
-                  </ListRow>
-                ))
-              )}
-            </div>
+            </p>}
+            {thisWeek ? (
+              <div class="mt-4">
+                <ScheduleWeek
+                  week={thisWeek.week}
+                  entries={thisWeek.entries}
+                  next={next}
+                  href={href}
+                  resources={eventResources}
+                  rollCallManager={canWrite ? courseParams : undefined}
+                  rollCallKeys={rollCallKeys}
+                  attendance={attendanceCells}
+                />
+              </div>
+            ) : (
+              <p class="mt-4 text-sm text-muted">{m.courses_home_nothing_this_week()}</p>
+            )}
           </>
         )
       }
     </section>
 
     {
-      examPreview.exams.length > 0 && (
+      openExams.length > 0 && (
+        <section id="open-exams" class="mt-10 scroll-mt-20">
+          <SectionHeader title={m.courses_home_open_exams()} />
+          <div class="mt-4 flex flex-col gap-3">
+            {openExams.slice(0, OPEN_EXAMS_SHOWN).map((exam) => (
+              <ExamRow exam={exam} href={href} exception={ownExceptions.get(exam.slug)} />
+            ))}
+          </div>
+          {openExams.length > OPEN_EXAMS_SHOWN && (
+            <a href={`${href}/exams`} class="mt-3 inline-block text-sm text-primary hover:underline">
+              {m.courses_home_more_open_exams({ count: openExams.length - OPEN_EXAMS_SHOWN })}
+            </a>
+          )}
+        </section>
+      )
+    }
+
+    {
+      !studentView && examPreview.exams.length > 0 && (
         <section id="exams" class="mt-10 scroll-mt-20">
           <SectionHeader title={examPreview.title} href={`${href}/exams`} />
 
@@ -308,7 +384,7 @@ const sectionLinks = [
 
     {
       gradeColumns.length > 0 && (
-        <section class="mt-10" aria-label={m.nav_course_tab_grades()}>
+        <section id="grades" class="mt-10 scroll-mt-20" aria-label={m.nav_course_tab_grades()}>
           <SectionHeader title={m.nav_course_tab_grades()} />
 
           <ul aria-label={m.nav_course_tab_grades()} class="mt-4 flex flex-col gap-3">
@@ -328,6 +404,24 @@ const sectionLinks = [
       )
     }
 
+    {
+      attendanceReport && attendanceStudent && (
+        <section id="attendance" class="mt-10 scroll-mt-20">
+          <SectionHeader title={m.attendance_page_heading()} />
+          <p class="mt-3 text-sm text-base-content/70">
+            {m.attendance_summary_link({
+              present: attendanceStudent.present,
+              total: attendanceStudent.total,
+              percent: formatAttendancePercent(attendanceStudent.present, attendanceStudent.total),
+            })}
+          </p>
+          <AttendanceTable report={attendanceReport} />
+        </section>
+      )
+    }
+
+    {
+      !studentView && (
     <section id="resources" class="mt-10 scroll-mt-20">
       <SectionHeader title={m.nav_course_tab_resources()} href={`${href}/resources`} />
 
@@ -368,6 +462,8 @@ const sectionLinks = [
         )
       }
     </section>
+      )
+    }
 
     {
       isEnrolled && (

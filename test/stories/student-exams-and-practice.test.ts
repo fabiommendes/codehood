@@ -92,18 +92,27 @@ test("student: see the exams assigned to me", async ({ page }) => {
 		await expect(page.getByRole("table")).toHaveCount(0);
 	});
 
-	await test.step("the course home page lists the open exam, then the upcoming one, under Exams", async () => {
+	await test.step("the course home page shows the open exam under This week, once, and no exam of a later week", async () => {
 		await page.goto(hrefOf(course));
 
-		const rows = section(page, "Exams")
-			.getByRole("link")
-			.filter({ hasNotText: "View all" });
-		await expect(rows).toHaveCount(2);
-		await expect(rows.nth(0)).toContainText(open.title);
-		await expect(rows.nth(1)).toContainText(upcoming.title);
+		const week = section(page, "This week");
+		await expect(
+			week.getByRole("heading", { name: /^Week -?\d+$/ }),
+		).toHaveCount(1);
+		await expect(week.getByRole("link", { name: open.title })).toHaveAttribute(
+			"href",
+			`${hrefOf(course)}/exams/${open.slug}`,
+		);
+		// Ten days ahead is another week; the Schedule tab holds it.
+		await expect(week.getByText(upcoming.title)).toHaveCount(0);
+		await expect(week.getByText(past.title)).toHaveCount(0);
+		await expect(week.getByText(draft.title)).toHaveCount(0);
+		// An exam already in This week is not repeated, and practice never joins Open exams.
+		await expect(section(page, "Open exams")).toHaveCount(0);
+		await expect(page.getByText(open.title)).toHaveCount(1);
 	});
 
-	await test.step("a course with only practice exams falls back to the Practice heading", async () => {
+	await test.step("a course with only practice exams adds nothing to the home page", async () => {
 		const practiceOnlyCourse = await persistedCourseFactory.create();
 		await enroll(practiceOnlyCourse.id, student.username);
 		const drill = await persistedExamFactory.create({
@@ -116,16 +125,15 @@ test("student: see the exams assigned to me", async ({ page }) => {
 
 		await page.goto(hrefOf(practiceOnlyCourse));
 
-		await expect(
-			page.getByRole("heading", { name: "Practice", exact: true }),
-		).toBeVisible();
-		await expect(page.getByText(drill.title)).toBeVisible();
-		await expect(
-			page.getByRole("heading", { name: "Exams", exact: true }),
-		).toHaveCount(0);
+		await expect(page.getByText(drill.title)).toHaveCount(0);
+		for (const title of ["Practice", "Exams"]) {
+			await expect(
+				page.getByRole("heading", { name: title, exact: true }),
+			).toHaveCount(0);
+		}
 	});
 
-	await test.step("a course with no exams at all omits the section entirely", async () => {
+	await test.step("a course with no exams at all has no exam section either", async () => {
 		const examlessCourse = await persistedCourseFactory.create();
 		await enroll(examlessCourse.id, student.username);
 
@@ -287,7 +295,7 @@ function hrefOf(
 /**
  * Scopes assertions to one exam section: the `<section>` wrapping the
  * heading named `title`, the same convention the course home page already
- * uses for "Exams", "Resources" and "Schedule".
+ * uses for "Exams", "Resources" and "This week".
  */
 function section(page: import("@playwright/test").Page, title: string) {
 	return page.locator("section").filter({

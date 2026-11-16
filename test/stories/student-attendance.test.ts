@@ -45,14 +45,16 @@ import {
  *
  * Course home (`<course>`)
  *   - While a roll call is open: a link "Check in".
- *   - A link "Attendance: <present> of <total> (<percent>%)" to the attendance
- *     page.
+ *   - A section "Attendance" with the text "Attendance: <present> of <total>
+ *     (<percent>%)" and the attendance table below. The student's own row only.
+ *   - The page `<course>/attendance` sends a student to the section
+ *     (`<course>#attendance`).
  *
  * Schedule (`<course>/schedule`)
  *   - Each meeting is an element whose id starts with `event-`. A past meeting
  *     with a roll call holds the text "Present" or "Absent" (exact).
  *
- * Attendance page (`<course>/attendance`)
+ * Attendance table (course home for a student)
  *   - Table with column headers "Student", one per meeting titled with the
  *     "Present", "Total", "%", then one per meeting title (date order). First cell: the
  *     name. Meeting cells read "Present", "Absent" or "-". The last three
@@ -169,10 +171,12 @@ test("student: Check in to class", async ({ page }) => {
 		).toBeVisible();
 	});
 
-	await test.step("the course home counts the roll calls attended, leading to their own row", async () => {
+	await test.step("the course home counts the roll calls attended and shows their own row", async () => {
 		await page.goto(href);
-		await page.getByRole("link", { name: "Attendance: 2 of 3 (67%)" }).click();
-		await expect(page).toHaveURL(`${href}/attendance`);
+		await expect(page.getByText("Attendance: 2 of 3 (67%)")).toBeVisible();
+		await expect(page.getByRole("link", { name: /^Attendance: / })).toHaveCount(
+			0,
+		);
 
 		await expect(page.getByRole("columnheader")).toHaveText([
 			"Student",
@@ -213,6 +217,11 @@ test("student: Check in to class", async ({ page }) => {
 		await expect(
 			page.getByRole("row").filter({ hasText: "Otto Hall" }),
 		).toHaveCount(0);
+	});
+
+	await test.step("the attendance page sends a student to that section of the home", async () => {
+		await page.goto(`${href}/attendance`);
+		await expect(page).toHaveURL(`${href}#attendance`);
 	});
 
 	await test.step("the schedule marks each past meeting that had a roll call", async () => {

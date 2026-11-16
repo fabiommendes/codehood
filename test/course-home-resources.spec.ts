@@ -31,7 +31,9 @@ test("a link on the course home opens its site in another tab", async ({
 		edition: course.edition.slug,
 	});
 
-	await logInAs(page, student);
+	// The course home lists resources for whoever teaches the course; a
+	// student reaches them through the Resources tab.
+	await logInAs(page, course.instructor);
 	await page.goto(href);
 
 	const row = page.getByRole("link", { name: /Outside reading/ });
@@ -67,7 +69,9 @@ test("the course home previews the three resources added last, newest first", as
 		edition: course.edition.slug,
 	});
 
-	await logInAs(page, student);
+	// The course home lists resources for whoever teaches the course; a
+	// student reaches them through the Resources tab.
+	await logInAs(page, course.instructor);
 	await page.goto(href);
 
 	const section = page.locator("section", {

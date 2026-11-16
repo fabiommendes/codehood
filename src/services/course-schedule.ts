@@ -74,8 +74,8 @@ function isHeld(entry: CalendarEntry): boolean {
 		: entry.exam.status !== "DRAFT";
 }
 
-/// The ISO course week `instant` falls in, by local calendar days from the Monday of week 0.
-function weekOf(instant: Date, courseStart: Date): number {
+/** Returns the course week `instant` falls in, counting local calendar days from the Monday of week 0. */
+export function weekOf(instant: Date, courseStart: Date): number {
 	const monday = Date.parse(`${courseWeekZero(courseStart)}T00:00:00Z`);
 	const days = (dayNumber(instant) - monday) / DAY;
 	return Math.floor(days / 7);

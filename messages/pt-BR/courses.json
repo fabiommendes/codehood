@@ -147,7 +147,6 @@
 	"courses_home_no_grade": "Sem nota",
 	"courses_home_no_resources_instructor": "Nenhum material enviado ainda.",
 	"courses_home_no_resources_student": "Nenhum material ainda. O corpo docente os publica pela CLI.",
-	"courses_home_nothing_on_calendar": "Nada mais no calendário.",
 	"courses_home_enrolled_since": "Matriculado desde {date}.",
 	"courses_home_leave_link": "Sair desta turma",
 	"courses_leave_title": "Sair de {discipline}?",
@@ -220,5 +219,18 @@
 	"courses_settings_enrollment_heading": "Entrada na turma",
 	"courses_settings_cli_heading": "CLI",
 	"courses_settings_cli_intro": "Crie o repositório do curso e faça login de dentro dele.",
-	"courses_roster_settings_link": "Links de convite e frase-senha"
+	"courses_roster_settings_link": "Links de convite e frase-senha",
+	"courses_home_this_week": "Esta semana",
+	"courses_home_open_exams": "Provas abertas",
+	"courses_home_nothing_this_week": "Nada na agenda nesta semana.",
+	"courses_home_more_open_exams": [
+		{
+			"declarations": ["input count", "local countPlural = count: plural"],
+			"selectors": ["countPlural"],
+			"match": {
+				"countPlural=one": "Mais {count} prova aberta →",
+				"countPlural=other": "Mais {count} provas abertas →"
+			}
+		}
+	]
 }

@@ -1,8 +1,7 @@
 ---
 import { hasPerm } from "@/auth/permissions";
-// A course's roll call attendance. The service scopes the report: the
-// instructor sees every student, a student only their own row. For the
-// instructor it belongs to the students tab, linked from the course card.
+// A course's roll call attendance for whoever manages it, in the students tab,
+// linked from the course card. A student's own row is on the course home.
 import AttendanceTable from "@/components/attendance/AttendanceTable";
 import CourseHeader from "@/components/CourseHeader.astro";
 import CsvDownload from "@/components/CsvDownload.astro";
@@ -24,16 +23,18 @@ const { course, href } = result;
 // biome-ignore lint/style/noNonNullAssertion: every course page runs through loadCourse, which already required Astro.locals.user.
 const actor = Astro.locals.actor!;
 const manages = hasPerm(actor, "enrollment.manage", course);
+// A student's attendance is a section of the course home.
+if (!manages) return Astro.redirect(`${href}#attendance`);
 const report = await db.rollCall.courseAttendance(course.id, { actor });
 const csvFilename = `attendance-${course.discipline.slug}-${course.edition.slug}.csv`;
 ---
 
 <AppLayout title={m.attendance_page_title({ discipline: course.discipline.name })}
   trail={breadcrumbs(Astro.url, { course })}
-  nav={manages ? studentsNav(href) : undefined}
+  nav={studentsNav(href)}
 >
   <main class="mx-auto max-w-4xl px-4 py-10">
-    <CourseHeader course={course} active={manages ? "students" : undefined} />
+    <CourseHeader course={course} active="students" />
 
     <div class="mt-8 flex flex-wrap items-center justify-between gap-3">
       <h2 class="text-2xl font-bold">{m.attendance_page_heading()}</h2>

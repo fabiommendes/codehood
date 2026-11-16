@@ -49,7 +49,7 @@ async function setup(page: Page) {
 			},
 			FULL_ACCESS,
 		);
-	return { href, meeting, add };
+	return { href, meeting, add, instructor: course.instructor };
 }
 
 const link = { type: "LINK" as const, url: "https://example.com/x" };
@@ -111,11 +111,14 @@ test("a course whose only resources belong to meetings shows the schedule line, 
 test("the course home previews general resources only, even when an event resource is newer", async ({
 	page,
 }) => {
-	const { href, add } = await setup(page);
+	const { href, add, instructor } = await setup(page);
 	await add("g1", "General one", link, false);
 	await add("g2", "General two", link, false);
 	await add("newest", "Newest meeting slides", link, true);
 
+	// Only whoever teaches the course gets the Resources preview on the home.
+	await page.context().clearCookies();
+	await logInAs(page, instructor);
 	await page.goto(href);
 
 	const section = page.locator("section", {

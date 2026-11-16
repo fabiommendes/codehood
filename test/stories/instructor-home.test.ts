@@ -242,7 +242,7 @@ test("instructor: see what needs my attention", async ({ page }) => {
 		// biome-ignore lint/style/noNonNullAssertion: five students were enrolled above.
 		await logInAs(page, algebraStudents[0]!);
 		await page.goto(hrefOf(algebra));
-		const exams = section(page, "Exams");
+		const exams = section(page, "This week");
 
 		await expect(exams).toContainText("Midterm");
 		await expect(exams).not.toContainText("to grade");
@@ -361,16 +361,16 @@ test("instructor: find my way around a course home", async ({ page }) => {
 		).toHaveAttribute("href", `${hrefOf(course)}/exams`);
 	});
 
-	await test.step("the sections come in the order schedule, exams, resources", async () => {
+	await test.step("the sections come in the order this week, exams, resources", async () => {
 		const headings = await page.locator("main section h2").allTextContents();
-		expect(headings).toEqual(["Schedule", "Exams", "Resources"]);
+		expect(headings).toEqual(["This week", "Exams", "Resources"]);
 	});
 
 	await test.step("the sidebar links each section of the page, then the instructor pages", async () => {
 		const card = page.locator("[data-course-card]");
 		await expect(
-			card.getByRole("link", { name: "Schedule", exact: true }),
-		).toHaveAttribute("href", "#schedule");
+			card.getByRole("link", { name: "This week", exact: true }),
+		).toHaveAttribute("href", "#this-week");
 		await expect(
 			card.getByRole("link", { name: "Exams", exact: true }),
 		).toHaveAttribute("href", "#exams");

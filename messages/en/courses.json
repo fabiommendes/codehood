@@ -147,7 +147,6 @@
 	"courses_home_no_grade": "No grade",
 	"courses_home_no_resources_instructor": "No resources pushed yet.",
 	"courses_home_no_resources_student": "No resources yet. The instructor publishes them with the CLI.",
-	"courses_home_nothing_on_calendar": "Nothing left on the calendar.",
 	"courses_home_enrolled_since": "Enrolled since {date}.",
 	"courses_home_leave_link": "Leave this course",
 	"courses_leave_title": "Leave {discipline}?",
@@ -220,5 +219,18 @@
 	"courses_settings_enrollment_heading": "Joining the class",
 	"courses_settings_cli_heading": "CLI",
 	"courses_settings_cli_intro": "Create the course repository and log in from inside it.",
-	"courses_roster_settings_link": "Invite links and passphrase"
+	"courses_roster_settings_link": "Invite links and passphrase",
+	"courses_home_this_week": "This week",
+	"courses_home_open_exams": "Open exams",
+	"courses_home_nothing_this_week": "Nothing on the calendar this week.",
+	"courses_home_more_open_exams": [
+		{
+			"declarations": ["input count", "local countPlural = count: plural"],
+			"selectors": ["countPlural"],
+			"match": {
+				"countPlural=one": "{count} more open exam →",
+				"countPlural=other": "{count} more open exams →"
+			}
+		}
+	]
 }
