@@ -7,39 +7,25 @@
  * The spec names no slugs, so each situation is found by what it is, not by
  * where it lives.
  */
-import { copyFileSync, mkdtempSync, rmSync } from "node:fs";
-import { tmpdir } from "node:os";
-import path from "node:path";
 import { expect, test } from "@playwright/test";
-import { PrismaBetterSqlite3 } from "@prisma/adapter-better-sqlite3";
 import { FULL_ACCESS } from "@/auth/actor";
 import { db } from "@/db";
-import { PrismaClient } from "@/db/client";
-import { TEST_SEEDED_DB_PATH } from "./env";
+import type { PrismaClient } from "@/db/client";
+import {
+	openSeededDatabase,
+	type SeededDatabase,
+	seededCourses,
+} from "./seed-support";
 
-/// A copy of the seeded database `test/run.ts` prepares, which no worker writes to.
-/// The worker's own database is shared with the spec files that run before and
-/// after this one, and some of them empty it; the seed is read from here instead.
+let seeded: SeededDatabase;
 let prisma: PrismaClient;
-let scratch: string;
 
 test.beforeAll(() => {
-	scratch = mkdtempSync(path.join(tmpdir(), "codehood-seed-"));
-	const file = path.join(scratch, "seeded.db");
-	copyFileSync(TEST_SEEDED_DB_PATH, file);
-	prisma = new PrismaClient({
-		adapter: new PrismaBetterSqlite3({ url: `file:${file}` }),
-	});
+	seeded = openSeededDatabase();
+	prisma = seeded.prisma;
 });
 
-test.afterAll(async () => {
-	await prisma.$disconnect();
-	rmSync(scratch, { recursive: true, force: true });
-});
-
-const SEEDED_INSTRUCTORS = ["ada", "alan", "instructor"];
-
-const seededCourses = { instructorId: { in: SEEDED_INSTRUCTORS } };
+test.afterAll(() => seeded.close());
 
 /// Every attempt of the seeded courses that has a history, with its exam.
 function seededHistories() {
