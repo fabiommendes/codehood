@@ -55,7 +55,7 @@ import {
 	hiddenFromStudents,
 } from "@/services/exam-state";
 import type { Prisma, PrismaTx } from "../client";
-import { realAttempt } from "../preview-filter";
+import { realAttemptSql } from "../preview-filter";
 import {
 	courseRefMatch,
 	courseRefWhere,
@@ -648,19 +648,24 @@ export const makeResponseService = defineService<ResponseT>()(() => {
 					select: { id: true },
 				}),
 			);
-			const waiting = await tx.submission.findFirst({
-				where: {
-					response: {
-						...realAttempt,
-						examId: exam.id,
-						...(input.author ? { authorId: input.author } : {}),
-					},
-					feedbacks: { none: {} },
-					status: { not: "WILL_NOT_GRADE" },
-				},
-				select: { id: true },
-			});
-			if (!waiting) return 0;
+			// Raw SQL: Prisma's `feedbacks: { none: {} }` aggregates the whole
+			// `Feedback` table, and this walks only the attempts of the exam.
+			const waiting = await tx.$queryRawUnsafe<{ id: number | bigint }[]>(
+				`SELECT s.id AS id
+				FROM ResponseRef r
+				CROSS JOIN Submission s ON s.responseId = r.id
+				WHERE r.examId = ?
+					AND ${realAttemptSql("r")}
+					${input.author === undefined ? "" : "AND r.authorId = ?"}
+					AND s.status <> 'WILL_NOT_GRADE'
+					AND NOT EXISTS (
+						SELECT 1 FROM Feedback f WHERE f.submissionId = s.id
+					)
+				LIMIT 1`,
+				exam.id,
+				...(input.author === undefined ? [] : [input.author]),
+			);
+			if (waiting.length === 0) return 0;
 			const { graded } = await gradeExpiredObjectives(tx, {
 				examId: exam.id,
 				author: input.author,

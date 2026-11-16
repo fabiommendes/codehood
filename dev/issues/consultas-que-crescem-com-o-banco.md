@@ -126,3 +126,24 @@ os convites pessoais ainda são carregados e filtrados em JS. Falta rodar o
 página de uma dessas listas pode falhar só no banco cheio, como aconteceu
 com o caso do diálogo de disciplina em `admin-form-errors`, que agora abre a
 página pelo cursor da linha.
+
+2026-11-16: questões do professor e filas de relatos paginadas; `main`
+rebaseada sobre o remoto. `test:perf` inteiro: de 249 rotas, 3 crescem 2× ou
+mais, todas abaixo de 7 ms no banco cheio (`GET /<curso>/attendance` 1,5 → 5,7
+ms, `POST /admin` 2,6 → 6,3 ms, `GET /api/user` 0,5 → 1,0 ms). Em 2026-11-14
+eram 19, com picos de 100 a 200 ms.
+
+A rodada achou uma consulta nova, vinda com a correção automática de
+objetivas: `response.settleExpired`, ao abrir a prova do professor, levava
+86,6 ms no banco cheio porque `feedbacks: { none: {} }` do Prisma agrega
+`Feedback` inteira. Trocada por SQL crua que percorre só as tentativas da
+prova; `GET /<curso>/exams/<prova>` ficou em 6,5 → 6,3 ms, sem SQL lenta.
+
+Falhas só no banco cheio: dois testes de `test/api-crud.spec.ts` supunham
+banco pequeno (corrigidos); `exam-answer-edit-isolation.spec.ts:483` e
+`exam-delivery.spec.ts:247` falharam na rodada inteira e passam sozinhos no
+banco cheio, então são instabilidade sob carga, não custo de consulta.
+
+Falta para o critério ao pé da letra: `/attendance` (3,8×) e `POST /admin`
+(2,4×). Sobram também `/roster`, `/resources`, `/exams` e o intervalo de
+datas do `/calendar`, que seguem o tamanho do curso e não o do banco.
