@@ -23,6 +23,7 @@ import {
 	type GradedStudent,
 } from "@/services/grading";
 import type { CourseNav } from "./course-nav";
+import type { CourseTab } from "./course-tabs";
 import { examNav } from "./exam-nav";
 import { loadCourse } from "./load-course";
 import { loadCourseExceptions } from "./load-exam-exceptions";
@@ -32,6 +33,8 @@ export type LoadGradingResult =
 			course: Course;
 			/// The course's URL prefix.
 			href: string;
+			/// The course tab strip the actor sees.
+			tabs: readonly CourseTab[];
 			exam: Exam;
 			/// The exam's question slugs, in exam order.
 			questions: string[];
@@ -65,7 +68,7 @@ export async function loadGrading(
 		manage: true,
 	});
 	if ("redirect" in result) return result;
-	const { course, href } = result;
+	const { course, href, tabs } = result;
 
 	// biome-ignore lint/style/noNonNullAssertion: loadCourse already redirected an anonymous visitor.
 	const actor = Astro.locals.actor!;
@@ -73,13 +76,13 @@ export async function loadGrading(
 	const loaded = await loadExamGrading(course.id, examSlug, actor, options);
 	if (!loaded) return { redirect: await Astro.rewrite("/404") };
 
-	return { course, href, ...loaded };
+	return { course, href, tabs, ...loaded };
 }
 
 /// What the grading of one exam reads, without the course it belongs to.
 export type ExamGrading = Omit<
 	Extract<LoadGradingResult, { exam: Exam }>,
-	"course" | "href"
+	"course" | "href" | "tabs"
 >;
 
 /**

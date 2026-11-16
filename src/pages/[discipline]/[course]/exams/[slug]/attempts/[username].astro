@@ -43,7 +43,7 @@ const result = await loadGrading(Astro, discipline, courseSegment, slug, {
 	author: username,
 });
 if ("redirect" in result) return result.redirect;
-const { course, href, exam, questions, attempts, feedback, exceptions } =
+const { course, href, tabs, exam, questions, attempts, feedback, exceptions } =
 	result;
 
 const attempt = attempts.find((entry) => entry.author === username);
@@ -175,7 +175,7 @@ const stateLabel = (status: string, score: number | null): string => {
   nav={await gradingExamNav(result, actor, row.name)}
 >
   <main class="mx-auto max-w-4xl px-4 py-10">
-    <CourseHeader course={course} active="exams" />
+    <CourseHeader course={course} tabs={tabs} active="exams" />
 
     <a href={`${href}/exams/${exam.slug}`} class="text-sm text-muted hover:text-primary">← {exam.title}</a>
 

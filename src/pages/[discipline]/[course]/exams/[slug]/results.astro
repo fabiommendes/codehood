@@ -21,7 +21,7 @@ export const prerender = false;
 const { discipline, course: courseSegment, slug } = Astro.params;
 const result = await loadExamStaff(Astro, discipline, courseSegment, slug);
 if ("redirect" in result) return result.redirect;
-const { course, href, exam, exceptions, data } = result;
+const { course, href, tabs, exam, exceptions, data } = result;
 
 // biome-ignore lint/style/noNonNullAssertion: loadExamStaff already redirected an anonymous visitor.
 const actor = Astro.locals.actor!;
@@ -55,7 +55,7 @@ const examHref = `${href}/exams/${exam.slug}`;
   })}
 >
   <main class="mx-auto max-w-4xl px-4 py-10">
-    <CourseHeader course={course} active="exams" />
+    <CourseHeader course={course} tabs={tabs} active="exams" />
 
     <a href={examHref} class="text-sm text-muted hover:text-primary">← {exam.title}</a>
     {

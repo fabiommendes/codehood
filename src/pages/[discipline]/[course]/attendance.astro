@@ -18,7 +18,7 @@ export const prerender = false;
 const { discipline, course: courseSegment } = Astro.params;
 const result = await loadCourse(Astro, discipline, courseSegment);
 if ("redirect" in result) return result.redirect;
-const { course, href } = result;
+const { course, href, tabs } = result;
 
 // biome-ignore lint/style/noNonNullAssertion: every course page runs through loadCourse, which already required Astro.locals.user.
 const actor = Astro.locals.actor!;
@@ -34,7 +34,7 @@ const csvFilename = `attendance-${course.discipline.slug}-${course.edition.slug}
   nav={studentsNav(href)}
 >
   <main class="mx-auto max-w-4xl px-4 py-10">
-    <CourseHeader course={course} active="students" />
+    <CourseHeader course={course} tabs={tabs} active="students" />
 
     <div class="mt-8 flex flex-wrap items-center justify-between gap-3">
       <h2 class="text-2xl font-bold">{m.attendance_page_heading()}</h2>

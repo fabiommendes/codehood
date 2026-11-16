@@ -20,7 +20,7 @@ export const prerender = false;
 const { discipline, course: courseSegment } = Astro.params;
 const result = await loadCourse(Astro, discipline, courseSegment);
 if ("redirect" in result) return result.redirect;
-const { course, href } = result;
+const { course, href, tabs } = result;
 
 // biome-ignore lint/style/noNonNullAssertion: every course page runs through loadCourse, which already required Astro.locals.user.
 const actor = Astro.locals.actor!;
@@ -51,7 +51,7 @@ function code(text: string): string {
   nav={resourcesNav(href, groups, repositories.length, { expand: true })}
 >
   <main class="mx-auto max-w-4xl px-4 py-10">
-    <CourseHeader course={course} active="resources" />
+    <CourseHeader course={course} tabs={tabs} active="resources" />
 
     {hasEventResources && <p class="mt-4 text-sm text-muted" set:html={m.courses_resources_on_schedule({
       schedule: `<a href="${escapeHtml(href)}/schedule" class="link">${escapeHtml(m.courses_resources_schedule_link())}</a>`,

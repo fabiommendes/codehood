@@ -5,27 +5,18 @@
 // page's navigation, and an instructor's extra tabs are the only thing that
 // marks them as one.
 import type { Course } from "@/db";
-import { type CourseTabKey, courseTabs } from "@/utils/course-tabs";
+import type { CourseTab, CourseTabKey } from "@/utils/course-tabs";
 import Tabs from "./ui/Tabs.astro";
 
 interface Props {
-	course: Course;
+	course: Pick<Course, "discipline" | "instructor" | "edition">;
+	/// The strip `loadCourse` computed for the viewing actor.
+	tabs: readonly CourseTab[];
 	/// Absent on a page that has no tab of its own.
 	active?: CourseTabKey;
 }
 
-const { course, active } = Astro.props;
-// biome-ignore lint/style/noNonNullAssertion: every course page runs through loadCourse, which already required Astro.locals.user.
-const actor = Astro.locals.actor!;
-
-// courseTabs only needs `id`/`instructor` (see its `enrollment.manage` check),
-// both of which the public Course already carries — no enrollment data needed.
-const ref = {
-	discipline: course.discipline.slug,
-	instructor: course.instructor.username,
-	edition: course.edition.slug,
-};
-const tabs = courseTabs(course, ref, actor);
+const { course, tabs, active } = Astro.props;
 ---
 
 <div data-page-header>

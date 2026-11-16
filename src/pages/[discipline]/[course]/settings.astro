@@ -27,7 +27,7 @@ const result = await loadCourse(Astro, discipline, courseSegment, {
 	manage: true,
 });
 if ("redirect" in result) return result.redirect;
-const { course, href } = result;
+const { course, href, tabs } = result;
 
 // biome-ignore lint/style/noNonNullAssertion: loadCourse({ manage: true }) already required Astro.locals.user.
 const actor = Astro.locals.actor!;
@@ -151,7 +151,7 @@ const RENEW_ICON =
   })}
 >
   <main class="mx-auto max-w-4xl px-4 py-10">
-    <CourseHeader course={course} active="home" />
+    <CourseHeader course={course} tabs={tabs} active="home" />
 
     <section class="mt-8" aria-labelledby="settings-course">
       <h2 id="settings-course" class="text-xl font-semibold">{m.courses_settings_course_heading()}</h2>

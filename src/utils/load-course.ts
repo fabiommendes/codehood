@@ -3,9 +3,10 @@ import { hasPerm } from "@/auth/permissions";
 import { NotAllowed } from "@/core/error";
 import { type Course, db } from "@/db";
 import { courseHref, parseCourseSegment } from "../urls";
+import { type CourseTab, courseTabs } from "./course-tabs";
 
 export type LoadCourseResult =
-	| { course: Course; href: string }
+	| { course: Course; href: string; tabs: readonly CourseTab[] }
 	| { redirect: Response };
 
 // TODO: IMPORTANT! database access must be done through service classes.
@@ -15,7 +16,8 @@ export type LoadCourseResult =
  * keeps the browser URL (unlike `Astro.redirect`), which is what lets the 403
  * page name the course the visitor was trying to reach. Also hands back the
  * course's `href`, so the same five-line `courseHref(...)` call isn't
- * repeated on every page.
+ * repeated on every page, and the tab strip the actor sees, which
+ * `CourseHeader` renders.
  *
  * Pass `manage: true` on instructor-only pages (`/manage`, `/roster`) to
  * also require `enrollment.manage`, not just visibility — the same predicate
@@ -65,13 +67,15 @@ export async function loadCourse(
 		return { redirect: await forbidden(Astro, segment) };
 	}
 
+	const ref = {
+		discipline: course.discipline.slug,
+		instructor: course.instructor.username,
+		edition: course.edition.slug,
+	};
 	return {
 		course,
-		href: courseHref({
-			discipline: course.discipline.slug,
-			instructor: course.instructor.username,
-			edition: course.edition.slug,
-		}),
+		href: courseHref(ref),
+		tabs: courseTabs(course, ref, actor),
 	};
 }
 

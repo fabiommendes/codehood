@@ -51,3 +51,30 @@ export function selectVariants<
 		}),
 	) as Record<keyof G, string>;
 }
+
+/// What `CourseHeader` reads of a course.
+export const headerCourse = {
+	discipline: { slug: "algorithms", name: "Algorithms and Data Structures" },
+	instructor: { name: "Ada Lovelace", username: "ada" },
+	edition: { slug: "2026-2" },
+} as never;
+
+const courseHref = "/algorithms/ada_2026-2";
+
+/// The tab strip a student sees on a course page.
+export const studentTabs = [
+	{ key: "home", label: "Home", href: courseHref },
+	{ key: "schedule", label: "Schedule", href: `${courseHref}/schedule` },
+	{ key: "resources", label: "Resources", href: `${courseHref}/resources` },
+	{ key: "exams", label: "Exams", href: `${courseHref}/exams` },
+] as const;
+
+/// The tab strip the course's instructor sees: the student's, plus Students and Questions.
+export const instructorTabs = [
+	studentTabs[0],
+	studentTabs[1],
+	{ key: "students", label: "Students", href: `${courseHref}/roster` },
+	studentTabs[2],
+	studentTabs[3],
+	{ key: "questions", label: "Questions", href: `${courseHref}/questions` },
+] as const;

@@ -2,14 +2,17 @@
 import AdminHeader from "@/components/AdminHeader.astro";
 import CliSetupLink from "@/components/CliSetupLink.astro";
 import CountRow from "@/components/CountRow.astro";
+import CourseHeader from "@/components/CourseHeader.astro";
 import CourseTile from "@/components/CourseTile.astro";
 import SectionHeader from "@/components/SectionHeader.astro";
 import ComponentsPage from "./_ComponentsPage.astro";
+import { headerCourse, instructorTabs, studentTabs } from "./_fixtures";
 
 export const prerender = false;
 
 const sections = [
 	{ id: "headers", label: "Headers" },
+	{ id: "course-header", label: "Course header" },
 	{ id: "course", label: "Course tiles and rows" },
 ];
 ---
@@ -40,6 +43,22 @@ const sections = [
     <h3 class="mt-10 mb-3 text-xl font-semibold">CliSetupLink</h3>
     <div class="rounded-box border border-edge bg-base-100 p-5">
       <p class="text-sm text-muted">Nothing published yet. <CliSetupLink /></p>
+    </div>
+  </section>
+
+  <section id="course-header" class="mb-14 scroll-mt-6">
+    <h2 class="text-2xl font-bold">Course header</h2>
+    <p class="mt-2 mb-6 text-sm text-muted">
+      <code class="font-mono">CourseHeader</code> heads every page of a course. It takes the tab strip ready, so an
+      instructor's extra tabs are the only thing that marks the view.
+    </p>
+    <h3 class="mb-3 text-xl font-semibold">Student</h3>
+    <div class="rounded-box border border-edge bg-base-100 p-5">
+      <CourseHeader course={headerCourse} tabs={studentTabs} active="home" />
+    </div>
+    <h3 class="mt-10 mb-3 text-xl font-semibold">Instructor</h3>
+    <div class="rounded-box border border-edge bg-base-100 p-5">
+      <CourseHeader course={headerCourse} tabs={instructorTabs} active="exams" />
     </div>
   </section>
 

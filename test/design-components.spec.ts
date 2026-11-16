@@ -13,7 +13,7 @@ const pages: {
 	},
 	{
 		path: "course",
-		sections: ["Headers", "Course tiles and rows"],
+		sections: ["Headers", "Course header", "Course tiles and rows"],
 		islands: [],
 	},
 	{

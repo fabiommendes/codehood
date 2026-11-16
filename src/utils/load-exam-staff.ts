@@ -17,6 +17,7 @@ import {
 	type GradedStudent,
 } from "@/services/grading";
 import { type QuestionStats, questionStats } from "@/services/question-stats";
+import type { CourseTab } from "./course-tabs";
 import { loadCourse } from "./load-course";
 import { loadCourseExceptions } from "./load-exam-exceptions";
 import { loadStudents } from "./load-grading";
@@ -130,6 +131,8 @@ export type LoadExamStaffResult =
 			course: Course;
 			/// The course's URL prefix.
 			href: string;
+			/// The course tab strip the actor sees.
+			tabs: readonly CourseTab[];
 			exam: Exam;
 			/// The exam's exceptions, by username.
 			exceptions: Map<string, ExceptionTiming>;
@@ -155,7 +158,7 @@ export async function loadExamStaff(
 		manage: true,
 	});
 	if ("redirect" in result) return result;
-	const { course, href } = result;
+	const { course, href, tabs } = result;
 
 	// biome-ignore lint/style/noNonNullAssertion: loadCourse already redirected an anonymous visitor.
 	const actor = Astro.locals.actor!;
@@ -174,5 +177,5 @@ export async function loadExamStaff(
 		exceptions,
 		new Date(),
 	);
-	return { course, href, exam, exceptions, data };
+	return { course, href, tabs, exam, exceptions, data };
 }

@@ -23,7 +23,7 @@ export const prerender = false;
 const { discipline, course: courseSegment, slug } = Astro.params;
 const result = await loadGrading(Astro, discipline, courseSegment, slug);
 if ("redirect" in result) return result.redirect;
-const { course, href, exam, answers, attempts } = result;
+const { course, href, tabs, exam, answers, attempts } = result;
 
 // biome-ignore lint/style/noNonNullAssertion: loadGrading already redirected an anonymous visitor.
 const actor = Astro.locals.actor!;
@@ -83,7 +83,7 @@ const badges = {
   nav={await gradingExamNav(result, actor)}
 >
   <main class="mx-auto max-w-4xl px-4 py-10">
-    <CourseHeader course={course} active="exams" />
+    <CourseHeader course={course} tabs={tabs} active="exams" />
 
     <a href={`${href}/exams/${exam.slug}`} class="text-sm text-muted hover:text-primary">← {m.grades_regrade_back()}</a>
 
