@@ -211,11 +211,25 @@ const ARTS: Record<SketchArt, Stroke[]> = {
 	loose: loose(),
 };
 
+/// Where each drawing's highest line sits, so the box starts there instead of
+/// reserving empty space above it. Every drawing ends near the bottom (156).
+const TOP: Record<SketchArt, number> = {
+	construction: 40,
+	blueprint: 10,
+	protractor: 40,
+	alvorada: 10,
+	plot: 10,
+	athos: 56,
+	loose: 44,
+};
+const HEIGHT = 156;
+
 const strokes = ARTS[art];
+const top = TOP[art];
 ---
 
 <svg
-  viewBox="0 0 256 156"
+  viewBox={`0 ${top} 256 ${HEIGHT - top}`}
   class:list={["sketch", className]}
   aria-hidden="true"
 >

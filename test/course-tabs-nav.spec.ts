@@ -5,6 +5,7 @@ import {
 	resourcesNav,
 	scheduleNav,
 	scheduleWeekId,
+	studentHomeNav,
 	studentsNav,
 } from "@/utils/course-tabs-nav";
 
@@ -86,25 +87,55 @@ test.describe("studentsNav", () => {
 });
 
 test.describe("homeNav", () => {
-	test("links the content reports and the settings", () => {
-		expect(homeNav(href).sections[0]?.entries).toEqual([
-			{ label: "Reports", href: `${href}/reports` },
-			{ label: "Settings", href: `${href}/settings` },
+	test("lists home, reports and settings on every page", () => {
+		expect(homeNav(href).sections[0]?.entries.map((e) => e.href)).toEqual([
+			href,
+			`${href}/reports`,
+			`${href}/settings`,
 		]);
 	});
 
-	test("puts the sections of the home page before the pages", () => {
-		const nav = homeNav(href, [
-			{ id: "schedule", label: "Schedule" },
-			{ id: "exams", label: "Exams" },
-		]);
-		expect(nav.sections[0]?.entries).toEqual([
+	test("folds the sections of the page the reader is on under its entry", () => {
+		const entries = homeNav(href, {
+			page: "home",
+			sections: [
+				{ id: "schedule", label: "Schedule" },
+				{ id: "exams", label: "Exams" },
+			],
+		}).sections[0]?.entries;
+		expect(entries?.[0]?.children).toEqual([
 			{ label: "Schedule", href: `${href}#schedule` },
 			{ label: "Exams", href: `${href}#exams` },
 		]);
-		expect(nav.sections[1]?.entries.map((e) => e.label)).toEqual([
-			"Reports",
-			"Settings",
+		expect(entries?.[2]?.children).toEqual([]);
+	});
+
+	test("settings sections hang from the settings entry", () => {
+		const entries = homeNav(href, {
+			page: "settings",
+			sections: [{ id: "settings-cli", label: "CLI" }],
+		}).sections[0]?.entries;
+		expect(entries?.[0]?.children).toEqual([]);
+		expect(entries?.[2]?.children).toEqual([
+			{ label: "CLI", href: `${href}/settings#settings-cli` },
+		]);
+	});
+});
+
+test.describe("studentHomeNav", () => {
+	test("puts the home sections at the first level, with the Home tab", () => {
+		const nav = studentHomeNav([
+			{ id: "schedule", label: "Schedule" },
+			{ id: "attendance", label: "Attendance" },
+		]);
+		expect(nav.tab).toBe("Home");
+		expect(nav.sections).toEqual([
+			{
+				entries: [
+					{ label: "Schedule", href: "#schedule" },
+					{ label: "Attendance", href: "#attendance" },
+				],
+			},
 		]);
 	});
 });

@@ -13,7 +13,13 @@ interface Props {
 	nav?: MarkedNav;
 }
 
-const { course, tab, nav } = Astro.props;
+const { course, nav } = Astro.props;
+// An entry that repeats the tab's name already says where the reader is.
+const tab = nav?.sections.some((s) =>
+	s.entries.some((e) => e.label === Astro.props.tab),
+)
+	? undefined
+	: Astro.props.tab;
 
 const row = "flex min-w-0 items-start gap-2 rounded-field px-2";
 const parentTone = (entry: MarkedEntry) =>
@@ -48,8 +54,8 @@ const sections = nav?.sections.filter((s) => s.entries.length > 0) ?? [];
   {
     sections.length > 0 && (
       <div class="px-2 pb-2">
-        {sections.map((section) => (
-          <div class="mt-1">
+        {sections.map((section, index) => (
+          <div class:list={[index === 0 ? "mt-1" : "mt-2 border-t border-base-300 pt-2"]}>
             {section.label && (
               <p class="flex justify-between px-2 pt-2 pb-1 text-[0.6875rem] font-medium tracking-wide text-muted uppercase">
                 <span>{section.label}</span>

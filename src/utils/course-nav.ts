@@ -27,6 +27,8 @@ export interface NavSection {
 export interface CourseNav {
 	/// The entity the page belongs to, shown under the tab (an exam's title).
 	context?: string;
+	/// The tab's name, for a page whose tab depends on the reader rather than its URL.
+	tab?: string;
 	sections: NavSection[];
 }
 

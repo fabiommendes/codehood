@@ -140,7 +140,14 @@ const RENEW_ICON =
 
 <AppLayout title={m.courses_settings_page_title({ discipline: course.discipline.name })}
   trail={breadcrumbs(Astro.url, { course })}
-  nav={homeNav(href)}
+  nav={homeNav(href, {
+    page: "settings",
+    sections: [
+      { id: "settings-course", label: m.courses_settings_course_heading() },
+      { id: "settings-enrollment", label: m.courses_settings_enrollment_heading() },
+      { id: "settings-cli", label: m.courses_settings_cli_heading() },
+    ],
+  })}
 >
   <main class="mx-auto max-w-4xl px-4 py-10">
     <CourseHeader course={course} active="home" />

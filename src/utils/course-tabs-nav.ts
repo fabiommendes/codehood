@@ -5,7 +5,7 @@
  */
 
 import { m } from "@/i18n";
-import type { CourseNav, NavEntry, NavSection } from "./course-nav";
+import type { CourseNav, NavEntry, NavLink } from "./course-nav";
 import { examTypeLabels } from "./exam-display";
 
 /** The id of the section of the resources page that holds one kind of resource. */
@@ -76,31 +76,63 @@ export function scheduleNav(
 	return { sections: [{ entries }] };
 }
 
+/** The sections of one home-tab page, as links under its entry. */
+export interface HomeSections {
+	/// The page that holds the sections.
+	page: "home" | "settings";
+	sections: readonly { id: string; label: string }[];
+}
+
 /**
- * Links to the instructor's pages of the home tab: the content reports and the
- * settings. The home page also passes `sections`, the ones it shows, which
- * come first as links to the page's own sections.
+ * Links to the instructor's pages of the home tab: home, reports and settings.
+ * The page the reader is on passes its own `sections`, which fold under its
+ * entry; the others show no sections, as they would not be on screen.
  */
-export function homeNav(
-	href: string,
-	sections: readonly { id: string; label: string }[] = [],
-): CourseNav {
-	const pages: NavSection = {
-		entries: [
-			{ label: m.nav_course_tab_reports(), href: `${href}/reports` },
-			{ label: m.nav_course_settings(), href: `${href}/settings` },
+export function homeNav(href: string, here?: HomeSections): CourseNav {
+	const children = (page: HomeSections["page"], base: string): NavLink[] =>
+		here?.page === page
+			? here.sections.map(({ id, label }) => ({
+					label,
+					href: `${base}#${id}`,
+				}))
+			: [];
+	return {
+		sections: [
+			{
+				entries: [
+					{
+						label: m.nav_course_tab_home(),
+						href,
+						children: children("home", href),
+					},
+					{ label: m.nav_course_tab_reports(), href: `${href}/reports` },
+					{
+						label: m.nav_course_settings(),
+						href: `${href}/settings`,
+						children: children("settings", `${href}/settings`),
+					},
+				],
+			},
 		],
 	};
-	if (sections.length === 0) return { sections: [pages] };
+}
+
+/**
+ * Links to the sections of a student's home, the only page of their home tab,
+ * so they sit at the first level.
+ */
+export function studentHomeNav(
+	sections: readonly { id: string; label: string }[],
+): CourseNav {
 	return {
+		tab: m.nav_course_tab_home(),
 		sections: [
 			{
 				entries: sections.map(({ id, label }) => ({
 					label,
-					href: `${href}#${id}`,
+					href: `#${id}`,
 				})),
 			},
-			pages,
 		],
 	};
 }

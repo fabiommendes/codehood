@@ -81,7 +81,7 @@ const reportContentPage =
 		Astro.url.pathname.slice(reportCourseHref.length).split("/")[1] ?? "",
 	);
 
-// The course card: the course and tab from the URL, the rest from `nav`.
+// The course card: the course and tab from the URL, plus the links of `nav`.
 // Pages without a tab of their own show the tab they belong to.
 const TAB_OF_PAGE: Record<string, string> = {
 	grades: "roster",
@@ -96,7 +96,7 @@ const pageSegment =
 		: (Astro.url.pathname.slice(reportCourseHref.length).split("/")[1] ?? "");
 const tabSegment = TAB_OF_PAGE[pageSegment] ?? pageSegment;
 const card =
-	nav && reportCourse && reportCourseHref
+	reportCourse && reportCourseHref
 		? {
 				course: {
 					code: reportCourse.discipline.slug,
@@ -104,10 +104,11 @@ const card =
 					href: reportCourseHref,
 				},
 				tab:
-					tabSegment === ""
+					nav?.tab ??
+					(tabSegment === ""
 						? m.nav_course_tab_home()
-						: (COURSE_TAB_LABELS as Record<string, string>)[tabSegment],
-				nav: markCourseNav(nav, Astro.url),
+						: (COURSE_TAB_LABELS as Record<string, string>)[tabSegment]),
+				nav: nav ? markCourseNav(nav, Astro.url) : undefined,
 			}
 		: null;
 ---

@@ -57,5 +57,8 @@
 	"nav_scene_crash": "Um programa parado em uma linha vermelha, de madrugada.",
 	"nav_admin_tab_reports": "Relatos",
 	"nav_course_tab_reports": "Relatos",
-	"nav_course_settings": "Configurações"
+	"nav_course_settings": "Configurações",
+	"nav_exam_overview": "Visão geral",
+	"nav_exam_by_student": "Por aluno",
+	"nav_exam_by_question": "Por questão"
 }

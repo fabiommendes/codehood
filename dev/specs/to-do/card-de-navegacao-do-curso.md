@@ -45,7 +45,7 @@ Papel: **I** instrutor, **A** aluno. "Card" é o nível 1; entre parênteses, as
 | Página | Papel | O que faço aqui | Como chego | Card |
 | :-- | :-- | :-- | :-- | :-- |
 | `index` | I | Ver o que pede atenção no curso agora | aba Início | Início (Agenda, Provas, Recursos) · Reports · Settings |
-| `index` | A | Ver o que tenho para fazer agora | aba Início | Início (Agenda, Provas, Notas, Recursos) · Frequência |
+| `index` | A | Ver o que tenho para fazer agora | aba Início | Agenda · Notas · Frequência (R3: âncoras no nível 1, só as seções que existem) |
 | `reports` | I | Tratar os problemas que os alunos reportaram no conteúdo | Início → Reports | igual ao `index` I |
 | `settings` | I | Mudar dados, matrícula e acesso via CLI do curso | Início → Settings | igual, com (Curso, Matrícula, CLI) |
 
@@ -90,7 +90,7 @@ ela saem da agenda (`ScheduleWeek`) e da home.
 | `roster` | I | Ver e matricular alunos | aba Alunos | Turma · Notas · Frequência |
 | `grades` | I | Ver e lançar notas da turma | Alunos → Notas | igual |
 | `attendance` | I | Ver a frequência da turma | Alunos → Frequência | igual |
-| `attendance` | A | Ver minha frequência | Início → Frequência | igual ao `index` A; a página passa para a aba Início no papel de aluno |
+| `attendance` | A | (deixa de existir) | aba Início → Frequência | redireciona para `index#attendance`; a frequência do aluno é uma seção da home |
 
 
 ### Questões

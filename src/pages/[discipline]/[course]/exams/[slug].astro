@@ -632,12 +632,6 @@ for (const submission of attempt?.submissions ?? []) {
 
     {
       canManage && exam.type !== "PRACTICE" && (
-        <ExamResults client:load href={`${href}/exams/${exam.slug}`} rows={resultRows} />
-      )
-    }
-
-    {
-      canManage && exam.type !== "PRACTICE" && (
         <section id="exceptions" class="mt-8 scroll-mt-20">
           <h2 class="text-lg font-semibold">{m.exams_exceptions_heading()}</h2>
           <div class="mt-3">
@@ -656,12 +650,19 @@ for (const submission of attempt?.submissions ?? []) {
 
     {
       canManage && exam.type !== "PRACTICE" && (
-        <QuestionStatsTable
-          client:load
-          href={`${href}/exams/${exam.slug}`}
-          stats={statsRows}
-          titles={questionTitles}
-        />
+        <div id="results" class="scroll-mt-20">
+          <div id="by-student" class="scroll-mt-20">
+            <ExamResults client:load href={`${href}/exams/${exam.slug}`} rows={resultRows} />
+          </div>
+          <div id="by-question" class="scroll-mt-20">
+            <QuestionStatsTable
+              client:load
+              href={`${href}/exams/${exam.slug}`}
+              stats={statsRows}
+              titles={questionTitles}
+            />
+          </div>
+        </div>
       )
     }
 
