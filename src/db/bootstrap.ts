@@ -1165,22 +1165,6 @@ async function createDemoCoursesIfMissing(): Promise<void> {
 	await db.question.create(
 		{
 			course: cs101.id,
-			slug: "linked-list-invariants",
-			status: "DRAFT",
-			version: "v1",
-			question: {
-				type: "essay",
-				title: "Linked list invariants",
-				stem: "Describe the invariant your `insert` implementation must preserve, and show where it could break.",
-				tags: ["data-structures"],
-				content: "text",
-			},
-		},
-		FULL_ACCESS,
-	);
-	await db.question.create(
-		{
-			course: cs101.id,
 			slug: "factorial-of-five",
 			status: "PUBLISHED",
 			version: "v1",
@@ -1361,37 +1345,8 @@ async function createDemoCoursesIfMissing(): Promise<void> {
 		},
 		FULL_ACCESS,
 	);
-	await db.exam.create(
-		{
-			course: cs201.id,
-			slug: "practice-trees",
-			type: "PRACTICE",
-			status: "ONGOING",
-			title: "Practice: binary search trees",
-			description: "Ungraded practice, open until the end of the term.",
-			tags: ["trees", "practice"],
-			questions: [{ slug: "bst-lookup", version: "v1" }],
-		},
-		FULL_ACCESS,
-	);
-
-	await db.exam.create(
-		{
-			course: cs101.id,
-			slug: "practice-recursion",
-			type: "PRACTICE",
-			status: "ONGOING",
-			title: "Practice: recursion",
-			description: "Ungraded practice, open until the end of the term.",
-			tags: ["recursion", "practice"],
-			questions: [{ slug: "recursion-basics", version: "v1" }],
-		},
-		FULL_ACCESS,
-	);
-
 	await seedReleasedQuiz(cs101, { hopper, hamilton });
 	await seedGradedExam(cs101.id, ada, { hopper, hamilton, liskov, bob });
-	await seedCodeExam(cs101.id, { hopper, hamilton, liskov, bob });
 	await seedExternalGradingExams(cs101.id, ada, {
 		hopper,
 		hamilton,
@@ -1418,7 +1373,6 @@ async function createDemoCoursesIfMissing(): Promise<void> {
 		hamilton,
 		liskov,
 		bob,
-		practicing: cohort[0] as User,
 	});
 	await seedGradeColumns(cs101.id, { hopper, hamilton, liskov, dijkstra });
 	await seedRollCalls(cs101.id, {
@@ -1429,27 +1383,6 @@ async function createDemoCoursesIfMissing(): Promise<void> {
 		dijkstra,
 		wirth,
 	});
-
-	// A quiz two weeks from the day the seed runs, so the calendar's upcoming
-	// list always has an exam in it.
-	await db.exam.create(
-		{
-			course: cs101.id,
-			slug: "quiz-03",
-			type: "QUIZ",
-			status: "SCHEDULED",
-			title: "Quiz 3: data structures",
-			description: "Lists, stacks and queues.",
-			scheduledAt: toInstant(
-				localDateOf(new Date(Date.now() + 14 * 24 * 3600 * 1000)),
-				14 * 60,
-			),
-			duration: { minutes: 30 },
-			tags: ["data-structures"],
-			questions: [{ slug: "recursion-basics", version: "v1" }],
-		},
-		FULL_ACCESS,
-	);
 
 	await seedExamExceptions(cs101.id, { hamilton, bob, liskov });
 	await seedQuestionStatsExam(cs101.id, [
@@ -1650,7 +1583,7 @@ async function seedAttachments(course: Course["id"]): Promise<void> {
 		FULL_ACCESS,
 	);
 
-	// Two weeks out, like quiz-03: the attachments stay 404 until it opens.
+	// Two weeks out: the attachments stay 404 until it opens.
 	await db.exam.create(
 		{
 			course,
@@ -1901,6 +1834,13 @@ async function seedRollCalls(
 		);
 	}
 
+	// The dev student is in the class from the opening, so every meeting counts for them.
+	await setEnrollmentDate(
+		course,
+		DEV_STUDENT_USERNAME,
+		new Date(opening.startAt.getTime() - DAY_MS),
+	);
+
 	// Bob enrolls through the second meeting's check-in, after the first one.
 	await setEnrollmentDate(
 		course,
@@ -1937,6 +1877,11 @@ async function seedRollCalls(
 			{ username: "liskov", deviceHash: "device-shared", minutes: 4 },
 			{ username: "hamilton", deviceHash: "device-hamilton", minutes: 3 },
 			{
+				username: DEV_STUDENT_USERNAME,
+				deviceHash: "device-student",
+				minutes: 6,
+			},
+			{
 				username: "bob",
 				deviceHash: "device-bob",
 				joined: "ENROLLMENT",
@@ -1951,6 +1896,11 @@ async function seedRollCalls(
 		checks: [
 			{ username: "hopper", deviceHash: "device-hopper", minutes: 2 },
 			{ username: "bob", deviceHash: "device-bob", minutes: 3 },
+			{
+				username: DEV_STUDENT_USERNAME,
+				deviceHash: "device-student",
+				minutes: 5,
+			},
 			{
 				username: "wirth",
 				deviceHash: "device-wirth",
@@ -1970,6 +1920,7 @@ async function seedRollCalls(
 		hopper: opening.startAt,
 		hamilton: opening.startAt,
 		liskov: opening.startAt,
+		[DEV_STUDENT_USERNAME]: opening.startAt,
 		bob: second.startAt,
 		wirth: third.startAt,
 	};
@@ -2292,6 +2243,7 @@ async function seedGradeColumns(
 				{ username: students.hamilton.username, value: 92 },
 				{ username: students.liskov.username, value: 71.5 },
 				{ username: students.dijkstra.username, value: 60 },
+				{ username: DEV_STUDENT_USERNAME, value: 78 },
 			],
 		},
 		FULL_ACCESS,
@@ -2639,7 +2591,7 @@ const ELM_MODULE_TESTS = {
 };
 
 /**
- * Seeds an open practice exam with two Elm questions whose pretests run in the browser.
+ * Adds two Elm questions whose pretests run in the browser to the Elm practice exam.
  *
  * One takes an examples block (`{example}`, a scored `{public}` and a private
  * region) and the other linked test modules. The answer keys are, for the
@@ -2674,17 +2626,13 @@ async function seedElmPretestExam(course: Course["id"]): Promise<void> {
 			FULL_ACCESS,
 		);
 	}
-	await db.exam.create(
+	await db.exam.update(
+		{ course, slug: "practice-elm" },
 		{
-			course,
-			slug: "practice-elm-pretests",
-			type: "PRACTICE",
-			status: "ONGOING",
-			title: "Practice: Elm pretests",
 			description:
-				"Two Elm questions with browser pretests: an examples block and linked test modules.",
-			tags: ["elm", "practice"],
+				"Send as many times as you like. Two questions run their pretests in the browser: an examples block and linked test modules.",
 			questions: [
+				{ slug: "elm-soma", version: "v1" },
 				{ slug: "elm-sequences", version: "v1" },
 				{ slug: "elm-vowels", version: "v1" },
 			],
@@ -2806,7 +2754,6 @@ class SeededTyping {
  * student is one situation: hopper typed normally and pasted a block, hamilton
  * has a marker, a rebase and a final gap, liskov hit a limit, bob answered
  * with no recorded typing. `history-off` was recorded and then switched off.
- * `history-practice` is a practice exam on the default, with nothing recorded.
  */
 async function seedAnswerEditHistoryExams(
 	course: Course["id"],
@@ -2815,10 +2762,9 @@ async function seedAnswerEditHistoryExams(
 		hamilton: User;
 		liskov: User;
 		bob: User;
-		practicing: User;
 	},
 ): Promise<void> {
-	const { hopper, hamilton, liskov, bob, practicing } = students;
+	const { hopper, hamilton, liskov, bob } = students;
 	const text = "essay-base-case";
 	const code = "code-factorial";
 	await db.question.create(
@@ -2876,20 +2822,6 @@ async function seedAnswerEditHistoryExams(
 			FULL_ACCESS,
 		);
 	}
-	await db.exam.create(
-		{
-			course,
-			slug: "history-practice",
-			type: "PRACTICE",
-			status: "ONGOING",
-			title: "Edit history: practice",
-			description:
-				"A practice exam on the default switch, which does not record.",
-			questions,
-		},
-		FULL_ACCESS,
-	);
-
 	const now = Date.now();
 	/// A time `minutes` before the seed ran.
 	const ago = (minutes: number) => new Date(now - minutes * 60_000);
@@ -3043,9 +2975,6 @@ async function seedAnswerEditHistoryExams(
 		false,
 		FULL_ACCESS,
 	);
-
-	// A student practices: the default does not record, so nothing is kept.
-	await save("history-practice", practicing, text, definition);
 }
 
 /**
@@ -3296,103 +3225,6 @@ async function seedGradedExam(
 		"explain-recursion":
 			"Recursion is when a function calls itself until it is done.",
 	});
-
-	await db.exam.update(
-		{ course, slug: exam },
-		{ status: "COMPLETED" },
-		FULL_ACCESS,
-	);
-}
-
-/**
- * Closes an exam with a Prolog code question for a grading runner to correct.
- *
- * Four answers wait for a grade: one correct, one that still leans on CLP(FD)
- * and so inverts the relation, one that does not load, and one the bot
- * `runner` already graded with notes for the instructor.
- */
-async function seedCodeExam(
-	course: Course["id"],
-	students: { hopper: User; hamilton: User; liskov: User; bob: User },
-): Promise<void> {
-	const exam = "test-06";
-	const question = "prolog-factorial-with-is";
-
-	await db.question.create(
-		{
-			course,
-			slug: question,
-			status: "PUBLISHED",
-			version: "v1",
-			question: {
-				type: "essay",
-				title: "Factorial in Prolog, without CLP(FD)",
-				stem: "Define `factorial(N, F)` so that `F` is the factorial of `N`. Use `is`, not `clpfd`.",
-				tags: ["prolog"],
-				content: "code",
-				highlight: "prolog",
-			},
-		},
-		FULL_ACCESS,
-	);
-	await db.exam.create(
-		{
-			course,
-			slug: exam,
-			type: "EXAM",
-			status: "ONGOING",
-			title: "Test 6: Prolog",
-			description: "A code answer for a grading runner.",
-			tags: ["prolog"],
-			questions: [{ slug: question, version: "v1" }],
-		},
-		FULL_ACCESS,
-	);
-
-	await answerExam(course, exam, students.hopper, {
-		[question]: [
-			"factorial(0, 1).",
-			"factorial(N, F) :-",
-			"    N > 0,",
-			"    M is N - 1,",
-			"    factorial(M, G),",
-			"    F is N * G.",
-		].join("\n"),
-	});
-	await answerExam(course, exam, students.hamilton, {
-		[question]: [
-			":- use_module(library(clpfd)).",
-			"factorial(0, 1).",
-			"factorial(N, F) :-",
-			"    N #> 0,",
-			"    M #= N - 1,",
-			"    F #= N * G,",
-			"    factorial(M, G).",
-		].join("\n"),
-	});
-	await answerExam(course, exam, students.liskov, {
-		[question]: ["factorial(0, 1)", "factorial(N, F) :- N > 0, F is N *"].join(
-			"\n",
-		),
-	});
-	const bob = await answerExam(course, exam, students.bob, {
-		[question]: [
-			"factorial(0, 1).",
-			"factorial(N, F) :- N > 0, M is N - 1, factorial(M, G), F is N * G.",
-			"% factorial(10, 3628800).",
-		].join("\n"),
-	});
-	await db.feedback.create(
-		{
-			submission: { publicId: bob[question] ?? "" },
-			ref: "auto-1",
-			score: "1",
-			bot: "runner",
-			feedback: "All tests passed.",
-			notes: "The answer hard-codes an expected output in a comment.",
-		},
-		FULL_ACCESS,
-	);
 
 	await db.exam.update(
 		{ course, slug: exam },
@@ -3691,12 +3523,15 @@ async function seedExternalGradingExams(
 }
 
 /**
- * Closes an exam with a JavaScript and a Python code question, so the grading
- * page can run every kind of answer.
+ * Closes an exam with a JavaScript, a Python and a Prolog code question, so
+ * the grading page can run every kind of answer and a grading runner has one
+ * to correct.
  *
  * JavaScript, one answer per student: correct, throws, loops forever, reads a
  * line with `prompt`. Python: correct, a `NameError`, a long output, a loop
- * that never ends. All of them wait for a grade.
+ * that never ends. Prolog: correct, one that leans on CLP(FD) and so inverts
+ * the relation, one that does not load, and one the bot `runner` already
+ * graded with notes for the instructor. All of them wait for a grade.
  */
 async function seedRunnableCodeExam(
 	course: Course["id"],
@@ -3705,6 +3540,7 @@ async function seedRunnableCodeExam(
 	const exam = "test-runnable";
 	const js = "js-double-it";
 	const py = "py-count-up";
+	const prolog = "prolog-factorial-with-is";
 
 	for (const question of [
 		{
@@ -3718,6 +3554,12 @@ async function seedRunnableCodeExam(
 			title: "Count up",
 			stem: "Print the numbers from 1 to `n`, one per line, where `n` is read from the input.",
 			language: "python",
+		},
+		{
+			slug: prolog,
+			title: "Factorial in Prolog, without CLP(FD)",
+			stem: "Define `factorial(N, F)` so that `F` is the factorial of `N`. Use `is`, not `clpfd`.",
+			language: "prolog",
 		},
 	]) {
 		await db.question.create(
@@ -3744,13 +3586,14 @@ async function seedRunnableCodeExam(
 			slug: exam,
 			type: "EXAM",
 			status: "ONGOING",
-			title: "Test 8: runnable answers",
+			title: "Test 6: code answers",
 			description:
-				"Code answers the grader can run: they work, fail, loop and ask for input.",
-			tags: ["javascript", "python"],
+				"Code answers the grader can run (they work, fail, loop and ask for input) and a Prolog one for a grading runner.",
+			tags: ["javascript", "python", "prolog"],
 			questions: [
 				{ slug: js, version: "v1" },
 				{ slug: py, version: "v1" },
+				{ slug: prolog, version: "v1" },
 			],
 		},
 		FULL_ACCESS,
@@ -3759,19 +3602,55 @@ async function seedRunnableCodeExam(
 	await answerExam(course, exam, students.hopper, {
 		[js]: 'const n = Number(prompt("Number?"));\nconsole.log(n * 2);',
 		[py]: "n = int(input())\nfor i in range(1, n + 1):\n    print(i)",
+		[prolog]: [
+			"factorial(0, 1).",
+			"factorial(N, F) :-",
+			"    N > 0,",
+			"    M is N - 1,",
+			"    factorial(M, G),",
+			"    F is N * G.",
+		].join("\n"),
 	});
 	await answerExam(course, exam, students.hamilton, {
 		[js]: 'const n = Number(prompt("Number?"));\nconsole.log(doubled(n));',
 		[py]: "n = int(input())\nfor i in range(1, n + 1):\n    print(j)",
+		[prolog]: [
+			":- use_module(library(clpfd)).",
+			"factorial(0, 1).",
+			"factorial(N, F) :-",
+			"    N #> 0,",
+			"    M #= N - 1,",
+			"    F #= N * G,",
+			"    factorial(M, G).",
+		].join("\n"),
 	});
 	await answerExam(course, exam, students.liskov, {
 		[js]: "let n = 1;\nwhile (true) {\n  n = n * 2;\n}",
 		[py]: "n = int(input())\nfor i in range(1, 200000):\n    print(f'line {i}: ' + 'x' * 40)",
+		[prolog]: ["factorial(0, 1)", "factorial(N, F) :- N > 0, F is N *"].join(
+			"\n",
+		),
 	});
-	await answerExam(course, exam, students.bob, {
+	const bob = await answerExam(course, exam, students.bob, {
 		[js]: 'console.log(Number(prompt("Number?")) * 2);',
 		[py]: "n = int(input())\ni = 1\nwhile True:\n    i += 1",
+		[prolog]: [
+			"factorial(0, 1).",
+			"factorial(N, F) :- N > 0, M is N - 1, factorial(M, G), F is N * G.",
+			"% factorial(10, 3628800).",
+		].join("\n"),
 	});
+	await db.feedback.create(
+		{
+			submission: { publicId: bob[prolog] ?? "" },
+			ref: "auto-1",
+			score: "1",
+			bot: "runner",
+			feedback: "All tests passed.",
+			notes: "The answer hard-codes an expected output in a comment.",
+		},
+		FULL_ACCESS,
+	);
 
 	await db.exam.update(
 		{ course, slug: exam },
@@ -4093,7 +3972,7 @@ async function seedRubricExam(
 /**
  * Seeds the three states an exam exception can leave an exam in.
  *
- * The dev student has 30 extra minutes on the upcoming quiz 3. Test 2 ended
+ * The dev student has 30 extra minutes on the midterm, a week ahead. Test 2 ended
  * and Bob, who missed it, has a makeup in two days, so its grades cannot be
  * released yet. Test 3's window ended half an hour ago, but Liskov has extra
  * time, so her closed attempt can still be reopened. It is an `EXAM`: a `QUIZ`
@@ -4109,7 +3988,7 @@ async function seedExamExceptions(
 	await db.examException.create(
 		{
 			course,
-			exam: "quiz-03",
+			exam: "midterm",
 			username: DEV_STUDENT_USERNAME,
 			extraTime: { minutes: 30 },
 			note: "Accommodation on file",
