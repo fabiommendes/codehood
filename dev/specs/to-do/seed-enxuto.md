@@ -410,6 +410,11 @@ Cuidados para S2 a S5:
   `js-sum-of-evens`.
 - S6: `cs201` ficou com o recurso `when-to-use-what` (Markdown). `test-trees`
   é criada por `seedTreesExam`, com liskov (certa) e bob (errada).
+- S7: helpers `createQuestion`, `createResource` e `createSlot`, a tabela de
+  usuários e a tabela dos recursos `CODE` de `cs101`. A contagem de registros
+  por tabela é igual à de antes. O arquivo parou em 3935 linhas: o que sobra é
+  dado (enunciados, aulas, respostas), e passar de 3600 pede cortar dado, o que
+  a spec proíbe. A meta de 3600 foi tratada como não atingida.
 
 ## Riscos
 

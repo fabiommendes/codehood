@@ -110,79 +110,44 @@ async function createDemoCoursesIfMissing(): Promise<void> {
 		return;
 	}
 
-	const ada = await demoUser({
-		email: "ada@codehood.local",
-		username: "ada",
-		name: "Ada Lovelace",
-		role: "INSTRUCTOR",
-		password: "ada",
-	});
-	const alan = await demoUser({
-		email: "alan.turing@codehood.local",
-		username: "alan",
-		name: "Alan Turing",
-		role: "INSTRUCTOR",
-		password: "alan",
-	});
-	const hopper = await demoUser({
-		email: "hopper@codehood.local",
-		username: "hopper",
-		name: "Grace Hopper",
-		role: "STUDENT",
-		password: "hopper",
-	});
-	const hamilton = await demoUser({
-		email: "hamilton@codehood.local",
-		username: "hamilton",
-		name: "Margaret Hamilton",
-		role: "STUDENT",
-		password: "hamilton",
-	});
-	const liskov = await demoUser({
-		email: "liskov@codehood.local",
-		username: "liskov",
-		name: "Barbara Liskov",
-		role: "STUDENT",
-		password: "liskov",
-	});
-	const bob = await demoUser({
-		email: "bob@codehood.local",
-		username: "bob",
-		name: "Bob Martin",
-		role: "STUDENT",
-		password: "bob",
-	});
-	const dijkstra = await demoUser({
-		email: "dijkstra@codehood.local",
-		username: "dijkstra",
-		name: "Edsger Dijkstra",
-		role: "STUDENT",
-		password: "dijkstra",
-	});
-	const wirth = await demoUser({
-		email: "wirth@codehood.local",
-		username: "wirth",
-		name: "Niklaus Wirth",
-		role: "STUDENT",
-		password: "wirth",
-	});
-	const cohort: User[] = [];
-	for (const [username, name] of [
-		["knuth", "Donald Knuth"],
-		["ritchie", "Dennis Ritchie"],
-		["thompson", "Ken Thompson"],
-		["backus", "John Backus"],
+	const accounts = new Map<string, User>();
+	for (const [username, name, role, email] of [
+		["ada", "Ada Lovelace", "INSTRUCTOR", "ada@codehood.local"],
+		["alan", "Alan Turing", "INSTRUCTOR", "alan.turing@codehood.local"],
+		["hopper", "Grace Hopper", "STUDENT"],
+		["hamilton", "Margaret Hamilton", "STUDENT"],
+		["liskov", "Barbara Liskov", "STUDENT"],
+		["bob", "Bob Martin", "STUDENT"],
+		["dijkstra", "Edsger Dijkstra", "STUDENT"],
+		["wirth", "Niklaus Wirth", "STUDENT"],
+		["knuth", "Donald Knuth", "STUDENT"],
+		["ritchie", "Dennis Ritchie", "STUDENT"],
+		["thompson", "Ken Thompson", "STUDENT"],
+		["backus", "John Backus", "STUDENT"],
 	] as const) {
-		cohort.push(
+		accounts.set(
+			username,
 			await demoUser({
-				email: `${username}@codehood.local`,
+				email: email ?? `${username}@codehood.local`,
 				username,
 				name,
-				role: "STUDENT",
+				role,
 				password: username,
 			}),
 		);
 	}
+	const account = (username: string): User => accounts.get(username) as User;
+	const [ada, alan, hopper, hamilton, liskov, bob, dijkstra, wirth] = [
+		"ada",
+		"alan",
+		"hopper",
+		"hamilton",
+		"liskov",
+		"bob",
+		"dijkstra",
+		"wirth",
+	].map(account) as [User, User, User, User, User, User, User, User];
+	const cohort = ["knuth", "ritchie", "thompson", "backus"].map(account);
 
 	for (const discipline of [
 		{ slug: "cs101", name: "Introduction to Programming" },
@@ -311,277 +276,208 @@ async function createDemoCoursesIfMissing(): Promise<void> {
 	const syllabusFileBuffer = Buffer.from(
 		"CS101 Syllabus\n\nGrading: 40% exams, 30% homework, 30% participation.\nOffice hours: Tuesdays 2-4pm.\n",
 	);
-	await db.resource.create(
+	await createResource(
+		cs101.id,
+		"syllabus",
+		"Syllabus",
 		{
-			course: cs101.id,
-			slug: "syllabus",
-			title: "Syllabus",
-			description: "Grading, schedule, and course policy.",
-			data: {
-				type: "FILE",
-				buffer: syllabusFileBuffer,
-				filename: "syllabus.txt",
-			},
-			rev: "syllabus-hash",
+			type: "FILE",
+			buffer: syllabusFileBuffer,
+			filename: "syllabus.txt",
 		},
-		FULL_ACCESS,
+		"syllabus-hash",
+		"Grading, schedule, and course policy.",
 	);
-	await db.resource.create(
+	await createResource(
+		cs101.id,
+		"sicp-ch1",
+		"SICP, chapter 1",
 		{
-			course: cs101.id,
-			slug: "sicp-ch1",
-			title: "SICP, chapter 1",
-			data: {
-				type: "LINK",
-				url: "https://mitp-content-server.mit.edu/books/content/sectbyfn/books_pres_0/6515/sicp.zip/full-text/book/book-Z-H-10.html",
-			},
-			rev: "demo-sicp-v1",
+			type: "LINK",
+			url: "https://mitp-content-server.mit.edu/books/content/sectbyfn/books_pres_0/6515/sicp.zip/full-text/book/book-Z-H-10.html",
 		},
-		FULL_ACCESS,
+		"demo-sicp-v1",
 	);
-	await db.resource.create(
+	await createResource(
+		cs101.id,
+		"toolchain",
+		"Setting up your toolchain",
 		{
-			course: cs101.id,
-			slug: "toolchain",
-			title: "Setting up your toolchain",
-			description: "Local dev environment, in three steps.",
-			data: {
-				type: "MD",
-				content:
-					"Install Node 22 and `pnpm`, then run `pnpm dev`.\n\n- Clone the course repository\n- Run `pnpm install`\n- Ask on the forum if anything fails",
-			},
-			rev: "demo-toolchain-v1",
+			type: "MD",
+			content:
+				"Install Node 22 and `pnpm`, then run `pnpm dev`.\n\n- Clone the course repository\n- Run `pnpm install`\n- Ask on the forum if anything fails",
 		},
-		FULL_ACCESS,
+		"demo-toolchain-v1",
+		"Local dev environment, in three steps.",
 	);
-	await db.resource.create(
+	// One resource per language of the code runner.
+	for (const [slug, title, language, description, content] of [
+		[
+			"factorial",
+			"factorial.py",
+			"python",
+			undefined,
+			"def factorial(n):\n    return 1 if n <= 1 else n * factorial(n - 1)\n\n\nprint(factorial(5))\n",
+		],
+		[
+			"prolog-factorial",
+			"factorial.pl",
+			"prolog",
+			"Consulted on Run; then query it at the Prolog prompt.",
+			[
+				"factorial(0, 1).",
+				"factorial(N, F) :-",
+				"    N > 0,",
+				"    M is N - 1,",
+				"    factorial(M, G),",
+				"    F is N * G.",
+				"",
+				":- factorial(5, F), format('5! = ~w~n', [F]).",
+				"",
+			].join("\n"),
+		],
+		[
+			"python-greet",
+			"greet.py",
+			"python",
+			"Reads a name with input() and greets it.",
+			'name = input("What is your name? ")\nprint("Hello, " + name + "!")\n',
+		],
+		[
+			"lua-greet",
+			"greet.lua",
+			"lua",
+			"Reads a name with io.read and greets it.",
+			'io.write("What is your name? ")\nlocal name = io.read("l")\nprint("Hello, " .. name .. "!")\n',
+		],
+		[
+			"scheme-greet",
+			"greet.scm",
+			"scheme",
+			"Reads a name with read-line; an error reports its top-level form.",
+			[
+				"(define (greet name)",
+				'  (string-append "Hello, " name "!"))',
+				"",
+				'(display "What is your name? ")',
+				"(display (greet (read-line)))",
+				"(newline)",
+				"",
+			].join("\n"),
+		],
+		[
+			"ts-greet",
+			"greet.ts",
+			"typescript",
+			"Types are removed, not checked; prompt() reads a name.",
+			[
+				"interface Greeting {",
+				"  name: string;",
+				"}",
+				"",
+				'const who: Greeting = { name: prompt("What is your name?") ?? "" };',
+				"console.log('Hello, ' + who.name + '!');",
+				"",
+			].join("\n"),
+		],
+		[
+			"elm-lists",
+			"Lists.elm",
+			"elm",
+			"Run compiles it and runs `tests` (one fails on purpose), then opens the REPL.",
+			[
+				"module Main exposing (..)",
+				"",
+				"import Expect",
+				"import Test exposing (Test, describe, test)",
+				"",
+				"",
+				"sumList : List Int -> Int",
+				"sumList =",
+				"    List.foldl (+) 0",
+				"",
+				"",
+				"lastOf : List a -> Maybe a",
+				"lastOf xs =",
+				"    List.head xs",
+				"",
+				"",
+				"tests : Test",
+				"tests =",
+				'    describe "lists"',
+				'        [ test "sumList adds" (\\_ -> Expect.equal 6 (sumList [ 1, 2, 3 ]))',
+				'        , test "lastOf takes the last" (\\_ -> Expect.equal (Just 3) (lastOf [ 1, 2, 3 ]))',
+				"        ]",
+				"",
+			].join("\n"),
+		],
+		[
+			"elm-repl",
+			"Shapes.elm",
+			"elm",
+			"No tests: Run opens the REPL with these definitions.",
+			[
+				"module Main exposing (..)",
+				"",
+				"",
+				"type Shape",
+				"    = Circle Float",
+				"    | Rect Float Float",
+				"",
+				"",
+				"area : Shape -> Float",
+				"area shape =",
+				"    case shape of",
+				"        Circle r ->",
+				"            pi * r * r",
+				"",
+				"        Rect w h ->",
+				"            w * h",
+				"",
+			].join("\n"),
+		],
+	] as const) {
+		await createResource(
+			cs101.id,
+			slug,
+			title,
+			{ type: "CODE", language, content },
+			`demo-${slug}-v1`,
+			description,
+		);
+	}
+	await createResource(
+		cs101.id,
+		"elm-notes",
+		"Elm notes",
 		{
-			course: cs101.id,
-			slug: "factorial",
-			title: "factorial.py",
-			data: {
-				type: "CODE",
-				language: "python",
-				content:
-					"def factorial(n):\n    return 1 if n <= 1 else n * factorial(n - 1)\n\n\nprint(factorial(5))\n",
-			},
-			rev: "demo-factorial-v1",
+			type: "MD",
+			content: [
+				"Run the block, then try `List.map square [1, 2, 3]` in the REPL:",
+				"",
+				"```elm run",
+				"module Main exposing (..)",
+				"",
+				"",
+				"square : Int -> Int",
+				"square n =",
+				"    n * n",
+				"```",
+				"",
+				"<!-- This comment is an authoring note and is not rendered. -->",
+				"",
+				"Press <kbd>Ctrl</kbd> + <kbd>Enter</kbd> to run. Squaring costs O(n<sup>2</sup>) digit steps.",
+				"",
+				"<details>",
+				"<summary>Why `square`?</summary>",
+				"",
+				"A small pure function is the easiest thing to try in the REPL.",
+				"",
+				"</details>",
+			].join("\n"),
 		},
-		FULL_ACCESS,
-	);
-	await db.resource.create(
-		{
-			course: cs101.id,
-			slug: "prolog-factorial",
-			title: "factorial.pl",
-			description: "Consulted on Run; then query it at the Prolog prompt.",
-			data: {
-				type: "CODE",
-				language: "prolog",
-				content: [
-					"factorial(0, 1).",
-					"factorial(N, F) :-",
-					"    N > 0,",
-					"    M is N - 1,",
-					"    factorial(M, G),",
-					"    F is N * G.",
-					"",
-					":- factorial(5, F), format('5! = ~w~n', [F]).",
-					"",
-				].join("\n"),
-			},
-			rev: "demo-prolog-factorial-v1",
-		},
-		FULL_ACCESS,
-	);
-	await db.resource.create(
-		{
-			course: cs101.id,
-			slug: "python-greet",
-			title: "greet.py",
-			description: "Reads a name with input() and greets it.",
-			data: {
-				type: "CODE",
-				language: "python",
-				content:
-					'name = input("What is your name? ")\nprint("Hello, " + name + "!")\n',
-			},
-			rev: "demo-python-greet-v1",
-		},
-		FULL_ACCESS,
-	);
-
-	await db.resource.create(
-		{
-			course: cs101.id,
-			slug: "lua-greet",
-			title: "greet.lua",
-			description: "Reads a name with io.read and greets it.",
-			data: {
-				type: "CODE",
-				language: "lua",
-				content:
-					'io.write("What is your name? ")\nlocal name = io.read("l")\nprint("Hello, " .. name .. "!")\n',
-			},
-			rev: "demo-lua-greet-v1",
-		},
-		FULL_ACCESS,
-	);
-	await db.resource.create(
-		{
-			course: cs101.id,
-			slug: "scheme-greet",
-			title: "greet.scm",
-			description:
-				"Reads a name with read-line; an error reports its top-level form.",
-			data: {
-				type: "CODE",
-				language: "scheme",
-				content: [
-					"(define (greet name)",
-					'  (string-append "Hello, " name "!"))',
-					"",
-					'(display "What is your name? ")',
-					"(display (greet (read-line)))",
-					"(newline)",
-					"",
-				].join("\n"),
-			},
-			rev: "demo-scheme-greet-v1",
-		},
-		FULL_ACCESS,
-	);
-	await db.resource.create(
-		{
-			course: cs101.id,
-			slug: "ts-greet",
-			title: "greet.ts",
-			description: "Types are removed, not checked; prompt() reads a name.",
-			data: {
-				type: "CODE",
-				language: "typescript",
-				content: [
-					"interface Greeting {",
-					"  name: string;",
-					"}",
-					"",
-					'const who: Greeting = { name: prompt("What is your name?") ?? "" };',
-					"console.log('Hello, ' + who.name + '!');",
-					"",
-				].join("\n"),
-			},
-			rev: "demo-ts-greet-v1",
-		},
-		FULL_ACCESS,
-	);
-	await db.resource.create(
-		{
-			course: cs101.id,
-			slug: "elm-lists",
-			title: "Lists.elm",
-			description:
-				"Run compiles it and runs `tests` (one fails on purpose), then opens the REPL.",
-			data: {
-				type: "CODE",
-				language: "elm",
-				content: [
-					"module Main exposing (..)",
-					"",
-					"import Expect",
-					"import Test exposing (Test, describe, test)",
-					"",
-					"",
-					"sumList : List Int -> Int",
-					"sumList =",
-					"    List.foldl (+) 0",
-					"",
-					"",
-					"lastOf : List a -> Maybe a",
-					"lastOf xs =",
-					"    List.head xs",
-					"",
-					"",
-					"tests : Test",
-					"tests =",
-					'    describe "lists"',
-					'        [ test "sumList adds" (\\_ -> Expect.equal 6 (sumList [ 1, 2, 3 ]))',
-					'        , test "lastOf takes the last" (\\_ -> Expect.equal (Just 3) (lastOf [ 1, 2, 3 ]))',
-					"        ]",
-					"",
-				].join("\n"),
-			},
-			rev: "demo-elm-lists-v1",
-		},
-		FULL_ACCESS,
-	);
-	await db.resource.create(
-		{
-			course: cs101.id,
-			slug: "elm-repl",
-			title: "Shapes.elm",
-			description: "No tests: Run opens the REPL with these definitions.",
-			data: {
-				type: "CODE",
-				language: "elm",
-				content: [
-					"module Main exposing (..)",
-					"",
-					"",
-					"type Shape",
-					"    = Circle Float",
-					"    | Rect Float Float",
-					"",
-					"",
-					"area : Shape -> Float",
-					"area shape =",
-					"    case shape of",
-					"        Circle r ->",
-					"            pi * r * r",
-					"",
-					"        Rect w h ->",
-					"            w * h",
-					"",
-				].join("\n"),
-			},
-			rev: "demo-elm-repl-v1",
-		},
-		FULL_ACCESS,
-	);
-	await db.resource.create(
-		{
-			course: cs101.id,
-			slug: "elm-notes",
-			title: "Elm notes",
-			description: "A runnable Elm block in a note.",
-			data: {
-				type: "MD",
-				content: [
-					"Run the block, then try `List.map square [1, 2, 3]` in the REPL:",
-					"",
-					"```elm run",
-					"module Main exposing (..)",
-					"",
-					"",
-					"square : Int -> Int",
-					"square n =",
-					"    n * n",
-					"```",
-					"",
-					"<!-- This comment is an authoring note and is not rendered. -->",
-					"",
-					"Press <kbd>Ctrl</kbd> + <kbd>Enter</kbd> to run. Squaring costs O(n<sup>2</sup>) digit steps.",
-					"",
-					"<details>",
-					"<summary>Why `square`?</summary>",
-					"",
-					"A small pure function is the easiest thing to try in the REPL.",
-					"",
-					"</details>",
-				].join("\n"),
-			},
-			rev: "demo-elm-notes-v1",
-		},
-		FULL_ACCESS,
+		"demo-elm-notes-v1",
+		"A runnable Elm block in a note.",
 	);
 
 	// Runnable JavaScript, one resource per state of the code runner widget.
@@ -621,101 +517,85 @@ async function createDemoCoursesIfMissing(): Promise<void> {
 		},
 	];
 	for (const { slug, title, description, content } of runnableCode) {
-		await db.resource.create(
-			{
-				course: cs101.id,
-				slug,
-				title,
-				description,
-				data: { type: "CODE", language: "javascript", content },
-				rev: `demo-${slug}-v1`,
-			},
-			FULL_ACCESS,
+		await createResource(
+			cs101.id,
+			slug,
+			title,
+			{ type: "CODE", language: "javascript", content },
+			`demo-${slug}-v1`,
+			description,
 		);
 	}
-	await db.resource.create(
+	await createResource(
+		cs101.id,
+		"js-notes",
+		"JavaScript notes",
 		{
-			course: cs101.id,
-			slug: "js-notes",
-			title: "JavaScript notes",
-			description: "Runnable blocks, a static one and one without a driver.",
-			data: {
-				type: "MD",
-				content: [
-					"Run these two blocks, they share one runner:",
-					"",
-					"```js run",
-					"let total = 0;",
-					"for (let i = 1; i <= 10; i++) total += i;",
-					"console.log(total);",
-					"```",
-					"",
-					"```js run",
-					'console.log("squares:", [1, 2, 3].map((n) => n * n));',
-					"```",
-					"",
-					"This one is only code:",
-					"",
-					"```js",
-					"console.log('not runnable');",
-					"```",
-					"",
-					"No driver for this language yet:",
-					"",
-					"```haskell run",
-					'main = putStrLn "hello"',
-					"```",
-				].join("\n"),
-			},
-			rev: "demo-js-notes-v1",
+			type: "MD",
+			content: [
+				"Run these two blocks, they share one runner:",
+				"",
+				"```js run",
+				"let total = 0;",
+				"for (let i = 1; i <= 10; i++) total += i;",
+				"console.log(total);",
+				"```",
+				"",
+				"```js run",
+				'console.log("squares:", [1, 2, 3].map((n) => n * n));',
+				"```",
+				"",
+				"This one is only code:",
+				"",
+				"```js",
+				"console.log('not runnable');",
+				"```",
+				"",
+				"No driver for this language yet:",
+				"",
+				"```haskell run",
+				'main = putStrLn "hello"',
+				"```",
+			].join("\n"),
 		},
-		FULL_ACCESS,
+		"demo-js-notes-v1",
+		"Runnable blocks, a static one and one without a driver.",
 	);
 
 	// cs201 gets one resource of its own, so /admin/courses does not look like
 	// resources only ever land on the first course seeded.
-	await db.resource.create(
+	await createResource(
+		cs201.id,
+		"when-to-use-what",
+		"Which structure, when",
 		{
-			course: cs201.id,
-			slug: "when-to-use-what",
-			title: "Which structure, when",
-			description:
-				"A rule of thumb for picking a structure under time pressure.",
-			data: {
-				type: "MD",
-				content:
-					"Need order-preserving iteration? Array or linked list.\n\nNeed fast lookup by key? Hash table.\n\nNeed sorted order *and* fast insert? Balanced tree.\n\nWhen in doubt, start with an array. You can always change it once a profiler tells you to.",
-			},
-			rev: "demo-when-to-use-v1",
+			type: "MD",
+			content:
+				"Need order-preserving iteration? Array or linked list.\n\nNeed fast lookup by key? Hash table.\n\nNeed sorted order *and* fast insert? Balanced tree.\n\nWhen in doubt, start with an array. You can always change it once a profiler tells you to.",
 		},
-		FULL_ACCESS,
+		"demo-when-to-use-v1",
+		"A rule of thumb for picking a structure under time pressure.",
 	);
 	// A weekly pattern plus a few weeks of the term calendar for each course, so
 	// /calendar, /<course>/schedule, and the course home page all have real
 	// data to render. cs101 gets a holiday and a cancelled lab so the muted/
 	// struck-through rendering has something to show, and descriptions from
 	// none to a full lesson plan, so the schedule shows how they sit together.
-	const cs101Mon = await db.timeSlot.create(
-		{
-			course: cs101.id,
-			slug: "mon",
-			title: "Lecture",
-			day: "MONDAY",
-			start: { hour: 14, minute: 0 },
-			duration: { hours: 2 },
-		},
-		FULL_ACCESS,
+	const cs101Mon = await createSlot(
+		cs101.id,
+		"mon",
+		"Lecture",
+		"MONDAY",
+		{ hour: 14, minute: 0 },
+		{ hours: 2 },
 	);
-	const cs101Wed = await db.timeSlot.create(
-		{
-			course: cs101.id,
-			slug: "wed",
-			title: "Lab",
-			day: "WEDNESDAY",
-			start: { hour: 14, minute: 0 },
-			duration: { hours: 2 },
-		},
-		FULL_ACCESS,
+	const cs101Wed = await createSlot(
+		cs101.id,
+		"wed",
+		"Lab",
+		"WEDNESDAY",
+		{ hour: 14, minute: 0 },
+		{ hours: 2 },
 	);
 	for (const event of [
 		{
@@ -879,16 +759,13 @@ async function createDemoCoursesIfMissing(): Promise<void> {
 
 	// A meeting on the day the seed runs, late enough to still be ahead, so
 	// the schedule offers to open its roll call.
-	const cs101Today = await db.timeSlot.create(
-		{
-			course: cs101.id,
-			slug: "office-hours",
-			title: "Office hours",
-			day: weekdayOf(new Date()),
-			start: { hour: 22, minute: 0 },
-			duration: { hours: 1, minutes: 59 },
-		},
-		FULL_ACCESS,
+	const cs101Today = await createSlot(
+		cs101.id,
+		"office-hours",
+		"Office hours",
+		weekdayOf(new Date()),
+		{ hour: 22, minute: 0 },
+		{ hours: 1, minutes: 59 },
 	);
 	const todayWeek = [weeksSoFar - 1, weeksSoFar, weeksSoFar + 1].find(
 		(week) =>
@@ -1020,16 +897,13 @@ async function createDemoCoursesIfMissing(): Promise<void> {
 		);
 	}
 
-	const cs201Mon = await db.timeSlot.create(
-		{
-			course: cs201.id,
-			slug: "mon",
-			title: "Lecture",
-			day: "MONDAY",
-			start: { hour: 10, minute: 0 },
-			duration: { hours: 1, minutes: 30 },
-		},
-		FULL_ACCESS,
+	const cs201Mon = await createSlot(
+		cs201.id,
+		"mon",
+		"Lecture",
+		"MONDAY",
+		{ hour: 10, minute: 0 },
+		{ hours: 1, minutes: 30 },
 	);
 	for (const event of [
 		{
@@ -1068,148 +942,99 @@ async function createDemoCoursesIfMissing(): Promise<void> {
 
 	// A handful of questions per course, covering several MDQ types and both
 	// draft and published status, so /<course>/questions has real data to list.
-	await db.question.create(
-		{
-			course: cs101.id,
-			slug: "recursion-basics",
-			status: "PUBLISHED",
-			version: "v1",
-			question: {
-				type: "multiple-choice",
-				title: "Recursion basics",
-				stem: "Which of the following is required for a recursive function to terminate?",
-				tags: ["recursion", "functions"],
-				choices: [
-					{ id: "base-case", text: "A base case", score: 1 },
-					{ id: "tail-call", text: "A tail call" },
-				],
+	await createQuestion(cs101.id, "recursion-basics", {
+		type: "multiple-choice",
+		title: "Recursion basics",
+		stem: "Which of the following is required for a recursive function to terminate?",
+		tags: ["recursion", "functions"],
+		choices: [
+			{ id: "base-case", text: "A base case", score: 1 },
+			{ id: "tail-call", text: "A tail call" },
+		],
+	});
+	await createQuestion(cs101.id, "loop-invariants", {
+		type: "true-false",
+		title: "Loop invariants",
+		stem: "Judge each statement about loop invariants as true or false.",
+		tags: ["loops"],
+		choices: [
+			{
+				id: "hold-before",
+				text: "An invariant must hold before the first iteration.",
+				correct: true,
 			},
-		},
-		FULL_ACCESS,
-	);
-	await db.question.create(
-		{
-			course: cs101.id,
-			slug: "loop-invariants",
-			status: "PUBLISHED",
-			version: "v1",
-			question: {
-				type: "true-false",
-				title: "Loop invariants",
-				stem: "Judge each statement about loop invariants as true or false.",
-				tags: ["loops"],
-				choices: [
-					{
-						id: "hold-before",
-						text: "An invariant must hold before the first iteration.",
-						correct: true,
-					},
-					{
-						id: "hold-only-after",
-						text: "An invariant must hold only after the loop terminates.",
-						correct: false,
-					},
-				],
+			{
+				id: "hold-only-after",
+				text: "An invariant must hold only after the loop terminates.",
+				correct: false,
 			},
-		},
-		FULL_ACCESS,
-	);
-	await db.question.create(
+		],
+	});
+	await createQuestion(cs101.id, "factorial-of-five", {
+		type: "numeric",
+		title: "Factorial of five",
+		stem: "What is 5! (five factorial)?",
+		tags: ["recursion"],
+		answer: 120,
+		domain: "integer",
+	});
+	await createQuestion(
+		cs101.id,
+		"big-o-warmup",
 		{
-			course: cs101.id,
-			slug: "factorial-of-five",
-			status: "PUBLISHED",
-			version: "v1",
-			question: {
-				type: "numeric",
-				title: "Factorial of five",
-				stem: "What is 5! (five factorial)?",
-				tags: ["recursion"],
-				answer: 120,
-				domain: "integer",
-			},
+			type: "multiple-selection",
+			title: "Big-O warm-up",
+			stem: "Select every statement below that correctly describes O(n log n) growth.",
+			tags: ["complexity"],
+			choices: [
+				{
+					id: "merge-sort",
+					text: "Merge sort's comparisons grow this way.",
+					correct: true,
+				},
+				{
+					id: "linear-search",
+					text: "Linear search's comparisons grow this way.",
+					correct: false,
+				},
+			],
 		},
-		FULL_ACCESS,
-	);
-	await db.question.create(
-		{
-			course: cs101.id,
-			slug: "big-o-warmup",
-			status: "DRAFT",
-			version: "v1",
-			question: {
-				type: "multiple-selection",
-				title: "Big-O warm-up",
-				stem: "Select every statement below that correctly describes O(n log n) growth.",
-				tags: ["complexity"],
-				choices: [
-					{
-						id: "merge-sort",
-						text: "Merge sort's comparisons grow this way.",
-						correct: true,
-					},
-					{
-						id: "linear-search",
-						text: "Linear search's comparisons grow this way.",
-						correct: false,
-					},
-				],
-			},
-		},
-		FULL_ACCESS,
+		"DRAFT",
 	);
 
-	await db.question.create(
-		{
-			course: cs201.id,
-			slug: "bst-lookup",
-			status: "PUBLISHED",
-			version: "v1",
-			question: {
-				type: "multiple-choice",
-				title: "BST lookup complexity",
-				stem: "In a balanced binary search tree, what is the worst-case time complexity of a lookup?",
-				tags: ["trees", "complexity"],
-				choices: [
-					{ id: "log-n", text: "O(log n)", score: 1 },
-					{ id: "n", text: "O(n)" },
-				],
-			},
-		},
-		FULL_ACCESS,
-	);
+	await createQuestion(cs201.id, "bst-lookup", {
+		type: "multiple-choice",
+		title: "BST lookup complexity",
+		stem: "In a balanced binary search tree, what is the worst-case time complexity of a lookup?",
+		tags: ["trees", "complexity"],
+		choices: [
+			{ id: "log-n", text: "O(log n)", score: 1 },
+			{ id: "n", text: "O(n)" },
+		],
+	});
 	// A blank that matches no pattern goes to the instructor, who grades it on its own.
-	await db.question.create(
-		{
-			course: cs101.id,
-			slug: "base-case-blanks",
-			status: "PUBLISHED",
-			version: "v1",
-			question: {
-				type: "fill-in",
-				title: "Base case, in words",
-				stem: "A recursive function stops at its [^stop] case, and each call works on a [^smaller] input.",
-				tags: ["recursion"],
-				unmatched: "manual",
-				blanks: [
-					{
-						id: "stop",
-						type: "multiple-choice",
-						choices: [
-							{ id: "base", text: "base", score: 1, feedback: "Right." },
-							{ id: "recursive", text: "recursive" },
-						],
-					},
-					{
-						id: "smaller",
-						type: "short-answer",
-						accept: ["smaller", "simpler"],
-					},
+	await createQuestion(cs101.id, "base-case-blanks", {
+		type: "fill-in",
+		title: "Base case, in words",
+		stem: "A recursive function stops at its [^stop] case, and each call works on a [^smaller] input.",
+		tags: ["recursion"],
+		unmatched: "manual",
+		blanks: [
+			{
+				id: "stop",
+				type: "multiple-choice",
+				choices: [
+					{ id: "base", text: "base", score: 1, feedback: "Right." },
+					{ id: "recursive", text: "recursive" },
 				],
 			},
-		},
-		FULL_ACCESS,
-	);
+			{
+				id: "smaller",
+				type: "short-answer",
+				accept: ["smaller", "simpler"],
+			},
+		],
+	});
 
 	// Exams in several states, so a course page can show a draft being written,
 	// one waiting to start, one running, and one already over.
@@ -2514,74 +2339,47 @@ class SeededTyping {
 async function seedOpenQuiz(course: Course["id"], knuth: User): Promise<void> {
 	const values = Buffer.from("n,fact\n0,1\n1,1\n2,2\n3,6\n", "utf8");
 	const valuesHash = hashBytes(values);
-	await db.question.create(
-		{
-			course,
-			slug: "stack-overflow-name",
-			status: "PUBLISHED",
-			version: "v1",
-			question: {
-				type: "short-answer",
-				title: "Runaway recursion",
-				stem: "What error does a recursion without a base case usually end in?",
-				tags: ["recursion"],
-				accept: [{ pattern: "stack overflow" }],
-			},
-		},
-		FULL_ACCESS,
-	);
-	await db.question.create(
-		{
-			course,
-			slug: "recursive-sum",
-			status: "PUBLISHED",
-			version: "v1",
-			question: {
-				type: "fill-in",
-				title: "Recursive sum",
-				stem: "A recursive `sum(xs)` returns [^base] for an empty list, and otherwise adds the first element to a call on the [^rest] of the list.",
-				tags: ["recursion"],
-				blanks: [
-					{ id: "base", type: "numeric", answer: 0 },
-					{
-						id: "rest",
-						type: "multiple-choice",
-						choices: [
-							{ id: "tail", text: "rest", score: 1 },
-							{ id: "head", text: "first element" },
-						],
-					},
+	await createQuestion(course, "stack-overflow-name", {
+		type: "short-answer",
+		title: "Runaway recursion",
+		stem: "What error does a recursion without a base case usually end in?",
+		tags: ["recursion"],
+		accept: [{ pattern: "stack overflow" }],
+	});
+	await createQuestion(course, "recursive-sum", {
+		type: "fill-in",
+		title: "Recursive sum",
+		stem: "A recursive `sum(xs)` returns [^base] for an empty list, and otherwise adds the first element to a call on the [^rest] of the list.",
+		tags: ["recursion"],
+		blanks: [
+			{ id: "base", type: "numeric", answer: 0 },
+			{
+				id: "rest",
+				type: "multiple-choice",
+				choices: [
+					{ id: "tail", text: "rest", score: 1 },
+					{ id: "head", text: "first element" },
 				],
 			},
-		},
-		FULL_ACCESS,
-	);
-	await db.question.create(
-		{
-			course,
-			slug: "factorial-lines",
-			status: "PUBLISHED",
-			version: "v1",
-			question: {
-				type: "ordering",
-				title: "Recursive factorial",
-				stem: "Sort and indent the lines into a recursive `factorial(n)`. One line is not part of it.",
-				tags: ["recursion"],
-				content: "code",
-				highlight: "python",
-				indentation: "strict",
-				lines: [
-					[0, "def factorial(n):"],
-					[1, "if n == 0:"],
-					[2, "return 1"],
-					[1, "return n * factorial(n - 1)"],
-				],
-				extra: [[1, "return factorial(n)"]],
-				incorrectFeedback: "The base case comes before the recursive call.",
-			},
-		},
-		FULL_ACCESS,
-	);
+		],
+	});
+	await createQuestion(course, "factorial-lines", {
+		type: "ordering",
+		title: "Recursive factorial",
+		stem: "Sort and indent the lines into a recursive `factorial(n)`. One line is not part of it.",
+		tags: ["recursion"],
+		content: "code",
+		highlight: "python",
+		indentation: "strict",
+		lines: [
+			[0, "def factorial(n):"],
+			[1, "if n == 0:"],
+			[2, "return 1"],
+			[1, "return n * factorial(n - 1)"],
+		],
+		extra: [[1, "return factorial(n)"]],
+		incorrectFeedback: "The base case comes before the recursive call.",
+	});
 	await db.exam.create(
 		{
 			course,
@@ -2825,46 +2623,28 @@ async function seedGradingShowcase(
 		"elm-soma",
 	] as const;
 
-	await db.question.create(
-		{
-			course,
-			slug: "explain-recursion",
-			status: "PUBLISHED",
-			version: "v1",
-			question: {
-				type: "essay",
-				title: "Explain recursion",
-				stem: "Explain, in your own words, why a recursive function needs a base case.",
-				tags: ["recursion"],
-				content: "text",
-			},
-		},
-		FULL_ACCESS,
-	);
-	await db.question.create(
-		{
-			course,
-			slug: returns,
-			status: "PUBLISHED",
-			version: "v1",
-			question: {
-				type: "ordering",
-				title: "Returns of factorial(3)",
-				stem: "In what order do the calls of `factorial(3)` return?",
-				tags: ["recursion"],
-				content: "text",
-				// An order nobody keyed waits for the instructor instead of scoring 0.
-				unmatched: "manual",
-				lines: [
-					[0, "factorial(0) returns 1"],
-					[0, "factorial(1) returns 1"],
-					[0, "factorial(2) returns 2"],
-					[0, "factorial(3) returns 6"],
-				],
-			},
-		},
-		FULL_ACCESS,
-	);
+	await createQuestion(course, "explain-recursion", {
+		type: "essay",
+		title: "Explain recursion",
+		stem: "Explain, in your own words, why a recursive function needs a base case.",
+		tags: ["recursion"],
+		content: "text",
+	});
+	await createQuestion(course, returns, {
+		type: "ordering",
+		title: "Returns of factorial(3)",
+		stem: "In what order do the calls of `factorial(3)` return?",
+		tags: ["recursion"],
+		content: "text",
+		// An order nobody keyed waits for the instructor instead of scoring 0.
+		unmatched: "manual",
+		lines: [
+			[0, "factorial(0) returns 1"],
+			[0, "factorial(1) returns 1"],
+			[0, "factorial(2) returns 2"],
+			[0, "factorial(3) returns 6"],
+		],
+	});
 	for (const question of [
 		{
 			slug: js,
@@ -2882,43 +2662,25 @@ async function seedGradingShowcase(
 			language: "python",
 		},
 	]) {
-		await db.question.create(
-			{
-				course,
-				slug: question.slug,
-				status: "PUBLISHED",
-				version: "v1",
-				question: {
-					type: "essay",
-					title: question.title,
-					stem: question.stem,
-					tags: [question.language],
-					content: "code",
-					highlight: question.language,
-					...(question.weight ? { weight: question.weight } : {}),
-					...(question.epilogue ? { epilogue: question.epilogue } : {}),
-				} as never,
-			},
-			FULL_ACCESS,
-		);
+		await createQuestion(course, question.slug, {
+			type: "essay",
+			title: question.title,
+			stem: question.stem,
+			tags: [question.language],
+			content: "code",
+			highlight: question.language,
+			...(question.weight ? { weight: question.weight } : {}),
+			...(question.epilogue ? { epilogue: question.epilogue } : {}),
+		} as never);
 	}
-	await db.question.create(
-		{
-			course,
-			slug: prolog,
-			status: "PUBLISHED",
-			version: "v1",
-			question: {
-				type: "essay",
-				title: "Comprimento de uma lista em Prolog",
-				stem: "Defina `comprimento(Lista, N)` de modo que `N` seja o número de elementos de `Lista`. Não use `length/2`.",
-				tags: ["prolog"],
-				content: "code",
-				highlight: "prolog",
-			},
-		},
-		FULL_ACCESS,
-	);
+	await createQuestion(course, prolog, {
+		type: "essay",
+		title: "Comprimento de uma lista em Prolog",
+		stem: "Defina `comprimento(Lista, N)` de modo que `N` seja o número de elementos de `Lista`. Não use `length/2`.",
+		tags: ["prolog"],
+		content: "code",
+		highlight: "prolog",
+	});
 	// The question document has no rubric field, so the initial rubric is
 	// written into the stored version the way a pushed question carries it.
 	const stored = await prisma.questionData.findFirstOrThrow({
@@ -2955,22 +2717,13 @@ async function seedGradingShowcase(
 			},
 		},
 	});
-	await db.question.create(
-		{
-			course,
-			slug: essay,
-			status: "PUBLISHED",
-			version: "v1",
-			question: {
-				type: "essay",
-				title: "O caso base da recursão em Prolog",
-				stem: "Por que um predicado recursivo em Prolog precisa de uma cláusula para o caso base? O que acontece com `comprimento/2` sem ela?",
-				tags: ["prolog", "recursion"],
-				content: "text",
-			},
-		},
-		FULL_ACCESS,
-	);
+	await createQuestion(course, essay, {
+		type: "essay",
+		title: "O caso base da recursão em Prolog",
+		stem: "Por que um predicado recursivo em Prolog precisa de uma cláusula para o caso base? O que acontece com `comprimento/2` sem ela?",
+		tags: ["prolog", "recursion"],
+		content: "text",
+	});
 	await db.exam.create(
 		{
 			course,
@@ -3437,16 +3190,10 @@ function elmReport(verdicts: {
 
 /// Creates `elm-soma`, the Elm question corrected by the external worker.
 async function seedElmQuestion(course: Course["id"]): Promise<void> {
-	await db.question.create(
-		{
-			course,
-			slug: "elm-soma",
-			status: "PUBLISHED",
-			version: "v1",
-			question: { ...elmExampleQuestion(), weight: 3 } as CodeQuestion,
-		},
-		FULL_ACCESS,
-	);
+	await createQuestion(course, "elm-soma", {
+		...elmExampleQuestion(),
+		weight: 3,
+	} as CodeQuestion);
 }
 
 /**
@@ -3692,21 +3439,9 @@ async function seedReleasedExam(
 	);
 	if (!dev) throw new Error("The dev student account is missing.");
 	const students = [...others, dev];
-	const question = (
-		slug: string,
-		body: Record<string, unknown>,
-	): Promise<unknown> =>
-		db.question.create(
-			{
-				course,
-				slug,
-				status: "PUBLISHED",
-				version: "v1",
-				question: { tags: ["algorithms"], ...body } as never,
-			},
-			FULL_ACCESS,
-		);
-	await question("fastest-sort", {
+	const algorithmQuestion = (slug: string, body: Record<string, unknown>) =>
+		createQuestion(course, slug, { tags: ["algorithms"], ...body } as never);
+	await algorithmQuestion("fastest-sort", {
 		type: "multiple-choice",
 		title: "Fastest general sort",
 		weight: 3,
@@ -3718,7 +3453,7 @@ async function seedReleasedExam(
 			{ id: "bogo", text: "Bogosort" },
 		],
 	});
-	await question("n-log-n", {
+	await algorithmQuestion("n-log-n", {
 		type: "multiple-selection",
 		title: "O(n log n) algorithms",
 		weight: 2,
@@ -3730,7 +3465,7 @@ async function seedReleasedExam(
 			{ id: "binary-search", text: "Binary search", correct: false },
 		],
 	});
-	await question("stack-facts", {
+	await algorithmQuestion("stack-facts", {
 		type: "true-false",
 		title: "Stack facts",
 		weight: 1,
@@ -3741,7 +3476,7 @@ async function seedReleasedExam(
 			{ id: "push", text: "Push adds to the top.", correct: true },
 		],
 	});
-	await question("pivot-trap", {
+	await algorithmQuestion("pivot-trap", {
 		type: "multiple-choice",
 		title: "Worst case of quicksort",
 		stem: "What is the worst-case time of quicksort with a fixed pivot?",
@@ -3750,7 +3485,7 @@ async function seedReleasedExam(
 			{ id: "linearithmic", text: "O(n log n)" },
 		],
 	});
-	await question("stack-top", {
+	await algorithmQuestion("stack-top", {
 		type: "multiple-choice",
 		title: "Stack access",
 		stem: "Which end of a stack does `pop` remove from?",
@@ -3994,24 +3729,15 @@ async function seedPracticeAndSimulations(
 	const essay =
 		"A base case is where the recursion stops; without it the calls never return.";
 
-	await db.question.create(
-		{
-			course,
-			slug: "ts-sum-of-squares",
-			status: "PUBLISHED",
-			version: "v1",
-			question: {
-				type: "essay",
-				title: "Sum of squares, typed",
-				stem: "Write a TypeScript function `sumOfSquares(n: number): number` and print `sumOfSquares(10)`.",
-				epilogue: "Print only the number.",
-				tags: ["typescript"],
-				content: "code",
-				highlight: "typescript",
-			},
-		},
-		FULL_ACCESS,
-	);
+	await createQuestion(course, "ts-sum-of-squares", {
+		type: "essay",
+		title: "Sum of squares, typed",
+		stem: "Write a TypeScript function `sumOfSquares(n: number): number` and print `sumOfSquares(10)`.",
+		epilogue: "Print only the number.",
+		tags: ["typescript"],
+		content: "code",
+		highlight: "typescript",
+	});
 	await seedElmPretestQuestions(course);
 	await db.exam.create(
 		{
@@ -4142,6 +3868,49 @@ async function seedPracticeAndSimulations(
 //
 // Utility functions
 //
+/// Creates a resource of `course`.
+function createResource(
+	course: Course["id"],
+	slug: string,
+	title: string,
+	data: Parameters<typeof db.resource.create>[0]["data"],
+	rev: string,
+	description?: string,
+): Promise<unknown> {
+	return db.resource.create(
+		{ course, slug, title, data, rev, ...(description ? { description } : {}) },
+		FULL_ACCESS,
+	);
+}
+
+/// Creates a weekly time slot of `course`.
+function createSlot(
+	course: Course["id"],
+	slug: string,
+	title: string,
+	day: Parameters<typeof db.timeSlot.create>[0]["day"],
+	start: Parameters<typeof db.timeSlot.create>[0]["start"],
+	duration: Parameters<typeof db.timeSlot.create>[0]["duration"],
+) {
+	return db.timeSlot.create(
+		{ course, slug, title, day, start, duration },
+		FULL_ACCESS,
+	);
+}
+
+/// Creates a v1 question of `course` from its body, published unless `status` says otherwise.
+function createQuestion(
+	course: Course["id"],
+	slug: string,
+	body: Parameters<typeof db.question.create>[0]["question"],
+	status: "DRAFT" | "PUBLISHED" = "PUBLISHED",
+): Promise<unknown> {
+	return db.question.create(
+		{ course, slug, status, version: "v1", question: body },
+		FULL_ACCESS,
+	);
+}
+
 async function demoUser(input: {
 	email: string;
 	username: string;
