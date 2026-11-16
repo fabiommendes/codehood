@@ -1,6 +1,8 @@
 ---
 import CourseHeader from "@/components/CourseHeader.astro";
 import type { AnswerPayload } from "@/components/exam/answer-payload";
+import QuestionNumber from "@/components/exam/QuestionNumber.astro";
+import { pointsByPosition } from "@/components/exam/question-points";
 import Answer from "@/components/grading/Answer.astro";
 import RegradeResolve from "@/components/grading/RegradeResolve";
 import { db } from "@/db";
@@ -51,11 +53,17 @@ const graderName = (pass: { grader: string | null }): string =>
 			? instructor.name
 			: pass.grader;
 
+const points = pointsByPosition(exam.questions);
 const cards = requests.map((request) => {
 	const doc = docs.get(request.question);
 	const submission = submissions.get(request.submission);
+	const position = exam.questions.findIndex(
+		(entry) => entry.slug === request.question,
+	);
 	return {
 		request,
+		number: position < 0 ? null : position + 1,
+		points: points[position],
 		title: doc?.title ?? request.question,
 		asked: doc ? publicForm(doc) : null,
 		payload: submission?.payload as AnswerPayload | undefined,
@@ -85,13 +93,13 @@ const badges = {
 
     <div class="mt-6 flex flex-col gap-6">
       {
-        cards.map(({ request, title, asked, payload, answer, student }) => (
+        cards.map(({ request, number, points, title, asked, payload, answer, student }) => (
           <article id={`regrade-${request.publicId}`} aria-label={`${student} · ${title}`} class="card card-border bg-base-100">
             <div class="card-body">
               <div class="flex items-start justify-between gap-3">
                 <div>
                   <h3 class="text-lg font-semibold">{student} <span class="font-mono text-sm font-normal text-muted">{request.author}</span></h3>
-                  <p class="text-sm text-base-content/70">{m.grades_regrade_question({ title })}</p>
+                  <p class="text-sm text-base-content/70">{number !== null && <><QuestionNumber number={number} points={points} />{" · "}</>}{m.grades_regrade_question({ title })}</p>
                 </div>
                 <span class:list={["badge badge-sm shrink-0", badges[request.status][0]]}>{badges[request.status][1]}</span>
               </div>

@@ -17,8 +17,12 @@ import type { PretestSource } from "./pretest-sources";
 
 /// What `ExamAttempt` takes from the server besides the state: the questions as the attempt shows them, the saved answers and, once it may be seen, the review.
 export interface AttemptView {
-	/// The questions in exam order, shuffled by the attempt's seed; none until the author is in the attempt.
-	questions: { slug: string; question: QuestionPublic["question"] }[];
+	/// The questions in exam order, shuffled by the attempt's seed, each with the exam's weight for it; none until the author is in the attempt.
+	questions: {
+		slug: string;
+		weight: number;
+		question: QuestionPublic["question"];
+	}[];
 	/// The latest saved answer per question slug.
 	answers: Record<string, AnswerPayload>;
 	/// When the server saved each answer, by question slug (ISO).
@@ -113,6 +117,9 @@ export async function loadAttemptView(
 		};
 	}
 
+	const weights = new Map(
+		exam.questions.map((entry) => [entry.slug, entry.weight]),
+	);
 	// Questions stay on the server until the author is in the attempt.
 	const showQuestions =
 		state.kind === "in-progress" ||
@@ -121,6 +128,7 @@ export async function loadAttemptView(
 	const questions = showQuestions
 		? input.publicQuestions.map(({ slug, question }) => ({
 				slug,
+				weight: weights.get(slug) ?? 1,
 				question: shufflePool(
 					question,
 					`${attempt?.publicId ?? author}:${slug}`,

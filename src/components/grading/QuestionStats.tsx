@@ -1,5 +1,6 @@
 import type { JSX } from "solid-js";
 import { createMemo, createSignal, Show } from "solid-js";
+import QuestionNumber from "@/components/exam/QuestionNumber";
 import Table, { type ColumnConfig } from "@/components/ui/Table";
 import {
 	compareNullsLast,
@@ -21,6 +22,8 @@ interface Props {
 	stats: Stats[];
 	/// The display title of each question, by slug; a missing one falls back to the slug.
 	titles: Map<string, string>;
+	/// The points out of 100 of each question (`pointsByPosition`), in exam order.
+	points: string[];
 }
 
 /// Right-aligned tabular figures, for both the header and the cells of a numeric column.
@@ -138,7 +141,10 @@ export default function QuestionStats(props: Props): JSX.Element {
 			sortKey: "position",
 			render: (entry) => (
 				<>
-					<span class="text-muted tabular-nums">Q{entry.position}.</span>{" "}
+					<QuestionNumber
+						number={entry.position}
+						points={props.points[entry.position - 1]}
+					/>{" "}
 					<a
 						href={`${props.href}/grading/${entry.question}?view=list`}
 						class="link"

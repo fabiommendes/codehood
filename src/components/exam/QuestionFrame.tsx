@@ -1,7 +1,7 @@
 import type { JSX } from "solid-js";
 import { Show } from "solid-js";
-import type { QuestionPublic } from "@/db";
-import { locale, m } from "@/i18n";
+import { m } from "@/i18n";
+import QuestionNumber from "./QuestionNumber";
 
 /// Tailwind scroll margin of a question, so a jump to it clears the attempt bar.
 export const QUESTION_SCROLL_MARGIN = "scroll-mt-48";
@@ -13,8 +13,8 @@ export interface QuestionFrameProps {
 	title?: string;
 	/// Text color class of the question number.
 	tone: string;
-	/// The question's share of the exam as points (`formatPoints`), or null when the exam has no weights.
-	points: string | null;
+	/// The question's share of the exam as points out of 100 (`formatPoints`).
+	points: string;
 	/// Shown under the points in the side column, and at the end of the card on narrow screens.
 	side?: () => JSX.Element;
 	/// Shown at the end of the title tab, such as the save state.
@@ -100,29 +100,4 @@ export function QuestionFrame(props: QuestionFrameProps): JSX.Element {
 			</div>
 		</section>
 	);
-}
-
-/// "Q3", the label students and instructors use to refer to a question.
-export function QuestionNumber(props: {
-	number: number;
-	tone: string;
-	class?: string;
-}): JSX.Element {
-	return (
-		<span
-			class={`font-display font-semibold leading-none tracking-tight ${props.tone} ${props.class ?? ""}`}
-		>
-			{m.exams_attempt_question_short({ number: props.number })}
-		</span>
-	);
-}
-
-/// The weight a question declares, 1 when it declares none.
-export function weightOf(question: QuestionPublic["question"]): number {
-	return question.weight ?? 1;
-}
-
-/// A part of the total as points out of 100, up to one decimal: `15`, `7.5`.
-export function formatPoints(share: number): string {
-	return (share * 100).toLocaleString(locale, { maximumFractionDigits: 1 });
 }

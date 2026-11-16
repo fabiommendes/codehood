@@ -329,6 +329,19 @@ and begins another simulation. The simulation never appears in the exam's
 results, its statistics, the grading queue or the course grades.
 
 
+### Grade an exam whose questions have different weights
+
+    status: implemented
+    url: /[discipline]/[course]/exams/[exam]
+
+Instructor gives some questions of an exam more weight than others. Wherever the
+exam lists its questions, in the grading queue, on each question's grading page,
+in the question statistics, on a student's attempt and in the regrade requests,
+each one is labelled `Q1`, `Q2`... with the points it carries out of 100, so
+"what was your answer to Q2?" means the same thing to everyone. The total in the
+results table is the weighted one, not the plain average.
+
+
 ### Grade submissions by hand
 
     status: implemented

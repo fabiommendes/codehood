@@ -1,0 +1,23 @@
+---
+/**
+ * "Q3", the label students and instructors use to refer to a question, with its points out of 100 when given.
+ */
+import { m } from "@/i18n";
+
+interface Props {
+	/// The question's position in the exam, from 1.
+	number: number;
+	/// The question's points out of 100 (`pointsByPosition`).
+	points?: string;
+}
+
+const { number, points } = Astro.props;
+---
+
+<span class="font-display font-semibold tabular-nums" data-testid="question-number">{m.exams_attempt_question_short({ number })}</span>
+{points !== undefined && (
+  <>
+    {" "}
+    <span class="whitespace-nowrap text-xs font-normal tabular-nums text-muted" data-testid="question-points">{m.exams_attempt_points({ points })}</span>
+  </>
+)}

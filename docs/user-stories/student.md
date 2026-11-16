@@ -229,6 +229,18 @@ they press "Submit exam", and a confirmation warns that the answers cannot be
 changed afterwards. Once the exam closes it stops accepting submissions.
 
 
+### See what each question is worth
+
+    status: implemented
+    url: /[discipline]/[course]/exams/[exam]
+
+Student answering an exam sees, beside each question, its number and how many
+points out of 100 it carries, so they can spend their time where it counts. After
+the grades are released the same labels sit on each reviewed question, and the
+total is the weighted one: missing a heavy question costs more than missing a
+light one.
+
+
 ### Run my code answer before submitting
 
     status: implemented

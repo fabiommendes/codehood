@@ -50,7 +50,8 @@ import {
 	measureClockOffset,
 } from "./code-draft";
 import { type CodeSends, hasPendingSend, sendsOf } from "./code-sends";
-import { formatPoints, QuestionFrame, weightOf } from "./QuestionFrame";
+import { QuestionFrame } from "./QuestionFrame";
+import { formatPoints } from "./question-points";
 import RegradeControls, { type QuestionRegrade } from "./RegradeControls";
 import { retryDelay } from "./save-retry";
 import { questionList, unansweredWarning } from "./unanswered-warning";
@@ -66,8 +67,12 @@ export interface ExamAttemptProps {
 	state: AttemptState;
 	/// Server time when the page rendered, so the countdown ignores client clock skew.
 	now: Date;
-	/// The exam's questions, public half only, in exam order.
-	questions: { slug: string; question: QuestionPublic["question"] }[];
+	/// The exam's questions, public half only, in exam order, with the weight the exam gives each.
+	questions: {
+		slug: string;
+		weight: number;
+		question: QuestionPublic["question"];
+	}[];
 	/// The student's latest answer per question slug.
 	answers: Record<string, AnswerPayload>;
 	/// The graded outcome per question, present once the grades are released.
@@ -225,14 +230,11 @@ export default function ExamAttempt(props: ExamAttemptProps): JSX.Element {
 		(props.codeRun ?? false) &&
 		props.questions.some((entry) => codeLanguageOf(entry.question) !== null);
 
-	// Weights show only when some question weighs other than the default 1.
-	const weighted = () =>
-		props.questions.some((entry) => weightOf(entry.question) !== 1);
 	const totalWeight = () =>
-		props.questions.reduce((sum, entry) => sum + weightOf(entry.question), 0);
+		props.questions.reduce((sum, entry) => sum + entry.weight, 0);
 	/// The part of the exam total a question carries, in [0, 1].
-	const shareOf = (question: QuestionPublic["question"]) =>
-		totalWeight() > 0 ? weightOf(question) / totalWeight() : 0;
+	const shareOf = (weight: number) =>
+		totalWeight() > 0 ? weight / totalWeight() : 0;
 
 	/// The mean weight of the questions still unanswered, which the water levels compare against.
 	const remainingMean = () => {
@@ -240,7 +242,7 @@ export default function ExamAttempt(props: ExamAttemptProps): JSX.Element {
 			.filter(
 				(entry) => !isAnswered(entry.question.type, answers()[entry.slug]),
 			)
-			.map((entry) => weightOf(entry.question));
+			.map((entry) => entry.weight);
 		return weights.length === 0
 			? 0
 			: weights.reduce((sum, weight) => sum + weight, 0) / weights.length;
@@ -1112,7 +1114,7 @@ export default function ExamAttempt(props: ExamAttemptProps): JSX.Element {
 								failed: saveErrors()[entry.slug] !== undefined,
 								level: isAnswered(entry.question.type, answers()[entry.slug])
 									? 1
-									: waterLevel(weightOf(entry.question), remainingMean()),
+									: waterLevel(entry.weight, remainingMean()),
 							}))}
 							current={current()}
 							runsCode={runsCode()}
@@ -1192,9 +1194,7 @@ export default function ExamAttempt(props: ExamAttemptProps): JSX.Element {
 									number={index() + 1}
 									title={entry.question.title}
 									tone={tone()}
-									points={
-										weighted() ? formatPoints(shareOf(entry.question)) : null
-									}
+									points={formatPoints(shareOf(entry.weight))}
 									side={clearButton}
 									status={
 										<Show when={kind() === "in-progress"}>

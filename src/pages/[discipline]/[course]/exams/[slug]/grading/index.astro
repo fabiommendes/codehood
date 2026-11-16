@@ -1,5 +1,7 @@
 ---
 import CourseHeader from "@/components/CourseHeader.astro";
+import QuestionNumber from "@/components/exam/QuestionNumber.astro";
+import { pointsByPosition } from "@/components/exam/question-points";
 import { db } from "@/db";
 import { m } from "@/i18n";
 import AppLayout from "@/layouts/AppLayout.astro";
@@ -45,8 +47,9 @@ const jobCounts = new Map(
 	),
 );
 
+const points = pointsByPosition(exam.questions);
 const queue = gradingQueue(questions, answers);
-const rows = queue.map((entry) => {
+const rows = queue.map((entry, index) => {
 	const doc = bySlug.get(entry.question);
 	const jobs = jobCounts.get(entry.question);
 	const jobLines = jobs
@@ -70,6 +73,8 @@ const rows = queue.map((entry) => {
 			m.grades_queue_not_graded({ count: entry.notGraded }),
 	].filter(Boolean);
 	return {
+		number: index + 1,
+		points: points[index] ?? "0",
 		slug: entry.question,
 		title: doc?.title ?? entry.question,
 		type: doc ? questionTypeLabels[doc.type] : null,
@@ -105,6 +110,7 @@ const nothingLeft =
           <li class="card card-border bg-base-100 transition-colors hover:border-primary">
             <div class="card-body flex-row items-center gap-4 py-4">
               <div class="min-w-0 flex-1">
+                <p class="text-sm"><QuestionNumber number={row.number} points={row.points} /></p>
                 <a href={gradingHref(`${href}/exams/${exam.slug}/grading/${row.slug}`, { names })} class="font-medium hover:text-primary">
                   {row.title}
                 </a>

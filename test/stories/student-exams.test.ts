@@ -12,6 +12,7 @@ import { courseHref } from "@/urls";
 import { expect, type Page, test } from "../fixtures";
 import { logInAs, resetDatabase, seedUser } from "./helpers";
 import { REGRADE_MESSAGE, releasedExam } from "./regrade-setup";
+import { weightedExam } from "./weighted-exam-support";
 
 test.beforeEach(resetDatabase);
 
@@ -910,5 +911,32 @@ test("student: run my code answer before submitting", async ({ page }) => {
 		await expect(page.getByRole("button", { name: "Run" })).toBeDisabled();
 		await editor.fill("console.log(3)");
 		await expect.poll(() => savedCode(quiz.slug)).toBe("console.log(3)");
+	});
+});
+
+test("student: see what each question is worth", async ({ page }) => {
+	const world = await weightedExam("wt-ana");
+	await logInAs(page, world.student);
+
+	await test.step("answering, each question shows its number and its points out of 100", async () => {
+		await page.goto(world.examUrl);
+		await page.getByRole("button", { name: "Start exam" }).click();
+
+		const heavy = page.getByRole("region", { name: "Question 1" });
+		await expect(heavy).toContainText("Q1");
+		await expect(heavy).toContainText("75/100");
+		await expect(
+			page.getByRole("region", { name: "Question 2" }),
+		).toContainText("25/100");
+	});
+
+	await test.step("after the release the review keeps the labels and the total is weighted", async () => {
+		await world.closeExam();
+		await page.goto(world.examUrl);
+
+		await expect(
+			page.getByRole("region", { name: "Question 1" }),
+		).toContainText("75/100");
+		await expect(page.getByText("25%").first()).toBeVisible();
 	});
 });

@@ -1,6 +1,8 @@
 ---
 import CourseHeader from "@/components/CourseHeader.astro";
 import type { AnswerPayload } from "@/components/exam/answer-payload";
+import QuestionNumber from "@/components/exam/QuestionNumber.astro";
+import { pointsByPosition } from "@/components/exam/question-points";
 import ReopenAttempt from "@/components/exam/ReopenAttempt";
 import Answer from "@/components/grading/Answer.astro";
 import AnswerEditSummary from "@/components/grading/AnswerEditSummary.astro";
@@ -115,6 +117,7 @@ const outcomes = examResult(
 	policy,
 );
 
+const points = pointsByPosition(exam.questions);
 const rows = outcomes.questions.map((outcome, index) => {
 	const doc = docs.get(outcome.question);
 	const counting = attempt.submissions
@@ -128,6 +131,8 @@ const rows = outcomes.questions.map((outcome, index) => {
 		);
 	return {
 		label: m.exams_attempt_question_label({ number: index + 1 }),
+		number: index + 1,
+		points: points[index] ?? "0",
 		outcome,
 		title: doc?.title ?? outcome.question,
 		asked: doc ? publicForm(doc) : null,
@@ -214,9 +219,10 @@ const stateLabel = (status: string, score: number | null): string => {
 
     <div class="mt-8 flex flex-col gap-6">
       {
-        rows.map(({ label, outcome, title, asked, attachmentUrl, counting, review, edits: editSummary }) => (
+        rows.map(({ label, number, points, outcome, title, asked, attachmentUrl, counting, review, edits: editSummary }) => (
           <article id={counting ? `answer-${counting.publicId}` : undefined} aria-label={label} class="card card-border bg-base-100">
             <div class="card-body">
+              <p class="text-sm"><QuestionNumber number={number} points={points} /></p>
               <h3 class="text-lg font-semibold">{title}</h3>
               <AttachmentList attachments={asked?.attachments} url={attachmentUrl} />
               {counting && answeredAfterDeadline(deadline, counting.createdAt) && (

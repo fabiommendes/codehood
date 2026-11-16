@@ -9,8 +9,12 @@
   prova e na REST, e o total é `Σ wᵢ·sᵢ / Σ wᵢ` na tabela de notas, no CSV e
   nas homes. A visão geral do professor lista as questões com `Qn`, tipo,
   peso e, com tentativa fechada, média e discriminação. A prova `test-06` do
-  seed pesa 3, 2 e 1. Falta mostrar `Qn` e "peso N" nas demais telas (spec
-  `dev/specs/to-do/pesos-e-numeros-de-questao.md`).
+  seed pesa 3, 2 e 1. O `Qn` e os pontos da questão em 100 ("pontos: 25/100",
+  sempre, mesmo sem pesos) aparecem na tela de responder e, no professor, na
+  revisão da tentativa, na fila de correção, na página da questão (e no título
+  da aba), nas estatísticas e nos pedidos de revisão, pelos componentes
+  `QuestionNumber`. A tela de responder lê o peso de `exam.questions`, não do
+  payload público (spec `dev/specs/to-review/pesos-e-numeros-de-questao.md`).
 
 - Correção automática de objetivas. Ao fechar a tentativa, o servidor grava um
   `Feedback` sem `graderId` e marca a submissão `GRADED_AUTOMATICALLY` nas

@@ -1,6 +1,6 @@
 ---
 type: spec
-status: to-do
+status: to-review
 tags: [exam, grading, questions, ui]
 relatedTo: [exam-result, exam-service, prova-moodle-e-pesos]
 ---
@@ -75,15 +75,26 @@ visível marcada na barra). Esta spec cobre o resto.
      título da aba;
   4. estatísticas (`components/grading/QuestionStats.astro`);
   5. pedidos de revisão (`exams/[slug]/regrades.astro`).
-- R11. Nas mesmas telas, "peso N" ao lado do `Qn`, só quando alguma questão
-  da prova tem peso diferente de 1.
-- R12. O rótulo e as bolinhas de peso viram componentes compartilhados:
-  `src/components/exam/QuestionNumber.astro` (e a versão Solid já em
-  `ExamAttempt.tsx`, movida para `src/components/exam/QuestionNumber.tsx`),
-  com as mensagens `exams_attempt_question_short` e `exams_attempt_weight`.
-- R13. A tela de responder (já feita) passa a ler o peso de `exam.questions`
-  em vez de `question.weight` do payload público, para não divergir quando o
-  override de R2 existir.
+- R11. Nas mesmas telas, e na de responder, o peso aparece sempre, mesmo
+  quando todas as questões valem 1. A forma é uma só: pontos em 100, a parte do
+  total que a questão carrega (`peso / Σ pesos`, até uma casa decimal), como
+  "pontos: 25/100". Descartado "peso N": é o `weight` cru do frontmatter, que
+  só significa algo ao lado dos pesos das outras questões, enquanto os pontos
+  dizem o efeito na nota sem conta e já são o que o aluno vê ao responder. O
+  `weight` cru continua na tabela de questões da visão geral.
+  Na tela de responder, os pontos ficam abaixo do `Qn`, na coluna lateral (e no
+  cabeçalho da aba em tela estreita). Nas demais, ao lado do `Qn`, em texto
+  pequeno e discreto.
+- R12. O rótulo e os pontos viram componentes compartilhados:
+  `src/components/exam/QuestionNumber.astro` e a versão Solid, movida de
+  `QuestionFrame.tsx` para `src/components/exam/QuestionNumber.tsx`, ambas com
+  as mensagens `exams_attempt_question_short` e `exams_attempt_points`. O
+  cálculo dos pontos por posição fica em
+  `src/components/exam/question-points.ts`.
+- R13. A tela de responder passa a ler o peso de `exam.questions` (via
+  `loadAttemptView`, que entrega `weight` em cada questão) em vez de
+  `question.weight` do payload público, para não divergir quando o override de
+  R2 existir. As bolinhas de água da barra usam o mesmo peso.
 
 ### CLI
 
@@ -93,8 +104,8 @@ visível marcada na barra). Esta spec cobre o resto.
 
 - R15. `src/db/bootstrap.ts` semeia uma prova corrigida e liberada com pesos
   3, 2 e 1, com um aluno cujo total ponderado difere da média simples, para
-  ver nas telas o total e o "peso N". As demais provas do seed ficam sem
-  pesos, para mostrar que nada aparece quando tudo vale 1.
+  ver nas telas o total e os pontos. As demais provas do seed ficam sem
+  pesos, para mostrar pontos iguais quando tudo vale 1.
 
 ## Fora do escopo
 
@@ -120,8 +131,8 @@ visível marcada na barra). Esta spec cobre o resto.
 - T4. Componentes e telas (`sonnet`). Arquivos de R10 a R13. Depende de T2.
   Pronto quando as histórias de T5 passam.
 - T5. Histórias e e2e (`sonnet`, antes de T4). Uma história do professor
-  (corrige a prova com pesos e vê `Qn`, "peso N" e o total ponderado na
-  tabela) e uma do aluno (vê o peso ao responder e o total ponderado depois
+  (corrige a prova com pesos e vê `Qn`, os pontos e o total ponderado na
+  tabela) e uma do aluno (vê os pontos ao responder e o total ponderado depois
   da liberação).
 - T6. Seed (`haiku`). `src/db/bootstrap.ts`. Requisitos: R15. Pronto quando
   `pnpm run db:reset` roda e a prova aparece com pesos no dev server.
@@ -130,9 +141,11 @@ visível marcada na barra). Esta spec cobre o resto.
 
 ## Critérios de aceite
 
-- No dev server, a prova semeada com pesos mostra `Qn` e "peso N" em todas as
-  telas de R10, e o total do aluno bate com a conta ponderada.
-- Uma prova sem pesos não mostra "peso" em lugar nenhum.
+- No dev server, a prova semeada com pesos mostra `Qn` e "pontos: 50/100",
+  "pontos: 33,3/100" e "pontos: 16,7/100" em todas as telas de R10, e o total do
+  aluno bate com a conta ponderada.
+- Uma prova sem pesos mostra pontos iguais (por exemplo 25/100 em quatro
+  questões) em todas as telas.
 - Na cópia de prod, a `prova-1`, com `weight` no frontmatter de q1 a q4 e
   `codehood push`, mostra os totais iguais aos do Moodle, exceto as
   diferenças já registradas no `report.md` da importação.

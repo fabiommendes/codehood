@@ -13,6 +13,7 @@ import { courseHref } from "@/urls";
 import { expect, test } from "../fixtures";
 import { logInAs, resetDatabase, seedUser } from "./helpers";
 import { releasedExam, requestRegrade } from "./regrade-setup";
+import { weightedExam } from "./weighted-exam-support";
 
 test.beforeEach(resetDatabase);
 
@@ -781,7 +782,7 @@ test("instructor: find the questions that need rework", async ({ page }) => {
 
 		// Question, Answered, Blank, Average, Correct, Discrimination, To grade.
 		await expect(cells("Best fruit")).toHaveText([
-			"Q1. Best fruit",
+			/^Q1.*Best fruit/,
 			"8",
 			"0",
 			"50%",
@@ -1169,5 +1170,61 @@ test("instructor: run a student's code while grading", async ({ page }) => {
 
 	await test.step("nothing was graded by running", async () => {
 		expect(await prisma.feedback.count()).toBe(0);
+	});
+});
+
+test("instructor: grade an exam whose questions have different weights", async ({
+	page,
+}) => {
+	const world = await weightedExam("wt-prof");
+	const { heavy } = await world.closeExam();
+	await db.regradeRequest.create(
+		{ course: world.course.id, submission: heavy, message: "Check Q1 again." },
+		{ actor: world.student },
+	);
+	await logInAs(page, world.teacher);
+	const heavyLabel = /Q1.*75\/100/;
+
+	await test.step("the grading queue labels each question with its number and points", async () => {
+		await page.goto(`${world.examUrl}/grading`);
+
+		const items = page.getByRole("listitem");
+		await expect(items.filter({ hasText: "Heavy question" })).toContainText(
+			/Q1.*75\/100/,
+		);
+		await expect(items.filter({ hasText: "Light question" })).toContainText(
+			/Q2.*25\/100/,
+		);
+	});
+
+	await test.step("a question's grading page shows them in the heading and the tab title", async () => {
+		await page.goto(`${world.examUrl}/grading/q-heavy`);
+
+		await expect(page.getByTestId("question-number")).toHaveText("Q1");
+		await expect(page.getByTestId("question-points")).toContainText("75/100");
+		await expect(
+			page.getByRole("heading", { level: 2, name: "Heavy question" }),
+		).toBeVisible();
+		await expect(page).toHaveTitle(/^Q1 Heavy question/);
+	});
+
+	await test.step("the statistics and the results table use the weighted total", async () => {
+		await page.goto(`${world.examUrl}/results`);
+
+		const stats = page.getByRole("row").filter({ hasText: "Heavy question" });
+		await expect(stats).toContainText(/Q1.*75\/100/);
+		await expect(
+			page.getByRole("row").filter({ hasText: "Ana Prado" }),
+		).toContainText("25%");
+	});
+
+	await test.step("the student's attempt and the regrade requests carry the same labels", async () => {
+		await page.goto(`${world.examUrl}/attempts/${world.student.username}`);
+		await expect(
+			page.getByRole("article", { name: /Question 1/ }),
+		).toContainText(heavyLabel);
+
+		await page.goto(`${world.examUrl}/regrades`);
+		await expect(page.getByRole("article")).toContainText(/Q1.*75\/100/);
 	});
 });

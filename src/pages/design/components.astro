@@ -950,7 +950,7 @@ const triagedReport: ReportRow = {
               data-variant={state.key}
               hidden={selected.statistics !== state.key}
             >
-              <QuestionStats client:load href="#" stats={state.stats} titles={statsTitles} />
+              <QuestionStats client:load href="#" stats={state.stats} titles={statsTitles} points={state.stats.map(() => "10")} />
             </div>
           ))
         }

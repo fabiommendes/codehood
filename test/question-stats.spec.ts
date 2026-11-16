@@ -973,16 +973,16 @@ test("question statistics: the instructor reads each question's numbers, a stude
 
 		await statsTable(page).getByRole("button", { name: "Average" }).click();
 		await expect(bodyRows).toContainText([
-			"Q2. Title two",
-			"Q1. Title one",
-			"Q3. Title three",
+			/^Q2.*Title two/,
+			/^Q1.*Title one/,
+			/^Q3.*Title three/,
 		]);
 		await statsTable(page).getByRole("button", { name: "Question" }).click();
-		await expect(bodyRows.nth(0)).toContainText("Q1. Title one");
+		await expect(bodyRows.nth(0)).toContainText(/^Q1.*Title one/);
 
 		const cells = (title: string) => statsRow(page, title).locator("td");
 		await expect(cells("Title one")).toHaveText([
-			"Q1. Title one",
+			/^Q1.*Title one/,
 			"3",
 			"0",
 			"75%",
@@ -991,7 +991,7 @@ test("question statistics: the instructor reads each question's numbers, a stude
 			"1",
 		]);
 		await expect(cells("Title two")).toHaveText([
-			"Q2. Title two",
+			/^Q2.*Title two/,
 			"2",
 			"1",
 			"25%",
@@ -1000,7 +1000,7 @@ test("question statistics: the instructor reads each question's numbers, a stude
 			"1",
 		]);
 		await expect(cells("Title three")).toHaveText([
-			"Q3. Title three",
+			/^Q3.*Title three/,
 			"1",
 			"2",
 			"",
