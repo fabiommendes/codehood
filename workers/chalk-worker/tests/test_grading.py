@@ -7,6 +7,7 @@ from pathlib import Path
 
 import pytest
 from chalk_grader import cgroup
+from chalk_grader.profiles import ReferenceMemoryLimit
 from conftest import SOLUTION, needs_elm, prepare, question_doc
 from mdq.models import CodeQuestion
 
@@ -77,6 +78,18 @@ def test_reference_that_fails_is_refused(tmp_path) -> None:
     doc = question_doc(answerKey=f"```elm\n{WRONG}```\n")
     g = QuestionGrader(CodeQuestion.model_validate(doc), tmp_path, sandbox="none")
     with pytest.raises(ReferenceError):
+        g.prepare()
+
+
+def test_reference_past_the_memory_in_prepare_is_refused(tmp_path, monkeypatch) -> None:
+    # Not PrepareFailed, which gives the jobs back without spending tries.
+    g = QuestionGrader(CodeQuestion.model_validate(question_doc()), tmp_path, sandbox="none")
+
+    def over_memory(_self: object) -> None:
+        raise ReferenceMemoryLimit("elm-test", 512 * 1024**2)
+
+    monkeypatch.setattr(type(g._grader), "prepare", over_memory)
+    with pytest.raises(ReferenceError, match=r"512 MiB.*--memory"):
         g.prepare()
 
 

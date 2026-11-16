@@ -17,7 +17,7 @@ from pathlib import Path
 from chalk_grader import disqualification as dq
 from chalk_grader import models
 from chalk_grader.profile_grader import ProfileGrader, resolve_profile
-from chalk_grader.profiles import PrepareError
+from chalk_grader.profiles import PrepareError, ReferenceMemoryLimit
 from chalk_grader.script_runner import RunError
 from chalk_grader.task import Task
 from mdq.models import CodeQuestion, RunnerReport
@@ -136,6 +136,14 @@ class QuestionGrader:
         _write_template(self.question, self._template)
         try:
             self._grader.prepare()
+        except ReferenceMemoryLimit as e:
+            # The reference goes past the memory of a run while its tests
+            # are collected: more tries would fail the same way.
+            budget = f" ({e.memory // MiB} MiB)" if e.memory else ""
+            raise ReferenceError(
+                f"the reference solution goes past the memory of a run{budget} while its "
+                "tests are collected; give the worker more --memory"
+            ) from None
         except (PrepareError, OSError, RuntimeError) as e:
             raise PrepareFailed(f"cannot prepare the profile: {e}") from None
         if not self._grader.prepare().tests:

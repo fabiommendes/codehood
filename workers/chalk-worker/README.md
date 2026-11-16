@@ -8,7 +8,8 @@ and sends back an mdq runner report with the teacher's `BOT` key. The server
 scores the report by the rubric of the question.
 
 Use it for questions that need an environment only the teacher has. Linux
-only. Languages: Elm (`elm-test`; needs `node`, `elm` and `elm-test`).
+only, with bubblewrap 0.8.0 or later for the sandbox (Ubuntu 22.04 ships
+0.6.1). Languages: Elm (`elm-test`; needs `node`, `elm` and `elm-test`).
 
 ```sh
 CODEHOOD_BOT_KEY=<key> chalk-worker [--server <url>] [--worker elm-test]
@@ -138,8 +139,8 @@ Caches live in `$XDG_CACHE_HOME/chalk-worker`.
 
 ## Development
 
-The worker lives in the codehood repository, in `workers/chalk-worker/`, and depends on `codehood-cli` from `../../cli` and
-on `chalk-grader` from PyPI.
+The worker lives in the codehood repository, in `workers/chalk-worker/`, and
+depends on `codehood-cli` from `../../cli` and on `chalk-grader` from PyPI.
 
 ```sh
 uv run ruff check && uv run pytest
