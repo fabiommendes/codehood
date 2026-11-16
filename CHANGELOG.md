@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+## 0.5.0 (2026-11-16)
+
 ### Changed
 
 - Versões e repositórios irmãos. `.mdq-ref` fixa o commit do mdq; `pnpm run
