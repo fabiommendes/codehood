@@ -4,6 +4,12 @@
 
 ### Changed
 
+- Versões e repositórios irmãos. `.mdq-ref` fixa o commit do mdq; `pnpm run
+  check:siblings` compara `../mdq` com ele (aviso no lint, erro no CI e no
+  release) e `pnpm run mdq:bump` adota um novo. Servidor, CLI e chalk-worker
+  têm uma versão só (`pnpm run check:versions`), subida pelo release, que
+  também grava o mdq na mensagem da tag e exige o `mdq` da CLI no PyPI. O CI
+  baixa o mdq no commit de `.mdq-ref` e testa a CLI contra o PyPI a cada push.
 - A CLI sai junto com o servidor, na mesma versão. `pnpm run release` sobe
   `cli/pyproject.toml`, data `cli/CHANGELOG.md` e roda os testes da CLI com as
   dependências do PyPI; o push da tag publica `codehood-cli` no PyPI

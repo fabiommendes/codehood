@@ -253,7 +253,7 @@ wheels = [
 
 [[package]]
 name = "codehood-cli"
-version = "0.2.0"
+version = "0.4.0"
 source = { editable = "." }
 dependencies = [
     { name = "httpx" },
@@ -743,7 +743,7 @@ wheels = [
 
 [[package]]
 name = "mdq"
-version = "0.2.0"
+version = "0.2.1"
 source = { editable = "../../mdq/mdq-py" }
 dependencies = [
     { name = "linkify-it-py" },

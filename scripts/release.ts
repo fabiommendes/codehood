@@ -9,19 +9,26 @@
  *    allowed, so a migration edited by hand after a failed run is kept.
  * 2. `pnpm run db:migrate`: writes the migration for the schema changes since
  *    the last release and checks it for data loss.
+ *    It also runs `scripts/check-siblings.ts --strict --fetch` (`../mdq` is the
+ *    commit in `.mdq-ref`, clean and pushed) and requires the `mdq` release
+ *    the CLI asks for to be on PyPI.
  * 3. The gate: `pnpm run lint`, `pnpm test`, and the CLI's tests against the
  *    PyPI releases of its dependencies (what the published package gets).
- * 4. Bumps `package.json` and `cli/pyproject.toml` to the same version, turns
- *    the "Unreleased" section of both changelogs into the version's,
- *    regenerates the CLI's OpenAPI snapshot, commits as `release: vX.Y.Z` and
- *    tags `vX.Y.Z`. Pushing the tag publishes the CLI to PyPI
- *    (`.github/workflows/publish-cli.yml`).
+ * 4. Bumps `package.json`, `cli/pyproject.toml` and
+ *    `workers/chalk-worker/pyproject.toml` (which pins `codehood-cli` to the
+ *    same version) to one version, turns the "Unreleased" section of both
+ *    changelogs into the version's, regenerates the CLI's OpenAPI snapshot,
+ *    commits as `release: vX.Y.Z` and tags `vX.Y.Z`, recording the mdq commit
+ *    and versions in the tag message. Pushing the tag publishes the CLI to PyPI
+ *    (`.github/workflows/publish-cli.yml`). The worker is not published.
  *
  * `--dry-run` stops after the gate. Nothing is pushed.
  */
 import { spawnSync } from "node:child_process";
 import { readdirSync, readFileSync, writeFileSync } from "node:fs";
 import { parseArgs } from "node:util";
+import { mdqHead, mdqVersions } from "./lib/mdq-snapshot";
+import { pyprojectLowerBound } from "./lib/siblings";
 
 const { values: args, positionals } = parseArgs({
 	allowPositionals: true,
@@ -63,6 +70,18 @@ function nextVersion(current: string, bump: string): string {
 	fail(`Unknown bump "${bump}". Use patch, minor, major or x.y.z.`);
 }
 
+/// Aborts unless the `mdq` release the CLI requires is on PyPI.
+async function requireMdqOnPypi(): Promise<void> {
+	const bound = pyprojectLowerBound(
+		readFileSync("cli/pyproject.toml", "utf8"),
+		"mdq",
+	);
+	if (bound === null) fail("cli/pyproject.toml has no `mdq>=` lower bound.");
+	const response = await fetch(`https://pypi.org/pypi/mdq/${bound}/json`);
+	if (response.status === 404) fail(`Publish mdq-py ${bound} first.`);
+	if (!response.ok) fail(`PyPI answered ${response.status} for mdq ${bound}.`);
+}
+
 const bump = positionals[0];
 if (!bump) fail("Usage: pnpm run release <patch|minor|major|x.y.z>");
 
@@ -89,6 +108,9 @@ if (playground.length > 0) {
 	fail(`The design playground must be empty:\n${playground.join("\n")}`);
 }
 if (output("git", ["tag", "--list", tag])) fail(`Tag ${tag} already exists.`);
+run("Siblings", "tsx", ["scripts/check-siblings.ts", "--strict", "--fetch"]);
+run("Versions", "tsx", ["scripts/check-versions.ts"]);
+await requireMdqOnPypi();
 console.log(`▶ Releasing ${pkg.version} → ${version}`);
 
 // 2. Migrations.
@@ -149,6 +171,23 @@ for (const file of ["CHANGELOG.md", "cli/CHANGELOG.md"]) {
 	);
 }
 
+run("Worker version", "uv", [
+	"version",
+	"--directory",
+	"workers/chalk-worker",
+	"--no-sync",
+	version,
+]);
+const workerFile = "workers/chalk-worker/pyproject.toml";
+writeFileSync(
+	workerFile,
+	readFileSync(workerFile, "utf8").replace(
+		/"codehood-cli==[^"]*"/,
+		`"codehood-cli==${version}"`,
+	),
+);
+run("Worker lock", "uv", ["lock", "--directory", "workers/chalk-worker"]);
+
 // The CLI's OpenAPI snapshot carries the version, so every bump makes it stale.
 run("OpenAPI", "pnpm", ["run", "openapi:cli"]);
 
@@ -159,12 +198,21 @@ run("Commit", "git", [
 	"cli/CHANGELOG.md",
 	"cli/pyproject.toml",
 	"cli/uv.lock",
+	workerFile,
+	"workers/chalk-worker/uv.lock",
 	"prisma/migrations",
 	"cli/resources/openapi/codehood.json",
 	"cli/codehood/api/generated.py",
 ]);
 run("Commit", "git", ["commit", "--quiet", "-m", `release: ${tag}`]);
-run("Tag", "git", ["tag", "--annotate", tag, "-m", `Codehood ${version}`]);
+const mdq = mdqVersions();
+run("Tag", "git", [
+	"tag",
+	"--annotate",
+	tag,
+	"-m",
+	`Codehood ${version}\n\nmdq: ${mdqHead()} (mdq-js ${mdq.js}, mdq-py ${mdq.py}, spec ${mdq.schema})`,
+]);
 
 console.log(
 	`\n✔ Tagged ${tag}. Publish with: git push origin main ${tag}` +

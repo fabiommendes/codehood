@@ -113,6 +113,12 @@ one per release, checks it for data loss and runs the gate before tagging.
 See "Deploying" in `README.md`. Instance-specific deployment lives in
 `deploy/`, a separate repository that git ignores here.
 
+The server, `cli/` and `workers/chalk-worker/` share one version
+(`pnpm run check:versions`). The mdq commit codehood builds against is pinned in
+`.mdq-ref`: `pnpm run check:siblings` compares `../mdq` with it (warnings in
+`pnpm run lint`, errors in CI and in the release) and `pnpm run mdq:bump` adopts
+`../mdq` HEAD. See `dev/specs/to-review/versoes-e-repositorios-irmaos.md`.
+
 ## Linting
 
 Never hand-fix what Biome can fix itself. Auto-fix first, then run the linter as
