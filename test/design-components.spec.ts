@@ -149,3 +149,19 @@ test("design/components shows one variant at a time and keeps it in the URL", as
 	await expect(variant("graded")).toBeVisible();
 	await expect(variant("pending")).toBeHidden();
 });
+
+test("selecting a toggle does not change the width of any choice", async ({
+	page,
+}) => {
+	await page.goto("/design/elements");
+	const group = page.getByRole("group", { name: "Single choice" }).first();
+	const choices = group.getByRole("button");
+	const widths = () =>
+		choices.evaluateAll((els) =>
+			els.map((el) => el.getBoundingClientRect().width),
+		);
+	const before = await widths();
+	await choices.nth(2).click();
+	await expect(choices.nth(2)).toHaveAttribute("aria-pressed", "true");
+	expect(await widths()).toEqual(before);
+});

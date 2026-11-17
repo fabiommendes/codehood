@@ -71,7 +71,7 @@ export default function ToggleGroup<V extends string>(
 	props: ToggleGroupProps<V>,
 ): JSX.Element {
 	const classes = (option: V) =>
-		`btn btn-sm join-item ${isSelected(props, option) ? "btn-primary font-semibold" : "font-normal"}`;
+		`btn btn-sm join-item ${isSelected(props, option) ? "btn-primary" : ""}`;
 
 	return (
 		// biome-ignore lint/a11y/useSemanticElements: a fieldset would not lay out as a `join`.
