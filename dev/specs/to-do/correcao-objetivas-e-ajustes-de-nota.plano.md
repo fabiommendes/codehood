@@ -852,7 +852,7 @@ começar com os stubs do T4 mergeados. Paralela a T2, T3, T5c.
 
 - Arquivo: `src/services/objective-review.ts` (pode reutilizar
   `responseSummary`, `reviewResult`, `examResult`, `isManualChange`,
-  `autoScoreOf`). Sem I/O, sem `m` além do que `responseSummary` já usa.
+  `autoScoreOf`). Sem I/O. Rótulos (lacuna, grafias, outras, em branco) vêm de mensagens `grades_objective_*`. Linhas em branco, removidas e "outras" nunca levam `review`. Linha de alteração sem resposta tem `submission` ausente.
 - Aceite: `test/objective-review.spec.ts`, `test:unit`, lint 0.
 
 ### T5b. Página de correção objetiva (Parte A)
