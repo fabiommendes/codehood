@@ -340,8 +340,10 @@ Depois da liberação das notas (mesma regra de `feedback.read` da
     (somar pontos, multiplicar ou substituir a nota, motivo e prévia do total)
     e "Lista de alunos";
   - "Lista de alunos" abre um diálogo com todos os alunos da prova, busca e
-    colunas ordenáveis (aluno, usuário, total, situação: pendente, sem
-    tentativa, ajustada, entregue). As setas anterior/próximo ficam como
+    colunas ordenáveis (aluno, matrícula, usuário, total, situação: pendente,
+    sem tentativa, ajustada, entregue). A busca também casa a matrícula
+    (`User.schoolId`, "—" quando ausente), que os alunos lembram melhor que o
+    nome de usuário. As setas anterior/próximo ficam como
     atalho: com 80 alunos, passar um a um não serve para achar alguém;
   - por questão, o lápis "Alterar nota" (B1);
   - o resumo "Ajustes de nota" lista o total original, um ajuste por linha
