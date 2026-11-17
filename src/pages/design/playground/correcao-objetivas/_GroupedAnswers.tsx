@@ -307,7 +307,7 @@ export default function GroupedAnswers(props: Props): JSX.Element {
 												)}
 											</Show>
 											<Show when={r.changed > 0}>
-												<span class="block text-xs text-info">
+												<span class="block text-xs text-yellow-700">
 													{r.changed}{" "}
 													{r.changed === 1 ? "alterada" : "alteradas"}
 												</span>

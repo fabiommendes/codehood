@@ -75,9 +75,9 @@ const STATE = {
 	},
 	changed: {
 		label: "alterada à mão",
-		chip: "btn-info",
-		dot: "bg-info",
-		tone: "text-info",
+		chip: "border-yellow-300 bg-yellow-100 text-yellow-900 hover:bg-yellow-200",
+		dot: "border border-yellow-400 bg-yellow-200",
+		tone: "text-yellow-700",
 	},
 } as const;
 const back = "/design/playground/correcao-objetivas";
@@ -183,7 +183,7 @@ const back = "/design/playground/correcao-objetivas";
               <div class="flex flex-wrap items-center gap-x-3 gap-y-2">
                 <span class="tabular-nums">
                   {changed ? (
-                    <><span class="text-muted line-through">{q.auto === null ? "sem resposta" : `${q.auto}%`}</span> → <strong class="text-success">{q.override?.score}%</strong> <span class="badge badge-info badge-soft badge-sm">alterada à mão</span></>
+                    <><span class="text-muted line-through">{q.auto === null ? "sem resposta" : `${q.auto}%`}</span> → <strong>{q.override?.score}%</strong> <span class="badge badge-sm border-yellow-200 bg-yellow-50 text-yellow-800">alterada à mão</span></>
                   ) : (
                     <span class={q.auto === 100 ? "font-semibold text-success" : "font-semibold"}>{q.auto === null ? "0% (sem resposta)" : `${q.auto}%`}</span>
                   )}

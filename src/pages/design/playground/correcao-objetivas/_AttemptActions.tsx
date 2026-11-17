@@ -38,7 +38,7 @@ const STATUS_BADGE: Record<AttemptStatus, string> = {
 	entregue: "badge-success",
 	pendente: "badge-warning",
 	"sem tentativa": "badge-neutral",
-	ajustada: "badge-info",
+	ajustada: "border-yellow-200 bg-yellow-50 text-yellow-800",
 };
 
 /// Order of the Situação column when sorted ascending.

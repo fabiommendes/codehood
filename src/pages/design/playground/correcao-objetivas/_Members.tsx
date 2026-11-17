@@ -69,7 +69,7 @@ export default function Members(props: Props): JSX.Element {
 							<Show when={r.manual !== undefined} fallback={`${r.auto}%`}>
 								<span class="text-muted line-through">{r.auto}%</span>{" "}
 								{r.manual}%{" "}
-								<span class="badge badge-info badge-soft badge-xs">
+								<span class="badge badge-xs border-yellow-200 bg-yellow-50 text-yellow-800">
 									alterada
 								</span>
 							</Show>

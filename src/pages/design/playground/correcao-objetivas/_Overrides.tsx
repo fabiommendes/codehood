@@ -35,7 +35,7 @@ export default function Overrides(props: {
 					sortValue: (r) => r.kind,
 					render: (r) => (
 						<span
-							class={`badge badge-sm ${r.kind === "Sanção" ? "badge-error badge-soft" : "badge-info badge-soft"}`}
+							class={`badge badge-sm ${r.kind === "Sanção" ? "badge-error badge-soft" : "border-yellow-200 bg-yellow-50 text-yellow-800"}`}
 						>
 							{r.kind}
 						</span>
