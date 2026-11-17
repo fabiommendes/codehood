@@ -1074,6 +1074,8 @@ async function createDemoCoursesIfMissing(): Promise<void> {
 			status: "SCHEDULED",
 			title: "Midterm exam",
 			description: "Everything from weeks 1 to 7.",
+			// A student does not see this until the exam opens for them.
+			preamble: "Answer every question. Notes and books are not allowed.",
 			// Under a week ahead, so a seed run in the morning still lists it as coming up.
 			scheduledAt: toInstant(
 				localDateOf(new Date(Date.now() + 6 * 24 * 3600 * 1000)),

@@ -1141,7 +1141,7 @@ export function groupExamsForStudent(
 	return groups;
 }
 
-/// What a reader of an exam sees of its attachments: all of them with their `origin` and `files`, the list without `origin`, or none.
+/// What a reader of an exam sees of its contents: all of it with attachment `origin` and `files`, the attachment list without `origin`, or none of the attachments, the preamble and the questions.
 type AttachmentView = "full" | "public" | "hidden";
 
 /// A downloaded attachment: its bytes, its mime type and the name the author gave it.
@@ -1158,8 +1158,8 @@ type PreparedAttachments = { list: Attachment[]; files: AttachmentFiles };
  * The attachment view of `actor` for each of `rows`, keyed by exam id.
  *
  * Whoever writes the course's contents sees everything. A student sees the
- * list from the moment the exam opens for them, which their own exception may
- * postpone or bring forward.
+ * attachments, the preamble and the questions from the moment the exam opens
+ * for them, which their own exception may postpone or bring forward.
  */
 async function attachmentViews(
 	tx: PrismaTx,
@@ -1376,7 +1376,7 @@ function publicAttachments(list: Attachment[]) {
 	return list.map(({ origin: _origin, ...rest }) => rest);
 }
 
-/** Converts a database row into the exam entity, showing its attachments as `view` says. */
+/** Converts a database row into the exam entity, showing its contents as `view` says: a `hidden` view has no attachments, no preamble and no questions. */
 function fromDb(
 	row: DbExam,
 	view: AttachmentView,
@@ -1391,7 +1391,7 @@ function fromDb(
 		status: row.status,
 		title: row.title,
 		description: row.description,
-		preamble: row.preamble,
+		preamble: view === "hidden" ? null : row.preamble,
 		format: row.format,
 		scheduledAt: row.scheduledAt,
 		duration: fromMs(row.durationMs),
@@ -1402,12 +1402,15 @@ function fromDb(
 		gradesReleasedAt: row.gradesReleasedAt,
 		rev: row.rev,
 		tags: row.examTags.map((t) => t.tag),
-		questions: row.questionsForExams.map((q, i) => ({
-			id: q.questionRef.id as Exam["questions"][number]["id"],
-			slug: q.questionRef.slug,
-			version: q.version,
-			weight: weights[i] ?? 1,
-		})),
+		questions:
+			view === "hidden"
+				? []
+				: row.questionsForExams.map((q, i) => ({
+						id: q.questionRef.id as Exam["questions"][number]["id"],
+						slug: q.questionRef.slug,
+						version: q.version,
+						weight: weights[i] ?? 1,
+					})),
 		createdAt: row.createdAt,
 		updatedAt: row.updatedAt,
 		attachments:

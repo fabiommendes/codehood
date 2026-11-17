@@ -182,11 +182,50 @@ test("create() refuses a question the exam does not carry", async () => {
 			},
 			{ actor: student },
 		),
-	).rejects.toBeInstanceOf(InvalidData);
+	).rejects.toBeInstanceOf(NotFound);
 
 	expect(
 		await prisma.submission.count({ where: { responseId: response.id } }),
 	).toBe(0);
+});
+
+test("create() answers a missing slug, a draft slug of the course and a slug of another exam with the same NotFound", async () => {
+	const { course } = await makeCourse();
+	const student = await enrollStudent(course.id);
+	const inExam = await makeQuestion(course.id);
+	const draft = await persistedQuestionFactory.create(
+		{ course: course.id, slug: tag("draft-"), status: "DRAFT" },
+		{ transient: { type: "essay" } },
+	);
+	const published = await makeQuestion(course.id);
+	await makeExam(course.id, [published.slug]);
+	const { response } = await makeOpenResponse(
+		course.id,
+		[inExam.slug],
+		student.username,
+	);
+
+	const errors = [];
+	for (const slug of [tag("missing-"), draft.slug, published.slug]) {
+		const error = await db.submission
+			.create(
+				{
+					response: { publicId: response.publicId },
+					question: slug,
+					payload: "1",
+				},
+				{ actor: student },
+			)
+			.then(
+				() => null,
+				(e: unknown) => e,
+			);
+		expect(error).toBeInstanceOf(NotFound);
+		expect((error as NotFound).message).not.toContain(slug);
+		errors.push(error);
+	}
+	expect(new Set(errors.map((e) => (e as NotFound).status)).size).toBe(1);
+	expect(new Set(errors.map((e) => (e as NotFound).message)).size).toBe(1);
 });
 
 //

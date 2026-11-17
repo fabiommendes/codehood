@@ -15,14 +15,14 @@ function tag(prefix: string): string {
 
 const PASSWORD = "correct-horse-battery-staple";
 
-async function makeInstructor() {
-	const username = tag("instructor");
+async function makeInstructor(role: "INSTRUCTOR" | "STUDENT" = "INSTRUCTOR") {
+	const username = tag(role.toLowerCase());
 	return db.user.create(
 		{
 			email: `${username}@codehood.test`,
 			username,
 			name: username,
-			role: "INSTRUCTOR",
+			role,
 			password: PASSWORD,
 			githubId: username,
 			schoolId: username,
@@ -338,4 +338,47 @@ test("OpenAPI list operation documents exams but no course keys", async ({
 	for (const key of ["courseId", "discipline", "instructor", "edition"]) {
 		expect(query).not.toContain(key);
 	}
+});
+
+test("GET hides the preamble and the questions of an upcoming exam from a student, and shows them to the instructor", async ({
+	request,
+}) => {
+	const { course, url, headers } = await makeCourse(request);
+	const student = await makeInstructor("STUDENT");
+	await db.enrollment.create(
+		{ course: course.id, username: student.username },
+		FULL_ACCESS,
+	);
+	const created = await request.post(url, {
+		headers,
+		data: {
+			slug: "upcoming",
+			title: "Upcoming",
+			type: "EXAM",
+			status: "SCHEDULED",
+			scheduledAt: new Date(Date.now() + 24 * 3600_000).toISOString(),
+			duration: { minutes: 60 },
+			preamble: "Secret instructions",
+		},
+	});
+	expect(created.status()).toBe(200);
+
+	const studentHeaders = await tokenFor(request, student.username);
+	const read = await request.get(`${url}/upcoming`, {
+		headers: studentHeaders,
+	});
+	expect(read.status()).toBe(200);
+	expect(await read.json()).toMatchObject({
+		title: "Upcoming",
+		preamble: null,
+		questions: [],
+	});
+	const listed = await request.get(url, { headers: studentHeaders });
+	expect((await listed.json()).items[0]).toMatchObject({
+		preamble: null,
+		questions: [],
+	});
+
+	const own = await request.get(`${url}/upcoming`, { headers });
+	expect((await own.json()).preamble).toBe("Secret instructions");
 });

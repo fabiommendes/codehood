@@ -200,7 +200,7 @@ test("student: use the files attached to an exam question", async ({
 	await test.step("before the exam opens there is no list and no download", async () => {
 		await page.goto(`${href}/exams/files-exam`);
 
-		await expect(page.getByText(preamble)).toBeVisible();
+		await expect(page.getByText(preamble)).toHaveCount(0);
 		await expect(
 			page.getByRole("region", { name: "Attachments", exact: true }),
 		).toHaveCount(0);

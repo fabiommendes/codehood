@@ -43,6 +43,13 @@
   contém está aberta para ele (com a exceção de segunda chamada aplicada) ou
   já encerrou. Uma questão publicada fora de qualquer prova deixou de ser
   visível ao aluno. O gabarito nunca vazou.
+  Também fechado: a prova que ainda não abriu para o aluno (inclusive com
+  exceção de segunda chamada futura) devolvia `preamble` e a lista de
+  questões (slug, versão e peso); agora o aluno recebe `preamble: null` e
+  `questions: []` até a prova abrir para ele. O professor e o SYSTEM veem
+  tudo. Enviar uma resposta, ou consultar os envios, de uma questão que não
+  está na prova dá o mesmo "não encontrado" de uma questão que não existe, e
+  o slug deixa de ser ecoado, então não dá para sondar slugs de rascunho.
 - No tablet e no celular, o breadcrumb ficava por cima da gaveta de
   navegação aberta.
 

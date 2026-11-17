@@ -457,7 +457,7 @@ export const makeGradingJobService = defineService()((client) => {
 	});
 
 	/**
-	 * The same as `forStudent` for several questions of one answer, keyed by question slug; a slug that names no question of the course is left out.
+	 * The same as `forStudent` for several questions of one answer, keyed by question slug; a slug that is not a question of the answer's exam is left out.
 	 *
 	 * @throws {@link NotFound} No such answer.
 	 * @throws {@link NotAllowed} The actor is not the author of the answer.
@@ -741,7 +741,7 @@ async function giveUp(
 	return state;
 }
 
-/// What the author of an answer sees of their sends of each of `questions`, by slug; unknown slugs are left out.
+/// What the author of an answer sees of their sends of each of `questions`, by slug; a slug that is not a question of the answer's exam is left out.
 async function studentViews(
 	tx: PrismaTx,
 	input: GradingJobStudentBatchQuery,
@@ -767,7 +767,11 @@ async function studentViews(
 	});
 
 	const questions = await tx.questionRef.findMany({
-		where: { courseId: exam.courseId, slug: { in: input.questions } },
+		where: {
+			courseId: exam.courseId,
+			slug: { in: input.questions },
+			questionsForExams: { some: { examId: exam.id } },
+		},
 		select: { id: true, slug: true, latestId: true, attempts: true },
 	});
 	const rows = await tx.submission.findMany({

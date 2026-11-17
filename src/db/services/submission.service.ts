@@ -619,9 +619,9 @@ export function assertAcceptingSubmissions(
  * when it pins none. Shared with `ResponseService.submit`, which appends a
  * submission the same way `submissionService.create` does.
  *
- * @throws {@link NotFound} If no question in the course has this slug.
- * @throws {@link InvalidData} If the question is not one of the exam's
- *   questions, or `payload` is not a well-formed response to it.
+ * @throws {@link NotFound} If no question in the course has this slug, or the
+ *   question is not one of the exam's questions.
+ * @throws {@link InvalidData} If `payload` is not a well-formed response to it.
  */
 export async function resolveExamQuestion(
 	tx: PrismaTx,
@@ -645,19 +645,12 @@ export async function resolveExamQuestion(
 		}),
 	);
 
+	// A question outside the exam looks the same as one that does not exist, so
+	// a slug cannot be probed for its presence in the course.
 	const inExam = await tx.questionsForExam.findUnique({
 		where: { examId_questionRefId: { examId, questionRefId: question.id } },
 	});
-	if (!inExam) {
-		throw new InvalidData({
-			question: [
-				{
-					code: "not-exists",
-					message: m.errors_question_not_in_exam({ slug: question.slug }),
-				},
-			],
-		});
-	}
+	if (!inExam) throw new NotFound("question");
 
 	const version = valueOrNotFound(
 		"question-version",

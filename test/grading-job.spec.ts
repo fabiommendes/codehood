@@ -1155,11 +1155,14 @@ test("forStudent: a student sees only their own submissions", async () => {
 	).rejects.toBeInstanceOf(NotFound);
 });
 
-/// A second code question of the course of `w`, with one send of the student in `state`.
+/// A second code question of the exam of `w`, with one send of the student in `state`.
 async function secondQuestion(w: World, state: JobState) {
 	const slug = await pushCode(w.course.id);
 	const row = await prisma.questionRef.findFirstOrThrow({
 		where: { courseId: w.course.id, slug },
+	});
+	await prisma.questionsForExam.create({
+		data: { examId: w.exam.id, questionRefId: row.id, position: 1 },
 	});
 	const submission = await sentBy({ ...w, questionId: row.id }, state);
 	return { slug, submission };
@@ -1217,4 +1220,43 @@ test("forStudentQuestions: a student reads only their own answer", async () => {
 			asStudent(w),
 		),
 	).rejects.toBeInstanceOf(NotFound);
+});
+
+test("forStudent: a missing slug, a draft slug of the course and a slug of another exam give the same NotFound", async () => {
+	const w = await world();
+	const draft = await pushCode(w.course.id);
+	await prisma.questionRef.updateMany({
+		where: { courseId: w.course.id, slug: draft },
+		data: { status: "DRAFT" },
+	});
+	const elsewhere = await pushCode(w.course.id);
+	await makeExam(w.course.id, { questions: [{ slug: elsewhere }] });
+
+	const errors = [];
+	for (const question of [tag("missing-"), draft, elsewhere]) {
+		const error = await db.gradingJob
+			.forStudent({ response: w.response.publicId, question }, asStudent(w))
+			.then(
+				() => null,
+				(e: unknown) => e,
+			);
+		expect(error).toBeInstanceOf(NotFound);
+		expect((error as NotFound).message).not.toContain(question);
+		errors.push(error as NotFound);
+	}
+	expect(new Set(errors.map((e) => e.status)).size).toBe(1);
+	expect(new Set(errors.map((e) => e.message)).size).toBe(1);
+});
+
+test("forStudentQuestions: leaves out a slug of the course that is not in the answer's exam", async () => {
+	const w = await world();
+	const elsewhere = await pushCode(w.course.id);
+	await makeExam(w.course.id, { questions: [{ slug: elsewhere }] });
+
+	const views = await db.gradingJob.forStudentQuestions(
+		{ response: w.response.publicId, questions: [w.question, elsewhere] },
+		asStudent(w),
+	);
+
+	expect(Object.keys(views)).toEqual([w.question]);
 });
