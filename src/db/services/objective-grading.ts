@@ -44,6 +44,7 @@ export async function gradeObjectives(
 					id: true,
 					status: true,
 					payload: true,
+					createdById: true,
 					question: { select: { id: true, latestId: true } },
 				},
 			},
@@ -53,6 +54,8 @@ export async function gradeObjectives(
 
 	const counting = new Map<number, (typeof response.submissions)[number]>();
 	for (const submission of response.submissions) {
+		// The instructor's grade for an unanswered question is never scored by the library.
+		if (submission.createdById !== null) continue;
 		if (!counting.has(submission.question.id)) {
 			counting.set(submission.question.id, submission);
 		}

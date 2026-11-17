@@ -179,5 +179,12 @@
 	"errors_exam_adjustment_set_exists": "\"{username}\" already has an active replacement grade: edit the existing one",
 	"errors_exam_adjustment_set_exists_edit": "This attempt already has an active replacement grade: edit the existing one",
 	"errors_exam_adjustment_practice": "Practice exams take no adjustments",
-	"errors_exam_adjustment_question": "\"{question}\" is not a question of this exam"
+	"errors_exam_adjustment_question": "\"{question}\" is not a question of this exam",
+	"errors_empty_attempt_practice": "Practice exams take no attempt made by the instructor",
+	"errors_empty_attempt_not_enrolled": "\"{username}\" is not enrolled in this course",
+	"errors_empty_attempt_exam_open": "The exam has not closed for \"{username}\" yet",
+	"errors_empty_attempt_in_progress": "The attempt of \"{username}\" is still in progress",
+	"errors_manual_grade_answered": "\"{username}\" answered this question: grade the answer instead",
+	"errors_manual_grade_score": "The score must be a number from 0 to 1",
+	"errors_manual_change_not_changed": "This answer was not changed by hand"
 }

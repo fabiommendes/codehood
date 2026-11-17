@@ -15,7 +15,7 @@ import type { z } from "zod";
 import type { Actor, UserActor } from "@/auth/actor";
 import { ensurePerm, hasPerm } from "@/auth/permissions";
 import { InvalidData, NotAllowed } from "@/core/error";
-import type { CourseId } from "@/core/schemas/base";
+import type { CourseId, ExamId, ResponseId } from "@/core/schemas/base";
 import type { CourseRef } from "@/core/schemas/course";
 import {
 	adjustmentValueError,
@@ -36,7 +36,7 @@ import {
 import { defineService, op } from "@/db/define-service";
 import { m } from "@/i18n";
 import type { Prisma, PrismaTx } from "../client";
-import { realAttempt } from "../preview-filter";
+import { attemptOrEmpty } from "../empty-attempt";
 import { courseRefWhere, valueOrNotFound } from "../utils";
 import { examReleaseSelect, releasedToStudents } from "./feedback.service";
 
@@ -85,15 +85,15 @@ export const makeExamAdjustmentService = defineService()(() => {
 	 * Adjusts each student of `input.usernames` on the exam, or on one of its questions.
 	 *
 	 * One adjustment per student, all or none, in the order of `usernames`. The
-	 * adjustment hits the attempt, so every student needs a real one (a
-	 * simulation does not count) and the exam cannot be a practice one.
+	 * adjustment hits the attempt: a student without one gets an empty attempt
+	 * (see `attemptOrEmpty`), and the exam cannot be a practice one.
 	 *
 	 * @throws {@link NotFound} If the course or the exam does not exist.
 	 * @throws {@link NotAllowed} If `actor` is not the course's instructor.
 	 * @throws {@link InvalidData}
 	 * Keyed on `exam` for a practice exam, `question` for one the exam does not
 	 * have, `op` and `value` for a value the operation refuses, and `usernames`
-	 * (`invalid`) for a repeated student or one without a real attempt, or
+	 * (`invalid`) for a repeated student or one `attemptOrEmpty` refuses, or
 	 * (`not-unique`) one that already has an active `SET`, or an active
 	 * adjustment on the same question.
 	 */
@@ -152,6 +152,8 @@ export const makeExamAdjustmentService = defineService()(() => {
 				questionRefId,
 				input.op,
 				input.usernames,
+				(opts.actor as UserActor).username,
+				new Date(),
 			);
 			const createdBy = (opts.actor as UserActor).username;
 			const rows: DbExamAdjustment[] = [];
@@ -449,17 +451,19 @@ async function releasedExams(
 }
 
 /**
- * The ids of the real attempts of `usernames` at the exam, in the order of `usernames`.
+ * The ids of the attempts of `usernames` at the exam, in the order of `usernames`, making an empty one for each student without.
  *
- * @throws {@link InvalidData} For a repeated student, one without a real attempt, or one that already has an active `SET` (when `op` is `SET`) or an active adjustment on the question.
+ * @throws {@link InvalidData} For a repeated student, one `attemptOrEmpty` refuses, or one that already has an active `SET` (when `op` is `SET`) or an active adjustment on the question.
  */
 async function attemptsOf(
 	tx: PrismaTx,
-	examId: number,
+	examId: ExamId,
 	questionRefId: number | null,
 	op: ExamAdjustmentOp,
 	usernames: string[],
-): Promise<number[]> {
+	createdBy: string,
+	now: Date,
+): Promise<ResponseId[]> {
 	const repeated = usernames.find((name, i) => usernames.indexOf(name) !== i);
 	if (repeated !== undefined) {
 		throw usernamesError(
@@ -467,18 +471,19 @@ async function attemptsOf(
 			m.errors_exam_adjustment_duplicate({ username: repeated }),
 		);
 	}
-	const attempts = await tx.response.findMany({
-		where: { examId, authorId: { in: usernames }, ...realAttempt },
-		select: { id: true, authorId: true },
-	});
-	const byAuthor = new Map(attempts.map((a) => [a.authorId, a.id]));
-	const missing = usernames.find((name) => !byAuthor.has(name));
-	if (missing !== undefined) {
-		throw usernamesError(
-			"invalid",
-			m.errors_exam_adjustment_no_attempt({ username: missing }),
-		);
+	const attempts: { id: ResponseId; authorId: string }[] = [];
+	for (const name of usernames) {
+		const attempt = await attemptOrEmpty(tx, {
+			examId,
+			author: name,
+			createdBy,
+			now,
+			field: "usernames",
+			requireFinished: false,
+		});
+		attempts.push({ id: attempt.id, authorId: name });
 	}
+	const byAuthor = new Map(attempts.map((a) => [a.authorId, a.id]));
 	// The exam total takes any number of FACTOR and OFFSET, but one SET.
 	if (questionRefId !== null || op === "SET") {
 		const active = await tx.examAdjustment.findMany({
@@ -501,7 +506,7 @@ async function attemptsOf(
 			);
 		}
 	}
-	return usernames.map((name) => byAuthor.get(name) as number);
+	return usernames.map((name) => byAuthor.get(name) as ResponseId);
 }
 
 /// An `InvalidData` on `usernames`.

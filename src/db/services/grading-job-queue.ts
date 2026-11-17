@@ -209,7 +209,11 @@ export async function promoteFinalSends(
 	for (const question of questions) {
 		try {
 			const newest = await tx.submission.findFirst({
-				where: { responseId: response.id, questionId: question.id },
+				where: {
+					responseId: response.id,
+					questionId: question.id,
+					createdById: null,
+				},
 				orderBy: { id: "desc" },
 				select: { kind: true, payload: true },
 			});

@@ -68,9 +68,12 @@ export const REVERT_REF_PREFIX = "revert-";
 
 /** The score of the newest pass with no grader (the automatic one), or `null` when there is none. */
 export function autoScoreOf(
-	_passes: readonly Pick<GradingPass, "grader" | "score" | "updatedAt">[],
+	passes: readonly Pick<GradingPass, "grader" | "score" | "updatedAt">[],
 ): number | null {
-	throw new Error("not implemented");
+	const automatic = newestPassesFirst(passes).find(
+		(pass) => pass.grader === null,
+	);
+	return automatic?.score ?? null;
 }
 
 /**
@@ -78,10 +81,13 @@ export function autoScoreOf(
  * with `REVERT_REF_PREFIX`, and either an earlier pass exists or the instructor created the submission.
  */
 export function isManualChange(
-	_passes: readonly GradingPass[],
-	_createdBy: string | null | undefined,
+	passes: readonly GradingPass[],
+	createdBy: string | null | undefined,
 ): boolean {
-	throw new Error("not implemented");
+	const [newest, ...earlier] = newestPassesFirst(passes);
+	if (!newest || newest.grader === null) return false;
+	if (newest.ref?.startsWith(REVERT_REF_PREFIX)) return false;
+	return earlier.length > 0 || Boolean(createdBy);
 }
 
 /// The answer a student gave to one question within a closed attempt: its newest submission, or for a `code` question the sent one that counts.
@@ -262,6 +268,7 @@ function buildAnswer(
 				? { review: true as const }
 				: {}),
 			passes: passes.map(toGradingPass),
+			...(submission.createdBy ? { createdBy: submission.createdBy } : {}),
 			...extra,
 		},
 	};

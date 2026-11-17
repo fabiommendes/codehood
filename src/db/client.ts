@@ -36,6 +36,9 @@ export { PrismaClient } from "../generated/prisma/client";
 /// Writes SQL `NULL` to an optional `Json` column, where a plain `null` is refused.
 export const DbNull = PrismaRuntime.DbNull;
 
+/// Writes JSON `null` to a required `Json` column, where a plain `null` is refused.
+export const JsonNull = PrismaRuntime.JsonNull;
+
 type PrismaTxFn = Parameters<PrismaClient["$transaction"]>[0];
 export type PrismaTx = Parameters<PrismaTxFn>[0];
 

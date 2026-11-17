@@ -7362,6 +7362,12 @@
           "preview": {
             "type": "boolean"
           },
+          "createdBy": {
+            "type": "string",
+            "nullable": true,
+            "pattern": "^[A-Za-z0-9][A-Za-z0-9_\\-]{1,30}$",
+            "example": "ada"
+          },
           "closedAt": {
             "type": "string",
             "nullable": true,
@@ -7439,6 +7445,12 @@
                     }
                   ]
                 },
+                "createdBy": {
+                  "type": "string",
+                  "nullable": true,
+                  "pattern": "^[A-Za-z0-9][A-Za-z0-9_\\-]{1,30}$",
+                  "example": "ada"
+                },
                 "startedAt": {
                   "type": "string",
                   "nullable": true,
@@ -7457,6 +7469,7 @@
                 "kind",
                 "automaticallyTriggered",
                 "payload",
+                "createdBy",
                 "startedAt",
                 "createdAt"
               ]
@@ -7478,6 +7491,7 @@
           "practiceSession",
           "acceptingSubmissions",
           "preview",
+          "createdBy",
           "closedAt",
           "submissions",
           "createdAt",
@@ -7580,6 +7594,12 @@
               }
             ]
           },
+          "createdBy": {
+            "type": "string",
+            "nullable": true,
+            "pattern": "^[A-Za-z0-9][A-Za-z0-9_\\-]{1,30}$",
+            "example": "ada"
+          },
           "startedAt": {
             "type": "string",
             "nullable": true,
@@ -7598,6 +7618,7 @@
           "kind",
           "automaticallyTriggered",
           "payload",
+          "createdBy",
           "startedAt",
           "createdAt"
         ]
@@ -37009,6 +37030,12 @@
                           "preview": {
                             "type": "boolean"
                           },
+                          "createdBy": {
+                            "type": "string",
+                            "nullable": true,
+                            "pattern": "^[A-Za-z0-9][A-Za-z0-9_\\-]{1,30}$",
+                            "example": "ada"
+                          },
                           "closedAt": {
                             "type": "string",
                             "nullable": true,
@@ -37086,6 +37113,12 @@
                                     }
                                   ]
                                 },
+                                "createdBy": {
+                                  "type": "string",
+                                  "nullable": true,
+                                  "pattern": "^[A-Za-z0-9][A-Za-z0-9_\\-]{1,30}$",
+                                  "example": "ada"
+                                },
                                 "startedAt": {
                                   "type": "string",
                                   "nullable": true,
@@ -37104,6 +37137,7 @@
                                 "kind",
                                 "automaticallyTriggered",
                                 "payload",
+                                "createdBy",
                                 "startedAt",
                                 "createdAt"
                               ]
@@ -37125,6 +37159,7 @@
                           "practiceSession",
                           "acceptingSubmissions",
                           "preview",
+                          "createdBy",
                           "closedAt",
                           "submissions",
                           "createdAt",
@@ -37277,6 +37312,12 @@
                     "preview": {
                       "type": "boolean"
                     },
+                    "createdBy": {
+                      "type": "string",
+                      "nullable": true,
+                      "pattern": "^[A-Za-z0-9][A-Za-z0-9_\\-]{1,30}$",
+                      "example": "ada"
+                    },
                     "closedAt": {
                       "type": "string",
                       "nullable": true,
@@ -37354,6 +37395,12 @@
                               }
                             ]
                           },
+                          "createdBy": {
+                            "type": "string",
+                            "nullable": true,
+                            "pattern": "^[A-Za-z0-9][A-Za-z0-9_\\-]{1,30}$",
+                            "example": "ada"
+                          },
                           "startedAt": {
                             "type": "string",
                             "nullable": true,
@@ -37372,6 +37419,7 @@
                           "kind",
                           "automaticallyTriggered",
                           "payload",
+                          "createdBy",
                           "startedAt",
                           "createdAt"
                         ]
@@ -37393,6 +37441,7 @@
                     "practiceSession",
                     "acceptingSubmissions",
                     "preview",
+                    "createdBy",
                     "closedAt",
                     "submissions",
                     "createdAt",
@@ -37494,6 +37543,12 @@
                     "preview": {
                       "type": "boolean"
                     },
+                    "createdBy": {
+                      "type": "string",
+                      "nullable": true,
+                      "pattern": "^[A-Za-z0-9][A-Za-z0-9_\\-]{1,30}$",
+                      "example": "ada"
+                    },
                     "closedAt": {
                       "type": "string",
                       "nullable": true,
@@ -37571,6 +37626,12 @@
                               }
                             ]
                           },
+                          "createdBy": {
+                            "type": "string",
+                            "nullable": true,
+                            "pattern": "^[A-Za-z0-9][A-Za-z0-9_\\-]{1,30}$",
+                            "example": "ada"
+                          },
                           "startedAt": {
                             "type": "string",
                             "nullable": true,
@@ -37589,6 +37650,7 @@
                           "kind",
                           "automaticallyTriggered",
                           "payload",
+                          "createdBy",
                           "startedAt",
                           "createdAt"
                         ]
@@ -37610,6 +37672,7 @@
                     "practiceSession",
                     "acceptingSubmissions",
                     "preview",
+                    "createdBy",
                     "closedAt",
                     "submissions",
                     "createdAt",
@@ -37723,6 +37786,12 @@
                     "preview": {
                       "type": "boolean"
                     },
+                    "createdBy": {
+                      "type": "string",
+                      "nullable": true,
+                      "pattern": "^[A-Za-z0-9][A-Za-z0-9_\\-]{1,30}$",
+                      "example": "ada"
+                    },
                     "closedAt": {
                       "type": "string",
                       "nullable": true,
@@ -37800,6 +37869,12 @@
                               }
                             ]
                           },
+                          "createdBy": {
+                            "type": "string",
+                            "nullable": true,
+                            "pattern": "^[A-Za-z0-9][A-Za-z0-9_\\-]{1,30}$",
+                            "example": "ada"
+                          },
                           "startedAt": {
                             "type": "string",
                             "nullable": true,
@@ -37818,6 +37893,7 @@
                           "kind",
                           "automaticallyTriggered",
                           "payload",
+                          "createdBy",
                           "startedAt",
                           "createdAt"
                         ]
@@ -37839,6 +37915,7 @@
                     "practiceSession",
                     "acceptingSubmissions",
                     "preview",
+                    "createdBy",
                     "closedAt",
                     "submissions",
                     "createdAt",
@@ -38162,6 +38239,12 @@
                               }
                             ]
                           },
+                          "createdBy": {
+                            "type": "string",
+                            "nullable": true,
+                            "pattern": "^[A-Za-z0-9][A-Za-z0-9_\\-]{1,30}$",
+                            "example": "ada"
+                          },
                           "startedAt": {
                             "type": "string",
                             "nullable": true,
@@ -38180,6 +38263,7 @@
                           "kind",
                           "automaticallyTriggered",
                           "payload",
+                          "createdBy",
                           "startedAt",
                           "createdAt"
                         ]
@@ -38314,6 +38398,12 @@
                         }
                       ]
                     },
+                    "createdBy": {
+                      "type": "string",
+                      "nullable": true,
+                      "pattern": "^[A-Za-z0-9][A-Za-z0-9_\\-]{1,30}$",
+                      "example": "ada"
+                    },
                     "startedAt": {
                       "type": "string",
                       "nullable": true,
@@ -38332,6 +38422,7 @@
                     "kind",
                     "automaticallyTriggered",
                     "payload",
+                    "createdBy",
                     "startedAt",
                     "createdAt"
                   ]
@@ -38469,6 +38560,12 @@
                         }
                       ]
                     },
+                    "createdBy": {
+                      "type": "string",
+                      "nullable": true,
+                      "pattern": "^[A-Za-z0-9][A-Za-z0-9_\\-]{1,30}$",
+                      "example": "ada"
+                    },
                     "startedAt": {
                       "type": "string",
                       "nullable": true,
@@ -38487,6 +38584,7 @@
                     "kind",
                     "automaticallyTriggered",
                     "payload",
+                    "createdBy",
                     "startedAt",
                     "createdAt"
                   ]
@@ -39967,6 +40065,12 @@
                     "preview": {
                       "type": "boolean"
                     },
+                    "createdBy": {
+                      "type": "string",
+                      "nullable": true,
+                      "pattern": "^[A-Za-z0-9][A-Za-z0-9_\\-]{1,30}$",
+                      "example": "ada"
+                    },
                     "closedAt": {
                       "type": "string",
                       "nullable": true,
@@ -40044,6 +40148,12 @@
                               }
                             ]
                           },
+                          "createdBy": {
+                            "type": "string",
+                            "nullable": true,
+                            "pattern": "^[A-Za-z0-9][A-Za-z0-9_\\-]{1,30}$",
+                            "example": "ada"
+                          },
                           "startedAt": {
                             "type": "string",
                             "nullable": true,
@@ -40062,6 +40172,7 @@
                           "kind",
                           "automaticallyTriggered",
                           "payload",
+                          "createdBy",
                           "startedAt",
                           "createdAt"
                         ]
@@ -40083,6 +40194,7 @@
                     "practiceSession",
                     "acceptingSubmissions",
                     "preview",
+                    "createdBy",
                     "closedAt",
                     "submissions",
                     "createdAt",

@@ -8,7 +8,8 @@ import {
 	answerGrade,
 	answerGradeBlanks,
 	answerGradeRubric,
-	type answerRef,
+	answerGradeUnanswered,
+	answerRef,
 	answerWillNotGrade,
 	gradingQuestion,
 } from "@/core/schemas/answer";
@@ -41,6 +42,53 @@ export const grading = {
 
 			const course = await checkedAnswer(input, actor);
 			await recordPass(input.submission, course, score, input.comment, actor);
+		}),
+	}),
+
+	/**
+	 * Grades a question the student left unanswered (instructor only).
+	 *
+	 * `score` is the text typed in the form, a whole percentage from 0 to 100.
+	 * The student's empty attempt is created when there is none.
+	 */
+	gradeUnanswered: defineAction({
+		input: answerGradeUnanswered,
+		handler: withServiceErrors(async (input, context) => {
+			const actor = requireUser(context);
+			const score = parsePercentScore(input.score);
+			if (score === null) throw new Error(SCORE_ERROR);
+
+			await db.manualGrade.gradeUnanswered(
+				{
+					course: parseCourseParams(input),
+					exam: input.exam,
+					author: input.author,
+					question: input.question,
+					score,
+					comment: input.comment,
+				},
+				{ actor },
+			);
+		}),
+	}),
+
+	/**
+	 * Undoes the change by hand of one answer, taking it back to its automatic score (instructor only).
+	 *
+	 * The history stays: the undo is a new grading pass.
+	 */
+	revert: defineAction({
+		input: answerRef,
+		handler: withServiceErrors(async (input, context) => {
+			const actor = requireUser(context);
+			await db.manualGrade.revert(
+				{
+					course: parseCourseParams(input),
+					exam: input.exam,
+					submission: input.submission,
+				},
+				{ actor },
+			);
 		}),
 	}),
 

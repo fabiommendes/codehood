@@ -179,5 +179,12 @@
 	"errors_exam_adjustment_set_exists": "\"{username}\" já tem uma nota substituta ativa: edite a existente",
 	"errors_exam_adjustment_set_exists_edit": "Esta tentativa já tem uma nota substituta ativa: edite a existente",
 	"errors_exam_adjustment_practice": "Provas de prática não têm ajustes",
-	"errors_exam_adjustment_question": "\"{question}\" não é uma questão desta prova"
+	"errors_exam_adjustment_question": "\"{question}\" não é uma questão desta prova",
+	"errors_empty_attempt_practice": "Provas de prática não têm tentativa criada pelo professor",
+	"errors_empty_attempt_not_enrolled": "\"{username}\" não está matriculado neste curso",
+	"errors_empty_attempt_exam_open": "A prova ainda não encerrou para \"{username}\"",
+	"errors_empty_attempt_in_progress": "A tentativa de \"{username}\" ainda está em andamento",
+	"errors_manual_grade_answered": "\"{username}\" respondeu esta questão: corrija a resposta",
+	"errors_manual_grade_score": "A nota deve ser um número de 0 a 1",
+	"errors_manual_change_not_changed": "Esta resposta não foi alterada à mão"
 }

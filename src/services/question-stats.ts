@@ -98,20 +98,21 @@ export function questionStats(
 	exceptions: ReadonlyMap<string, ExceptionTiming> = new Map(),
 	policy: ResultPolicy = {},
 ): QuestionStats[] {
+	const measured = measuredAttempts(attempts);
 	const answers = countingAnswers(
 		exam,
 		questions,
-		attempts,
+		measured,
 		feedback,
 		now,
 		exceptions,
 		policy,
 	);
-	const closedAttempts = closedAttemptCount(exam, attempts, now, exceptions);
+	const closedAttempts = closedAttemptCount(exam, measured, now, exceptions);
 	const rows = scoreRows(
 		exam,
 		questions,
-		attempts,
+		measured,
 		feedback,
 		now,
 		exceptions,
@@ -140,9 +141,16 @@ export function questionStats(
 
 /** The attempts as statistics read them: instructor-created attempts dropped, and instructor-created submissions dropped from the rest. */
 export function measuredAttempts<T extends GradingAttempt>(
-	_attempts: readonly T[],
+	attempts: readonly T[],
 ): T[] {
-	throw new Error("not implemented");
+	return attempts
+		.filter((attempt) => !attempt.createdBy)
+		.map((attempt) => ({
+			...attempt,
+			submissions: attempt.submissions.filter(
+				(submission) => !submission.createdBy,
+			),
+		}));
 }
 
 /// The closed attempts of the exam: the ones `countingAnswers` reads, found by their authors' personal timing.
@@ -361,8 +369,9 @@ export type AnswerDistribution =
  */
 export function answerDistribution(
 	question: QuestionDocument,
-	answers: readonly Pick<CountingAnswer, "payload" | "createdBy">[],
+	allAnswers: readonly Pick<CountingAnswer, "payload" | "createdBy">[],
 ): AnswerDistribution | null {
+	const answers = allAnswers.filter((answer) => !answer.createdBy);
 	switch (question.type) {
 		case "multiple-choice":
 			return {

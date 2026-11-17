@@ -1,7 +1,7 @@
 import { z } from "zod";
 import { m } from "@/i18n";
 import { isPercentScore, SCORE_ERROR } from "../score";
-import { rowVersion, slug } from "./base";
+import { rowVersion, slug, username } from "./base";
 import { blankGrade, score } from "./feedback";
 import {
 	rubricBase,
@@ -31,6 +31,16 @@ export const answerGrade = answerRef.extend({
 		.optional()
 		.meta({ form: { label: m.forms_label_comment(), widget: "textarea" } }),
 });
+
+/// What "Alterar nota" sends for a question with no answer: the exam page segments, the student, the question, a whole percentage and an optional comment.
+export const answerGradeUnanswered = answerRef
+	.omit({ submission: true })
+	.extend({
+		author: username,
+		question: slug,
+		score: answerGrade.shape.score,
+		comment: answerGrade.shape.comment,
+	});
 
 /// What the will-not-grade dialog sends: the answer and an optional comment for the student.
 export const answerWillNotGrade = answerRef.extend({
