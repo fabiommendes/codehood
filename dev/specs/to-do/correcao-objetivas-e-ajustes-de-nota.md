@@ -134,14 +134,12 @@ Vale para toda questão com `isAutoGraded(doc)` (automática e não `code`).
 - A11. Enquanto a issue não é implementada, a página mostra a nota fixa
   ("role=note", `alert-info`): fixar uma nova versão **não** corrige de novo
   as respostas existentes; use "Alterar nota".
-- A12. Bug conhecido: o `AnswerKey` mostra rótulos em inglês ("Correct order",
-  "Blank 1 of 3"). Os textos vêm de `../mdq/mdq-js/src/solid/messages.tsx`,
-  que já tem o dicionário `ptBR`; as chamadas do Codehood passam
-  `mdqMessages` (`QuestionPreview.tsx`, `AnswerView.tsx`, `AnswerField.tsx`).
-  Achar o ramo da chave de resposta que escapa disso e corrigir. Se a causa
-  estiver no mdq, a correção é lá e o `.mdq-ref` avança (`pnpm run mdq:bump`).
-  Teste: a página de uma questão de ordenação e uma de lacunas, em pt-BR,
-  sem as strings inglesas.
+- A12. Descartado: não é bug. O dev server é compilado em `en`
+  (`lang="en"`), e os rótulos "Correct order" e "Blank 1 of 3" estão certos
+  nesse locale. Num build pt-BR a chave sai em português ("ordem correta",
+  "Lacuna 1 de 3"), conferido por um teste com `CODEHOOD_LOCALE=pt-BR`. A
+  impressão de bug veio do contraste com os mockups, escritos em português.
+  A atualização da issue de recorreção (A10) passa para a T5b.
 
 ### B. Alterar a nota de uma questão
 

@@ -896,7 +896,7 @@ movidos não colidem com T6 (T6 vem depois).
 - Aceite: os testes do T5b; screenshots de cada tipo com dados do seed (T8
   completa o seed; use o que existir e relate o que faltou); lint 0.
 
-### T5c. Rótulos em inglês na chave e texto da issue (A10, A12)
+### T5c. Descartada (A12 não é bug; A10 vai para a T5b)
 
 Depende de T1. Paralela a tudo.
 
