@@ -32,6 +32,8 @@ export interface ExamExceptionsProps {
 	/// The students an exception may be granted to.
 	students: { username: string; name: string }[];
 	rows: ExceptionRow[];
+	/// The section heading, shown with the "Add exception" button on its right.
+	heading: string;
 }
 
 /// What the exception changes, as "+30 min · rescheduled"; the new date itself shows only when there is no window to carry it.
@@ -215,17 +217,18 @@ export default function ExamExceptions(
 
 	return (
 		<div class="flex flex-col gap-4">
+			<div class="flex flex-wrap items-center justify-between gap-3">
+				<h2 class="page-subheader">{props.heading}</h2>
+				<button type="button" class="btn btn-primary btn-sm" onClick={openAdd}>
+					{m.exams_exceptions_add()}
+				</button>
+			</div>
+
 			<Table
 				columns={columns}
 				data={props.rows}
 				empty={m.exams_exceptions_empty()}
 			/>
-
-			<div>
-				<button type="button" class="btn btn-primary btn-sm" onClick={openAdd}>
-					{m.exams_exceptions_add()}
-				</button>
-			</div>
 
 			<dialog ref={dialog} class="modal">
 				<div class="modal-box">

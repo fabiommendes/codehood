@@ -14,7 +14,6 @@
 	"repositories_pull_note": "With local commits, update with {command}.",
 	"repositories_files_label": "Files",
 	"repositories_up": "Up",
-	"repositories_back": "Back to repositories",
 	"repositories_download_file": "Download {name}",
 	"repositories_too_large": "This file is larger than 1 MB, so it is not shown here.",
 	"repositories_not_viewable": "This file cannot be shown here.",

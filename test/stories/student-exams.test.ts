@@ -941,6 +941,7 @@ test("student: run my code answer before submitting", async ({ page }) => {
 		slug: "quiz-code",
 		type: "QUIZ",
 		status: "ONGOING",
+		allowCodeRun: false,
 		questions,
 	});
 	const savedCode = async (exam: string) => {
@@ -1001,7 +1002,7 @@ test("student: run my code answer before submitting", async ({ page }) => {
 		await expect(page.getByText("Resource not found")).toHaveCount(0);
 	});
 
-	await test.step("a quiz does not run code by default, and the answer is still written and saved", async () => {
+	await test.step("a quiz that turns code execution off does not run code, and the answer is still written and saved", async () => {
 		await page.goto(`${href}/exams/${quiz.slug}`);
 		await page.getByRole("button", { name: /^Start/ }).click();
 

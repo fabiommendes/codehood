@@ -553,6 +553,18 @@ h6 {
 	fill: #00d2e6;
 }
 
+/* Section headings of an app page, below the page title: `page-subheader` on
+   the page's h2, `page-subsubheader` on an h3 that splits one of its
+   sections. Headings inside cards and dialogs keep `card-title` or their own
+   size. Spacing stays in utilities at the call site. */
+@utility page-subheader {
+	@apply text-2xl font-bold;
+}
+
+@utility page-subsubheader {
+	@apply text-xl font-semibold;
+}
+
 /* Small blue uppercase eyebrow label above a heading — matches the landing page's
    section kickers (src/pages/index.astro's .landing .kicker). */
 .kicker {

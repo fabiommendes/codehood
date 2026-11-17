@@ -194,7 +194,7 @@ test("the code of the editor is the answer that was sent", async ({ page }) => {
 test("when the teacher turned running off the answer is still written and saved", async ({
 	page,
 }) => {
-	const s = await setup({ page, type: "QUIZ" });
+	const s = await setup({ page, type: "QUIZ", allowCodeRun: false });
 	await page.goto(s.url);
 
 	await expect(
@@ -208,8 +208,10 @@ test("when the teacher turned running off the answer is still written and saved"
 	await expect(footer(page)).toContainText(/Saved at \d\d:\d\d/);
 });
 
-test("an exam that turns running on explicitly runs code", async ({ page }) => {
-	const s = await setup({ page, type: "EXAM", allowCodeRun: true });
+test("an exam that does not set running runs code, whatever its type", async ({
+	page,
+}) => {
+	const s = await setup({ page, type: "EXAM" });
 	await page.goto(s.url);
 
 	await expect(runner(page).locator("[data-action=run]")).toBeEnabled();
@@ -219,7 +221,7 @@ test("an exam that turns running on explicitly runs code", async ({ page }) => {
 test("an exam that is not running code reserves no runtime", async ({
 	page,
 }) => {
-	const s = await setup({ page, type: "QUIZ" });
+	const s = await setup({ page, type: "QUIZ", allowCodeRun: false });
 	await page.goto(s.url);
 
 	await editor(page).fill("console.log(3)");
@@ -482,14 +484,13 @@ test("stem and epilogue have the same DOM as the essay question of mdq", async (
 	await expect(page.locator("#question-2 .mdq-stem script")).toHaveCount(0);
 });
 
-test("the exam page says where the code-run setting comes from", async ({
+test("the exam page says nothing about code execution while it is on", async ({
 	page,
 }) => {
-	const practice = await setup({ page });
-	await page.goto(practice.url);
-	await expect(page.getByTestId("code-run-setting")).toHaveText(
-		"Code execution: on (PRACTICE default)",
-	);
+	const s = await setup({ page, type: "EXAM" });
+	await page.goto(s.url);
+	await expect(runner(page).locator("[data-action=run]")).toBeEnabled();
+	await expect(page.getByTestId("code-run-setting")).toHaveCount(0);
 });
 
 test("an exam that switches running off in the exam says so", async ({
@@ -498,7 +499,7 @@ test("an exam that switches running off in the exam says so", async ({
 	const s = await setup({ page, type: "PRACTICE", allowCodeRun: false });
 	await page.goto(s.url);
 	await expect(page.getByTestId("code-run-setting")).toHaveText(
-		"Code execution: off (set in the exam)",
+		"Code execution is off for this exam",
 	);
 	await expect(runner(page).locator("[data-action=run]")).toBeDisabled();
 });

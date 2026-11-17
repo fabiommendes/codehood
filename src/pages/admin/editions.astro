@@ -61,75 +61,73 @@ const editionRows: EditionRow[] = page.items.map((edition) => ({
 ---
 
 <AppLayout title={m.admin_editions_page_title()}>
-  <main class="mx-auto max-w-4xl px-4 py-10">
-    <AdminHeader active="editions" />
+  <AdminHeader active="editions" />
 
-    <p class="max-w-xl text-muted">
-      {m.admin_editions_intro()}
-    </p>
+  <p class="max-w-xl text-muted">
+    {m.admin_editions_intro()}
+  </p>
 
-    {
-      createResult && !createResult.error && (
-        <div role="alert" class="alert alert-success mt-6">
-          <span>{m.admin_edition_created({ slug: createResult.data.slug })}</span>
-        </div>
-      )
-    }
-
-    <div class="card card-border mt-6 bg-base-100">
-      <div class="card-body">
-        <h2 class="card-title">{m.admin_new_edition()}</h2>
-        <form
-          method="POST"
-          action={actionHref(actions.admin.createEdition, here.search)}
-          class="mt-2 flex flex-wrap items-start gap-4"
-        >
-          <FormAlert error={createForm.error} class="w-full" />
-          <Field {...createForm.field("slug")} class="font-mono" />
-          <Field {...createForm.field("name")} />
-          <Field {...createForm.field("startDate")} />
-          <Field {...createForm.field("endDate")} />
-
-          <button
-            type="submit"
-            class="btn btn-square btn-primary mt-7"
-            aria-label={m.admin_new_edition()}
-            title={m.admin_new_edition()}
-          >
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
-              <path
-                d="M12 5v14M5 12h14"
-                stroke="currentColor"
-                stroke-width="1.8"
-                stroke-linecap="round"></path>
-            </svg>
-          </button>
-        </form>
+  {
+    createResult && !createResult.error && (
+      <div role="alert" class="alert alert-success mt-6">
+        <span>{m.admin_edition_created({ slug: createResult.data.slug })}</span>
       </div>
+    )
+  }
+
+  <div class="card card-border mt-6 bg-base-100">
+    <div class="card-body">
+      <h2 class="card-title">{m.admin_new_edition()}</h2>
+      <form
+        method="POST"
+        action={actionHref(actions.admin.createEdition, here.search)}
+        class="mt-2 flex flex-wrap items-start gap-4"
+      >
+        <FormAlert error={createForm.error} class="w-full" />
+        <Field {...createForm.field("slug")} class="font-mono" />
+        <Field {...createForm.field("name")} />
+        <Field {...createForm.field("startDate")} />
+        <Field {...createForm.field("endDate")} />
+
+        <button
+          type="submit"
+          class="btn btn-square btn-primary mt-7"
+          aria-label={m.admin_new_edition()}
+          title={m.admin_new_edition()}
+        >
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
+            <path
+              d="M12 5v14M5 12h14"
+              stroke="currentColor"
+              stroke-width="1.8"
+              stroke-linecap="round"></path>
+          </svg>
+        </button>
+      </form>
     </div>
+  </div>
 
-    {
-      updateResult && !updateResult.error && (
-        <div role="alert" class="alert alert-success mt-6">
-          <span>{m.admin_edition_updated()}</span>
-        </div>
-      )
-    }
-    <FormAlert error={deleteResult?.error && errorMessage(deleteResult.error)} class="mt-6" />
-    {
-      deleteResult && !deleteResult.error && (
-        <div role="alert" class="alert alert-success mt-6">
-          <span>{m.admin_edition_deleted()}</span>
-        </div>
-      )
-    }
+  {
+    updateResult && !updateResult.error && (
+      <div role="alert" class="alert alert-success mt-6">
+        <span>{m.admin_edition_updated()}</span>
+      </div>
+    )
+  }
+  <FormAlert error={deleteResult?.error && errorMessage(deleteResult.error)} class="mt-6" />
+  {
+    deleteResult && !deleteResult.error && (
+      <div role="alert" class="alert alert-success mt-6">
+        <span>{m.admin_edition_deleted()}</span>
+      </div>
+    )
+  }
 
-    <EditionsTable
-      editions={editionRows}
-      cursor={{ ...pageLinks(here, page), total }}
-      search={here.search}
-      editForm={editForm}
-      failedSlug={failedSlug}
-    />
-  </main>
+  <EditionsTable
+    editions={editionRows}
+    cursor={{ ...pageLinks(here, page), total }}
+    search={here.search}
+    editForm={editForm}
+    failedSlug={failedSlug}
+  />
 </AppLayout>

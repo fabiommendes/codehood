@@ -50,94 +50,92 @@ function code(text: string): string {
   trail={breadcrumbs(Astro.url, { course })}
   nav={resourcesNav(href, groups, repositories.length, { expand: true })}
 >
-  <main class="mx-auto max-w-4xl px-4 py-10">
-    <CourseHeader course={course} tabs={tabs} active="resources" />
+  <CourseHeader course={course} tabs={tabs} active="resources" />
 
-    {hasEventResources && <p class="mt-4 text-sm text-muted" set:html={m.courses_resources_on_schedule({
-      schedule: `<a href="${escapeHtml(href)}/schedule" class="link">${escapeHtml(m.courses_resources_schedule_link())}</a>`,
-    })} />}
-    {
-      all.length === 0 && canWrite && (
-        <Alert variant="info" class="mt-4">
-          <span>
-            <span set:html={m.courses_resources_empty_instructor({
-              folder: code("resources/"),
-              command: code("codehood push"),
-            })} />{" "}
-            <CliSetupLink />
-          </span>
-        </Alert>
-      )
-    }
-    {
-      all.length === 0 && !canWrite && (
-        <Alert variant="info" class="mt-4">
-          <span>{m.courses_resources_empty_student()}</span>
-        </Alert>
-      )
-    }
+  {hasEventResources && <p class="mt-4 text-sm text-muted" set:html={m.courses_resources_on_schedule({
+    schedule: `<a href="${escapeHtml(href)}/schedule" class="link">${escapeHtml(m.courses_resources_schedule_link())}</a>`,
+  })} />}
+  {
+    all.length === 0 && canWrite && (
+      <Alert variant="info" class="mt-4">
+        <span>
+          <span set:html={m.courses_resources_empty_instructor({
+            folder: code("resources/"),
+            command: code("codehood push"),
+          })} />{" "}
+          <CliSetupLink />
+        </span>
+      </Alert>
+    )
+  }
+  {
+    all.length === 0 && !canWrite && (
+      <Alert variant="info" class="mt-4">
+        <span>{m.courses_resources_empty_student()}</span>
+      </Alert>
+    )
+  }
 
-    <div class="mt-8 flex flex-col gap-6">
-      {
-        groups.map((group) => (
-          <section id={resourceGroupId(group.type)} class="scroll-mt-20">
-            <h3 class="text-sm font-semibold tracking-wide text-muted uppercase">
-              {group.label}
-            </h3>
-            <div class="mt-2 flex flex-col gap-3">
-              {group.resources.map((resource) => {
-                const file =
-                  resource.data.type === "FILE" ? resource.data : undefined;
-                return (
-                  <ListRow
-                    href={resourceHref(resource, href)}
-                    download={file ? fileDownloadName(resource, file) : undefined}
-                    external={resource.data.type === "LINK"}
+  <div class="mt-8 flex flex-col gap-6">
+    {
+      groups.map((group) => (
+        <section id={resourceGroupId(group.type)} class="scroll-mt-20">
+          <h3 class="text-sm font-semibold tracking-wide text-muted uppercase">
+            {group.label}
+          </h3>
+          <div class="mt-2 flex flex-col gap-3">
+            {group.resources.map((resource) => {
+              const file =
+                resource.data.type === "FILE" ? resource.data : undefined;
+              return (
+                <ListRow
+                  href={resourceHref(resource, href)}
+                  download={file ? fileDownloadName(resource, file) : undefined}
+                  external={resource.data.type === "LINK"}
+                >
+                  <span
+                    slot="leading"
+                    class="grid h-10 w-10 shrink-0 place-items-center rounded-field bg-primary/10 text-primary"
                   >
-                    <span
-                      slot="leading"
-                      class="grid h-10 w-10 shrink-0 place-items-center rounded-field bg-primary/10 text-primary"
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
+                      <path
+                        d={RESOURCE_ICONS[resource.data.type]}
+                        stroke="currentColor"
+                        stroke-width="1.6"
+                        stroke-linecap="round"
+                        stroke-linejoin="round"
+                      />
+                    </svg>
+                  </span>
+                  <p class="font-medium">{resource.title}</p>
+                  <p class="text-sm text-muted">
+                    {resourceDetail(resource)}
+                  </p>
+                  {RESOURCE_ACTION_ICONS[resource.data.type] && (
+                    <svg
+                      slot="trailing"
+                      width="18"
+                      height="18"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      class="shrink-0 text-muted"
+                      aria-hidden="true"
                     >
-                      <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
-                        <path
-                          d={RESOURCE_ICONS[resource.data.type]}
-                          stroke="currentColor"
-                          stroke-width="1.6"
-                          stroke-linecap="round"
-                          stroke-linejoin="round"
-                        />
-                      </svg>
-                    </span>
-                    <p class="font-medium">{resource.title}</p>
-                    <p class="text-sm text-muted">
-                      {resourceDetail(resource)}
-                    </p>
-                    {RESOURCE_ACTION_ICONS[resource.data.type] && (
-                      <svg
-                        slot="trailing"
-                        width="18"
-                        height="18"
-                        viewBox="0 0 24 24"
-                        fill="none"
-                        class="shrink-0 text-muted"
-                        aria-hidden="true"
-                      >
-                        <path
-                          d={RESOURCE_ACTION_ICONS[resource.data.type]}
-                          stroke="currentColor"
-                          stroke-width="1.6"
-                          stroke-linecap="round"
-                          stroke-linejoin="round"
-                        />
-                      </svg>
-                    )}
-                  </ListRow>
-                );
-              })}
-            </div>
-          </section>
-        ))
-      }
-    </div>
-  </main>
+                      <path
+                        d={RESOURCE_ACTION_ICONS[resource.data.type]}
+                        stroke="currentColor"
+                        stroke-width="1.6"
+                        stroke-linecap="round"
+                        stroke-linejoin="round"
+                      />
+                    </svg>
+                  )}
+                </ListRow>
+              );
+            })}
+          </div>
+        </section>
+      ))
+    }
+  </div>
 </AppLayout>

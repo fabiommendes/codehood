@@ -14,6 +14,26 @@
   revisão do que foi sancionado. REST em
   `/api/course/{discipline}/{course}/exam/{slug}/sanction`.
 
+### Changed
+
+- Execução de código ligada por padrão em todo tipo de prova; antes só a
+  lista (PRACTICE) rodava código sem `meta.codeRun: true`. A página da prova
+  só avisa quando a execução está desligada.
+- Duração de prova legível: "2h 30 min", e "até <data>, <hora>" a partir de
+  um dia. Vale no cabeçalho da prova, na tabela de provas, no cronograma e no
+  calendário. O cabeçalho da prova mostra a data antes da duração e perdeu a
+  contagem de questões e a data de atualização; encerrar a prova e o registro
+  de edição foram para a seção "Configurações", no fim da página.
+- `AppLayout` desenha o `<main>` da página, com a largura escolhida pela prop
+  `width`. Cabeçalhos de seção usam `page-subheader` (h2) e
+  `page-subsubheader` (h3). Saem os links "← voltar" que repetiam o
+  breadcrumb.
+
+### Fixed
+
+- No tablet e no celular, o breadcrumb ficava por cima da gaveta de
+  navegação aberta.
+
 ## 0.5.1 (2026-11-17)
 
 ### Fixed

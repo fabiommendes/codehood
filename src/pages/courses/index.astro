@@ -29,79 +29,77 @@ const courses = page.items;
 ---
 
 <AppLayout title={isAdmin ? m.courses_list_all_title() : m.courses_list_my_title()}>
-  <main class="mx-auto max-w-4xl px-4 py-10">
-    <PageKicker text={m.courses_term_overview()} squares />
-    <div class="flex flex-wrap items-center justify-between gap-4">
-      <div>
-        <h1 class="text-3xl font-bold">
-          {isAdmin ? m.courses_list_all_title() : m.courses_list_my_title()}
-        </h1>
-        <p class="mt-2 text-base-content/70">
-          {isAdmin ? m.courses_list_all_subtitle() : m.courses_list_my_subtitle()}
-        </p>
-      </div>
-      {
-        courses.length > 0 && (
-          <a href="/courses/join" class="btn btn-primary rounded-full">
-            {m.courses_list_join()}
-          </a>
-        )
-      }
+  <PageKicker text={m.courses_term_overview()} squares />
+  <div class="flex flex-wrap items-center justify-between gap-4">
+    <div>
+      <h1 class="text-3xl font-bold">
+        {isAdmin ? m.courses_list_all_title() : m.courses_list_my_title()}
+      </h1>
+      <p class="mt-2 text-base-content/70">
+        {isAdmin ? m.courses_list_all_subtitle() : m.courses_list_my_subtitle()}
+      </p>
     </div>
-
     {
-      justLeft && (
-        <Alert variant="success" class="mt-6">
-          <span>{m.courses_list_left()}</span>
-        </Alert>
+      courses.length > 0 && (
+        <a href="/courses/join" class="btn btn-primary rounded-full">
+          {m.courses_list_join()}
+        </a>
       )
     }
+  </div>
 
-    {
-      courses.length === 0 ? (
-        <EmptyState scene="constellation" title={m.courses_list_empty_title()} class="mt-10">
-          {m.courses_list_empty_body()}
-          <a slot="actions" href="/courses/join" class="btn btn-primary rounded-full">
-            {m.courses_list_join()}
-          </a>
-        </EmptyState>
-      ) : (
-        <div class="mt-8 grid grid-cols-1 gap-5 sm:grid-cols-2 xl:grid-cols-3">
-          {courses.map((course) => {
-            const href = courseHref({
-              discipline: course.discipline.slug,
-              instructor: course.instructor.username,
-              edition: course.edition.slug,
-            });
-            const isInstructor = course.instructor.username === actor.username;
-            return (
-              <a
-                href={href}
-                class="card card-border bg-base-100 shadow-sm transition-shadow hover:shadow-md"
-              >
-                <div class="card-body">
-                  <span
-                    class:list={[
-                      "badge badge-sm font-mono",
-                      isInstructor ? "badge-primary" : "badge-outline",
-                    ]}
-                  >
-                    {course.discipline.slug}
-                  </span>
-                  <h2 class="card-title mt-1">{course.discipline.name}</h2>
-                  <p class="text-sm text-muted">
-                    {isInstructor ? m.courses_list_teaching() : course.instructor.name}
-                  </p>
-                  <p class="mt-3 text-xs text-muted">
-                    {m.courses_list_enrolled({ edition: course.edition.slug, count: course.enrollmentCount })}
-                  </p>
-                </div>
-              </a>
-            );
-          })}
-        </div>
-        <CursorPagination {...pageLinks(listUrl(Astro.url), page)} total={total} />
-      )
-    }
-  </main>
+  {
+    justLeft && (
+      <Alert variant="success" class="mt-6">
+        <span>{m.courses_list_left()}</span>
+      </Alert>
+    )
+  }
+
+  {
+    courses.length === 0 ? (
+      <EmptyState scene="constellation" title={m.courses_list_empty_title()} class="mt-10">
+        {m.courses_list_empty_body()}
+        <a slot="actions" href="/courses/join" class="btn btn-primary rounded-full">
+          {m.courses_list_join()}
+        </a>
+      </EmptyState>
+    ) : (
+      <div class="mt-8 grid grid-cols-1 gap-5 sm:grid-cols-2 xl:grid-cols-3">
+        {courses.map((course) => {
+          const href = courseHref({
+            discipline: course.discipline.slug,
+            instructor: course.instructor.username,
+            edition: course.edition.slug,
+          });
+          const isInstructor = course.instructor.username === actor.username;
+          return (
+            <a
+              href={href}
+              class="card card-border bg-base-100 shadow-sm transition-shadow hover:shadow-md"
+            >
+              <div class="card-body">
+                <span
+                  class:list={[
+                    "badge badge-sm font-mono",
+                    isInstructor ? "badge-primary" : "badge-outline",
+                  ]}
+                >
+                  {course.discipline.slug}
+                </span>
+                <h2 class="card-title mt-1">{course.discipline.name}</h2>
+                <p class="text-sm text-muted">
+                  {isInstructor ? m.courses_list_teaching() : course.instructor.name}
+                </p>
+                <p class="mt-3 text-xs text-muted">
+                  {m.courses_list_enrolled({ edition: course.edition.slug, count: course.enrollmentCount })}
+                </p>
+              </div>
+            </a>
+          );
+        })}
+      </div>
+      <CursorPagination {...pageLinks(listUrl(Astro.url), page)} total={total} />
+    )
+  }
 </AppLayout>

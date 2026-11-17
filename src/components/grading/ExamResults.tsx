@@ -156,7 +156,7 @@ export default function ExamResults(props: Props): JSX.Element {
 	return (
 		<section class="mt-8">
 			<div class="flex items-center justify-between gap-4">
-				<h2 class="text-lg font-semibold">{m.grades_results_title()}</h2>
+				<h3 class="page-subsubheader">{m.grades_results_students_title()}</h3>
 				<div class="flex items-center gap-2">
 					<Show when={props.rows.length > 0 && pending() === 0}>
 						<a href={`${props.href}/grading`} class="btn btn-outline btn-sm">

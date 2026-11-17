@@ -180,18 +180,19 @@ const openRegrades = staff?.openRegrades ?? 0;
 const personalExtra = ownException?.extraTime ?? null;
 
 const codeRun = effectiveCodeRun(exam);
-const codeRunLabel =
-	codeRun.source === "exam"
-		? codeRun.allowed
-			? m.exams_detail_code_run_on_exam()
-			: m.exams_detail_code_run_off_exam()
-		: codeRun.allowed
-			? m.exams_detail_code_run_on_default({ type: exam.type })
-			: m.exams_detail_code_run_off_default({ type: exam.type });
 
 // One line under the title: what the exam is, when, and how long.
 const meta = [
 	examTypeLabels[exam.type],
+	ownException?.scheduledAt
+		? m.exams_detail_new_date({
+				date: formatDateTime(ownException.scheduledAt),
+			})
+		: shown.scheduledAt
+			? formatDateTime(shown.scheduledAt)
+			: canManage
+				? m.exams_not_scheduled()
+				: null,
 	personalExtra
 		? m.exams_detail_duration_personal({
 				// The class's own extra time is part of the duration the student's extra comes on top of.
@@ -202,31 +203,17 @@ const meta = [
 									durationToMinutes(exam.extraTime),
 							)
 						: exam.duration,
+					shown.scheduledAt,
 				),
 				extra: formatDuration(personalExtra),
 			})
 		: exam.extraTime
 			? m.exams_detail_duration_extra({
-					duration: formatDuration(exam.duration),
+					duration: formatDuration(exam.duration, shown.scheduledAt),
 					extra: formatDuration(exam.extraTime),
 				})
-			: formatDuration(exam.duration),
-	ownException?.scheduledAt
-		? m.exams_detail_new_date({
-				date: formatDateTime(ownException.scheduledAt),
-			})
-		: shown.scheduledAt
-			? formatDateTime(shown.scheduledAt)
-			: canManage
-				? m.exams_not_scheduled()
-				: null,
-	canManage
-		? m.exams_detail_question_count({ count: exam.questions.length })
-		: null,
+			: formatDuration(exam.duration, shown.scheduledAt),
 	exam.tags.length > 0 ? exam.tags.join(", ") : null,
-	canManage
-		? m.exams_detail_updated({ date: formatDateTime(exam.updatedAt) })
-		: null,
 ].filter((part): part is string => part !== null);
 
 const view = await loadAttemptView({
@@ -258,96 +245,131 @@ const examOutcome = view.result;
     ],
   })}
 >
-  <main class="mx-auto max-w-4xl px-4 py-10">
-    <CourseHeader course={course} tabs={tabs} active="exams" />
+  <CourseHeader course={course} tabs={tabs} active="exams" />
 
-    <div class="mt-2 flex items-start justify-between gap-4">
-      <div>
-        <h2 class="text-2xl font-bold">{exam.title}</h2>
-        <p class="mt-1 text-sm text-muted">{meta.join(" · ")}</p>
-        <p class="mt-1 text-sm text-muted" data-testid="code-run-setting">{codeRunLabel}</p>
+  <div class="mt-6 flex items-start justify-between gap-4">
+    <div>
+      <h2 class="page-subheader">{exam.title}</h2>
+      <p class="mt-1 text-sm text-muted">{meta.join(" · ")}</p>
+      {!codeRun.allowed && <p class="mt-1 text-sm text-muted" data-testid="code-run-setting">{m.exams_detail_code_run_off()}</p>}
+    </div>
+    <span class:list={["badge badge-sm mt-1.5 shrink-0", badge.className]}>{badge.label}</span>
+  </div>
+
+  {
+    exam.description && (
+      <div class="mt-4 text-sm text-base-content/70">
+        {descriptionHtml ? <Fragment set:html={descriptionHtml} /> : <p>{exam.description}</p>}
       </div>
-      <span class:list={["badge badge-sm mt-1.5 shrink-0", badge.className]}>{badge.label}</span>
-    </div>
+    )
+  }
 
-    {
-      exam.description && (
-        <div class="mt-4 text-sm text-base-content/70">
-          {descriptionHtml ? <Fragment set:html={descriptionHtml} /> : <p>{exam.description}</p>}
+  {
+    exam.preamble && (
+      <section id="instructions" class="mt-6 scroll-mt-20">
+        <h3 class="page-subsubheader">{m.exams_detail_instructions()}</h3>
+        <div class="mt-3 rounded-box border border-edge bg-base-100 p-6">
+          {preambleHtml ? (
+            <div class="prose prose-sm max-w-none" set:html={preambleHtml} />
+          ) : (
+            <p class="whitespace-pre-wrap text-sm">{exam.preamble}</p>
+          )}
         </div>
-      )
-    }
+      </section>
+    )
+  }
 
-    {
-      exam.preamble && (
-        <section id="instructions" class="mt-6 scroll-mt-20">
-          <h2 class="text-lg font-semibold">{m.exams_detail_instructions()}</h2>
-          <div class="mt-3 rounded-box border border-edge bg-base-100 p-6">
-            {preambleHtml ? (
-              <div class="prose prose-sm max-w-none" set:html={preambleHtml} />
-            ) : (
-              <p class="whitespace-pre-wrap text-sm">{exam.preamble}</p>
+  <div class="mt-4">
+    <AttachmentList
+      attachments={exam.attachments}
+      codeBlocks={await highlightQuestionCodeBlocks({ attachments: exam.attachments })}
+      url={(name) => examAttachmentUrl(`${discipline}/${courseSegment}`, slug, name)}
+    />
+  </div>
+
+  {
+    canManage && pendingAnswers > 0 && (
+      <div
+        role="status"
+        class="mt-6 flex items-center justify-between gap-4 rounded-box border border-edge bg-base-200 p-4 text-sm"
+      >
+        <span>
+          {m.exams_detail_pending_banner({
+            phase: examPhaseLabels[phase],
+            count: pendingAnswers,
+          })}
+        </span>
+        <a href={`${href}/exams/${exam.slug}/grading`} class="btn btn-primary btn-sm">
+          {m.exams_detail_grade_answers()}
+        </a>
+      </div>
+    )
+  }
+
+  {
+    canManage && openRegrades > 0 && (
+      <p role="status" class="mt-6 rounded-box border border-edge bg-base-200 p-4 text-sm">
+        <a href={`${href}/exams/${exam.slug}/regrades`} class="link font-medium">
+          {m.grades_regrade_banner({ count: openRegrades })}
+        </a>
+      </p>
+    )
+  }
+
+  {
+    canManage && exam.type === "EXAM" && (
+      <section id="release-status" class="mt-6 scroll-mt-20" data-testid="release-status">
+        {exam.gradesReleasedAt || canRelease ? (
+          <div class="flex flex-col gap-2">
+            {!exam.gradesReleasedAt && (
+              <p role="status" class="text-sm text-base-content/70">
+                {m.exams_release_status_ready()}
+              </p>
             )}
+            <ReleaseGrades
+              client:load
+              discipline={discipline!}
+              course={courseSegment!}
+              exam={slug}
+              releasedAt={exam.gradesReleasedAt}
+              canRelease={canRelease}
+              now={now}
+            />
           </div>
-        </section>
-      )
-    }
+        ) : (
+          <p role="status" class="text-sm text-base-content/70">
+            {m.exams_release_status_blocked({ reason: blockedReason })}
+            {releaseBlocker === "pending" && (
+              <>
+                {" "}
+                <a href={`${href}/exams/${exam.slug}/grading`} class="link">{m.exams_detail_grade_answers()}</a>
+              </>
+            )}
+          </p>
+        )}
+      </section>
+    )
+  }
 
-    <div class="mt-4">
-      <AttachmentList
-        attachments={exam.attachments}
-        codeBlocks={await highlightQuestionCodeBlocks({ attachments: exam.attachments })}
-        url={(name) => examAttachmentUrl(`${discipline}/${courseSegment}`, slug, name)}
-      />
-    </div>
+  {canManage && <ExamQuestionsTable href={href} rows={questionRows} stats={questionStats} />}
 
-    {
-      canManage && pendingAnswers > 0 && (
-        <div
-          role="status"
-          class="mt-6 flex items-center justify-between gap-4 rounded-box border border-edge bg-base-200 p-4 text-sm"
-        >
-          <span>
-            {m.exams_detail_pending_banner({
-              phase: examPhaseLabels[phase],
-              count: pendingAnswers,
-            })}
-          </span>
-          <a href={`${href}/exams/${exam.slug}/grading`} class="btn btn-primary btn-sm">
-            {m.exams_detail_grade_answers()}
-          </a>
-        </div>
-      )
-    }
-
-    {
-      canManage && openRegrades > 0 && (
-        <p role="status" class="mt-6 rounded-box border border-edge bg-base-200 p-4 text-sm">
-          <a href={`${href}/exams/${exam.slug}/regrades`} class="link font-medium">
-            {m.grades_regrade_banner({ count: openRegrades })}
-          </a>
-        </p>
-      )
-    }
-
-    {
-      canClose && (
-        <section id="close-exam" class="mt-6 scroll-mt-20">
-          <CloseExam
-            client:load
-            discipline={discipline!}
-            course={courseSegment!}
-            exam={slug}
-            inProgress={staff?.inProgress ?? 0}
-            noDeadline={windowEnd(exam) === null}
-          />
-        </section>
-      )
-    }
-
-    {
-      canManage && (
-        <section class="mt-6">
+  {
+    canManage && (
+      <section id="exam-settings" aria-labelledby="exam-settings-heading" class="mt-10 scroll-mt-20">
+        <h3 id="exam-settings-heading" class="page-subsubheader">{m.exams_detail_settings_heading()}</h3>
+        {canClose && (
+          <div id="close-exam" class="mt-4 scroll-mt-20">
+            <CloseExam
+              client:load
+              discipline={discipline!}
+              course={courseSegment!}
+              exam={slug}
+              inProgress={staff?.inProgress ?? 0}
+              noDeadline={windowEnd(exam) === null}
+            />
+          </div>
+        )}
+        <div class="mt-4">
           <AnswerHistorySwitch
             client:load
             discipline={discipline!}
@@ -355,86 +377,49 @@ const examOutcome = view.result;
             exam={slug}
             enabled={effectiveAnswerHistory(exam)}
           />
-        </section>
-      )
-    }
+        </div>
+      </section>
+    )
+  }
 
-    {
-      canManage && exam.type === "EXAM" && (
-        <section id="release-status" class="mt-6 scroll-mt-20" data-testid="release-status">
-          {exam.gradesReleasedAt || canRelease ? (
-            <div class="flex flex-col gap-2">
-              {!exam.gradesReleasedAt && (
-                <p role="status" class="text-sm text-base-content/70">
-                  {m.exams_release_status_ready()}
-                </p>
-              )}
-              <ReleaseGrades
-                client:load
-                discipline={discipline!}
-                course={courseSegment!}
-                exam={slug}
-                releasedAt={exam.gradesReleasedAt}
-                canRelease={canRelease}
-                now={now}
-              />
-            </div>
-          ) : (
-            <p role="status" class="text-sm text-base-content/70">
-              {m.exams_release_status_blocked({ reason: blockedReason })}
-              {releaseBlocker === "pending" && (
-                <>
-                  {" "}
-                  <a href={`${href}/exams/${exam.slug}/grading`} class="link">{m.exams_detail_grade_answers()}</a>
-                </>
-              )}
-            </p>
-          )}
-        </section>
-      )
-    }
+  {
+    !canManage && examOutcome?.total != null && (
+      <section class="mt-8">
+        <ReleasedScore score={examOutcome.total} releasedAt={exam.gradesReleasedAt} />
+      </section>
+    )
+  }
 
-    {canManage && <ExamQuestionsTable href={href} rows={questionRows} stats={questionStats} />}
+  {
+    !canManage && (
+      <section id="questions" class="mt-8 scroll-mt-20">
+        <ExamAttempt
+          client:load
+          discipline={discipline!}
+          course={courseSegment!}
+          exam={slug}
+          type={exam.type}
+          state={state}
+          now={now}
+          questions={view.questions}
+          answers={view.answers}
+          result={view.result}
+          reviews={view.reviews}
+          regrades={view.regrades}
+          codeRun={codeRun.allowed}
+          runnerOrigin={RUNNER_ORIGIN}
+          pretests={view.pretests}
+          exampleHtml={view.exampleHtml}
+          codeBlocks={view.codeBlocks}
+          codeSends={view.codeSends}
+          username={actor.username}
+          answeredAt={view.answeredAt}
+          graceMs={EXAM_ANSWER_GRACE_MS}
+          attempt={attempt?.publicId}
+          answerHistory={effectiveAnswerHistory(exam)}
+        />
+      </section>
+    )
+  }
 
-    {
-      !canManage && examOutcome?.total != null && (
-        <section class="mt-8">
-          <ReleasedScore score={examOutcome.total} releasedAt={exam.gradesReleasedAt} />
-        </section>
-      )
-    }
-
-    {
-      !canManage && (
-        <section id="questions" class="mt-8 scroll-mt-20">
-          <ExamAttempt
-            client:load
-            discipline={discipline!}
-            course={courseSegment!}
-            exam={slug}
-            type={exam.type}
-            state={state}
-            now={now}
-            questions={view.questions}
-            answers={view.answers}
-            result={view.result}
-            reviews={view.reviews}
-            regrades={view.regrades}
-            codeRun={codeRun.allowed}
-            runnerOrigin={RUNNER_ORIGIN}
-            pretests={view.pretests}
-            exampleHtml={view.exampleHtml}
-            codeBlocks={view.codeBlocks}
-            codeSends={view.codeSends}
-            username={actor.username}
-            answeredAt={view.answeredAt}
-            graceMs={EXAM_ANSWER_GRACE_MS}
-            attempt={attempt?.publicId}
-            answerHistory={effectiveAnswerHistory(exam)}
-          />
-        </section>
-      )
-    }
-
-  </main>
 </AppLayout>

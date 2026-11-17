@@ -9,7 +9,7 @@ for (const type of TYPES) {
 		test(`${type} with allowCodeRun ${allowCodeRun} resolves as documented`, () => {
 			const expected =
 				allowCodeRun === null
-					? { allowed: type === "PRACTICE", source: "default" }
+					? { allowed: true, source: "default" }
 					: { allowed: allowCodeRun, source: "exam" };
 			expect(effectiveCodeRun({ type, allowCodeRun })).toEqual(expected);
 			expect(canRunCode({ type, allowCodeRun })).toBe(expected.allowed);

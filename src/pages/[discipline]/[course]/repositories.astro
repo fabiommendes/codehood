@@ -44,41 +44,39 @@ function code(text: string): string {
   trail={breadcrumbs(Astro.url, { course })}
   nav={resourcesNav(href, resourceGroups, repositories.length)}
 >
-  <main class="mx-auto max-w-4xl px-4 py-10">
-    <CourseHeader course={course} tabs={tabs} active="resources" />
+  <CourseHeader course={course} tabs={tabs} active="resources" />
 
-    {repositories.length === 0 && (
-      <Alert variant="info" class="mt-4">
-        {canWrite ? (
-          <span>
-            <span set:html={m.repositories_empty_instructor({
-              folder: code("repositories/"),
-              command: code("ch push"),
-            })} />{" "}
-            <CliSetupLink />
-          </span>
-        ) : (
-          <span>{m.repositories_empty_student()}</span>
-        )}
-      </Alert>
-    )}
+  {repositories.length === 0 && (
+    <Alert variant="info" class="mt-4">
+      {canWrite ? (
+        <span>
+          <span set:html={m.repositories_empty_instructor({
+            folder: code("repositories/"),
+            command: code("ch push"),
+          })} />{" "}
+          <CliSetupLink />
+        </span>
+      ) : (
+        <span>{m.repositories_empty_student()}</span>
+      )}
+    </Alert>
+  )}
 
-    <ul class="mt-8 flex flex-col gap-3">
-      {repositories.map((repository) => (
-        <li class="card border border-base-content/15 bg-base-200/50">
-          <div class="card-body gap-1 p-4">
-            <a href={`${href}/repositories/${repository.slug}`} class="link link-hover font-medium">{repository.title}</a>
-            {repository.head ? (
-              <p class="text-sm text-muted">
-                {repository.message}
-                {repository.committedAt && <> · {formatDateTime(repository.committedAt)}</>}
-              </p>
-            ) : (
-              <p class="text-sm text-muted">{m.repositories_pending()}</p>
-            )}
-          </div>
-        </li>
-      ))}
-    </ul>
-  </main>
+  <ul class="mt-8 flex flex-col gap-3">
+    {repositories.map((repository) => (
+      <li class="card border border-base-content/15 bg-base-200/50">
+        <div class="card-body gap-1 p-4">
+          <a href={`${href}/repositories/${repository.slug}`} class="link link-hover font-medium">{repository.title}</a>
+          {repository.head ? (
+            <p class="text-sm text-muted">
+              {repository.message}
+              {repository.committedAt && <> · {formatDateTime(repository.committedAt)}</>}
+            </p>
+          ) : (
+            <p class="text-sm text-muted">{m.repositories_pending()}</p>
+          )}
+        </div>
+      </li>
+    ))}
+  </ul>
 </AppLayout>

@@ -78,21 +78,17 @@ const exceptionRows: ExceptionRow[] = storedExceptions
     sanctions: data.sanctions,
   })}
 >
-  <main class="mx-auto max-w-4xl px-4 py-10">
-    <CourseHeader course={course} tabs={tabs} active="exams" />
+  <CourseHeader course={course} tabs={tabs} active="exams" />
 
-    <a href={`${href}/exams/${exam.slug}`} class="text-sm text-muted hover:text-primary">← {exam.title}</a>
-    <h2 class="mt-2 text-2xl font-bold">{m.exams_exceptions_heading()}</h2>
-
-    <section id="exceptions" class="mt-4">
-      <ExamExceptions
-        client:load
-        discipline={discipline!}
-        course={courseSegment!}
-        exam={exam.slug}
-        students={exceptionStudents}
-        rows={exceptionRows}
-      />
-    </section>
-  </main>
+  <section id="exceptions" class="mt-6">
+    <ExamExceptions
+      client:load
+      heading={m.exams_exceptions_heading()}
+      discipline={discipline!}
+      course={courseSegment!}
+      exam={exam.slug}
+      students={exceptionStudents}
+      rows={exceptionRows}
+    />
+  </section>
 </AppLayout>

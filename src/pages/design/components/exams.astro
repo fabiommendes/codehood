@@ -377,7 +377,7 @@ const sections = [
           data-variant={state.key}
           hidden={selected["exam-exceptions"] !== state.key}
         >
-          <ExamExceptions {...examTarget} students={exceptionStudents} rows={state.rows} />
+          <ExamExceptions {...examTarget} heading={m.exams_exceptions_heading()} students={exceptionStudents} rows={state.rows} />
         </div>
       ))
     }

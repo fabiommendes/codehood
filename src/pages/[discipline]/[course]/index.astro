@@ -246,240 +246,238 @@ const sectionLinks = studentView
     ? studentHomeNav(sectionLinks)
     : homeNav(href, { page: "home", sections: sectionLinks })}
 >
-  <main class="mx-auto max-w-4xl px-4 py-10">
-    {
-      justJoined && (
-        <Alert variant="success" class="mb-6">
-          <span>{m.attendance_result_joined({ course: course.discipline.name })}</span>
-        </Alert>
-      )
-    }
+  {
+    justJoined && (
+      <Alert variant="success" class="mb-6">
+        <span>{m.attendance_result_joined({ course: course.discipline.name })}</span>
+      </Alert>
+    )
+  }
 
-    <CourseHeader course={course} tabs={tabs} active="home" />
+  <CourseHeader course={course} tabs={tabs} active="home" />
 
-    {
-      course.description && (
-        <p class="mt-6 max-w-2xl text-base-content/70">{course.description}</p>
-      )
-    }
+  {
+    course.description && (
+      <p class="mt-6 max-w-2xl text-base-content/70">{course.description}</p>
+    )
+  }
 
-    {
-      meetingNow && (
-        <div class="mt-6 flex flex-wrap items-center gap-3 rounded-box border border-edge bg-base-100 px-4 py-3">
-          <span class="font-medium">{meetingNow.title}</span>
-          <span class="text-sm text-muted">{m.courses_home_happening_now()}</span>
-          {meetingNowRollCall ? (
-            <a
-              href={`${href}/roll-call/${meetingNow.week}/${meetingNow.timeSlot.slug}`}
-              class="btn btn-primary btn-sm ml-auto"
-            >
-              {m.courses_home_view_roll_call()}
-            </a>
-          ) : (
-            <OpenRollCallDialog
-              client:load
-              label={m.courses_home_open_roll_call()}
-              discipline={courseParams.discipline}
-              course={courseParams.course}
-              week={meetingNow.week}
-              timeSlot={meetingNow.timeSlot.slug}
-              href={href}
-            />
-          )}
-        </div>
-      )
-    }
-
-    {
-      isEnrolled && !canWrite && openRollCall && (
-        <div class="mt-6">
-          <a href="/check-in" class="btn btn-primary btn-sm">{m.courses_home_check_in()}</a>
-        </div>
-      )
-    }
-
-    <section id="this-week" class="mt-10 scroll-mt-20">
-      <SectionHeader title={m.courses_home_this_week()} href={`${href}/schedule`} />
-
-      {
-        slots.length === 0 && !thisWeek ? (
-          <p class="mt-4 text-sm text-muted">
-            {canWrite ? (
-              <>
-                {m.schedule_none_instructor()} <CliSetupLink />
-              </>
-            ) : (
-              m.schedule_none_student()
-            )}
-          </p>
-        ) : (
-          <>
-            {slots.length > 0 && <p class="mt-3 text-sm text-base-content/70">
-              {slots
-                .map(
-                  (slot) =>
-                    m.schedule_slot_summary({
-                      title: slot.title ?? m.schedule_slot_default_title(),
-                      day: WEEKDAY_LABEL[slot.day] ?? slot.day,
-                      start: formatClock(slot.start),
-                      end: formatTime(
-                        toMinutes(slot.start) + durationToMinutes(slot.duration),
-                      ),
-                    }),
-                )
-                .join(", ")}
-            </p>}
-            {thisWeek ? (
-              <div class="mt-4">
-                <ScheduleWeek
-                  week={thisWeek.week}
-                  entries={thisWeek.entries}
-                  next={next}
-                  href={href}
-                  resources={eventResources}
-                  rollCallManager={canWrite ? courseParams : undefined}
-                  rollCallKeys={rollCallKeys}
-                  attendance={attendanceCells}
-                />
-              </div>
-            ) : (
-              <p class="mt-4 text-sm text-muted">{m.courses_home_nothing_this_week()}</p>
-            )}
-          </>
-        )
-      }
-    </section>
-
-    {
-      openExams.length > 0 && (
-        <section id="open-exams" class="mt-10 scroll-mt-20">
-          <SectionHeader title={m.courses_home_open_exams()} />
-          <div class="mt-4 flex flex-col gap-3">
-            {openExams.slice(0, OPEN_EXAMS_SHOWN).map((exam) => (
-              <ExamRow exam={exam} href={href} exception={ownExceptions.get(exam.slug)} />
-            ))}
-          </div>
-          {openExams.length > OPEN_EXAMS_SHOWN && (
-            <a href={`${href}/exams`} class="mt-3 inline-block text-sm text-primary hover:underline">
-              {m.courses_home_more_open_exams({ count: openExams.length - OPEN_EXAMS_SHOWN })}
-            </a>
-          )}
-        </section>
-      )
-    }
-
-    {
-      !studentView && examPreview.exams.length > 0 && (
-        <section id="exams" class="mt-10 scroll-mt-20">
-          <SectionHeader title={examPreview.title} href={`${href}/exams`} />
-
-          <div class="mt-4 flex flex-col gap-3">
-            {shownExams.map(({ exam, pending }) => (
-              <ExamRow exam={exam} href={href} pending={pending} exception={ownExceptions.get(exam.slug)} />
-            ))}
-          </div>
-        </section>
-      )
-    }
-
-    {
-      gradeColumns.length > 0 && (
-        <section id="grades" class="mt-10 scroll-mt-20" aria-label={m.nav_course_tab_grades()}>
-          <SectionHeader title={m.nav_course_tab_grades()} />
-
-          <ul aria-label={m.nav_course_tab_grades()} class="mt-4 flex flex-col gap-3">
-            {gradeColumns.map((column) => {
-              const value = column.values[0]?.value;
-              return (
-                <li class="flex items-baseline justify-between gap-4 rounded-box border border-edge bg-base-100 px-4 py-3">
-                  <span class="font-medium">{column.title}</span>
-                  <span class={value === undefined ? "text-sm text-muted" : "font-medium"}>
-                    {value === undefined ? m.courses_home_no_grade() : formatGradeValue(value)}
-                  </span>
-                </li>
-              );
-            })}
-          </ul>
-        </section>
-      )
-    }
-
-    {
-      attendanceReport && attendanceStudent && (
-        <section id="attendance" class="mt-10 scroll-mt-20">
-          <SectionHeader title={m.attendance_page_heading()} />
-          <p class="mt-3 text-sm text-base-content/70">
-            {m.attendance_summary_link({
-              present: attendanceStudent.present,
-              total: attendanceStudent.total,
-              percent: formatAttendancePercent(attendanceStudent.present, attendanceStudent.total),
-            })}
-          </p>
-          <AttendanceTable report={attendanceReport} />
-        </section>
-      )
-    }
-
-    {
-      !studentView && (
-    <section id="resources" class="mt-10 scroll-mt-20">
-      <SectionHeader title={m.nav_course_tab_resources()} href={`${href}/resources`} />
-
-      {
-        resources.length === 0 ? (
-          <p class="mt-4 text-sm text-muted">
-            {eventResources.size > 0 ? (
-              <span
-                set:html={m.courses_resources_on_schedule({
-                  schedule: `<a href="${escapeHtml(href)}/schedule" class="link">${escapeHtml(m.courses_resources_schedule_link())}</a>`,
-                })}
-              />
-            ) : canWrite ? (
-              <>
-                {m.courses_home_no_resources_instructor()} <CliSetupLink />
-              </>
-            ) : (
-              m.courses_home_no_resources_student()
-            )}
-          </p>
-        ) : (
-          <div class="mt-4 flex flex-col gap-3">
-            {newestResources.map((resource) => (
-              <ListRow
-                href={resourceHref(resource, href)}
-                download={
-                  resource.data.type === "FILE"
-                    ? fileDownloadName(resource, resource.data)
-                    : undefined
-                }
-                external={resource.data.type === "LINK"}
-              >
-                <p class="font-medium">{resource.title}</p>
-                <p class="text-sm text-muted">{resourceDetail(resource)}</p>
-              </ListRow>
-            ))}
-          </div>
-        )
-      }
-    </section>
-      )
-    }
-
-    {
-      isEnrolled && (
-        <p class="mt-12 border-t border-base-content/10 pt-4 text-sm text-muted">
-          {m.courses_home_enrolled_since({ date: formatDate(course.joinedAt) })}{" "}
-          <button
-            type="button"
-            class="link link-hover text-error"
-            data-open-dialog="leave-course-dialog"
+  {
+    meetingNow && (
+      <div class="mt-6 flex flex-wrap items-center gap-3 rounded-box border border-edge bg-base-100 px-4 py-3">
+        <span class="font-medium">{meetingNow.title}</span>
+        <span class="text-sm text-muted">{m.courses_home_happening_now()}</span>
+        {meetingNowRollCall ? (
+          <a
+            href={`${href}/roll-call/${meetingNow.week}/${meetingNow.timeSlot.slug}`}
+            class="btn btn-primary btn-sm ml-auto"
           >
-            {m.courses_home_leave_link()}
-          </button>
+            {m.courses_home_view_roll_call()}
+          </a>
+        ) : (
+          <OpenRollCallDialog
+            client:load
+            label={m.courses_home_open_roll_call()}
+            discipline={courseParams.discipline}
+            course={courseParams.course}
+            week={meetingNow.week}
+            timeSlot={meetingNow.timeSlot.slug}
+            href={href}
+          />
+        )}
+      </div>
+    )
+  }
+
+  {
+    isEnrolled && !canWrite && openRollCall && (
+      <div class="mt-6">
+        <a href="/check-in" class="btn btn-primary btn-sm">{m.courses_home_check_in()}</a>
+      </div>
+    )
+  }
+
+  <section id="this-week" class="mt-10 scroll-mt-20">
+    <SectionHeader title={m.courses_home_this_week()} href={`${href}/schedule`} />
+
+    {
+      slots.length === 0 && !thisWeek ? (
+        <p class="mt-4 text-sm text-muted">
+          {canWrite ? (
+            <>
+              {m.schedule_none_instructor()} <CliSetupLink />
+            </>
+          ) : (
+            m.schedule_none_student()
+          )}
         </p>
+      ) : (
+        <>
+          {slots.length > 0 && <p class="mt-3 text-sm text-base-content/70">
+            {slots
+              .map(
+                (slot) =>
+                  m.schedule_slot_summary({
+                    title: slot.title ?? m.schedule_slot_default_title(),
+                    day: WEEKDAY_LABEL[slot.day] ?? slot.day,
+                    start: formatClock(slot.start),
+                    end: formatTime(
+                      toMinutes(slot.start) + durationToMinutes(slot.duration),
+                    ),
+                  }),
+              )
+              .join(", ")}
+          </p>}
+          {thisWeek ? (
+            <div class="mt-4">
+              <ScheduleWeek
+                week={thisWeek.week}
+                entries={thisWeek.entries}
+                next={next}
+                href={href}
+                resources={eventResources}
+                rollCallManager={canWrite ? courseParams : undefined}
+                rollCallKeys={rollCallKeys}
+                attendance={attendanceCells}
+              />
+            </div>
+          ) : (
+            <p class="mt-4 text-sm text-muted">{m.courses_home_nothing_this_week()}</p>
+          )}
+        </>
       )
     }
-  </main>
+  </section>
+
+  {
+    openExams.length > 0 && (
+      <section id="open-exams" class="mt-10 scroll-mt-20">
+        <SectionHeader title={m.courses_home_open_exams()} />
+        <div class="mt-4 flex flex-col gap-3">
+          {openExams.slice(0, OPEN_EXAMS_SHOWN).map((exam) => (
+            <ExamRow exam={exam} href={href} exception={ownExceptions.get(exam.slug)} />
+          ))}
+        </div>
+        {openExams.length > OPEN_EXAMS_SHOWN && (
+          <a href={`${href}/exams`} class="mt-3 inline-block text-sm text-primary hover:underline">
+            {m.courses_home_more_open_exams({ count: openExams.length - OPEN_EXAMS_SHOWN })}
+          </a>
+        )}
+      </section>
+    )
+  }
+
+  {
+    !studentView && examPreview.exams.length > 0 && (
+      <section id="exams" class="mt-10 scroll-mt-20">
+        <SectionHeader title={examPreview.title} href={`${href}/exams`} />
+
+        <div class="mt-4 flex flex-col gap-3">
+          {shownExams.map(({ exam, pending }) => (
+            <ExamRow exam={exam} href={href} pending={pending} exception={ownExceptions.get(exam.slug)} />
+          ))}
+        </div>
+      </section>
+    )
+  }
+
+  {
+    gradeColumns.length > 0 && (
+      <section id="grades" class="mt-10 scroll-mt-20" aria-label={m.nav_course_tab_grades()}>
+        <SectionHeader title={m.nav_course_tab_grades()} />
+
+        <ul aria-label={m.nav_course_tab_grades()} class="mt-4 flex flex-col gap-3">
+          {gradeColumns.map((column) => {
+            const value = column.values[0]?.value;
+            return (
+              <li class="flex items-baseline justify-between gap-4 rounded-box border border-edge bg-base-100 px-4 py-3">
+                <span class="font-medium">{column.title}</span>
+                <span class={value === undefined ? "text-sm text-muted" : "font-medium"}>
+                  {value === undefined ? m.courses_home_no_grade() : formatGradeValue(value)}
+                </span>
+              </li>
+            );
+          })}
+        </ul>
+      </section>
+    )
+  }
+
+  {
+    attendanceReport && attendanceStudent && (
+      <section id="attendance" class="mt-10 scroll-mt-20">
+        <SectionHeader title={m.attendance_page_heading()} />
+        <p class="mt-3 text-sm text-base-content/70">
+          {m.attendance_summary_link({
+            present: attendanceStudent.present,
+            total: attendanceStudent.total,
+            percent: formatAttendancePercent(attendanceStudent.present, attendanceStudent.total),
+          })}
+        </p>
+        <AttendanceTable report={attendanceReport} />
+      </section>
+    )
+  }
+
+  {
+    !studentView && (
+    <section id="resources" class="mt-10 scroll-mt-20">
+    <SectionHeader title={m.nav_course_tab_resources()} href={`${href}/resources`} />
+
+    {
+      resources.length === 0 ? (
+        <p class="mt-4 text-sm text-muted">
+          {eventResources.size > 0 ? (
+            <span
+              set:html={m.courses_resources_on_schedule({
+                schedule: `<a href="${escapeHtml(href)}/schedule" class="link">${escapeHtml(m.courses_resources_schedule_link())}</a>`,
+              })}
+            />
+          ) : canWrite ? (
+            <>
+              {m.courses_home_no_resources_instructor()} <CliSetupLink />
+            </>
+          ) : (
+            m.courses_home_no_resources_student()
+          )}
+        </p>
+      ) : (
+        <div class="mt-4 flex flex-col gap-3">
+          {newestResources.map((resource) => (
+            <ListRow
+              href={resourceHref(resource, href)}
+              download={
+                resource.data.type === "FILE"
+                  ? fileDownloadName(resource, resource.data)
+                  : undefined
+              }
+              external={resource.data.type === "LINK"}
+            >
+              <p class="font-medium">{resource.title}</p>
+              <p class="text-sm text-muted">{resourceDetail(resource)}</p>
+            </ListRow>
+          ))}
+        </div>
+      )
+    }
+    </section>
+    )
+  }
+
+  {
+    isEnrolled && (
+      <p class="mt-12 border-t border-base-content/10 pt-4 text-sm text-muted">
+        {m.courses_home_enrolled_since({ date: formatDate(course.joinedAt) })}{" "}
+        <button
+          type="button"
+          class="link link-hover text-error"
+          data-open-dialog="leave-course-dialog"
+        >
+          {m.courses_home_leave_link()}
+        </button>
+      </p>
+    )
+  }
 </AppLayout>
 
 {

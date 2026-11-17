@@ -91,88 +91,86 @@ function weekSpan(weeks: { week: number }[]): string {
   trail={breadcrumbs(Astro.url, { course })}
   nav={scheduleNav(href, { past, ahead }, foldPast)}
 >
-  <main class="mx-auto max-w-4xl px-4 py-10">
-    <CourseHeader course={course} tabs={tabs} active="schedule" />
+  <CourseHeader course={course} tabs={tabs} active="schedule" />
 
-    {
-      slots.length === 0 ? (
-        <Alert variant="info" class="mt-6">
-          <span>
-            {canWrite ? (
-              <>
-                {m.schedule_none_instructor()} <CliSetupLink />
-              </>
-            ) : (
-              m.schedule_none_student()
-            )}
-          </span>
-        </Alert>
-      ) : (
-        <>
-          <p class="mt-6 text-sm text-base-content/70">
-            {slots
-              .map(
-                (slot) =>
-                  m.schedule_slot_summary({
-                    title: slot.title ?? m.schedule_slot_default_title(),
-                    day: WEEKDAY_LABEL[slot.day]?.() ?? slot.day,
-                    start: formatClock(slot.start),
-                    end: formatTime(
-                      toMinutes(slot.start) + durationToMinutes(slot.duration),
-                    ),
-                  }),
-              )
-              .join(", ")}
-          </p>
-          <p class="mt-1 text-xs text-muted">
-            {m.schedule_meetings_held({ count: meetingsHeld })}
-          </p>
-
-          {entries.length === 0 ? (
-            <p class="mt-8 text-sm text-muted">
-              {m.schedule_no_events()}
-            </p>
+  {
+    slots.length === 0 ? (
+      <Alert variant="info" class="mt-6">
+        <span>
+          {canWrite ? (
+            <>
+              {m.schedule_none_instructor()} <CliSetupLink />
+            </>
           ) : (
-            <div class="mt-8 flex flex-col gap-8">
-              {foldPast && (
-                <details id="past-weeks">
-                  <summary class="cursor-pointer text-sm font-medium text-muted hover:text-base-content">
-                    {m.schedule_past_weeks({ span: weekSpan(past), count: past.length })}
-                  </summary>
-                  <div class="mt-6 flex flex-col gap-8">
-                    {past.map(({ week, entries }) => (
-                      <ScheduleWeek
-                        week={week}
-                        entries={entries}
-                        next={next}
-                        href={href}
-                        resources={eventResources}
-                        rollCallManager={rollCallManager}
-                        rollCallKeys={rollCallKeys}
-                        attendance={attendance}
-                      />
-                    ))}
-                  </div>
-                </details>
-              )}
-              {(foldPast ? ahead : [...past, ...ahead]).map(({ week, entries }) => (
-                <ScheduleWeek
-                        week={week}
-                        entries={entries}
-                        next={next}
-                        href={href}
-                        resources={eventResources}
-                        rollCallManager={rollCallManager}
-                        rollCallKeys={rollCallKeys}
-                        attendance={attendance}
-                      />
-              ))}
-            </div>
+            m.schedule_none_student()
           )}
-        </>
-      )
-    }
-  </main>
+        </span>
+      </Alert>
+    ) : (
+      <>
+        <p class="mt-6 text-sm text-base-content/70">
+          {slots
+            .map(
+              (slot) =>
+                m.schedule_slot_summary({
+                  title: slot.title ?? m.schedule_slot_default_title(),
+                  day: WEEKDAY_LABEL[slot.day]?.() ?? slot.day,
+                  start: formatClock(slot.start),
+                  end: formatTime(
+                    toMinutes(slot.start) + durationToMinutes(slot.duration),
+                  ),
+                }),
+            )
+            .join(", ")}
+        </p>
+        <p class="mt-1 text-xs text-muted">
+          {m.schedule_meetings_held({ count: meetingsHeld })}
+        </p>
+
+        {entries.length === 0 ? (
+          <p class="mt-8 text-sm text-muted">
+            {m.schedule_no_events()}
+          </p>
+        ) : (
+          <div class="mt-8 flex flex-col gap-8">
+            {foldPast && (
+              <details id="past-weeks">
+                <summary class="cursor-pointer text-sm font-medium text-muted hover:text-base-content">
+                  {m.schedule_past_weeks({ span: weekSpan(past), count: past.length })}
+                </summary>
+                <div class="mt-6 flex flex-col gap-8">
+                  {past.map(({ week, entries }) => (
+                    <ScheduleWeek
+                      week={week}
+                      entries={entries}
+                      next={next}
+                      href={href}
+                      resources={eventResources}
+                      rollCallManager={rollCallManager}
+                      rollCallKeys={rollCallKeys}
+                      attendance={attendance}
+                    />
+                  ))}
+                </div>
+              </details>
+            )}
+            {(foldPast ? ahead : [...past, ...ahead]).map(({ week, entries }) => (
+              <ScheduleWeek
+                week={week}
+                entries={entries}
+                next={next}
+                href={href}
+                resources={eventResources}
+                rollCallManager={rollCallManager}
+                rollCallKeys={rollCallKeys}
+                attendance={attendance}
+              />
+            ))}
+          </div>
+        )}
+      </>
+    )
+  }
 </AppLayout>
 
 <script>

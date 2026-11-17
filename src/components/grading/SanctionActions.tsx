@@ -76,20 +76,52 @@ export default function SanctionActions(
 	});
 
 	return (
-		<div class="flex gap-2">
+		<div class="flex justify-end gap-1">
 			<button
 				type="button"
-				class="btn btn-outline btn-xs"
+				class="btn btn-square btn-ghost btn-sm"
+				aria-label={m.grades_sanction_edit_button()}
+				title={m.grades_sanction_edit_button()}
 				onClick={() => setEditing(true)}
 			>
-				{m.grades_sanction_edit_button()}
+				<svg
+					aria-hidden="true"
+					width="18"
+					height="18"
+					viewBox="0 0 24 24"
+					fill="none"
+				>
+					<path
+						d="M4 20h4L18.5 9.5a2.1 2.1 0 0 0-4-4L4 16v4Zm9-13 4 4"
+						stroke="currentColor"
+						stroke-width="1.6"
+						stroke-linecap="round"
+						stroke-linejoin="round"
+					/>
+				</svg>
 			</button>
 			<button
 				type="button"
-				class="btn btn-outline btn-error btn-xs"
+				class="btn btn-square btn-ghost btn-sm text-error"
+				aria-label={m.grades_sanction_revoke_button()}
+				title={m.grades_sanction_revoke_button()}
 				onClick={() => setRevoking(true)}
 			>
-				{m.grades_sanction_revoke_button()}
+				<svg
+					aria-hidden="true"
+					width="18"
+					height="18"
+					viewBox="0 0 24 24"
+					fill="none"
+				>
+					<path
+						d="M9 14 4 9l5-5M4 9h10.5a5.5 5.5 0 0 1 0 11H11"
+						stroke="currentColor"
+						stroke-width="1.6"
+						stroke-linecap="round"
+						stroke-linejoin="round"
+					/>
+				</svg>
 			</button>
 
 			<SanctionModal

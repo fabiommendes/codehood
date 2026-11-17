@@ -54,12 +54,12 @@ const showBadge =
 const schedule = timing.scheduledAt
 	? formatDateTime(timing.scheduledAt)
 	: phase === "upcoming"
-		? "Not scheduled"
+		? m.exams_not_scheduled()
 		: null;
 const detail = [
 	examTypeLabels[exam.type],
-	formatDuration(exam.duration),
 	schedule,
+	formatDuration(exam.duration, timing.scheduledAt),
 ]
 	.filter(Boolean)
 	.join(" · ");

@@ -14,7 +14,6 @@
 	"repositories_pull_note": "Com commits locais, atualize com {command}.",
 	"repositories_files_label": "Arquivos",
 	"repositories_up": "Subir",
-	"repositories_back": "Voltar aos repositórios",
 	"repositories_download_file": "Baixar {name}",
 	"repositories_too_large": "Este arquivo tem mais de 1 MB e não é exibido aqui.",
 	"repositories_not_viewable": "Este arquivo não pode ser exibido aqui.",

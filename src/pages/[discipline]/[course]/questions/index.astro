@@ -62,23 +62,21 @@ const courseParams = {
 <AppLayout title={m.questions_list_page_title({ discipline: course.discipline.name })}
   trail={breadcrumbs(Astro.url, { course })}
 >
-  <main class="mx-auto max-w-4xl px-4 py-10">
-    <CourseHeader course={course} tabs={tabs} active="questions" />
+  <CourseHeader course={course} tabs={tabs} active="questions" />
 
-    <h2 class="mt-6 text-xl font-semibold">{m.questions_title()}</h2>
-    <p class="mt-1 text-sm text-muted">{course.discipline.name}</p>
+  <h2 class="mt-6 page-subheader">{m.questions_title()}</h2>
+  <p class="mt-1 text-sm text-muted">{course.discipline.name}</p>
 
-    <QuestionsTable
-      questions={page.items.map(({ id: _id, ...q }) => q)}
-      cursor={{ ...pageLinks(here, page), total }}
-      bankTotal={bankTotal ?? total}
-      tags={tags}
-      query={query}
-      search={here.search}
-      href={href}
-      discipline={courseParams.discipline}
-      course={courseParams.course}
-      client:load
-    />
-  </main>
+  <QuestionsTable
+    questions={page.items.map(({ id: _id, ...q }) => q)}
+    cursor={{ ...pageLinks(here, page), total }}
+    bankTotal={bankTotal ?? total}
+    tags={tags}
+    query={query}
+    search={here.search}
+    href={href}
+    discipline={courseParams.discipline}
+    course={courseParams.course}
+    client:load
+  />
 </AppLayout>

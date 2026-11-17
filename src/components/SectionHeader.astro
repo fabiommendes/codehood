@@ -11,7 +11,7 @@ const { title, href, linkText = m.common_view_all() } = Astro.props;
 ---
 
 <div class="flex items-baseline justify-between">
-  <h2 class="text-xl font-semibold">{title}</h2>
+  <h2 class="page-subheader">{title}</h2>
   {
     href && (
       <a href={href} class="text-sm text-primary hover:underline">

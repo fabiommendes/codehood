@@ -1101,14 +1101,15 @@ async function createDemoCoursesIfMissing(): Promise<void> {
 			type: "EXAM",
 			status: "DRAFT",
 			title: "Final exam",
-			description: "Still being written.",
+			description: "A take-home exam, still being written.",
 			// Dated four weeks from the seed, so the instructor's calendar shows
-			// a draft coming up, which students never see.
+			// a draft coming up, which students never see. Three days long, so
+			// its duration reads as the moment it ends.
 			scheduledAt: toInstant(
 				localDateOf(new Date(Date.now() + 28 * 24 * 3600 * 1000)),
 				14 * 60,
 			),
-			duration: { hours: 2 },
+			duration: { hours: 72 },
 			tags: ["final"],
 			questions: [{ slug: "big-o-warmup", version: "v1" }],
 		},

@@ -58,22 +58,20 @@ const courseParams = {
   trail={breadcrumbs(Astro.url, { course })}
   nav={await loadScheduleNav(course, href, actor, `${m.schedule_week({ week: weekNumber })} · ${formatDateTime(event.startAt)}`)}
 >
-  <main class="mx-auto max-w-4xl px-4 py-10">
-    <CourseHeader course={course} tabs={tabs} active="schedule" />
-    <h2 class="mt-8 mb-4 text-2xl font-semibold">{event.title}</h2>
-    <RollCallManager
-      {...courseParams}
-      week={weekNumber}
-      timeSlot={timeSlot}
-      pageHref={`${href}/roll-call/${weekNumber}/${timeSlot}`}
-      scheduleHref={`${href}/schedule`}
-      students={students}
-      initial={{
-        closesAt: rollCall.closesAt,
-        attendances: rollCall.attendances,
-      }}
-      now={Date.now()}
-      client:load
-    />
-  </main>
+  <CourseHeader course={course} tabs={tabs} active="schedule" />
+  <h2 class="mt-8 mb-4 page-subheader">{event.title}</h2>
+  <RollCallManager
+    {...courseParams}
+    week={weekNumber}
+    timeSlot={timeSlot}
+    pageHref={`${href}/roll-call/${weekNumber}/${timeSlot}`}
+    scheduleHref={`${href}/schedule`}
+    students={students}
+    initial={{
+      closesAt: rollCall.closesAt,
+      attendances: rollCall.attendances,
+    }}
+    now={Date.now()}
+    client:load
+  />
 </AppLayout>

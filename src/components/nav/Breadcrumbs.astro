@@ -55,13 +55,16 @@ const { trail, static: isStatic = false } = Astro.props;
   [data-breadcrumbs]:not([data-static]) {
     --crumbs-left: max(1rem, calc((100% - 56rem) / 2 + 1rem));
     position: relative;
-    z-index: 40;
+    /* The content's level, below the drawer that slides over the page. */
+    z-index: 10;
     width: calc(100% - 2 * var(--crumbs-left));
     margin: 1rem 0 -1.25rem var(--crumbs-left);
   }
   @media (min-width: 64rem) {
     [data-breadcrumbs]:not([data-static]) {
       position: sticky;
+      /* Above the top bar it rises into; the sidebar never covers it here. */
+      z-index: 40;
       /* Centred in the 4rem bar. */
       top: 0.875rem;
       width: calc(100% - var(--crumbs-left) - var(--crumbs-reserve, 12rem));

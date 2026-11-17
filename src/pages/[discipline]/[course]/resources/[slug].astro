@@ -88,68 +88,66 @@ const bodyHtml =
   trail={breadcrumbs(Astro.url, { course, item: resource.title })}
   nav={nav}
 >
-  <main class="mx-auto max-w-4xl px-4 py-10">
-    <CourseHeader
-      course={course}
-      tabs={tabs}
-      active={resource.event ? "schedule" : "resources"}
-    />
+  <CourseHeader
+    course={course}
+    tabs={tabs}
+    active={resource.event ? "schedule" : "resources"}
+  />
 
-    <a
-      href={resource.event
-        ? `${href}/schedule#event-${resource.event.id}`
-        : `${href}/resources`}
-      class="text-sm text-muted hover:text-primary"
-      >{resource.event ? m.courses_resource_back_schedule() : m.courses_resource_back_resources()}</a
-    >
+  <a
+    href={resource.event
+      ? `${href}/schedule#event-${resource.event.id}`
+      : `${href}/resources`}
+    class="text-sm text-muted hover:text-primary"
+    >{resource.event ? m.courses_resource_back_schedule() : m.courses_resource_back_resources()}</a
+  >
 
-    <div class="mt-2 flex flex-wrap items-center gap-2">
-      <h2 class="text-xl font-semibold">{resource.title}</h2>
-      {
-        data.type === "CODE" && (
-          <Badge size="sm" style="outline">
-            {data.language}
-          </Badge>
-        )
-      }
-    </div>
+  <div class="mt-2 flex flex-wrap items-center gap-2">
+    <h2 class="page-subheader">{resource.title}</h2>
     {
-      resource.description && (
-        <p class="mt-1 text-sm text-muted">{resource.description}</p>
+      data.type === "CODE" && (
+        <Badge size="sm" style="outline">
+          {data.language}
+        </Badge>
       )
     }
+  </div>
+  {
+    resource.description && (
+      <p class="mt-1 text-sm text-muted">{resource.description}</p>
+    )
+  }
 
-    {
-      data.type === "MD" ? (
-        <div class="card card-border mt-6 bg-base-200/50">
-          <div class="card-body">
-            <div
-              data-runner-origin={RUNNER_ORIGIN ?? undefined}
-              class="prose prose-sm max-w-none prose-a:text-primary prose-a:no-underline hover:prose-a:underline [&>:first-child]:mt-0 [&>:last-child]:mb-0"
-              set:html={bodyHtml}
-            />
-          </div>
-        </div>
-      ) : data.type === "CODE" && runLanguage ? (
-        <div class="mt-6">
-          <CodeRunner
-            client:load
-            mode="snippet"
-            language={runLanguage}
-            code={data.content}
-            highlightedHtml={bodyHtml}
-            runnerOrigin={RUNNER_ORIGIN}
-            label={resource.title}
+  {
+    data.type === "MD" ? (
+      <div class="card card-border mt-6 bg-base-200/50">
+        <div class="card-body">
+          <div
+            data-runner-origin={RUNNER_ORIGIN ?? undefined}
+            class="prose prose-sm max-w-none prose-a:text-primary prose-a:no-underline hover:prose-a:underline [&>:first-child]:mt-0 [&>:last-child]:mb-0"
+            set:html={bodyHtml}
           />
         </div>
-      ) : (
-        <div
-          class="code-block mt-6"
-          set:html={bodyHtml}
+      </div>
+    ) : data.type === "CODE" && runLanguage ? (
+      <div class="mt-6">
+        <CodeRunner
+          client:load
+          mode="snippet"
+          language={runLanguage}
+          code={data.content}
+          highlightedHtml={bodyHtml}
+          runnerOrigin={RUNNER_ORIGIN}
+          label={resource.title}
         />
-      )
-    }
-  </main>
+      </div>
+    ) : (
+      <div
+        class="code-block mt-6"
+        set:html={bodyHtml}
+      />
+    )
+  }
 </AppLayout>
 
 <script>

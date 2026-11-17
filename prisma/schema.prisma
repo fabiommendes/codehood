@@ -1282,8 +1282,8 @@ model Exam {
 
   scheduledAt   DateTime?
   durationMs    Int?
-  /// Whether students may run code in answer mode. Null follows the exam
-  /// type: on for PRACTICE, off for QUIZ and EXAM. Review mode ignores it.
+  /// Whether students may run code in answer mode. Null means on, for every
+  /// exam type. Review mode ignores it.
   allowCodeRun  Boolean?
   /// Whether the browser records the edit history of open answers. Null follows
   /// the exam type: on for EXAM and QUIZ, off for PRACTICE. Server-side state

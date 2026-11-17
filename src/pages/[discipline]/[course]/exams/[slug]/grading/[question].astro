@@ -213,123 +213,75 @@ const shown = (
   trail={breadcrumbs(Astro.url, { course, item: exam.title, question: title })}
   nav={await gradingExamNav(result, actor, undefined, sanctions)}
 >
-  <main class:list={["mx-auto px-4 py-10", listView ? "max-w-4xl" : "max-w-6xl"]}>
-    <CourseHeader course={course} tabs={tabs} active="exams" />
+  <CourseHeader course={course} tabs={tabs} active="exams" />
 
-    <a href={gradingHref(queueHref, { names })} class="text-sm text-muted hover:text-primary">← {m.grades_question_back()}</a>
+  <a href={gradingHref(queueHref, { names })} class="text-sm text-muted hover:text-primary">← {m.grades_question_back()}</a>
 
-    <p class="mt-2 text-sm"><QuestionNumber number={position + 1} points={points} /></p>
-    <h2 class="text-2xl font-bold">{title}</h2>
+  <p class="mt-2 text-sm"><QuestionNumber number={position + 1} points={points} /></p>
+  <h2 class="page-subheader">{title}</h2>
 
-    <nav class="mt-3 flex gap-4 text-sm">
-      {previous && <a href={gradingHref(`${queueHref}/${previous}`, { names, list: listView })} class="link">{m.grades_question_previous()}</a>}
-      {next && <a href={gradingHref(`${queueHref}/${next}`, { names, list: listView })} class="link">{m.grades_question_next()}</a>}
-      <a href={gradingHref(here, { names, list: !listView })} class="link">{listView ? m.grades_question_view_one() : m.grades_question_view_list()}</a>
-      <a href={gradingHref(here, { names: !names, list: listView })} role="switch" aria-checked={names ? "true" : "false"} class="link ml-auto">{m.grades_question_show_names()}</a>
-    </nav>
+  <nav class="mt-3 flex gap-4 text-sm">
+    {previous && <a href={gradingHref(`${queueHref}/${previous}`, { names, list: listView })} class="link">{m.grades_question_previous()}</a>}
+    {next && <a href={gradingHref(`${queueHref}/${next}`, { names, list: listView })} class="link">{m.grades_question_next()}</a>}
+    <a href={gradingHref(here, { names, list: !listView })} class="link">{listView ? m.grades_question_view_one() : m.grades_question_view_list()}</a>
+    <a href={gradingHref(here, { names: !names, list: listView })} role="switch" aria-checked={names ? "true" : "false"} class="link ml-auto">{m.grades_question_show_names()}</a>
+  </nav>
 
-    {versionMissing && (
-      <div role="alert" class="alert alert-warning mt-4">
-        <span>{m.grades_question_version_missing({ version: pinnedVersion })}</span>
-      </div>
-    )}
+  {versionMissing && (
+    <div role="alert" class="alert alert-warning mt-4">
+      <span>{m.grades_question_version_missing({ version: pinnedVersion })}</span>
+    </div>
+  )}
 
-    {
-      listView ? (
-        hasKey ? (
-          <section class="mt-6">
-            <h3 class="text-lg font-semibold">{m.grades_question_correct_answer()}</h3>
-            <div class="mt-3 rounded-box border border-edge bg-base-100 p-6">
-              {doc.type === "code" ? <CodeAnswerKey question={doc} /> : <AnswerKey client:load question={doc} codeBlocks={keyBlocks} />}
-            </div>
-          </section>
-        ) : (
-          <section
-            aria-label={m.grades_question_statement()}
-            class="prose prose-sm mt-6 max-w-none rounded-box border border-edge bg-base-100 p-6"
-            set:html={statementHtml}
-          />
-        )
-      ) : (
-        <details class="mt-4 rounded-box border border-edge bg-base-100">
-          <summary class="cursor-pointer px-4 py-2 text-sm font-medium">{m.grades_grader_questions()}</summary>
-          <div class="p-4">
-            {hasKey ? (
-              doc.type === "code" ? <CodeAnswerKey question={doc} /> : <AnswerKey client:load question={doc} codeBlocks={keyBlocks} />
-            ) : (
-              <div class="prose prose-sm max-w-none" set:html={statementHtml} />
-            )}
+  {
+    listView ? (
+      hasKey ? (
+        <section class="mt-6">
+          <h3 class="page-subsubheader">{m.grades_question_correct_answer()}</h3>
+          <div class="mt-3 rounded-box border border-edge bg-base-100 p-6">
+            {doc.type === "code" ? <CodeAnswerKey question={doc} /> : <AnswerKey client:load question={doc} codeBlocks={keyBlocks} />}
           </div>
-        </details>
+        </section>
+      ) : (
+        <section
+          aria-label={m.grades_question_statement()}
+          class="prose prose-sm mt-6 max-w-none rounded-box border border-edge bg-base-100 p-6"
+          set:html={statementHtml}
+        />
       )
-    }
-
-    {queue && (
-      <CodeQueue
-        summary={queue}
-        target={{ discipline: discipline!, course: courseSegment!, exam: exam.slug, question: questionSlug }}
-        now={new Date()}
-      />
-    )}
-
-    {listView && distribution && <AnswerDistributionSection distribution={distribution} />}
-
-    {shown.length === 0 && <p class="mt-8 text-base-content/70">{m.grades_question_no_answers()}</p>}
-
-    {
-      !listView && grader && shown.length > 0 && (
-        <div class="mt-6 grid items-start gap-6 lg:grid-cols-[minmax(0,1fr)_22rem]">
-          <section aria-label={m.grades_grader_answer()} class="card card-border bg-base-100">
-            <div class="card-body">
-              {shown.map(({ answer, result }, position) => (
-                <div id={`answer-${answer.submission}`} hidden={position !== 0}>
-                  {openRegrades.has(answer.submission) && (
-                    <a href={`${regradesHref}#regrade-${openRegrades.get(answer.submission)}`} class="badge badge-warning badge-sm">{m.grades_regrade_requested()}</a>
-                  )}
-                  {sanctionLabel(answer.author) && <span class="badge badge-error badge-sm">{sanctionLabel(answer.author)}</span>}
-                  {answer.passes.some((pass) => pass.notes !== undefined) && (
-                    <span class="badge badge-error badge-sm">{m.grades_question_suspicious()}</span>
-                  )}
-                  {names && <p class="font-medium">{studentNames.get(answer.author) ?? answer.author}</p>}
-                  <Answer question={asked} codeBlocks={askedBlocks} payload={answer.payload as AnswerPayload} result={result} submission={answer.submission} />
-                  {worker && sendsOf.has(answer.submission) && <CodeSends sends={sendsOf.get(answer.submission)!} question={worker} />}
-                  {answer.passes
-                    .filter((pass) => pass.bot !== null)
-                    .slice(0, 1)
-                    .map((pass) => (
-                      <div role="note" class="alert alert-info alert-soft mt-4 block text-sm">
-                        <p class="font-semibold">{m.grades_question_auto()}: {pass.bot}</p>
-                        <p>{pass.willNotGrade ? m.grades_question_not_graded() : pass.score === null ? m.grades_question_no_score() : formatScore(pass.score)}</p>
-                        {pass.comment && <p class="mt-1 whitespace-pre-wrap">{pass.comment}</p>}
-                        {pass.notes && <p class="mt-1 whitespace-pre-wrap">{pass.notes}</p>}
-                        <AppliedItems items={pass.rubricItems ?? []} />
-                      </div>
-                    ))}
-                </div>
-              ))}
-            </div>
-          </section>
-          <RubricGrader
-            client:load
-            target={{ discipline: discipline!, course: courseSegment!, exam: exam.slug, question: questionSlug }}
-            initial={grader}
-            queueHref={gradingHref(queueHref, { names })}
-          />
+    ) : (
+      <details class="mt-4 rounded-box border border-edge bg-base-100">
+        <summary class="cursor-pointer px-4 py-2 text-sm font-medium">{m.grades_grader_questions()}</summary>
+        <div class="p-4">
+          {hasKey ? (
+            doc.type === "code" ? <CodeAnswerKey question={doc} /> : <AnswerKey client:load question={doc} codeBlocks={keyBlocks} />
+          ) : (
+            <div class="prose prose-sm max-w-none" set:html={statementHtml} />
+          )}
         </div>
-      )
-    }
+      </details>
+    )
+  }
 
-    {listView && (
-    <div class="mt-8 flex flex-col gap-6">
-      {
-        shown.map(({ answer, label, isPending, result, blanks }, index) => (
-          <>
-            {!isPending && (index === 0 || shown[index - 1]?.isPending) && (
-              <h3 class="text-lg font-semibold">{m.grades_question_graded()}</h3>
-            )}
-            <article id={`answer-${answer.submission}`} aria-label={label} class="card card-border bg-base-100">
-              <div class="card-body">
-                <p class="text-sm font-semibold text-muted">{label}</p>
+  {queue && (
+    <CodeQueue
+      summary={queue}
+      target={{ discipline: discipline!, course: courseSegment!, exam: exam.slug, question: questionSlug }}
+      now={new Date()}
+    />
+  )}
+
+  {listView && distribution && <AnswerDistributionSection distribution={distribution} />}
+
+  {shown.length === 0 && <p class="mt-8 text-base-content/70">{m.grades_question_no_answers()}</p>}
+
+  {
+    !listView && grader && shown.length > 0 && (
+      <div class="mt-6 grid items-start gap-6 lg:grid-cols-[minmax(0,1fr)_22rem]">
+        <section aria-label={m.grades_grader_answer()} class="card card-border bg-base-100">
+          <div class="card-body">
+            {shown.map(({ answer, result }, position) => (
+              <div id={`answer-${answer.submission}`} hidden={position !== 0}>
                 {openRegrades.has(answer.submission) && (
                   <a href={`${regradesHref}#regrade-${openRegrades.get(answer.submission)}`} class="badge badge-warning badge-sm">{m.grades_regrade_requested()}</a>
                 )}
@@ -338,56 +290,102 @@ const shown = (
                   <span class="badge badge-error badge-sm">{m.grades_question_suspicious()}</span>
                 )}
                 {names && <p class="font-medium">{studentNames.get(answer.author) ?? answer.author}</p>}
-                <Answer question={asked} codeBlocks={askedBlocks} payload={answer.payload as AnswerPayload} result={result} submission={answer.submission} reviewLabel={names ? (studentNames.get(answer.author) ?? answer.author) : label} />
+                <Answer question={asked} codeBlocks={askedBlocks} payload={answer.payload as AnswerPayload} result={result} submission={answer.submission} />
                 {worker && sendsOf.has(answer.submission) && <CodeSends sends={sendsOf.get(answer.submission)!} question={worker} />}
-
-                {!isPending && (
-                  <>
-                    <p class="mt-4 text-lg font-semibold">
-                      {answer.state === "graded" && answer.verdict !== null
-                        ? formatScore(answer.verdict)
-                        : m.grades_question_not_graded()}
-                    </p>
-                    {answer.passes.length > 0 && (
-                    <ul aria-label={m.grades_question_history()} class="mt-2 flex flex-col gap-2">
-                      {answer.passes.map((pass) => (
-                        <li class="rounded-box bg-base-200/50 px-3 py-2 text-sm">
-                          <p>
-                            <span class="font-medium">{pass.willNotGrade ? m.grades_question_not_graded() : pass.score === null ? m.grades_question_no_score() : formatScore(pass.score)}</span>
-                            <span class="text-muted"> · {graderName(pass)}</span>
-                          </p>
-                          <AppliedItems items={pass.rubricItems ?? []} />
-                          {pass.comment && <p class="mt-1 whitespace-pre-wrap text-base-content/70">{pass.comment}</p>}
-                          {pass.notes && (
-                            <div role="note" aria-label={m.grades_question_notes()} class="alert alert-warning alert-soft mt-2 block text-sm">
-                              <p class="font-semibold">{m.grades_question_notes()}</p>
-                              <p class="mt-1 whitespace-pre-wrap">{pass.notes}</p>
-                            </div>
-                          )}
-                        </li>
-                      ))}
-                    </ul>
-                    )}
-                  </>
-                )}
-
-                <AnswerControls
-                  client:load
-                  discipline={discipline!}
-                  course={courseSegment!}
-                  exam={exam.slug}
-                  submission={answer.submission}
-                  state={answer.state}
-                  blanks={blanks}
-                />
+                {answer.passes
+                  .filter((pass) => pass.bot !== null)
+                  .slice(0, 1)
+                  .map((pass) => (
+                    <div role="note" class="alert alert-info alert-soft mt-4 block text-sm">
+                      <p class="font-semibold">{m.grades_question_auto()}: {pass.bot}</p>
+                      <p>{pass.willNotGrade ? m.grades_question_not_graded() : pass.score === null ? m.grades_question_no_score() : formatScore(pass.score)}</p>
+                      {pass.comment && <p class="mt-1 whitespace-pre-wrap">{pass.comment}</p>}
+                      {pass.notes && <p class="mt-1 whitespace-pre-wrap">{pass.notes}</p>}
+                      <AppliedItems items={pass.rubricItems ?? []} />
+                    </div>
+                  ))}
               </div>
-            </article>
-          </>
-        ))
-      }
-    </div>
-    )}
-  </main>
+            ))}
+          </div>
+        </section>
+        <RubricGrader
+          client:load
+          target={{ discipline: discipline!, course: courseSegment!, exam: exam.slug, question: questionSlug }}
+          initial={grader}
+          queueHref={gradingHref(queueHref, { names })}
+        />
+      </div>
+    )
+  }
+
+  {listView && (
+  <div class="mt-8 flex flex-col gap-6">
+    {
+      shown.map(({ answer, label, isPending, result, blanks }, index) => (
+        <>
+          {!isPending && (index === 0 || shown[index - 1]?.isPending) && (
+            <h3 class="page-subsubheader">{m.grades_question_graded()}</h3>
+          )}
+          <article id={`answer-${answer.submission}`} aria-label={label} class="card card-border bg-base-100">
+            <div class="card-body">
+              <p class="text-sm font-semibold text-muted">{label}</p>
+              {openRegrades.has(answer.submission) && (
+                <a href={`${regradesHref}#regrade-${openRegrades.get(answer.submission)}`} class="badge badge-warning badge-sm">{m.grades_regrade_requested()}</a>
+              )}
+              {sanctionLabel(answer.author) && <span class="badge badge-error badge-sm">{sanctionLabel(answer.author)}</span>}
+              {answer.passes.some((pass) => pass.notes !== undefined) && (
+                <span class="badge badge-error badge-sm">{m.grades_question_suspicious()}</span>
+              )}
+              {names && <p class="font-medium">{studentNames.get(answer.author) ?? answer.author}</p>}
+              <Answer question={asked} codeBlocks={askedBlocks} payload={answer.payload as AnswerPayload} result={result} submission={answer.submission} reviewLabel={names ? (studentNames.get(answer.author) ?? answer.author) : label} />
+              {worker && sendsOf.has(answer.submission) && <CodeSends sends={sendsOf.get(answer.submission)!} question={worker} />}
+
+              {!isPending && (
+                <>
+                  <p class="mt-4 text-lg font-semibold">
+                    {answer.state === "graded" && answer.verdict !== null
+                      ? formatScore(answer.verdict)
+                      : m.grades_question_not_graded()}
+                  </p>
+                  {answer.passes.length > 0 && (
+                  <ul aria-label={m.grades_question_history()} class="mt-2 flex flex-col gap-2">
+                    {answer.passes.map((pass) => (
+                      <li class="rounded-box bg-base-200/50 px-3 py-2 text-sm">
+                        <p>
+                          <span class="font-medium">{pass.willNotGrade ? m.grades_question_not_graded() : pass.score === null ? m.grades_question_no_score() : formatScore(pass.score)}</span>
+                          <span class="text-muted"> · {graderName(pass)}</span>
+                        </p>
+                        <AppliedItems items={pass.rubricItems ?? []} />
+                        {pass.comment && <p class="mt-1 whitespace-pre-wrap text-base-content/70">{pass.comment}</p>}
+                        {pass.notes && (
+                          <div role="note" aria-label={m.grades_question_notes()} class="alert alert-warning alert-soft mt-2 block text-sm">
+                            <p class="font-semibold">{m.grades_question_notes()}</p>
+                            <p class="mt-1 whitespace-pre-wrap">{pass.notes}</p>
+                          </div>
+                        )}
+                      </li>
+                    ))}
+                  </ul>
+                  )}
+                </>
+              )}
+
+              <AnswerControls
+                client:load
+                discipline={discipline!}
+                course={courseSegment!}
+                exam={exam.slug}
+                submission={answer.submission}
+                state={answer.state}
+                blanks={blanks}
+              />
+            </div>
+          </article>
+        </>
+      ))
+    }
+  </div>
+  )}
 </AppLayout>
 
 <script>

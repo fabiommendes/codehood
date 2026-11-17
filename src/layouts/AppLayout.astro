@@ -27,9 +27,20 @@ interface Props {
 	/// Links of a course page for the course card in the sidebar; the course
 	/// and the tab come from the URL. Without it the page has no card.
 	nav?: CourseNav;
+	/// The width of the page's `<main>`: `default` for most pages, `narrow`
+	/// for a short single column, `wide` for wide tables and side-by-side
+	/// panes, and `full` for a page that lays out the whole content area on
+	/// its own (no max width, no padding).
+	width?: "narrow" | "default" | "wide" | "full";
 }
 
-const { title, trail, nav } = Astro.props;
+const { title, trail, nav, width = "default" } = Astro.props;
+const MAIN_CLASS = {
+	narrow: "mx-auto w-full max-w-2xl px-4 py-10",
+	default: "mx-auto w-full max-w-4xl px-4 py-10",
+	wide: "mx-auto w-full max-w-6xl px-4 py-10",
+	full: "w-full",
+} as const;
 const crumbs = trail ?? breadcrumbs(Astro.url, { page: title });
 const user = Astro.locals.actor;
 
@@ -196,7 +207,9 @@ const card =
         </div>
         <Breadcrumbs trail={crumbs} />
         <div id="content" tabindex="-1" class="relative z-10 flex-1 outline-none">
-          <slot />
+          <main class={MAIN_CLASS[width]}>
+            <slot />
+          </main>
         </div>
         <AppFooter class="relative z-10 px-6" reportable={!!user} />
       </div>

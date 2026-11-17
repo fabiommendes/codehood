@@ -7,7 +7,6 @@
 	"questions_title": "Questões",
 	"questions_list_page_title": "Questões · {discipline}",
 	"questions_detail_page_title": "{title} · Questões",
-	"questions_back_to_list": "← Questões",
 	"questions_problems_heading": "Esta questão tem problemas que o mdq.spec não permite:",
 	"questions_details": "Detalhes",
 	"questions_field_type": "Tipo",

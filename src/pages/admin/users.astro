@@ -58,110 +58,108 @@ const [createdBefore, createdAfter] = splitAtSlot(
 ---
 
 <AppLayout title={m.admin_users_page_title()}>
-  <main class="mx-auto max-w-4xl px-4 py-10">
-    <AdminHeader active="users" />
+  <AdminHeader active="users" />
 
-    <div class="flex flex-wrap items-center justify-between gap-3">
-      <p class="text-muted">
-        {m.admin_users_total({ count: total })}
-      </p>
-      <button
-        type="button"
-        class="btn btn-primary btn-sm"
-        data-open-dialog="add-user-dialog"
-      >
-        {m.admin_users_add()}
-      </button>
-    </div>
-
-    {
-      createUserResult && !createUserResult.error && (
-        <div role="alert" class="alert alert-success mt-6">
-          <span>
-            {createdBefore}<span class="font-mono"
-              >@{createUserResult.data.username}</span
-            >{createdAfter}
-          </span>
-        </div>
-      )
-    }
-
-    <dialog
-      id="add-user-dialog"
-      class="modal"
-      data-reopen={createUserResult?.error ? "" : undefined}
+  <div class="flex flex-wrap items-center justify-between gap-3">
+    <p class="text-muted">
+      {m.admin_users_total({ count: total })}
+    </p>
+    <button
+      type="button"
+      class="btn btn-primary btn-sm"
+      data-open-dialog="add-user-dialog"
     >
-      <div class="modal-box">
-        <form method="dialog">
-          <button class="btn btn-circle btn-ghost btn-sm absolute right-2 top-2"
-            >✕</button
-          >
-        </form>
-        <h3 class="text-lg font-bold">{m.admin_users_add()}</h3>
-        <form
-          method="POST"
-          action={actionHref(actions.admin.createUser, here.search)}
-          class="mt-4 flex flex-col gap-4"
+      {m.admin_users_add()}
+    </button>
+  </div>
+
+  {
+    createUserResult && !createUserResult.error && (
+      <div role="alert" class="alert alert-success mt-6">
+        <span>
+          {createdBefore}<span class="font-mono"
+            >@{createUserResult.data.username}</span
+          >{createdAfter}
+        </span>
+      </div>
+    )
+  }
+
+  <dialog
+    id="add-user-dialog"
+    class="modal"
+    data-reopen={createUserResult?.error ? "" : undefined}
+  >
+    <div class="modal-box">
+      <form method="dialog">
+        <button class="btn btn-circle btn-ghost btn-sm absolute right-2 top-2"
+          >✕</button
         >
-          <FormAlert error={createForm.error} />
-          <Field {...createForm.field("name")} />
-          <Field {...createForm.field("email")} />
-          <Field {...createForm.field("username")} class="font-mono" />
-          <Field {...role} value={role.value || "STUDENT"} />
-          <Field {...createForm.field("githubId")} />
-          <Field {...createForm.field("schoolId")} />
-          <Field {...createForm.field("password")} />
-
-          <div class="modal-action">
-            <button type="submit" class="btn btn-primary">
-              {m.admin_users_add_submit()}
-            </button>
-          </div>
-        </form>
-      </div>
-      <form method="dialog" class="modal-backdrop">
-        <button>{m.admin_close_backdrop()}</button>
       </form>
-    </dialog>
+      <h3 class="text-lg font-bold">{m.admin_users_add()}</h3>
+      <form
+        method="POST"
+        action={actionHref(actions.admin.createUser, here.search)}
+        class="mt-4 flex flex-col gap-4"
+      >
+        <FormAlert error={createForm.error} />
+        <Field {...createForm.field("name")} />
+        <Field {...createForm.field("email")} />
+        <Field {...createForm.field("username")} class="font-mono" />
+        <Field {...role} value={role.value || "STUDENT"} />
+        <Field {...createForm.field("githubId")} />
+        <Field {...createForm.field("schoolId")} />
+        <Field {...createForm.field("password")} />
 
-    <div class="stats mt-8 max-w-md border border-edge bg-base-100">
-      <div class="stat">
-        <div class="stat-title">{m.admin_users_stat_admins()}</div>
-        <div class="stat-value text-2xl">{counts.ADMIN}</div>
-      </div>
-      <div class="stat">
-        <div class="stat-title">{m.admin_users_stat_instructors()}</div>
-        <div class="stat-value text-2xl">{counts.INSTRUCTOR}</div>
-      </div>
-      <div class="stat">
-        <div class="stat-title">{m.admin_users_stat_students()}</div>
-        <div class="stat-value text-2xl">{counts.STUDENT}</div>
-      </div>
+        <div class="modal-action">
+          <button type="submit" class="btn btn-primary">
+            {m.admin_users_add_submit()}
+          </button>
+        </div>
+      </form>
     </div>
+    <form method="dialog" class="modal-backdrop">
+      <button>{m.admin_close_backdrop()}</button>
+    </form>
+  </dialog>
 
-    <FormAlert error={forceLogoutResult?.error && errorMessage(forceLogoutResult.error)} class="mt-6" />
-    {
-      forceLogoutResult && !forceLogoutResult.error && (
-        <div role="alert" class="alert alert-success mt-6">
-          <span>{m.admin_force_logout_done()}</span>
-        </div>
-      )
-    }
+  <div class="stats mt-8 max-w-md border border-edge bg-base-100">
+    <div class="stat">
+      <div class="stat-title">{m.admin_users_stat_admins()}</div>
+      <div class="stat-value text-2xl">{counts.ADMIN}</div>
+    </div>
+    <div class="stat">
+      <div class="stat-title">{m.admin_users_stat_instructors()}</div>
+      <div class="stat-value text-2xl">{counts.INSTRUCTOR}</div>
+    </div>
+    <div class="stat">
+      <div class="stat-title">{m.admin_users_stat_students()}</div>
+      <div class="stat-value text-2xl">{counts.STUDENT}</div>
+    </div>
+  </div>
 
-    {
-      resetResult && !resetResult.error && (
-        <div role="alert" class="alert alert-success mt-6">
-          <span>{m.admin_reset_password_done({ username: `@${resetUsername}` })}</span>
-        </div>
-      )
-    }
+  <FormAlert error={forceLogoutResult?.error && errorMessage(forceLogoutResult.error)} class="mt-6" />
+  {
+    forceLogoutResult && !forceLogoutResult.error && (
+      <div role="alert" class="alert alert-success mt-6">
+        <span>{m.admin_force_logout_done()}</span>
+      </div>
+    )
+  }
 
-    <UsersTable
-      users={page.items}
-      cursor={{ ...pageLinks(here, page), total }}
-      search={here.search}
-      resetForm={resetForm}
-      failedUsername={resetResult?.error ? resetUsername : undefined}
-    />
-  </main>
+  {
+    resetResult && !resetResult.error && (
+      <div role="alert" class="alert alert-success mt-6">
+        <span>{m.admin_reset_password_done({ username: `@${resetUsername}` })}</span>
+      </div>
+    )
+  }
+
+  <UsersTable
+    users={page.items}
+    cursor={{ ...pageLinks(here, page), total }}
+    search={here.search}
+    resetForm={resetForm}
+    failedUsername={resetResult?.error ? resetUsername : undefined}
+  />
 </AppLayout>

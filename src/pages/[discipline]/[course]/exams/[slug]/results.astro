@@ -61,42 +61,41 @@ const resultRows = data.resultRows.map((row) =>
     sanctions: data.sanctions,
   })}
 >
-  <main class="mx-auto max-w-4xl px-4 py-10">
-    <CourseHeader course={course} tabs={tabs} active="exams" />
+  <CourseHeader course={course} tabs={tabs} active="exams" />
 
-    <a href={examHref} class="text-sm text-muted hover:text-primary">← {exam.title}</a>
-    {
-      data.pending > 0 && (
-        <div
-          role="status"
-          class="mt-4 flex items-center justify-between gap-4 rounded-box border border-edge bg-base-200 p-4 text-sm"
-        >
-          <span>{m.exams_detail_pending_banner({ phase: examPhaseLabels[phase], count: data.pending })}</span>
-          <a href={`${examHref}/grading`} class="btn btn-primary btn-sm">{m.exams_detail_grade_answers()}</a>
-        </div>
-      )
-    }
-    {
-      exam.type === "EXAM" && (
-        <p class="mt-2 text-sm text-muted">
-          <a href={`${examHref}#release-status`} class="link">{m.exams_release_button()}</a>
-        </p>
-      )
-    }
+  <h2 class="mt-6 page-subheader">{m.grades_results_title()}</h2>
 
-    <div id="by-question" class="scroll-mt-20">
-      <QuestionStatsTable client:load href={examHref} stats={data.statsRows} titles={titles} points={pointsByPosition(exam.questions)} />
-    </div>
-    <div id="by-student" class="scroll-mt-20">
-      <ExamResults
-        client:load
-        href={examHref}
-        discipline={discipline!}
-        course={courseSegment!}
-        exam={exam.slug}
-        rows={resultRows}
-        questions={exam.questions.map((question) => ({ slug: question.slug, title: titles.get(question.slug) ?? question.slug }))}
-      />
-    </div>
-  </main>
+  {
+    data.pending > 0 && (
+      <div
+        role="status"
+        class="mt-4 flex items-center justify-between gap-4 rounded-box border border-edge bg-base-200 p-4 text-sm"
+      >
+        <span>{m.exams_detail_pending_banner({ phase: examPhaseLabels[phase], count: data.pending })}</span>
+        <a href={`${examHref}/grading`} class="btn btn-primary btn-sm">{m.exams_detail_grade_answers()}</a>
+      </div>
+    )
+  }
+  {
+    exam.type === "EXAM" && (
+      <p class="mt-2 text-sm text-muted">
+        <a href={`${examHref}#release-status`} class="link">{m.exams_release_button()}</a>
+      </p>
+    )
+  }
+
+  <div id="by-question" class="scroll-mt-20">
+    <QuestionStatsTable client:load href={examHref} stats={data.statsRows} titles={titles} points={pointsByPosition(exam.questions)} />
+  </div>
+  <div id="by-student" class="scroll-mt-20">
+    <ExamResults
+      client:load
+      href={examHref}
+      discipline={discipline!}
+      course={courseSegment!}
+      exam={exam.slug}
+      rows={resultRows}
+      questions={exam.questions.map((question) => ({ slug: question.slug, title: titles.get(question.slug) ?? question.slug }))}
+    />
+  </div>
 </AppLayout>

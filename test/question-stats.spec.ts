@@ -880,7 +880,7 @@ async function grade(submission: string, score: string) {
 
 function statsHeading(page: Page) {
 	return page.getByRole("heading", {
-		level: 2,
+		level: 3,
 		name: "Question statistics",
 		exact: true,
 	});

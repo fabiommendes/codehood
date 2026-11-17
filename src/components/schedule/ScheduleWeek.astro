@@ -182,7 +182,7 @@ function faded(entry: CalendarEntry): boolean {
             </div>
             {entry.kind === "exam" && (
               <p class="mt-1 text-sm text-muted">
-                {formatDuration(entry.exam.duration)}
+                {formatDuration(entry.exam.duration, entry.startAt)}
               </p>
             )}
             {entry.kind === "event" && entry.event.description && (

@@ -205,7 +205,7 @@ export default function ExamsTable(props: Props): JSX.Element {
 			title: m.exams_table_col_duration(),
 			class: `text-muted ${CARD_CELL}`,
 			sortKey: "duration" satisfies SortField,
-			render: (exam) => formatDuration(exam.duration),
+			render: (exam) => formatDuration(exam.duration, exam.scheduledAt),
 		},
 		{
 			title: m.exams_table_col_tags(),

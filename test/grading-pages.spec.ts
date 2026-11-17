@@ -289,7 +289,9 @@ test("grading queue: lists the questions in exam order with their counts and lin
 		page.getByRole("heading", { level: 2, name: "Grading", exact: true }),
 	).toBeVisible();
 	await expect(
-		page.getByRole("link", { name: "← Midterm exam", exact: true }),
+		page
+			.getByRole("navigation", { name: "Breadcrumb" })
+			.getByRole("link", { name: "Midterm exam", exact: true }),
 	).toHaveAttribute("href", `${href}/exams/midterm`);
 
 	const items = page
@@ -327,7 +329,7 @@ test("grading queue: lists the questions in exam order with their counts and lin
 	await expect(page.getByText("Nothing left to grade.")).toHaveCount(0);
 });
 
-test("grading queue: with every answer graded or marked will-not-grade it says nothing is left, and the back-link leads to the exam", async ({
+test("grading queue: with every answer graded or marked will-not-grade it says nothing is left, and the breadcrumb leads to the exam", async ({
 	page,
 }) => {
 	const { teacher, course, href } = await setup("queue2");
@@ -363,7 +365,9 @@ test("grading queue: with every answer graded or marked will-not-grade it says n
 	).toBeVisible();
 	await expect(page.getByText("Nothing left to grade.")).toBeVisible();
 	await expect(
-		page.getByRole("link", { name: "← Final exam", exact: true }),
+		page
+			.getByRole("navigation", { name: "Breadcrumb" })
+			.getByRole("link", { name: "Final exam", exact: true }),
 	).toHaveAttribute("href", `${href}/exams/final`);
 
 	const items = page

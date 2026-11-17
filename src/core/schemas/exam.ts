@@ -65,7 +65,7 @@ export const examSchema = z.object({
 	duration: duration.nullable(),
 	extraTime: duration.nullable(),
 
-	/// Whether students may run code in answer mode. Null follows the exam type.
+	/// Whether students may run code in answer mode. Null means on.
 	allowCodeRun: z.boolean().nullable(),
 
 	/// Whether the browser records the edit history of open answers. Null follows

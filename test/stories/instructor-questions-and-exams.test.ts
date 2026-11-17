@@ -420,7 +420,7 @@ test("instructor: browse the question bank", async ({ page }) => {
 		await expect(page).toHaveURL(`${href}/questions/recursion-basics`);
 
 		await expect(
-			page.getByRole("heading", { name: "Recursion basics" }),
+			page.getByRole("heading", { level: 2, name: "Recursion basics" }),
 		).toBeVisible();
 		await expect(page.getByText("Multiple choice").first()).toBeVisible();
 		await expect(

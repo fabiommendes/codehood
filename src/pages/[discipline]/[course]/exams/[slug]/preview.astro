@@ -68,59 +68,56 @@ const codeRun = effectiveCodeRun(exam);
     sanctions: data.sanctions,
   })}
 >
-  <main class="mx-auto max-w-4xl px-4 py-10">
-    <CourseHeader course={course} tabs={tabs} active="exams" />
+  <CourseHeader course={course} tabs={tabs} active="exams" />
 
-    <a href={`${href}/exams/${exam.slug}`} class="text-sm text-muted hover:text-primary">← {exam.title}</a>
-    <h2 class="mt-2 text-2xl font-bold">{exam.title}</h2>
+  <h2 class="mt-6 page-subheader">{exam.title}</h2>
 
-    {
-      exam.preamble && (
-        <div class="mt-6 rounded-box border border-edge bg-base-100 p-6">
-          {preambleHtml ? (
-            <div class="prose prose-sm max-w-none" set:html={preambleHtml} />
-          ) : (
-            <p class="whitespace-pre-wrap text-sm">{exam.preamble}</p>
-          )}
-        </div>
-      )
-    }
+  {
+    exam.preamble && (
+      <div class="mt-6 rounded-box border border-edge bg-base-100 p-6">
+        {preambleHtml ? (
+          <div class="prose prose-sm max-w-none" set:html={preambleHtml} />
+        ) : (
+          <p class="whitespace-pre-wrap text-sm">{exam.preamble}</p>
+        )}
+      </div>
+    )
+  }
 
-    <div class="mt-4">
-      <AttachmentList
-        attachments={exam.attachments}
-        codeBlocks={await highlightQuestionCodeBlocks({ attachments: exam.attachments })}
-        url={(name) => examAttachmentUrl(`${discipline}/${courseSegment}`, slug!, name)}
-      />
-    </div>
+  <div class="mt-4">
+    <AttachmentList
+      attachments={exam.attachments}
+      codeBlocks={await highlightQuestionCodeBlocks({ attachments: exam.attachments })}
+      url={(name) => examAttachmentUrl(`${discipline}/${courseSegment}`, slug!, name)}
+    />
+  </div>
 
-    <section class="mt-8">
-      <ExamAttempt
-        client:load
-        preview
-        discipline={discipline!}
-        course={courseSegment!}
-        exam={exam.slug}
-        type={exam.type}
-        state={state}
-        now={now}
-        questions={view.questions}
-        answers={view.answers}
-        result={view.result}
-        reviews={view.reviews}
-        regrades={view.regrades}
-        codeRun={codeRun.allowed}
-        runnerOrigin={RUNNER_ORIGIN}
-        pretests={view.pretests}
-        exampleHtml={view.exampleHtml}
-        codeBlocks={view.codeBlocks}
-        codeSends={view.codeSends}
-        username={actor.username}
-        answeredAt={view.answeredAt}
-        graceMs={EXAM_ANSWER_GRACE_MS}
-        attempt={attempt?.publicId}
-        answerHistory={effectiveAnswerHistory(exam)}
-      />
-    </section>
-  </main>
+  <section class="mt-8">
+    <ExamAttempt
+      client:load
+      preview
+      discipline={discipline!}
+      course={courseSegment!}
+      exam={exam.slug}
+      type={exam.type}
+      state={state}
+      now={now}
+      questions={view.questions}
+      answers={view.answers}
+      result={view.result}
+      reviews={view.reviews}
+      regrades={view.regrades}
+      codeRun={codeRun.allowed}
+      runnerOrigin={RUNNER_ORIGIN}
+      pretests={view.pretests}
+      exampleHtml={view.exampleHtml}
+      codeBlocks={view.codeBlocks}
+      codeSends={view.codeSends}
+      username={actor.username}
+      answeredAt={view.answeredAt}
+      graceMs={EXAM_ANSWER_GRACE_MS}
+      attempt={attempt?.publicId}
+      answerHistory={effectiveAnswerHistory(exam)}
+    />
+  </section>
 </AppLayout>

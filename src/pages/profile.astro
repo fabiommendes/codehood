@@ -127,7 +127,7 @@ const profileTabs = [
 ---
 
 <AppLayout title={m.profile_title()}>
-  <main class="mx-auto flex max-w-4xl flex-col gap-6 px-4 py-10">
+  <div class="flex flex-col gap-6">
     <div>
       <PageKicker text={m.profile_kicker()} />
       <h1 class="text-2xl font-bold">{m.profile_title()}</h1>
@@ -404,7 +404,7 @@ const profileTabs = [
         </div>
       </Fragment>
     </Tabs>
-  </main>
+  </div>
 </AppLayout>
 
 <script>

@@ -193,7 +193,9 @@ test("attempt page: shows the student's name, one article per question, and Not 
 	await expect(page).toHaveURL(`${href}/exams/midterm/attempts/at1-ana`);
 	await expect(titleHeading(page, "Ana Prado")).toBeVisible();
 	await expect(
-		page.getByRole("link", { name: "← Midterm exam", exact: true }),
+		page
+			.getByRole("navigation", { name: "Breadcrumb" })
+			.getByRole("link", { name: "Midterm exam", exact: true }),
 	).toHaveAttribute("href", `${href}/exams/midterm`);
 	await expect(page.getByRole("article")).toHaveCount(3);
 	for (const [n, title] of [

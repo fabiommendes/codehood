@@ -182,7 +182,7 @@ export default function QuestionStats(props: Props): JSX.Element {
 
 	return (
 		<section class="mt-8">
-			<h2 class="text-lg font-semibold">{m.grades_stats_title()}</h2>
+			<h3 class="page-subsubheader">{m.grades_stats_title()}</h3>
 			<Show
 				when={props.stats.some((entry) => entry.answered > 0)}
 				fallback={

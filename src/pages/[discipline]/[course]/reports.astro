@@ -45,18 +45,16 @@ const [page, total] = await Promise.all([
 	trail={breadcrumbs(Astro.url, { course })}
 	nav={homeNav(href)}
 >
-	<main class="mx-auto max-w-4xl px-4 py-10">
-		<CourseHeader course={course} tabs={tabs} active="home" />
+	<CourseHeader course={course} tabs={tabs} active="home" />
 
-		<p class="mb-6 max-w-xl text-muted">{m.report_course_intro()}</p>
+	<p class="mb-6 max-w-xl text-muted">{m.report_course_intro()}</p>
 
-		<ReportFilters filters={filters} hideKind />
-		<ReportQueue
-			client:load
-			reports={page.items.map(toReportRow)}
-			status={filters.status}
-			kind="CONTENT"
-		/>
-		<CursorPagination {...pageLinks(listUrl(Astro.url), page)} total={total} />
-	</main>
+	<ReportFilters filters={filters} hideKind />
+	<ReportQueue
+		client:load
+		reports={page.items.map(toReportRow)}
+		status={filters.status}
+		kind="CONTENT"
+	/>
+	<CursorPagination {...pageLinks(listUrl(Astro.url), page)} total={total} />
 </AppLayout>

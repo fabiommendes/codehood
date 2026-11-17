@@ -12,11 +12,10 @@ export interface CodeRunSetting {
 }
 
 /**
- * The effective setting and where it comes from, for the exam page to show
- * ("on (PRACTICE default)", "off (set by the instructor)").
+ * The effective setting and where it comes from.
  *
- * `default`: `allowCodeRun` is null and the exam type decides. `exam`: the
- * course repository set it.
+ * `default`: `allowCodeRun` is null, which means on. `exam`: the course
+ * repository set it.
  */
 export interface EffectiveCodeRun {
 	allowed: boolean;
@@ -26,18 +25,17 @@ export interface EffectiveCodeRun {
 /**
  * The effective code-run setting of `exam`.
  *
- * An explicit `allowCodeRun` wins; null follows the exam type: on for
- * `PRACTICE`, off for `QUIZ` and `EXAM`.
+ * An explicit `allowCodeRun` wins; null means on, for every exam type.
  *
  * @example
- * effectiveCodeRun({ type: "PRACTICE", allowCodeRun: null }); // { allowed: true, source: "default" }
- * effectiveCodeRun({ type: "EXAM", allowCodeRun: true }); // { allowed: true, source: "exam" }
+ * effectiveCodeRun({ type: "EXAM", allowCodeRun: null }); // { allowed: true, source: "default" }
+ * effectiveCodeRun({ type: "EXAM", allowCodeRun: false }); // { allowed: false, source: "exam" }
  */
 export function effectiveCodeRun(exam: CodeRunSetting): EffectiveCodeRun {
 	if (exam.allowCodeRun !== null) {
 		return { allowed: exam.allowCodeRun, source: "exam" };
 	}
-	return { allowed: exam.type === "PRACTICE", source: "default" };
+	return { allowed: true, source: "default" };
 }
 
 /**

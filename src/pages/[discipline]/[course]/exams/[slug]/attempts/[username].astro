@@ -197,157 +197,153 @@ const stateLabel = (status: string, score: number | null): string => {
   trail={breadcrumbs(Astro.url, { course, item: exam.title, student: row.name })}
   nav={await gradingExamNav(result, actor, row.name)}
 >
-  <main class="mx-auto max-w-4xl px-4 py-10">
-    <CourseHeader course={course} tabs={tabs} active="exams" />
+  <CourseHeader course={course} tabs={tabs} active="exams" />
 
-    <a href={`${href}/exams/${exam.slug}`} class="text-sm text-muted hover:text-primary">← {exam.title}</a>
+  <h2 class="mt-6 page-subheader">
+    {row.name}
+    {row.dropped && <span class="badge badge-outline badge-sm ml-2">{m.exams_attempt_dropped()}</span>}
+  </h2>
 
-    <h2 class="mt-2 text-2xl font-bold">
-      {row.name}
-      {row.dropped && <span class="badge badge-outline badge-sm ml-2">{m.exams_attempt_dropped()}</span>}
-    </h2>
-
-    <dl class="mt-4 grid grid-cols-1 gap-x-8 gap-y-3 rounded-box border border-edge bg-base-100 p-6 sm:grid-cols-3">
-      <div>
-        <dt class="text-sm text-muted">{m.exams_attempt_started()}</dt>
-        <dd class="mt-0.5 font-medium">{formatDateTime(row.startedAt, { year: "numeric" })}</dd>
-      </div>
-      <div>
-        <dt class="text-sm text-muted">{m.exams_attempt_submitted()}</dt>
-        <dd class="mt-0.5 font-medium">
-          {closed ? formatDateTime(attemptClosedAt(attempt) ?? deadline ?? attempt.updatedAt, { year: "numeric" }) : m.exams_attempt_in_progress()}
-        </dd>
-      </div>
-      <div>
-        <dt class="text-sm text-muted">{m.exams_attempt_total()}</dt>
-        <dd class="mt-0.5 font-medium">{attemptTotalLabel(row.total, row.state)}</dd>
-      </div>
-    </dl>
-
-    {
-      exception && (
-        <p class="mt-4 text-sm text-base-content/70">
-          <span class="font-medium">{m.exams_attempt_exception()}:</span>{" "}
-          {[exceptionExtra, exceptionDate && m.exams_detail_new_date({ date: exceptionDate })].filter(Boolean).join(" · ")}
-          {" · "}
-          <a class="link" href={`${href}/exams/${exam.slug}/exceptions`}>{m.exams_attempt_edit_exception()}</a>
-        </p>
-      )
-    }
-
-    {
-      examSanction && (
-        <div role="status" class="alert alert-error alert-soft mt-4 block text-sm">
-          <p class="font-semibold">{m.grades_sanction_banner_title()}</p>
-          <p>{Number(examSanction.factor) === 0 ? m.grades_sanction_banner_zeroed() : m.grades_sanction_banner_factor({ percent: Math.round(Number(examSanction.factor) * 100) })}</p>
-          {examSanction.reason && <p class="whitespace-pre-wrap">{m.grades_sanction_banner_reason({ reason: examSanction.reason })}</p>}
-          {examSanctionNotes && (
-            <p class="whitespace-pre-wrap">{m.grades_sanction_banner_notes({ notes: examSanctionNotes })}</p>
-          )}
-          <p class="mt-1"><a class="link" href={`${href}/exams/${exam.slug}/sanctions`}>{m.grades_sanction_manage()}</a></p>
-        </div>
-      )
-    }
-
-    {
-      sanctionable && !examSanction && (
-        <div class="mt-4">
-          <SanctionDialog
-            client:load
-            discipline={discipline!}
-            course={courseSegment!}
-            exam={exam.slug}
-            usernames={[row.author]}
-            questions={rows.map((entry) => ({ slug: entry.outcome.question, title: entry.title }))}
-            triggerLabel={m.grades_sanction_exam_button()}
-            triggerClass="btn btn-outline btn-error btn-sm"
-            title={m.grades_sanction_exam_button()}
-            submitLabel={m.grades_sanction_submit()}
-          />
-        </div>
-      )
-    }
-
-    {
-      canReopen && (
-        <div class="mt-4">
-          <ReopenAttempt
-            client:load
-            discipline={discipline!}
-            course={courseSegment!}
-            exam={exam.slug}
-            username={row.author}
-          />
-        </div>
-      )
-    }
-
-    <div class="mt-8 flex flex-col gap-6">
-      {
-        rows.map(({ label, number, points, outcome, title, asked, attachmentUrl, counting, review, edits: editSummary }) => (
-          <article id={counting ? `answer-${counting.publicId}` : undefined} aria-label={label} class="card card-border bg-base-100">
-            <div class="card-body">
-              <p class="text-sm"><QuestionNumber number={number} points={points} /></p>
-              <div class="flex flex-wrap items-center justify-between gap-2">
-                <h3 class="text-lg font-semibold">{title}</h3>
-                {outcome.sanction ? (
-                  <a class="badge badge-error badge-sm" href={`${href}/exams/${exam.slug}/sanctions`}>
-                    {outcome.sanction.factor === 0 ? m.grades_sanction_zeroed() : m.grades_sanction_reduced({ factor: outcome.sanction.factor })}
-                  </a>
-                ) : (
-                  sanctionable && (
-                    <SanctionDialog
-                      client:load
-                      discipline={discipline!}
-                      course={courseSegment!}
-                      exam={exam.slug}
-                      usernames={[row.author]}
-                      question={outcome.question}
-                      triggerLabel={m.grades_sanction_zero_button()}
-                      triggerClass="btn btn-outline btn-error btn-xs"
-                      title={m.grades_sanction_zero_button()}
-                      submitLabel={m.grades_sanction_zero_button()}
-                    />
-                  )
-                )}
-              </div>
-              <AttachmentList attachments={asked?.attachments} url={attachmentUrl} codeBlocks={attachmentBlocks} />
-              {counting && answeredAfterDeadline(deadline, counting.createdAt) && (
-                <span class="badge badge-warning badge-sm">{m.exams_attempt_answered_late({ seconds: Math.round((counting.createdAt.getTime() - deadline!.getTime()) / 1000) })}</span>
-              )}
-              {counting && openRegrades.has(counting.publicId) && (
-                <a href={`${href}/exams/${exam.slug}/regrades#regrade-${openRegrades.get(counting.publicId)}`} class="badge badge-warning badge-sm">{m.grades_regrade_requested()}</a>
-              )}
-              {counting && asked ? (
-                <>
-                  <Answer question={asked} payload={counting.payload as AnswerPayload} result={review} submission={counting.publicId} />
-                  <p class="mt-4 font-semibold">{stateLabel(outcome.status, outcome.score)}</p>
-                  <AppliedItems items={outcome.rubricItems ?? []} />
-                  {outcome.comments.map((comment) => (
-                    <p class="whitespace-pre-wrap text-sm text-base-content/70">{comment}</p>
-                  ))}
-                  {closed && (
-                    <p class="mt-2">
-                      <a
-                        class="link"
-                        href={gradingHref(`${href}/exams/${exam.slug}/grading/${outcome.question}`, {
-                          names: true,
-                          anchor: `answer-${counting.publicId}`,
-                        })}
-                      >
-                        {m.exams_attempt_grade_this()}
-                      </a>
-                    </p>
-                  )}
-                </>
-              ) : (
-                <p class="text-muted">{m.exams_attempt_not_answered()}</p>
-              )}
-              {editSummary && <AnswerEditSummary summary={editSummary} enabled={edits.enabled} />}
-            </div>
-          </article>
-        ))
-      }
+  <dl class="mt-4 grid grid-cols-1 gap-x-8 gap-y-3 rounded-box border border-edge bg-base-100 p-6 sm:grid-cols-3">
+    <div>
+      <dt class="text-sm text-muted">{m.exams_attempt_started()}</dt>
+      <dd class="mt-0.5 font-medium">{formatDateTime(row.startedAt, { year: "numeric" })}</dd>
     </div>
-  </main>
+    <div>
+      <dt class="text-sm text-muted">{m.exams_attempt_submitted()}</dt>
+      <dd class="mt-0.5 font-medium">
+        {closed ? formatDateTime(attemptClosedAt(attempt) ?? deadline ?? attempt.updatedAt, { year: "numeric" }) : m.exams_attempt_in_progress()}
+      </dd>
+    </div>
+    <div>
+      <dt class="text-sm text-muted">{m.exams_attempt_total()}</dt>
+      <dd class="mt-0.5 font-medium">{attemptTotalLabel(row.total, row.state)}</dd>
+    </div>
+  </dl>
+
+  {
+    exception && (
+      <p class="mt-4 text-sm text-base-content/70">
+        <span class="font-medium">{m.exams_attempt_exception()}:</span>{" "}
+        {[exceptionExtra, exceptionDate && m.exams_detail_new_date({ date: exceptionDate })].filter(Boolean).join(" · ")}
+        {" · "}
+        <a class="link" href={`${href}/exams/${exam.slug}/exceptions`}>{m.exams_attempt_edit_exception()}</a>
+      </p>
+    )
+  }
+
+  {
+    examSanction && (
+      <div role="status" class="alert alert-error alert-soft mt-4 block text-sm">
+        <p class="font-semibold">{m.grades_sanction_banner_title()}</p>
+        <p>{Number(examSanction.factor) === 0 ? m.grades_sanction_banner_zeroed() : m.grades_sanction_banner_factor({ percent: Math.round(Number(examSanction.factor) * 100) })}</p>
+        {examSanction.reason && <p class="whitespace-pre-wrap">{m.grades_sanction_banner_reason({ reason: examSanction.reason })}</p>}
+        {examSanctionNotes && (
+          <p class="whitespace-pre-wrap">{m.grades_sanction_banner_notes({ notes: examSanctionNotes })}</p>
+        )}
+        <p class="mt-1"><a class="link" href={`${href}/exams/${exam.slug}/sanctions`}>{m.grades_sanction_manage()}</a></p>
+      </div>
+    )
+  }
+
+  {
+    sanctionable && !examSanction && (
+      <div class="mt-4">
+        <SanctionDialog
+          client:load
+          discipline={discipline!}
+          course={courseSegment!}
+          exam={exam.slug}
+          usernames={[row.author]}
+          questions={rows.map((entry) => ({ slug: entry.outcome.question, title: entry.title }))}
+          triggerLabel={m.grades_sanction_exam_button()}
+          triggerClass="btn btn-outline btn-error btn-sm"
+          title={m.grades_sanction_exam_button()}
+          submitLabel={m.grades_sanction_submit()}
+        />
+      </div>
+    )
+  }
+
+  {
+    canReopen && (
+      <div class="mt-4">
+        <ReopenAttempt
+          client:load
+          discipline={discipline!}
+          course={courseSegment!}
+          exam={exam.slug}
+          username={row.author}
+        />
+      </div>
+    )
+  }
+
+  <div class="mt-8 flex flex-col gap-6">
+    {
+      rows.map(({ label, number, points, outcome, title, asked, attachmentUrl, counting, review, edits: editSummary }) => (
+        <article id={counting ? `answer-${counting.publicId}` : undefined} aria-label={label} class="card card-border bg-base-100">
+          <div class="card-body">
+            <p class="text-sm"><QuestionNumber number={number} points={points} /></p>
+            <div class="flex flex-wrap items-center justify-between gap-2">
+              <h3 class="text-lg font-semibold">{title}</h3>
+              {outcome.sanction ? (
+                <a class="badge badge-error badge-sm" href={`${href}/exams/${exam.slug}/sanctions`}>
+                  {outcome.sanction.factor === 0 ? m.grades_sanction_zeroed() : m.grades_sanction_reduced({ factor: outcome.sanction.factor })}
+                </a>
+              ) : (
+                sanctionable && (
+                  <SanctionDialog
+                    client:load
+                    discipline={discipline!}
+                    course={courseSegment!}
+                    exam={exam.slug}
+                    usernames={[row.author]}
+                    question={outcome.question}
+                    triggerLabel={m.grades_sanction_zero_button()}
+                    triggerClass="btn btn-outline btn-error btn-xs"
+                    title={m.grades_sanction_zero_button()}
+                    submitLabel={m.grades_sanction_zero_button()}
+                  />
+                )
+              )}
+            </div>
+            <AttachmentList attachments={asked?.attachments} url={attachmentUrl} codeBlocks={attachmentBlocks} />
+            {counting && answeredAfterDeadline(deadline, counting.createdAt) && (
+              <span class="badge badge-warning badge-sm">{m.exams_attempt_answered_late({ seconds: Math.round((counting.createdAt.getTime() - deadline!.getTime()) / 1000) })}</span>
+            )}
+            {counting && openRegrades.has(counting.publicId) && (
+              <a href={`${href}/exams/${exam.slug}/regrades#regrade-${openRegrades.get(counting.publicId)}`} class="badge badge-warning badge-sm">{m.grades_regrade_requested()}</a>
+            )}
+            {counting && asked ? (
+              <>
+                <Answer question={asked} payload={counting.payload as AnswerPayload} result={review} submission={counting.publicId} />
+                <p class="mt-4 font-semibold">{stateLabel(outcome.status, outcome.score)}</p>
+                <AppliedItems items={outcome.rubricItems ?? []} />
+                {outcome.comments.map((comment) => (
+                  <p class="whitespace-pre-wrap text-sm text-base-content/70">{comment}</p>
+                ))}
+                {closed && (
+                  <p class="mt-2">
+                    <a
+                      class="link"
+                      href={gradingHref(`${href}/exams/${exam.slug}/grading/${outcome.question}`, {
+                        names: true,
+                        anchor: `answer-${counting.publicId}`,
+                      })}
+                    >
+                      {m.exams_attempt_grade_this()}
+                    </a>
+                  </p>
+                )}
+              </>
+            ) : (
+              <p class="text-muted">{m.exams_attempt_not_answered()}</p>
+            )}
+            {editSummary && <AnswerEditSummary summary={editSummary} enabled={edits.enabled} />}
+          </div>
+        </article>
+      ))
+    }
+  </div>
 </AppLayout>
