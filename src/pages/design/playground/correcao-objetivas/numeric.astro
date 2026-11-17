@@ -2,8 +2,11 @@
 import { numeric } from "./_data";
 import Frame from "./_Frame.astro";
 import Groups from "./_Groups.astro";
+import { guard } from "./_guard";
 
 export const prerender = false;
+const g = await guard(Astro as never);
+if ("redirect" in g) return g.redirect;
 const q = numeric();
 const names = Astro.url.searchParams.get("names") === "1";
 // The zoomed window of the axis, in seconds, and the tolerance band of the key.
@@ -24,7 +27,7 @@ const far = [
 const ticks = [1.95, 2.0, 2.05, 2.1, 2.15];
 ---
 
-<Frame q={q}>
+<Frame q={q} grading={g}>
   <section class="mt-8">
     <h3 class="page-subsubheader">Valores enviados</h3>
     <p class="mt-1 text-sm text-muted">Histograma dos valores, em segundos. A faixa verde é a tolerância do gabarito. Âmbar: valor na faixa, mas com a unidade errada.</p>

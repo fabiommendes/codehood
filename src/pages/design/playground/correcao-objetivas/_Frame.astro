@@ -4,21 +4,23 @@ import QuestionNumber from "@/components/exam/QuestionNumber.astro";
 import AnswerKey from "@/components/grading/AnswerKey";
 import { type Fixture, fmt, studentLabel } from "./_data";
 import { docOf } from "./_docs";
+import type { Grading } from "./_guard";
 import Icon from "./_Icon.astro";
 import Overrides from "./_Overrides";
 import Shell from "./_Shell.astro";
 
 interface Props {
 	q: Fixture;
+	grading: Grading;
 }
 
-const { q } = Astro.props;
+const { q, grading } = Astro.props;
 const names = Astro.url.searchParams.get("names") === "1";
 const back = "/design/playground/correcao-objetivas";
 const regrades = "/cs101/ada_2026-2/exams/quiz-01/regrades";
 ---
 
-<Shell title={q.title}>
+<Shell title={q.title} grading={grading}>
   <a href={back} class="text-sm text-muted hover:text-primary">← Mockups da correção</a>
   <p class="mt-2 text-sm"><QuestionNumber number={q.position} points={q.points} /> <span class="badge badge-ghost badge-sm ml-1">{q.typeLabel}</span></p>
   <div class="relative flex items-center gap-2">

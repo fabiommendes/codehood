@@ -1,7 +1,10 @@
 ---
 import Attempt from "./_Attempt.astro";
+import { guard } from "./_guard";
 
 export const prerender = false;
+const g = await guard(Astro as never);
+if ("redirect" in g) return g.redirect;
 ---
 
-<Attempt variant="bonus" />
+<Attempt variant="bonus" grading={g} />

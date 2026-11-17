@@ -2,9 +2,12 @@
 import { trueFalse } from "./_data";
 import Frame from "./_Frame.astro";
 import GroupedAnswers from "./_GroupedAnswers";
+import { guard } from "./_guard";
 import { memberRow } from "./_rows";
 
 export const prerender = false;
+const g = await guard(Astro as never);
+if ("redirect" in g) return g.redirect;
 const q = trueFalse();
 const names = Astro.url.searchParams.get("names") === "1";
 const gabarito = q.key.map((k) => (k.ok ? "V" : "F"));
@@ -55,7 +58,7 @@ const rows = q.key.map((k, i) => {
 });
 ---
 
-<Frame q={q}>
+<Frame q={q} grading={g}>
   <section class="mt-8">
     <h3 class="page-subsubheader">Afirmação por afirmação</h3>
     <p class="mt-1 text-sm text-muted">Cada linha é um item do gabarito. A barra mostra quem marcou V (verde) e F (vermelho). "Erraram" e a marcação contam só quem errou o item.</p>

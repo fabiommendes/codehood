@@ -2,9 +2,12 @@
 import { multipleSelection } from "./_data";
 import Frame from "./_Frame.astro";
 import GroupedAnswers, { type Check } from "./_GroupedAnswers";
+import { guard } from "./_guard";
 import { groupRows, memberRow } from "./_rows";
 
 export const prerender = false;
+const g = await guard(Astro as never);
+if ("redirect" in g) return g.redirect;
 const q = multipleSelection();
 const names = Astro.url.searchParams.get("names") === "1";
 const options = q.key.map((k, i) => ({
@@ -69,7 +72,7 @@ const comboRows = (block: (typeof q.blocks)[number]) =>
 	});
 ---
 
-<Frame q={q}>
+<Frame q={q} grading={g}>
   <section class="mt-8">
     <h3 class="page-subsubheader">Por alternativa</h3>
     <p class="mt-1 text-sm text-muted">Quantos marcaram cada alternativa. A caixa verde é do gabarito.</p>

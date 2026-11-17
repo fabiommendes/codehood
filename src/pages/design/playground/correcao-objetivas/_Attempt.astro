@@ -2,14 +2,16 @@
 /// The student attempt page with a grade change, either per question or as a bonus on the exam.
 import QuestionNumber from "@/components/exam/QuestionNumber.astro";
 import { ATTEMPT_QUESTIONS, ATTEMPT_STUDENT, fmt } from "./_data";
+import type { Grading } from "./_guard";
 import Icon from "./_Icon.astro";
 import Shell from "./_Shell.astro";
 
 interface Props {
 	variant: "override" | "bonus";
+	grading: Grading;
 }
 
-const { variant } = Astro.props;
+const { variant, grading } = Astro.props;
 const perQuestion = variant === "override";
 const BONUS = 15;
 const points = 20;
@@ -22,7 +24,7 @@ const finalTotal = perQuestion
 const back = "/design/playground/correcao-objetivas";
 ---
 
-<Shell title={ATTEMPT_STUDENT.name}>
+<Shell title={ATTEMPT_STUDENT.name} grading={grading}>
   <a href={back} class="text-sm text-muted hover:text-primary">← Mockups da correção</a>
   <div class="relative mt-6 flex items-center gap-2">
     <a href="#" class="btn btn-ghost btn-sm btn-square text-base-content/60 lg:absolute lg:right-full lg:mr-1" aria-label="Aluno anterior" title="Aluno anterior">

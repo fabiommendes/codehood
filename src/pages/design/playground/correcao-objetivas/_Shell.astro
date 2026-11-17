@@ -3,20 +3,15 @@
 import CourseHeader from "@/components/CourseHeader.astro";
 import AppLayout from "@/layouts/AppLayout.astro";
 import { breadcrumbs } from "@/utils/breadcrumbs";
-import { gradingExamNav, loadGrading } from "@/utils/load-grading";
+import { gradingExamNav } from "@/utils/load-grading";
+import type { Grading } from "./_guard";
 
 interface Props {
 	title: string;
+	grading: Grading;
 }
 
-const { title } = Astro.props;
-const result = await loadGrading(
-	Astro as never,
-	"cs101",
-	"ada_2026-2",
-	"quiz-01",
-);
-if ("redirect" in result) return result.redirect;
+const { title, grading: result } = Astro.props;
 // biome-ignore lint/style/noNonNullAssertion: loadGrading redirected an anonymous visitor.
 const actor = Astro.locals.actor!;
 ---

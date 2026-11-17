@@ -2,10 +2,13 @@
 import { fillIn, type Member as M } from "./_data";
 import Frame from "./_Frame.astro";
 import GroupedAnswers from "./_GroupedAnswers";
+import { guard } from "./_guard";
 import Members from "./_Members";
 import { groupRows, memberRow } from "./_rows";
 
 export const prerender = false;
+const g = await guard(Astro as never);
+if ("redirect" in g) return g.redirect;
 const q = fillIn();
 const names = Astro.url.searchParams.get("names") === "1";
 const wrongBy = new Map<number, { member: M; misses: string[] }>();
@@ -35,7 +38,7 @@ const missed = [...wrongBy.values()]
 	);
 ---
 
-<Frame q={q}>
+<Frame q={q} grading={g}>
   <section class="mt-8">
     <h3 class="page-subsubheader">Valores por lacuna</h3>
     {q.blocks.map((block) => (

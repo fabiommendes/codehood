@@ -2,9 +2,12 @@
 import { shortAnswer } from "./_data";
 import Frame from "./_Frame.astro";
 import GroupedAnswers from "./_GroupedAnswers";
+import { guard } from "./_guard";
 import { groupRows } from "./_rows";
 
 export const prerender = false;
+const g = await guard(Astro as never);
+if ("redirect" in g) return g.redirect;
 const q = shortAnswer();
 const names = Astro.url.searchParams.get("names") === "1";
 const all = q.blocks.flatMap((b) => b.groups);
@@ -33,7 +36,7 @@ const rows = groupRows(
 });
 ---
 
-<Frame q={q}>
+<Frame q={q} grading={g}>
   <section class="mt-8">
     <h3 class="page-subsubheader">Textos distintos</h3>
     <p class="mt-1 text-sm text-muted">
