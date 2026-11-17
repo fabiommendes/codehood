@@ -1,3 +1,4 @@
+import type { Page } from "@playwright/test";
 import { FULL_ACCESS } from "@/auth/actor";
 import { db } from "@/db";
 import { persistedCourseFactory } from "@/fixtures/course.factory";
@@ -61,6 +62,20 @@ test("instructor: see who is enrolled", async ({ page }) => {
 			).toBeVisible();
 		}
 	});
+
+	await test.step("and a search narrows it to the student it names", async () => {
+		const [first, ...others] = course.students;
+		if (!first) throw new Error("expected enrolled students");
+		await page.getByRole("searchbox", { name: "Search" }).fill(first.email);
+		await expect(
+			page.getByRole("row").filter({ hasText: first.name }),
+		).toBeVisible();
+		for (const student of others) {
+			await expect(
+				page.getByRole("row").filter({ hasText: student.name }),
+			).toHaveCount(0);
+		}
+	});
 });
 
 test("instructor: hand out one join link for the whole class", async ({
@@ -79,7 +94,7 @@ test("instructor: hand out one join link for the whole class", async ({
 	await logInAs(page, instructor);
 
 	await test.step("instructor generates a link capped at 5 seats", async () => {
-		await page.goto(`${href}/settings`);
+		await openEnrollTab(page, href, "Invite link");
 		await fillField(page, "Limit to N uses (optional)", "5");
 		await page.getByRole("button", { name: "Generate link" }).click();
 	});
@@ -110,7 +125,7 @@ test("instructor: hand out one join link for the whole class", async ({
 
 	await test.step("revoking it stops the link working", async () => {
 		await logInAs(page, instructor);
-		await page.goto(`${href}/settings`);
+		await openEnrollTab(page, href, "Invite link");
 		const list = page.getByRole("list", { name: "Classroom invites" });
 		await expect(list.getByRole("listitem")).toHaveCount(1);
 		await list.getByRole("button", { name: "Revoke" }).click();
@@ -139,7 +154,7 @@ test("instructor: Enroll the room with a passphrase", async ({ page }) => {
 	const code = page.locator("#passphrase-value");
 
 	await test.step("before day one there is no code to read out", async () => {
-		await page.goto(`${href}/settings`);
+		await openEnrollTab(page, href, "Passphrase");
 		await expect(
 			page.getByText("No active passphrase. Generate one below."),
 		).toBeVisible();
@@ -154,7 +169,7 @@ test("instructor: Enroll the room with a passphrase", async ({ page }) => {
 	const value = await code.textContent();
 
 	await test.step("reading it out again shows the same code, not a new one", async () => {
-		await page.goto(`${href}/settings`);
+		await openEnrollTab(page, href, "Passphrase");
 		await expect(code).toHaveText(value as string);
 	});
 
@@ -332,3 +347,14 @@ test("instructor: Invite a student personally", async ({ page }) => {
 		invitedRole: "STUDENT",
 	});
 });
+
+/** Opens the roster's "Add student" dialog on one of its tabs. */
+async function openEnrollTab(
+	page: Page,
+	href: string,
+	tab: "Invite link" | "Passphrase",
+): Promise<void> {
+	await page.goto(`${href}/roster`);
+	await page.getByRole("button", { name: "Add student" }).click();
+	await page.getByRole("radio", { name: tab }).click();
+}

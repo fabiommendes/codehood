@@ -1,12 +1,9 @@
 ---
 import CourseHeader from "@/components/CourseHeader.astro";
 import CsvDownload from "@/components/CsvDownload.astro";
-import Field from "@/components/form/Field";
+import EnrollDialog from "@/components/EnrollDialog.astro";
 import StudentsTable from "@/components/StudentsTable";
-import { enrollmentAdd } from "@/core/schemas/enrollment";
 import { db } from "@/db";
-import { errorMessage } from "@/forms/field-errors";
-import { formState } from "@/forms/form-state";
 import { m } from "@/i18n";
 import AppLayout from "@/layouts/AppLayout.astro";
 import { breadcrumbs } from "@/utils/breadcrumbs";
@@ -33,14 +30,11 @@ const courseParams = {
 	course: `${course.instructor.username}_${course.edition.slug}`,
 };
 
-const addStudentForm = formState(enrollmentAdd, undefined, {
-	id: "add-student",
-});
 const students = await db.enrollment.findMany({ course: course.id }, { actor });
 
-const COPY_ICON =
-	"M9 9.5h9a1 1 0 0 1 1 1v9a1 1 0 0 1-1 1H9a1 1 0 0 1-1-1v-9a1 1 0 0 1 1-1Z M6 14.5H5a1 1 0 0 1-1-1v-9a1 1 0 0 1 1-1h9a1 1 0 0 1 1 1v1";
-const CHECK_ICON = "m5 12.5 4.5 4.5L19 7.5";
+/// A person with a plus beside them.
+const ADD_STUDENT_ICON =
+	"M15 19v-1a4 4 0 0 0-4-4H7a4 4 0 0 0-4 4v1M9 10.5a3.25 3.25 0 1 0 0-6.5 3.25 3.25 0 0 0 0 6.5ZM19 8v6M16 11h6";
 
 const csvFilename = `roster-${course.discipline.slug}-${course.edition.slug}.csv`;
 const csvRows = [
@@ -69,204 +63,32 @@ const csvRows = [
 >
   <CourseHeader course={course} tabs={tabs} active="students" />
 
-  <div class="mt-4 flex flex-wrap items-center justify-between gap-3">
-    <p class="text-muted">
-      {m.courses_roster_enrolled_count({
-        discipline: course.discipline.name,
-        count: students.length,
-      })}
-    </p>
-    <CsvDownload
-      id="roster-csv"
-      filename={csvFilename}
-      rows={csvRows}
-      disabled={students.length === 0}
-    />
-  </div>
-
-  {
-    students.length === 0 ? (
-      <p class="mt-8 text-center text-muted">
-        {m.courses_roster_empty()}
-      </p>
-    ) : (
-      <StudentsTable
-        students={students.map(({ courseId: _courseId, ...s }) => s)}
-        discipline={courseParams.discipline}
-        course={courseParams.course}
-        client:load
+  <StudentsTable
+    students={students.map(({ courseId: _courseId, ...s }) => s)}
+    discipline={courseParams.discipline}
+    course={courseParams.course}
+    client:load
+  >
+    <div class="flex items-center gap-2">
+      <CsvDownload
+        id="roster-csv"
+        filename={csvFilename}
+        rows={csvRows}
+        disabled={students.length === 0}
       />
-    )
-  }
-
-  <div class="mt-6 flex flex-wrap items-center gap-4">
-    <button
-      type="button"
-      class="btn btn-outline btn-sm"
-      data-open-dialog="add-student-dialog"
-    >
-      {m.courses_roster_add_student()}
-    </button>
-    <a href={`${href}/settings`} class="link link-primary text-sm">{m.courses_roster_settings_link()}</a>
-  </div>
+      <button
+        type="button"
+        class="btn btn-square btn-primary btn-sm"
+        data-open-dialog="enroll-dialog"
+        aria-label={m.courses_roster_add_student()}
+        title={m.courses_roster_add_student()}
+      >
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+          <path d={ADD_STUDENT_ICON} stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"></path>
+        </svg>
+      </button>
+    </div>
+  </StudentsTable>
 </AppLayout>
 
-<dialog id="add-student-dialog" class="modal">
-  <div class="modal-box">
-    <form method="dialog">
-      <button class="btn btn-circle btn-ghost btn-sm absolute right-2 top-2">
-        ✕
-      </button>
-    </form>
-    <h3 class="text-lg font-bold">{m.courses_roster_add_student()}</h3>
-    <p class="mt-1 text-sm text-muted">
-      {m.courses_roster_add_body()}
-    </p>
-
-    <div id="add-student-error" class="alert alert-error mt-4" hidden>
-      <span></span>
-    </div>
-
-    <div id="add-student-invited" class="mt-4" hidden>
-      <p
-        class="text-sm"
-        set:html={m.courses_roster_no_account({
-          email: '<span id="add-student-email" class="font-medium"></span>',
-        })}
-      />
-      <div class="join mt-2 w-full">
-        <input
-          type="text"
-          readonly
-          value=""
-          class="input join-item w-full font-mono text-sm"
-          id="personal-invite-url"
-        />
-        <button
-          type="button"
-          class="btn btn-primary join-item"
-          id="copy-personal-invite-url"
-          aria-label={m.courses_roster_copy_invite()}
-          title={m.courses_roster_copy()}
-        >
-          <svg
-            id="copy-personal-invite-url-icon"
-            width="18"
-            height="18"
-            viewBox="0 0 24 24"
-            fill="none"
-          >
-            <path
-              d={COPY_ICON}
-              stroke="currentColor"
-              stroke-width="1.6"
-              stroke-linecap="round"
-              stroke-linejoin="round"></path>
-          </svg>
-        </button>
-      </div>
-    </div>
-
-    {/* No `method`/`action`: the submit handler below owns it. */}
-    <form id="add-student-form" class="mt-4">
-      <input type="hidden" name="discipline" value={courseParams.discipline} />
-      <input type="hidden" name="course" value={courseParams.course} />
-      <Field {...addStudentForm.field("login")} />
-    </form>
-
-    <div class="modal-action">
-      <form method="dialog">
-        <button class="btn btn-ghost">{m.courses_roster_cancel()}</button>
-      </form>
-      <button type="submit" form="add-student-form" class="btn btn-primary">
-        {m.courses_roster_add()}
-      </button>
-    </div>
-  </div>
-  <form method="dialog" class="modal-backdrop">
-    <button>{m.courses_close_backdrop()}</button>
-  </form>
-</dialog>
-
-<script>
-  import { actions } from "astro:actions";
-  import { errorMessage } from "@/forms/field-errors";
-  import { m } from "@/i18n";
-
-  // Mirrors COPY_ICON/CHECK_ICON in the frontmatter — duplicated here since a
-  // processed <script> (needed for the astro:actions import) can't read
-  // server-side consts the way a define:vars script can.
-  const COPY_ICON =
-    "M9 9.5h9a1 1 0 0 1 1 1v9a1 1 0 0 1-1 1H9a1 1 0 0 1-1-1v-9a1 1 0 0 1 1-1Z M6 14.5H5a1 1 0 0 1-1-1v-9a1 1 0 0 1 1-1h9a1 1 0 0 1 1 1v1";
-  const CHECK_ICON = "m5 12.5 4.5 4.5L19 7.5";
-
-  function showError(box: HTMLElement, message: string) {
-    const span = box.querySelector("span");
-    if (span) span.textContent = message;
-    box.hidden = false;
-  }
-
-  // Copies the value of `inputId` and flips the button's icon to a tick for a
-  // moment, so the instructor sees the copy landed.
-  function wireCopyButton(buttonId: string, inputId: string) {
-    const button = document.getElementById(buttonId);
-    const input = document.getElementById(inputId) as HTMLInputElement | null;
-    const iconPath = document.querySelector(`#${buttonId}-icon path`);
-    if (!button || !input || !iconPath) return;
-
-    button.addEventListener("click", async () => {
-      await navigator.clipboard.writeText(input.value);
-      iconPath.setAttribute("d", CHECK_ICON);
-      button.setAttribute("aria-label", m.courses_roster_copied_label());
-      button.setAttribute("title", m.courses_roster_copied());
-      setTimeout(() => {
-        iconPath.setAttribute("d", COPY_ICON);
-        button.setAttribute("aria-label", m.courses_roster_copy_invite());
-        button.setAttribute("title", m.courses_roster_copy());
-      }, 1500);
-    });
-  }
-
-  // Add student: an existing account is enrolled, so the page reloads to show
-  // them in the table; an unknown email produces a link that stays on screen
-  // to be copied.
-  const addStudentForm = document.getElementById(
-    "add-student-form",
-  ) as HTMLFormElement | null;
-  const addStudentError = document.getElementById("add-student-error");
-  const addStudentInvited = document.getElementById("add-student-invited");
-
-  addStudentForm?.addEventListener("submit", async (event) => {
-    event.preventDefault();
-    if (addStudentError) addStudentError.hidden = true;
-    const { data, error } = await actions.course.addStudent(
-      new FormData(addStudentForm),
-    );
-    if (error) {
-      if (addStudentError)
-        showError(
-          addStudentError,
-          errorMessage(error) || m.courses_roster_something_wrong(),
-        );
-      return;
-    }
-    if (data.kind === "enrolled") {
-      window.location.reload();
-      return;
-    }
-    const emailLabel = document.getElementById("add-student-email");
-    if (emailLabel) emailLabel.textContent = data.email;
-    const urlInput = document.getElementById(
-      "personal-invite-url",
-    ) as HTMLInputElement | null;
-    if (urlInput)
-      urlInput.value = new URL(
-        `/invite/${data.token}`,
-        window.location.origin,
-      ).toString();
-    if (addStudentInvited) addStudentInvited.hidden = false;
-    addStudentForm.reset();
-  });
-
-  wireCopyButton("copy-personal-invite-url", "personal-invite-url");
-</script>
+<EnrollDialog id="enroll-dialog" courseId={course.id} params={courseParams} />

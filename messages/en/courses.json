@@ -135,6 +135,7 @@
 	"courses_students_col_enrolled": "Enrolled",
 	"courses_students_col_actions": "Actions",
 	"courses_students_drop": "Drop",
+	"courses_students_drop_label": "Drop {name}",
 	"courses_students_close": "Close",
 	"courses_students_drop_title": "Drop {name} from this course?",
 	"courses_students_drop_body": "Their access ends immediately. Nothing is deleted. Their submissions stay in the gradebook, and re-enrolling restores access.",
@@ -157,22 +158,10 @@
 	"courses_leave_submit": "Leave course",
 	"courses_roster_page_title": "Students · {discipline}",
 	"courses_roster_invite_revoked": "Invite revoked.",
+	"courses_roster_tab_email": "Email",
+	"courses_roster_tab_link": "Invite link",
 	"courses_roster_add_student": "Add student",
 	"courses_roster_passphrase": "Passphrase",
-	"courses_roster_enrolled_count": [
-		{
-			"declarations": [
-				"input discipline",
-				"input count",
-				"local countPlural = count: plural"
-			],
-			"selectors": ["countPlural"],
-			"match": {
-				"countPlural=one": "{discipline} · {count} enrolled",
-				"countPlural=other": "{discipline} · {count} enrolled"
-			}
-		}
-	],
 	"courses_roster_empty": "No students enrolled yet.",
 	"courses_roster_add_body": "Existing accounts are enrolled right away. An email with no account gets a one-time invite link.",
 	"courses_roster_no_account": "No account yet. Send {email} this link:",
@@ -216,10 +205,8 @@
 	"courses_settings_no_description": "No description.",
 	"courses_settings_from_file": "from {file}",
 	"courses_settings_fixed": "set when the course was created",
-	"courses_settings_enrollment_heading": "Joining the class",
 	"courses_settings_cli_heading": "CLI",
 	"courses_settings_cli_intro": "Create the course repository and log in from inside it.",
-	"courses_roster_settings_link": "Invite links and passphrase",
 	"courses_home_this_week": "This week",
 	"courses_home_open_exams": "Open exams",
 	"courses_home_nothing_this_week": "Nothing on the calendar this week.",

@@ -6,6 +6,8 @@
 	"common_light_theme": "Light theme",
 	"common_attachments": "Attachments",
 	"common_table_empty": "Nothing to show.",
+	"common_search": "Search",
+	"common_table_no_match": "Nothing matches “{query}”.",
 	"common_attachment_show_code": "Show code",
 	"common_pagination_label": "Pages",
 	"common_pagination_previous": "Previous",

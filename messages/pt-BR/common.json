@@ -6,6 +6,8 @@
 	"common_light_theme": "Tema claro",
 	"common_attachments": "Anexos",
 	"common_table_empty": "Nada para mostrar.",
+	"common_search": "Buscar",
+	"common_table_no_match": "Nada corresponde a “{query}”.",
 	"common_attachment_show_code": "Ver código",
 	"common_pagination_label": "Páginas",
 	"common_pagination_previous": "Anterior",
