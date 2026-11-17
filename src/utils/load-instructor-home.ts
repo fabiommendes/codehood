@@ -2,7 +2,7 @@ import type { UserActor } from "@/auth/actor";
 import { type Course, db } from "@/db";
 import { loadResultPolicy } from "@/db/result-policy";
 import { questionProblems } from "@/mdq";
-import { examResult, sanctionsByResponse } from "@/services/exam-result";
+import { adjustmentsByResponse, examResult } from "@/services/exam-result";
 import {
 	type ExamRegrades,
 	type InstructorHome,
@@ -78,7 +78,7 @@ export async function loadInstructorHome(
 				loadResultPolicy(course.id),
 			]);
 
-			const sanctionsOf = sanctionsByResponse(sanctions);
+			const sanctionsOf = adjustmentsByResponse(sanctions);
 			const taughtExams: TaughtExam[] = exams.map((exam) => ({
 				course: home,
 				exam,

@@ -41,7 +41,7 @@ export interface ResultAdjustment {
 
 /** Groups the adjustments of every operation by the `publicId` of the attempt they hit, dropping any other field (notes). */
 export function adjustmentsByResponse(
-	_views: readonly {
+	views: readonly {
 		response: string;
 		question: string | null;
 		op: AdjustmentOp;
@@ -49,71 +49,67 @@ export function adjustmentsByResponse(
 		reason: string | null;
 	}[],
 ): ReadonlyMap<string, ResultAdjustment[]> {
-	throw new Error("not implemented");
+	const byResponse = new Map<string, ResultAdjustment[]>();
+	for (const { response, question, op, value, reason } of views) {
+		// Copied field by field: a staff view also carries the private notes, which must not ride along.
+		const adjustment = { question, op, value, reason };
+		const list = byResponse.get(response);
+		if (list) list.push(adjustment);
+		else byResponse.set(response, [adjustment]);
+	}
+	return byResponse;
 }
 
+/** @deprecated Alias kept for `exam.service.ts`. */
+export const sanctionsByResponse = adjustmentsByResponse;
+
 /** Whether the adjustment lowers a grade: a `FACTOR` below 1. Only these block a regrade request. */
-export function reducesGrade(_adjustment: {
+export function reducesGrade(adjustment: {
 	op: AdjustmentOp;
 	value: string | number;
 }): boolean {
-	throw new Error("not implemented");
+	return adjustment.op === "FACTOR" && Number(adjustment.value) < 1;
 }
+
+type AdjustmentLike = { op: AdjustmentOp; value: string | number };
 
 /**
  * The exam total after the exam-level adjustments, or `null` when `base` is `null` and nothing fixes the total.
  *
  * Order: a FACTOR 0 gives 0; else base is the SET value or `base`; each FACTOR multiplies it while it is positive;
  * every OFFSET is added; the result is clamped to `[min(b, 0), 1]`, `b` being the base before the factors.
+ * A negative calculated total is never improved by a FACTOR 0.
  */
 export function adjustTotal(
-	_base: number | null,
-	_adjustments: readonly { op: AdjustmentOp; value: string | number }[],
+	base: number | null,
+	adjustments: readonly AdjustmentLike[],
 ): number | null {
-	throw new Error("not implemented");
+	const values = (op: AdjustmentOp) =>
+		adjustments
+			.filter((entry) => entry.op === op)
+			.map((entry) => Number(entry.value));
+	const set = values("SET")[0];
+	const factors = values("FACTOR");
+	const start = set ?? base;
+	if (factors.includes(0)) {
+		return set === undefined && start !== null && start < 0 ? start : 0;
+	}
+	if (start === null) return null;
+	let total = start;
+	for (const factor of factors) {
+		if (total > 0) total *= factor;
+	}
+	for (const offset of values("OFFSET")) total += offset;
+	return Math.min(1, Math.max(Math.min(start, 0), total));
 }
 
 /** Whether the adjustments define the total by themselves: a SET, or a FACTOR 0. */
-export function fixesTotal(
-	_adjustments: readonly { op: AdjustmentOp; value: string | number }[],
-): boolean {
-	throw new Error("not implemented");
-}
-
-/// An active sanction on an attempt: on one question by slug, or on the whole exam when `question` is `null`.
-export interface ResultSanction {
-	question: string | null;
-	/// The factor as a decimal string in `[0, 1)`.
-	factor: string;
-	reason: string | null;
-}
-
-/**
- * Groups the `FACTOR` adjustments by the `publicId` of the attempt they hit; `SET` and `OFFSET` are not part of the result yet.
- *
- * @example
- * sanctionsByResponse([{ response: "r1", question: null, op: "FACTOR", value: "0", reason: null }]).get("r1")
- * // [{ question: null, factor: "0", reason: null }]
- */
-export function sanctionsByResponse(
-	views: readonly {
-		response: string;
-		question: string | null;
-		op: "SET" | "FACTOR" | "OFFSET";
-		value: string;
-		reason: string | null;
-	}[],
-): ReadonlyMap<string, ResultSanction[]> {
-	const byResponse = new Map<string, ResultSanction[]>();
-	for (const { response, question, op, value, reason } of views) {
-		if (op !== "FACTOR") continue;
-		// Copied field by field: a staff view also carries the private notes, which must not ride along.
-		const sanction = { question, factor: value, reason };
-		const list = byResponse.get(response);
-		if (list) list.push(sanction);
-		else byResponse.set(response, [sanction]);
-	}
-	return byResponse;
+export function fixesTotal(adjustments: readonly AdjustmentLike[]): boolean {
+	return adjustments.some(
+		(entry) =>
+			entry.op === "SET" ||
+			(entry.op === "FACTOR" && Number(entry.value) === 0),
+	);
 }
 
 /// The part of a submission the result depends on. A missing `status` reads as `PENDING_GRADE`, a missing `kind` as `AUTOSAVE`.
@@ -219,15 +215,6 @@ export interface QuestionOutcome {
 			score: number | null;
 		};
 	};
-	/// The sanction on the question, with what it was before the factor applied.
-	sanction?: {
-		factor: number;
-		reason: string | null;
-		original: {
-			status: Exclude<QuestionOutcomeStatus, "sanctioned">;
-			score: number | null;
-		};
-	};
 }
 
 /// An exam question as `examResult` takes it: its slug and its weight in the total.
@@ -252,7 +239,7 @@ export interface ExamResult {
 	/// Weighted mean of the question scores in `[-1, 1]`, unanswered and
 	/// not-graded counting as zero; `null` while any answered question is still `pending`.
 	total: number | null;
-	/// How many questions are `pending` after the sanctions; 0 when the exam has factor 0.
+	/// How many questions are `pending` after the adjustments; 0 when the adjustments fix the total.
 	pending: number;
 	/// The adjustments of the whole exam, in order of application: SET, then FACTORs, then OFFSETs.
 	adjustments?: {
@@ -262,12 +249,6 @@ export interface ExamResult {
 	}[];
 	/// The total after the question adjustments, before any adjustment of the exam.
 	original?: { total: number | null };
-	/// The sanction on the whole exam; `original.total` is the total before its factor, after the question sanctions.
-	sanction?: {
-		factor: number;
-		reason: string | null;
-		original: { total: number | null };
-	};
 }
 
 /**
@@ -282,18 +263,16 @@ export interface ExamResult {
  * whatever feedback it has: its score is `null`, it counts as zero in the
  * total, it is not pending, and it keeps its comments.
  *
- * A sanction on a question with factor 0 makes it `sanctioned` with score 0,
- * even without a grade, and it is not pending.
- * A sanction with factor above 0 makes a graded question `sanctioned` with
- * its score times the factor, and leaves one without a grade as it is.
+ * A `FACTOR` adjustment on a question with value 0 makes it `sanctioned` with
+ * score 0, even without a grade, and it is not pending.
+ * One with a value above 0 makes a graded question `sanctioned` with
+ * its score times the value, and leaves one without a grade as it is.
  * A negative score is never multiplied.
  * On a `code` question the factor applies to the discounted score and
  * `codeAttempts` stays as it was.
- * A sanction on the exam multiplies a positive total by its factor, and a
- * factor 0 gives total 0 even with pending questions.
- * `pending` counts the pending questions after the sanctions, and is 0 when
- * the exam has factor 0.
- * A sanction on a question the exam does not have is ignored.
+ * The adjustments of the whole exam give the total through `adjustTotal`, and
+ * `pending` is 0 when they fix the total (`fixesTotal`).
+ * An adjustment on a question the exam does not have is ignored.
  *
  * @params questions The exam's questions in exam order, with their weights.
  * @params submissions Every submission of the attempt, any order.
@@ -302,34 +281,15 @@ export interface ExamResult {
  * from the newest alone. Autosaves do not count then.
  *
  * @params feedback The feedback the viewer may see on those submissions.
- * @params sanctions The active sanctions of the attempt.
+ * @params adjustments The active adjustments of the attempt.
  * @params policy How the exam discounts `code` submissions; defaults apply when missing.
  */
 export function examResult(
 	questions: readonly WeightedQuestion[],
 	submissions: ResultSubmission[],
 	feedback: ResultFeedback[],
-	sanctions: readonly (ResultSanction | ResultAdjustment)[],
+	adjustments: readonly ResultAdjustment[],
 	policy: ResultPolicy = {},
-): ExamResult {
-	if (sanctions.some((entry) => "op" in entry)) {
-		throw new Error("not implemented");
-	}
-	return legacyExamResult(
-		questions,
-		submissions,
-		feedback,
-		sanctions as readonly ResultSanction[],
-		policy,
-	);
-}
-
-function legacyExamResult(
-	questions: readonly WeightedQuestion[],
-	submissions: ResultSubmission[],
-	feedback: ResultFeedback[],
-	sanctions: readonly ResultSanction[],
-	policy: ResultPolicy,
 ): ExamResult {
 	const outcomes = questions
 		.map(({ slug }) => {
@@ -345,43 +305,50 @@ function legacyExamResult(
 			return codeOutcomeOf(slug, sent, feedback, penalty);
 		})
 		.map((outcome) =>
-			sanctionOutcome(
+			adjustOutcome(
 				outcome,
-				harshest(
-					sanctions.filter((entry) => entry.question === outcome.question),
+				lowestFactor(
+					adjustments.filter(
+						(entry) =>
+							entry.op === "FACTOR" && entry.question === outcome.question,
+					),
 				),
 			),
 		);
 	const weights = questions.map((question) => question.weight);
-	const total = totalOf(outcomes, weights);
+	const calculated = totalOf(outcomes, weights);
 	const pending = outcomes.filter(
 		(outcome) => outcome.status === "pending",
 	).length;
-	const exam = harshest(sanctions.filter((entry) => entry.question === null));
-	if (!exam) return { questions: outcomes, total, pending };
-	const factor = Number(exam.factor);
+	const onExam = ADJUSTMENT_ORDER.flatMap((op) =>
+		adjustments.filter((entry) => entry.question === null && entry.op === op),
+	);
+	if (onExam.length === 0) {
+		return { questions: outcomes, total: calculated, pending };
+	}
 	return {
 		questions: outcomes,
-		total:
-			factor === 0
-				? factorOf(total ?? 0, 0)
-				: total === null
-					? null
-					: factorOf(total, factor),
-		pending: factor === 0 ? 0 : pending,
-		sanction: {
-			factor,
-			reason: exam.reason,
-			original: { total },
-		},
+		total: adjustTotal(calculated, onExam),
+		pending: fixesTotal(onExam) ? 0 : pending,
+		adjustments: onExam.map(({ op, value, reason }) => ({
+			op,
+			value: Number(value),
+			reason,
+		})),
+		original: { total: calculated },
 	};
 }
 
-/// The sanction with the lowest factor, or `undefined` with none.
-function harshest(list: readonly ResultSanction[]): ResultSanction | undefined {
-	return list.reduce<ResultSanction | undefined>(
+/// The order exam adjustments apply in.
+const ADJUSTMENT_ORDER: readonly AdjustmentOp[] = ["SET", "FACTOR", "OFFSET"];
+
+/// The adjustment with the lowest value, or `undefined` with none.
+function lowestFactor(
+	list: readonly ResultAdjustment[],
+): ResultAdjustment | undefined {
+	return list.reduce<ResultAdjustment | undefined>(
 		(lowest, entry) =>
-			!lowest || Number(entry.factor) < Number(lowest.factor) ? entry : lowest,
+			!lowest || Number(entry.value) < Number(lowest.value) ? entry : lowest,
 		undefined,
 	);
 }
@@ -391,29 +358,30 @@ function factorOf(value: number, factor: number): number {
 	return value > 0 ? value * factor : value;
 }
 
-/// The outcome after `sanction`, or the outcome itself without one.
-function sanctionOutcome(
+/// The outcome after `adjustment`, or the outcome itself without one.
+function adjustOutcome(
 	outcome: QuestionOutcome,
-	sanction: ResultSanction | undefined,
+	adjustment: ResultAdjustment | undefined,
 ): QuestionOutcome {
-	if (!sanction) return outcome;
-	const factor = Number(sanction.factor);
+	if (!adjustment) return outcome;
+	const factor = Number(adjustment.value);
 	const info = {
-		factor,
-		reason: sanction.reason,
+		op: "FACTOR" as const,
+		value: factor,
+		reason: adjustment.reason,
 		original: {
 			status: outcome.status as Exclude<QuestionOutcomeStatus, "sanctioned">,
 			score: outcome.score,
 		},
 	};
 	if (outcome.score === null && factor > 0) {
-		return { ...outcome, sanction: info };
+		return { ...outcome, adjustment: info };
 	}
 	return {
 		...outcome,
 		status: "sanctioned",
 		score: factorOf(outcome.score ?? 0, factor),
-		sanction: info,
+		adjustment: info,
 	};
 }
 

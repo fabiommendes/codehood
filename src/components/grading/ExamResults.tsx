@@ -12,7 +12,7 @@ import { attemptTotalLabel } from "./attempt-total";
 import SanctionDialog from "./SanctionDialog";
 
 /// An attempt's row with, once sanctioned, the total it would have without the sanctions.
-export type ResultRow = AttemptRow & { original?: number | null };
+export type ResultRow = AttemptRow & { unsanctioned?: number | null };
 
 interface Props {
 	/// The exam page's URL.
@@ -136,16 +136,16 @@ export default function ExamResults(props: Props): JSX.Element {
 			headerClass: NUMERIC,
 			render: (row) => (
 				<Show
-					when={row.original !== undefined && row.state === "submitted"}
+					when={row.unsanctioned !== undefined && row.state === "submitted"}
 					fallback={attemptTotalLabel(row.total, row.state)}
 				>
 					<ins class="font-semibold text-error no-underline">
 						{attemptTotalLabel(row.total, row.state)}
 					</ins>
-					<Show when={row.original != null}>
+					<Show when={row.unsanctioned != null}>
 						{" "}
 						<del class="text-error">
-							{attemptTotalLabel(row.original ?? null, row.state)}
+							{attemptTotalLabel(row.unsanctioned ?? null, row.state)}
 						</del>
 					</Show>
 				</Show>

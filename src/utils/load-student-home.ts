@@ -1,7 +1,7 @@
 import type { UserActor } from "@/auth/actor";
 import { db } from "@/db";
 import { loadResultPolicy } from "@/db/result-policy";
-import { examResult, sanctionsByResponse } from "@/services/exam-result";
+import { adjustmentsByResponse, examResult } from "@/services/exam-result";
 import { examSchedule, released } from "@/services/exam-state";
 import {
 	type HomeCourse,
@@ -71,7 +71,7 @@ export async function loadStudentHome(
 				loadResultPolicy(course.id),
 			]);
 
-			const sanctionsOf = sanctionsByResponse(sanctions);
+			const sanctionsOf = adjustmentsByResponse(sanctions);
 			const homeExams: HomeExam[] = exams.map((exam) => {
 				const attempt = attempts.find((entry) => entry.exam === exam.slug);
 				const schedule = examSchedule(exam, exceptions.get(exam.slug));

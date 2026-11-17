@@ -16,9 +16,9 @@ import { m } from "@/i18n";
 import AppLayout from "@/layouts/AppLayout.astro";
 import { publicForm } from "@/mdq";
 import {
+	adjustmentsByResponse,
 	examResult,
 	formatScore,
-	sanctionsByResponse,
 } from "@/services/exam-result";
 import {
 	answeredAfterDeadline,
@@ -68,7 +68,7 @@ const [students, stored, sanctions] = await Promise.all([
 		{ actor },
 	),
 ]);
-const sanctionsOf = sanctionsByResponse(sanctions);
+const sanctionsOf = adjustmentsByResponse(sanctions);
 const docs = new Map(stored.map((entry) => [entry.slug, entry.question]));
 const versions = new Map(stored.map((entry) => [entry.slug, entry.version]));
 const publicIds = new Map(stored.map((entry) => [entry.slug, entry.publicId]));
@@ -290,9 +290,9 @@ const stateLabel = (status: string, score: number | null): string => {
             <p class="text-sm"><QuestionNumber number={number} points={points} /></p>
             <div class="flex flex-wrap items-center justify-between gap-2">
               <h3 class="text-lg font-semibold">{title}</h3>
-              {outcome.sanction ? (
+              {outcome.adjustment ? (
                 <a class="badge badge-error badge-sm" href={`${href}/exams/${exam.slug}/sanctions`}>
-                  {outcome.sanction.factor === 0 ? m.grades_sanction_zeroed() : m.grades_sanction_reduced({ factor: outcome.sanction.factor })}
+                  {outcome.adjustment.value === 0 ? m.grades_sanction_zeroed() : m.grades_sanction_reduced({ factor: outcome.adjustment.value })}
                 </a>
               ) : (
                 sanctionable && (

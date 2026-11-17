@@ -7,7 +7,7 @@
  */
 import ReleaseGradeColumn from "@/components/grading/ReleaseGradeColumn";
 import { m } from "@/i18n";
-import { formatScore } from "@/services/exam-result";
+import { formatScore, reducesGrade } from "@/services/exam-result";
 import {
 	formatGradeValue,
 	type GradeCell,
@@ -49,12 +49,14 @@ const label = (cell: GradeCell): string => {
 };
 /// The tooltip of a sanctioned total: the factor and the reason the student is told, never the notes.
 const sanctionTitle = (cell: GradeCell): string | undefined => {
-	if (cell.kind !== "total" || !cell.sanction) return undefined;
-	const factor = String(cell.sanction.factor);
-	return cell.sanction.reason
+	if (cell.kind !== "total") return undefined;
+	const reduction = cell.adjustments?.find(reducesGrade);
+	if (!reduction) return undefined;
+	const factor = String(reduction.value);
+	return reduction.reason
 		? m.grades_sanction_cell_title_reason({
 				factor,
-				reason: cell.sanction.reason,
+				reason: reduction.reason,
 			})
 		: m.grades_sanction_cell_title({ factor });
 };

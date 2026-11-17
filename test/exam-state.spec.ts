@@ -921,7 +921,8 @@ function zeroedResult(): ExamResult {
 		...result("pending"),
 		total: 0,
 		pending: 0,
-		sanction: { factor: 0, reason: null, original: { total: null } },
+		adjustments: [{ op: "FACTOR", value: 0, reason: null }],
+		original: { total: null },
 	};
 }
 

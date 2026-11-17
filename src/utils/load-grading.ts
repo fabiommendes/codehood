@@ -8,7 +8,7 @@ import {
 	type Feedback,
 } from "@/db";
 import { loadResultPolicy } from "@/db/result-policy";
-import { resultPolicy, sanctionsByResponse } from "@/services/exam-result";
+import { adjustmentsByResponse, resultPolicy } from "@/services/exam-result";
 import type { ExceptionTiming } from "@/services/exam-state";
 import {
 	type GradesTable,
@@ -218,7 +218,7 @@ export async function loadGrades(
 		students,
 		attempts,
 		feedback,
-		sanctionsByResponse(sanctions),
+		adjustmentsByResponse(sanctions),
 		now,
 		{
 			exceptions,
@@ -230,7 +230,7 @@ export async function loadGrades(
 		students,
 		attempts,
 		feedback,
-		sanctionsByResponse(sanctions),
+		adjustmentsByResponse(sanctions),
 		now,
 		{
 			withDropped: true,

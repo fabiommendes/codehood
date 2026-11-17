@@ -36,7 +36,12 @@ import {
 } from "@/db/conditional-write";
 import { defineService, op } from "@/db/define-service";
 import { m } from "@/i18n";
-import { examResult, resultPolicy, unweighted } from "@/services/exam-result";
+import {
+	examResult,
+	reducesGrade,
+	resultPolicy,
+	unweighted,
+} from "@/services/exam-result";
 import { regradeBlocker, regradeBlockerMessage } from "@/services/regrade";
 import type { Prisma, PrismaTx } from "../client";
 import { realAttempt } from "../preview-filter";
@@ -168,8 +173,9 @@ const contestedSelect = {
 			createdAt: true,
 			acceptingSubmissions: true,
 			adjustments: {
-				where: { revokedAt: null, op: "FACTOR" },
+				where: { revokedAt: null },
 				select: {
+					op: true,
 					value: true,
 					reason: true,
 					questionRef: { select: { slug: true } },
@@ -363,10 +369,11 @@ export const makeRegradeRequestService = defineService<RegradeRequestT>()(
 							submission: entry.publicId,
 						})),
 					),
-					response.adjustments.map((sanction) => ({
-						question: sanction.questionRef?.slug ?? null,
-						factor: sanction.value,
-						reason: sanction.reason,
+					response.adjustments.map((adjustment) => ({
+						question: adjustment.questionRef?.slug ?? null,
+						op: adjustment.op,
+						value: adjustment.value,
+						reason: adjustment.reason,
 					})),
 					resultPolicy(response.exam.type, {
 						...(contested.question.penalty === null
@@ -385,7 +392,8 @@ export const makeRegradeRequestService = defineService<RegradeRequestT>()(
 						attempt: response,
 						outcome,
 						examReduced: response.adjustments.some(
-							(sanction) => sanction.questionRef === null,
+							(adjustment) =>
+								adjustment.questionRef === null && reducesGrade(adjustment),
 						),
 						submission: input.submission,
 						requested: contested.regradeRequest !== null,

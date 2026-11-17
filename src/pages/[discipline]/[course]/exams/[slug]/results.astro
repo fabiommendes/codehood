@@ -45,7 +45,7 @@ const examHref = `${href}/exams/${exam.slug}`;
 // A sanctioned attempt carries the total it would have without the sanctions.
 const resultRows = data.resultRows.map((row) =>
 	data.originalTotals.has(row.author)
-		? { ...row, original: data.originalTotals.get(row.author) ?? null }
+		? { ...row, unsanctioned: data.originalTotals.get(row.author) ?? null }
 		: row,
 );
 ---

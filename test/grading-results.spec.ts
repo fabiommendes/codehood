@@ -5,7 +5,7 @@ import { prisma } from "@/db/client";
 import { persistedCourseFactory } from "@/fixtures/course.factory";
 import { persistedExamFactory } from "@/fixtures/exam.factory";
 import { capitalShortAnswerManual } from "@/mdq/fixtures";
-import { type ResultSanction, unweighted } from "@/services/exam-result";
+import { type ResultAdjustment, unweighted } from "@/services/exam-result";
 import type { ExamTiming, ExceptionTiming } from "@/services/exam-state";
 import {
 	attemptRows,
@@ -120,7 +120,7 @@ function rowsOf(
 	feedback: GradingFeedback[] = [],
 	students: GradedStudent[] = [student("ana", "Ana")],
 	exam: ExamTiming = openExam(),
-	sanctions: ReadonlyMap<string, ResultSanction[]> = new Map(),
+	sanctions: ReadonlyMap<string, ResultAdjustment[]> = new Map(),
 ) {
 	return attemptRows(
 		exam,
@@ -840,7 +840,7 @@ test("countingAnswers: an answer waits until its author's extra time is over", (
 //
 
 /// The sanctions of `author`'s attempt as `attempt()` keys them.
-function sanctionsOf(author: string, ...sanctions: ResultSanction[]) {
+function sanctionsOf(author: string, ...sanctions: ResultAdjustment[]) {
 	return new Map([[`attempt-${author}`, sanctions]]);
 }
 
@@ -850,7 +850,12 @@ test("attemptRows: a zeroed question without a grade is not pending and the tota
 		[],
 		[student("ana", "Ana")],
 		openExam(),
-		sanctionsOf("ana", { question: "q1", factor: "0", reason: null }),
+		sanctionsOf("ana", {
+			question: "q1",
+			op: "FACTOR",
+			value: "0",
+			reason: null,
+		}),
 	);
 
 	expect(rows[0]?.pending).toBe(0);
@@ -863,13 +868,18 @@ test("attemptRows: an exam zeroed with a pending answer has total 0 and no pendi
 		[],
 		[student("ana", "Ana")],
 		openExam(),
-		sanctionsOf("ana", { question: null, factor: "0", reason: "cola" }),
+		sanctionsOf("ana", {
+			question: null,
+			op: "FACTOR",
+			value: "0",
+			reason: "cola",
+		}),
 	);
 
 	expect(rows[0]).toMatchObject({
 		pending: 0,
 		total: 0,
-		sanction: { factor: 0, reason: "cola" },
+		adjustments: [{ op: "FACTOR", value: 0, reason: "cola" }],
 	});
 });
 
@@ -883,7 +893,12 @@ test("attemptRows: an in-progress attempt stays in-progress with a null total ev
 		[],
 		[student("ana", "Ana")],
 		openExam(),
-		sanctionsOf("ana", { question: null, factor: "0", reason: null }),
+		sanctionsOf("ana", {
+			question: null,
+			op: "FACTOR",
+			value: "0",
+			reason: null,
+		}),
 	);
 
 	expect(rows[0]).toMatchObject({
@@ -902,12 +917,17 @@ test("attemptRows: sanctions of another attempt do not leak", () => {
 		[pass("a1", "1", 20), pass("b1", "1", 21)],
 		[student("ana", "Ana"), student("bia", "Bia")],
 		openExam(),
-		sanctionsOf("ana", { question: null, factor: "0.5", reason: null }),
+		sanctionsOf("ana", {
+			question: null,
+			op: "FACTOR",
+			value: "0.5",
+			reason: null,
+		}),
 	);
 
 	const [ana, bia] = rows;
-	expect(ana?.sanction).toMatchObject({ factor: 0.5 });
+	expect(ana?.adjustments).toMatchObject([{ op: "FACTOR", value: 0.5 }]);
 	expect(ana?.total).toBeCloseTo(1 / 6, 10);
-	expect(bia?.sanction).toBeUndefined();
+	expect(bia?.adjustments).toBeUndefined();
 	expect(bia?.total).toBeCloseTo(1 / 3, 10);
 });

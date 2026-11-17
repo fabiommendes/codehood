@@ -8,9 +8,10 @@ import { loadResultPolicy } from "@/db/result-policy";
 import { shufflePool } from "@/mdq/shuffle";
 import { DEFAULT_CODE_PENALTY } from "@/services/code-grading";
 import {
+	adjustmentsByResponse,
 	type ExamResult,
 	examResult,
-	sanctionsByResponse,
+	reducesGrade,
 } from "@/services/exam-result";
 import type { AttemptState, ExamSchedule } from "@/services/exam-state";
 import { regradeBlocker } from "@/services/regrade";
@@ -77,7 +78,7 @@ export async function loadAttemptView(
 
 	const sanctions =
 		state.kind === "results" && attempt && !preview
-			? sanctionsByResponse(
+			? adjustmentsByResponse(
 					await db.examAdjustment.findMany(
 						{ course, exam: exam.slug, author },
 						{ actor },
@@ -124,7 +125,7 @@ export async function loadAttemptView(
 						author,
 						attempt,
 						outcome,
-						examReduced: result?.sanction !== undefined,
+						examReduced: result?.adjustments?.some(reducesGrade) ?? false,
 						submission: outcome.submission,
 						requested: request !== null,
 					},

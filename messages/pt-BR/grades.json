@@ -341,5 +341,11 @@
 	"grades_summary_removed": "(removida)",
 	"grades_summary_none_selected": "(nenhuma marcada)",
 	"grades_summary_true": "V",
-	"grades_summary_false": "F"
+	"grades_summary_false": "F",
+	"grades_adjustment_set": "Nota substituída por {percent}%",
+	"grades_adjustment_zeroed": "Zerada",
+	"grades_adjustment_penalty_factor": "Penalidade ×{factor}",
+	"grades_adjustment_bonus_factor": "Bônus ×{factor}",
+	"grades_adjustment_bonus_offset": "Bônus +{points}",
+	"grades_adjustment_penalty_offset": "Penalidade −{points}"
 }

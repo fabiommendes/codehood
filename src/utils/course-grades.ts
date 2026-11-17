@@ -6,7 +6,7 @@ import { db } from "@/db";
 import { activeAdjustmentsOf } from "@/db/active-adjustments";
 import { loadResultPolicy } from "@/db/result-policy";
 import { attendancePercent } from "@/services/attendance-table";
-import { sanctionsByResponse } from "@/services/exam-result";
+import { adjustmentsByResponse } from "@/services/exam-result";
 import {
 	type CourseGradesReport,
 	courseGradesReport,
@@ -65,7 +65,7 @@ export async function loadCourseGrades(
 		students,
 		attempts,
 		feedback,
-		sanctionsByResponse(sanctions),
+		adjustmentsByResponse(sanctions),
 		now,
 		{
 			withDropped: true,

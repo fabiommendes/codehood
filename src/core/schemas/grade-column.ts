@@ -84,14 +84,18 @@ export const gradeCellSchema = z.discriminatedUnion("kind", [
 	z.object({
 		kind: z.literal("total"),
 		total: z.number(),
-		/// The sanction on the exam, when there is one: `total` is already after its factor.
-		sanction: z
-			.object({
-				factor: z.number(),
-				reason: z.string().nullable(),
-				original: z.object({ total: z.number().nullable() }),
-			})
+		/// The adjustments of the exam, in order of application, when there are any: `total` is already after them.
+		adjustments: z
+			.array(
+				z.object({
+					op: z.enum(["SET", "FACTOR", "OFFSET"]),
+					value: z.number(),
+					reason: z.string().nullable(),
+				}),
+			)
 			.optional(),
+		/// The total before the adjustments of the exam, with `adjustments`.
+		original: z.object({ total: z.number().nullable() }).optional(),
 	}),
 	z.object({ kind: z.literal("pending") }),
 	z.object({ kind: z.literal("in-progress") }),

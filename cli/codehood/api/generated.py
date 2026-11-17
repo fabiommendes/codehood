@@ -17,6 +17,12 @@ from .base import (
 )
 
 
+class AdjustmentsItem(Model):
+    op: Literal["SET", "FACTOR", "OFFSET"]
+    value: float
+    reason: str | None
+
+
 class BlobMissingInput(Model):
     hashes: list[str]
 
@@ -564,6 +570,13 @@ class Course(Model):
 class CourseAttendanceResponse(Model):
     events: list[EventsItem]
     students: list[CourseAttendanceResponseStudentsItem]
+
+
+class CourseGradesResponseStudentsItemShape5(Model):
+    kind: Literal["total"]
+    total: float
+    adjustments: list[AdjustmentsItem] | None = None
+    original: Original | None = None
 
 
 class Exam(Model):
@@ -1154,12 +1167,6 @@ class RubricSplit(Model):
     children: list[RubricItemCreate]
 
 
-class Sanction(Model):
-    factor: float
-    reason: str | None
-    original: Original
-
-
 class TimeSlot(Model):
     model_config = ConfigDict(populate_by_name=True)
 
@@ -1265,10 +1272,23 @@ class CalendarEvent(Model):
     updated_at: str = Field(alias="updatedAt")
 
 
-class CourseGradesResponseStudentsItemShape5(Model):
-    kind: Literal["total"]
-    total: float
-    sanction: Sanction | None = None
+class CourseGradesResponseStudentsItem(Model):
+    model_config = ConfigDict(populate_by_name=True)
+
+    username: str
+    name: str
+    email: str
+    school_id: str | None = Field(alias="schoolId")
+    github_id: str | None = Field(alias="githubId")
+    status: Literal["ACTIVE", "DROPPED"]
+    results: dict[
+        str,
+        CourseGradesResponseStudentsItemShape5
+        | CourseGradesResponseStudentsItemShape4
+        | CourseGradesResponseStudentsItemShape2
+        | CourseGradesResponseStudentsItemShape3
+        | CourseGradesResponseStudentsItemShape,
+    ]
 
 
 class ListCourseResponse(Model):
@@ -1364,23 +1384,9 @@ class ListTimeslotResponse(Model):
     prev: str | None
 
 
-class CourseGradesResponseStudentsItem(Model):
-    model_config = ConfigDict(populate_by_name=True)
-
-    username: str
-    name: str
-    email: str
-    school_id: str | None = Field(alias="schoolId")
-    github_id: str | None = Field(alias="githubId")
-    status: Literal["ACTIVE", "DROPPED"]
-    results: dict[
-        str,
-        CourseGradesResponseStudentsItemShape5
-        | CourseGradesResponseStudentsItemShape4
-        | CourseGradesResponseStudentsItemShape2
-        | CourseGradesResponseStudentsItemShape3
-        | CourseGradesResponseStudentsItemShape,
-    ]
+class CourseGradesResponse(Model):
+    exams: list[ExamsItem]
+    students: list[CourseGradesResponseStudentsItem]
 
 
 class JobsItem(Model):
@@ -1499,11 +1505,6 @@ class UpdateQuestionRequest(Model):
 
 class ClaimGradingJobsResponse(Model):
     jobs: list[JobsItem]
-
-
-class CourseGradesResponse(Model):
-    exams: list[ExamsItem]
-    students: list[CourseGradesResponseStudentsItem]
 
 
 class ListQuestionResponse(Model):

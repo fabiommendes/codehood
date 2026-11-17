@@ -16078,33 +16078,44 @@
                                     "total": {
                                       "type": "number"
                                     },
-                                    "sanction": {
+                                    "adjustments": {
+                                      "type": "array",
+                                      "items": {
+                                        "type": "object",
+                                        "properties": {
+                                          "op": {
+                                            "type": "string",
+                                            "enum": [
+                                              "SET",
+                                              "FACTOR",
+                                              "OFFSET"
+                                            ]
+                                          },
+                                          "value": {
+                                            "type": "number"
+                                          },
+                                          "reason": {
+                                            "type": "string",
+                                            "nullable": true
+                                          }
+                                        },
+                                        "required": [
+                                          "op",
+                                          "value",
+                                          "reason"
+                                        ]
+                                      }
+                                    },
+                                    "original": {
                                       "type": "object",
                                       "properties": {
-                                        "factor": {
-                                          "type": "number"
-                                        },
-                                        "reason": {
-                                          "type": "string",
+                                        "total": {
+                                          "type": "number",
                                           "nullable": true
-                                        },
-                                        "original": {
-                                          "type": "object",
-                                          "properties": {
-                                            "total": {
-                                              "type": "number",
-                                              "nullable": true
-                                            }
-                                          },
-                                          "required": [
-                                            "total"
-                                          ]
                                         }
                                       },
                                       "required": [
-                                        "factor",
-                                        "reason",
-                                        "original"
+                                        "total"
                                       ]
                                     }
                                   },

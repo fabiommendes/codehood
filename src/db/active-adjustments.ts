@@ -2,7 +2,7 @@ import type { ExamAdjustmentOp } from "@/core/schemas/exam-adjustment";
 import { type PrismaTx, prisma } from "./client";
 
 /**
- * The active adjustments of a course (or of the exams `examIds`), as `sanctionsByResponse` takes them.
+ * The active adjustments of a course (or of the exams `examIds`), as `adjustmentsByResponse` takes them.
  *
  * Reads no permission and hides nothing: only for callers that authorize the
  * whole grades view themselves, never for a student's reads. Those callers

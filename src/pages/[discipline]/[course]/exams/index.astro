@@ -9,9 +9,9 @@ import { loadResultPolicy } from "@/db/result-policy";
 import { m } from "@/i18n";
 import AppLayout from "@/layouts/AppLayout.astro";
 import {
+	adjustmentsByResponse,
 	examResult,
 	formatScore,
-	sanctionsByResponse,
 } from "@/services/exam-result";
 import {
 	type AttemptState,
@@ -72,7 +72,7 @@ if (!canWrite) {
 		),
 		loadResultPolicy(course.id),
 	]);
-	const sanctionsOf = sanctionsByResponse(sanctions);
+	const sanctionsOf = adjustmentsByResponse(sanctions);
 	for (const exam of exams) {
 		const attempt = attempts.find((entry) => entry.exam === exam.slug);
 		const schedule = examSchedule(exam, exceptions.get(exam.slug));

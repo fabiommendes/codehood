@@ -113,10 +113,10 @@ test("the cell of a zeroed student is a total of 0 carrying the sanction, and a 
 	expect(zeroed).toMatchObject({
 		kind: "total",
 		total: 0,
-		sanction: { factor: 0, reason: "copied" },
+		adjustments: [{ op: "FACTOR", value: 0, reason: "copied" }],
 	});
 	expect(untouched).toMatchObject({ kind: "total", total: 1 });
-	expect(untouched).not.toHaveProperty("sanction");
+	expect(untouched).not.toHaveProperty("adjustments");
 });
 
 test("a BOT key of the instructor reads the sanctioned cell without error", async () => {

@@ -2,7 +2,7 @@ import type { AstroGlobal } from "astro";
 import type { UserActor } from "@/auth/actor";
 import { type Course, db, type Exam, type ExamExceptionView } from "@/db";
 import { loadResultPolicy } from "@/db/result-policy";
-import { examResult, sanctionsByResponse } from "@/services/exam-result";
+import { adjustmentsByResponse, examResult } from "@/services/exam-result";
 import {
 	releaseBlocker as blockerOf,
 	type ExceptionTiming,
@@ -101,7 +101,7 @@ export async function loadExamStaffData(
 	]);
 	const slugs = exam.questions.map((question) => question.slug);
 	const policy = policyOf(exam);
-	const sanctionsOf = sanctionsByResponse(sanctions);
+	const sanctionsOf = adjustmentsByResponse(sanctions);
 	const results = attempts.map((entry) =>
 		examResult(
 			exam.questions,

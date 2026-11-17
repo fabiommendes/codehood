@@ -86,8 +86,7 @@ export function regradeBlocker(
 	const state = attemptOf(schedule, ctx.author, ctx.attempt, now);
 	if (state.kind !== "results") return "not-released";
 
-	if (ctx.examReduced || outcome.sanction || outcome.adjustment)
-		return "sanctioned";
+	if (ctx.examReduced || outcome.adjustment) return "sanctioned";
 
 	if (outcome.submission !== ctx.submission) return "not-counting";
 	if (outcome.status === "pending" || outcome.status === "unanswered") {

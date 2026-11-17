@@ -17,8 +17,8 @@ import {
 	isNewerSubmission,
 	newestPassesFirst,
 	type QuestionOutcome,
+	type ResultAdjustment,
 	type ResultPolicy,
-	type ResultSanction,
 	unweighted,
 	type WeightedQuestion,
 } from "./exam-result";
@@ -445,8 +445,10 @@ export interface AttemptRow {
 	pending: number;
 	/// The attempt's total in `[-1, 1]`, or `null` while `in-progress` or with an answer pending.
 	total: number | null;
-	/// The sanction on the whole exam, when the attempt is closed and has one.
-	sanction?: ExamResult["sanction"];
+	/// The adjustments of the whole exam, when the attempt is closed and has any.
+	adjustments?: ExamResult["adjustments"];
+	/// The total before the adjustments of the exam, with `adjustments`.
+	original?: ExamResult["original"];
 	/// When the student started the attempt.
 	startedAt: Date;
 }
@@ -460,7 +462,7 @@ export interface AttemptRow {
  *
  * @params questions The exam's questions with their weights, in exam order.
  * @params feedback Every grading pass on the exam, released or not.
- * @params sanctions The active sanctions of each attempt, by the attempt's `publicId`.
+ * @params sanctions The active adjustments of each attempt, by the attempt's `publicId`.
  * @params students The course's students, dropped ones included.
  * @params exceptions The exam's exceptions, by username; each attempt is `in-progress` or `submitted` by its author's personal timing, as in {@link countingAnswers}.
  * @params policy How the exam discounts `code` submissions, as in `examResult`.
@@ -470,7 +472,7 @@ export function attemptRows(
 	questions: readonly WeightedQuestion[],
 	attempts: GradingAttempt[],
 	feedback: GradingFeedback[],
-	sanctions: ReadonlyMap<string, ResultSanction[]>,
+	sanctions: ReadonlyMap<string, ResultAdjustment[]>,
 	students: GradedStudent[],
 	now: Date,
 	exceptions: ReadonlyMap<string, ExceptionTiming> = new Map(),
@@ -509,7 +511,9 @@ export function attemptRows(
 			questions: slugs.length,
 			pending: result?.pending ?? 0,
 			total: result?.total ?? null,
-			...(result?.sanction ? { sanction: result.sanction } : {}),
+			...(result?.adjustments
+				? { adjustments: result.adjustments, original: result.original }
+				: {}),
 			startedAt: attempt.createdAt,
 		};
 	});

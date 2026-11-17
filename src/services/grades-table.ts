@@ -12,7 +12,7 @@ import type { courseGradesSchema } from "@/core/schemas/grade-column";
 import type { Enrollment } from "@/db/services/enrollment.service";
 import type { Exam } from "@/db/services/exam.service";
 import type { GradeColumn } from "@/db/services/grade-column.service";
-import type { ExamResult, ResultPolicy, ResultSanction } from "./exam-result";
+import type { ExamResult, ResultAdjustment, ResultPolicy } from "./exam-result";
 import {
 	type ExceptionTiming,
 	examPhase,
@@ -31,7 +31,12 @@ import {
 /// What one student's cell reads for one exam.
 export type GradeCell =
 	/// A closed attempt with no answer pending, with its total in `[-1, 1]`.
-	| { kind: "total"; total: number; sanction?: ExamResult["sanction"] }
+	| {
+			kind: "total";
+			total: number;
+			adjustments?: ExamResult["adjustments"];
+			original?: ExamResult["original"];
+	  }
 	/// A closed attempt with some answer waiting for a grade.
 	| { kind: "pending" }
 	/// An attempt the student can still answer.
@@ -120,14 +125,14 @@ export interface GradesTableOptions {
  *
  * @params attempts Every non-practice attempt of the course.
  * @params feedback Every grading pass of the course, released or not.
- * @params sanctions The active sanctions of each attempt, by the attempt's `publicId`.
+ * @params sanctions The active adjustments of each attempt, by the attempt's `publicId`.
  */
 export function gradesTable(
 	exams: Exam[],
 	students: GradedStudent[],
 	attempts: TableAttempt[],
 	feedback: GradingFeedback[],
-	sanctions: ReadonlyMap<string, ResultSanction[]>,
+	sanctions: ReadonlyMap<string, ResultAdjustment[]>,
 	now: Date,
 	options: GradesTableOptions = {},
 ): GradesTable {
@@ -172,7 +177,9 @@ export function gradesTable(
 				? {
 						kind: "total",
 						total: row.total,
-						...(row.sanction ? { sanction: row.sanction } : {}),
+						...(row.adjustments
+							? { adjustments: row.adjustments, original: row.original }
+							: {}),
 					}
 				: { kind: "pending" };
 		});

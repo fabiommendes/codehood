@@ -1,7 +1,7 @@
 import { expect, test } from "@playwright/test";
 import fc from "fast-check";
 import type { Exam } from "@/db";
-import type { ResultSanction } from "@/services/exam-result";
+import type { ResultAdjustment } from "@/services/exam-result";
 import type { ExceptionTiming } from "@/services/exam-state";
 import {
 	type GradeCell,
@@ -141,7 +141,7 @@ function tableOf(
 	students: GradedStudent[],
 	sittings: ReturnType<typeof sat>[] = [],
 	now = NOW,
-	sanctions: ReadonlyMap<string, ResultSanction[]> = new Map(),
+	sanctions: ReadonlyMap<string, ResultAdjustment[]> = new Map(),
 ) {
 	return gradesTable(
 		exams,
@@ -679,8 +679,8 @@ test("gradesTable: an unclosed attempt inside the personal window is in progress
 function sanctionsOf(
 	slug: string,
 	author: string,
-	...sanctions: ResultSanction[]
-): ReadonlyMap<string, ResultSanction[]> {
+	...sanctions: ResultAdjustment[]
+): ReadonlyMap<string, ResultAdjustment[]> {
 	return new Map([[`${slug}-${author}`, sanctions]]);
 }
 
@@ -696,13 +696,18 @@ test("gradesTable: an exam zeroed with a pending answer is a total cell carrying
 		[ana, bia],
 		sittings,
 		NOW,
-		sanctionsOf("e1", "ana", { question: null, factor: "0", reason: "cola" }),
+		sanctionsOf("e1", "ana", {
+			question: null,
+			op: "FACTOR",
+			value: "0",
+			reason: "cola",
+		}),
 	);
 
 	expect(table.rows[0]?.cells[0]).toMatchObject({
 		kind: "total",
 		total: 0,
-		sanction: { factor: 0, reason: "cola" },
+		adjustments: [{ op: "FACTOR", value: 0, reason: "cola" }],
 	});
 	expect(table.columns[0]?.mean).toBeCloseTo(0.5, 10);
 });
@@ -713,7 +718,12 @@ test("gradesTable: a question zeroed without a grade leaves a total cell, not pe
 		[ana],
 		[sat("e1", "ana", { q1: "1", q2: null })],
 		NOW,
-		sanctionsOf("e1", "ana", { question: "q2", factor: "0", reason: null }),
+		sanctionsOf("e1", "ana", {
+			question: "q2",
+			op: "FACTOR",
+			value: "0",
+			reason: null,
+		}),
 	);
 
 	expect(table.rows[0]?.cells[0]).toMatchObject({ kind: "total", total: 0.5 });

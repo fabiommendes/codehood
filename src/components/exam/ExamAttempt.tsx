@@ -26,6 +26,7 @@ import {
 	type ExamResult,
 	formatScore,
 	type QuestionOutcome,
+	reducesGrade,
 } from "@/services/exam-result";
 import type { AttemptState } from "@/services/exam-state";
 import type { ReviewResult } from "@/services/review";
@@ -1082,16 +1083,20 @@ export default function ExamAttempt(props: ExamAttemptProps): JSX.Element {
 					}
 				>
 					<Show
-						when={kind() === "results" ? props.result?.sanction : undefined}
+						when={
+							kind() === "results"
+								? props.result?.adjustments?.find(reducesGrade)
+								: undefined
+						}
 					>
 						{(sanction) => (
 							<p role="alert" class="alert alert-warning text-sm">
 								<span class="whitespace-pre-wrap">
 									<strong>
-										{sanction().factor === 0
+										{sanction().value === 0
 											? m.exams_sanction_exam_zeroed()
 											: m.exams_sanction_exam_reduced({
-													percent: formatPercent(sanction().factor),
+													percent: formatPercent(sanction().value),
 												})}
 									</strong>
 									<Show when={sanction().reason}>
@@ -1802,14 +1807,14 @@ function Outcome(props: {
 							</Match>
 						</Switch>
 					</p>
-					<Show when={outcome().sanction}>
+					<Show when={outcome().adjustment}>
 						{(sanction) => (
 							<p class="mt-1">
 								<span class="badge badge-warning badge-sm">
-									{sanction().factor === 0
+									{sanction().value === 0
 										? m.exams_sanction_question_zeroed()
 										: m.exams_sanction_question_reduced({
-												percent: formatPercent(sanction().factor),
+												percent: formatPercent(sanction().value),
 											})}
 								</span>
 								<Show when={sanction().reason}>
