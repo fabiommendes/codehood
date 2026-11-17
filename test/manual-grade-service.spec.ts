@@ -173,6 +173,24 @@ test("gradeUnanswered: the student's own attempt is reused, still the student's,
 	expect(response?.createdById).toBeNull();
 });
 
+test("gradeUnanswered: the attempt's updatedAt advances, so a conditional write on it sees the grade", async () => {
+	const ctx = await setup({}, "ONGOING");
+	const student = await enroll(ctx.course.id);
+	await deliver(ctx, student, ctx.q2.slug);
+	await complete(ctx);
+	const before = await prisma.response.findFirstOrThrow({
+		where: { examId: ctx.exam.id, authorId: student.username },
+	});
+	await new Promise((resolve) => setTimeout(resolve, 20));
+
+	await grade(ctx, student.username);
+
+	const after = await prisma.response.findFirstOrThrow({
+		where: { examId: ctx.exam.id, authorId: student.username },
+	});
+	expect(after.updatedAt.getTime()).toBeGreaterThan(before.updatedAt.getTime());
+});
+
 test("gradeUnanswered: a student without an attempt gets a closed, empty one made by the instructor", async () => {
 	const ctx = await setup();
 	const student = await enroll(ctx.course.id);
@@ -283,13 +301,13 @@ test("gradeUnanswered: a draft exam is refused on author", async () => {
 test("gradeUnanswered: an exam still open for the student alone, by an exception, is refused on author", async () => {
 	const ctx = await setup();
 	const student = await enroll(ctx.course.id);
-	// A makeup that began an hour ago on an untimed exam: it is open for them only.
+	// A makeup that began 10 minutes ago on a 60 minute exam: open for them only.
 	await db.examException.create(
 		{
 			course: ctx.course.id,
 			exam: ctx.exam.slug,
 			username: student.username,
-			scheduledAt: new Date(Date.now() - HOUR),
+			scheduledAt: new Date(Date.now() - 10 * 60_000),
 		},
 		FULL_ACCESS,
 	);

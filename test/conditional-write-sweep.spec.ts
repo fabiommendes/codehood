@@ -870,6 +870,8 @@ const EXEMPT: Record<string, string> = {
 		"no public update/upsert/delete; append is a compare-and-swap on AnswerEditField.revision",
 	gradingJob:
 		"no public update/upsert/delete; every transition is a compare-and-swap on the job's state and holder",
+	manualGrade:
+		"adds an instructor submission and a pass; takes no expectedUpdatedAt from the caller",
 };
 
 /// Models of `prisma/schema.prisma` that have an `updatedAt` column.

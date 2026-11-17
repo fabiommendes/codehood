@@ -82,7 +82,11 @@ test("closing: an autosave the instructor created on a code question is not prom
 
 	const rows = await stored(ctx);
 	expect(rows.map((row) => row.kind)).toEqual(["AUTOSAVE"]);
-	expect(await prisma.gradingJob.count()).toBe(0);
+	expect(
+		await prisma.gradingJob.count({
+			where: { submission: { response: { examId: ctx.exam.id } } },
+		}),
+	).toBe(0);
 });
 
 test("closing: a grade given to an unanswered code question stays an AUTOSAVE after the attempt is reopened and closed again", async () => {
@@ -127,7 +131,11 @@ test("closing: a grade given to an unanswered code question stays an AUTOSAVE af
 		kind: "AUTOSAVE",
 		createdById: ctx.instructor.username,
 	});
-	expect(await prisma.gradingJob.count()).toBe(0);
+	expect(
+		await prisma.gradingJob.count({
+			where: { submission: { response: { examId: ctx.exam.id } } },
+		}),
+	).toBe(0);
 });
 
 //

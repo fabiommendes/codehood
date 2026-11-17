@@ -221,7 +221,8 @@ test("create: an exam still open for the student alone, by an exception, is refu
 			course: ctx.course.id,
 			exam: ctx.exam.slug,
 			username: student.username,
-			scheduledAt: new Date(Date.now() - HOUR),
+			// Began 10 minutes ago on a 60 minute exam: the window is still open.
+			scheduledAt: new Date(Date.now() - 10 * 60_000),
 		},
 		FULL_ACCESS,
 	);
