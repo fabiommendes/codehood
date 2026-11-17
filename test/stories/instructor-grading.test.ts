@@ -12,6 +12,13 @@ import {
 import { courseHref } from "@/urls";
 import { expect, test } from "../fixtures";
 import { logInAs, resetDatabase, seedUser } from "./helpers";
+import {
+	CHALLENGE_COMMENT,
+	objectiveExam,
+	objectiveLabel,
+	PARTIAL_COMMENT,
+	passesOf,
+} from "./objective-support";
 import { releasedExam, requestRegrade } from "./regrade-setup";
 import { gradedExam, NOTES, REASON } from "./sanction-support";
 import { weightedExam } from "./weighted-exam-support";
@@ -1542,5 +1549,163 @@ test("instructor: sanction a student's grade", async ({ page }) => {
 		await expect(cell("Bia Lima").getByTitle(/^Sanctioned/)).toHaveCount(0);
 		await expect(cell("Davi Rocha")).toHaveText(["100%"]);
 		await expect(cell("Davi Rocha").getByTitle(/^Sanctioned/)).toHaveCount(0);
+	});
+});
+
+test("instructor: review an automatically graded question", async ({
+	page,
+}) => {
+	const world = await objectiveExam("ro");
+	const grade = (pass: { score: number }[]) => pass.at(-1)?.score;
+	await logInAs(page, world.teacher);
+	await page.goto(world.choiceUrl);
+
+	const summary = page.getByTestId("summary");
+	const attention = page.locator("section#attention");
+	const overrides = page.locator("section#overrides");
+	const row = (text: string) => page.getByRole("row").filter({ hasText: text });
+
+	await test.step("the summary counts the answers, the share that got it right and what has no grade", async () => {
+		await expect(summary).toContainText("4");
+		await expect(summary).toContainText(/33\s*%/);
+		await expect(page.locator('a[href="#attention"]')).toContainText("1");
+	});
+
+	await test.step("the key sits in a closed block that opens on demand", async () => {
+		const key = page.locator("details").first();
+		await expect(key).not.toHaveAttribute("open", "");
+		await key.locator("summary").click();
+		await expect(key).toContainText("Which city is the capital of Brazil?");
+	});
+
+	await test.step("needs attention lists the answer with no grade and the open regrade request", async () => {
+		await expect(attention.getByRole("listitem")).toHaveCount(2);
+		const pending = attention
+			.getByRole("listitem")
+			.filter({ hasText: "Davi Rocha" });
+		await expect(pending).toContainText(objectiveLabel("pending"));
+		await expect(
+			pending.getByRole("button", { name: objectiveLabel("give_grade") }),
+		).toBeVisible();
+		const contested = attention
+			.getByRole("listitem")
+			.filter({ hasText: "Bia Lima" });
+		await expect(contested).toContainText(objectiveLabel("regrade"));
+		await expect(
+			contested.getByRole("link", { name: objectiveLabel("view_request") }),
+		).toHaveAttribute("href", new RegExp(`${world.regradesUrl}(#.*)?$`));
+	});
+
+	await test.step("identical answers are grouped, one row per alternative, and a wrong one chosen by who does well elsewhere is flagged", async () => {
+		const rio = row("Rio de Janeiro");
+		await expect(rio).toContainText("3");
+		await expect(rio).toContainText(/75\s*%/);
+		await expect(rio).toContainText(objectiveLabel("varies"));
+		await expect(rio).toContainText(objectiveLabel("review"));
+		const brasilia = row("Brasília");
+		await expect(brasilia).toContainText(/25\s*%/);
+		await expect(brasilia).toContainText(/100\s*%/);
+		await expect(brasilia).toContainText("–");
+		await expect(brasilia).not.toContainText(objectiveLabel("review"));
+		await expect(row("São Paulo")).toContainText("0");
+	});
+
+	await test.step("giving a grade to the answer with none removes it from needs attention", async () => {
+		const pending = attention
+			.getByRole("listitem")
+			.filter({ hasText: "Davi Rocha" });
+		await pending.getByRole("spinbutton").fill("0");
+		await pending
+			.getByRole("button", { name: objectiveLabel("give_grade") })
+			.click();
+
+		await expect(attention.getByRole("listitem")).toHaveCount(1);
+		await expect(attention).not.toContainText("Davi Rocha");
+		await expect(page.locator('a[href="#attention"]')).toHaveCount(0);
+		await expect(summary).toContainText(/25\s*%/);
+		await page.reload();
+		await expect(attention.getByRole("listitem")).toHaveCount(1);
+		const passes = await passesOf(world.davi.submission);
+		expect(passes).toHaveLength(1);
+		expect(passes[0]).toMatchObject({
+			score: 0,
+			grader: world.teacher.username,
+		});
+	});
+
+	await test.step("answers changed by hand are listed apart with the automatic grade struck through", async () => {
+		await expect(overrides.getByRole("heading")).toContainText("(1)");
+		const ana = overrides.getByRole("row").filter({ hasText: "Ana Prado" });
+		await expect(ana).toContainText(/50\s*%/);
+		await expect(ana).toContainText(PARTIAL_COMMENT);
+		await expect(ana.locator("s, del, .line-through")).toContainText(/0\s*%/);
+		await expect(
+			ana.getByRole("button", { name: objectiveLabel("change_grade") }),
+		).toBeVisible();
+	});
+
+	await test.step("the people button opens the students of a group, by name, and a pencil marks one as right", async () => {
+		await row("Rio de Janeiro").getByRole("button").click();
+		const dialog = page.getByRole("dialog");
+		await expect(dialog).toBeVisible();
+		for (const name of ["Ana Prado", "Bia Lima", "Davi Rocha"]) {
+			await expect(dialog).toContainText(name);
+		}
+		await expect(dialog).not.toContainText("Caio Nunes");
+
+		await dialog
+			.getByRole("row")
+			.filter({ hasText: "Bia Lima" })
+			.getByRole("button", { name: objectiveLabel("change_grade") })
+			.click();
+		await dialog.getByRole("textbox").fill(CHALLENGE_COMMENT);
+		await dialog
+			.getByRole("button", { name: objectiveLabel("mark_correct") })
+			.click();
+
+		await expect(overrides.getByRole("heading")).toContainText("(2)");
+		const bia = overrides.getByRole("row").filter({ hasText: "Bia Lima" });
+		await expect(bia).toContainText(/100\s*%/);
+		await expect(bia).toContainText(CHALLENGE_COMMENT);
+		await expect(summary).toContainText(/50\s*%/);
+		const passes = await passesOf(world.bia.submission);
+		expect(passes).toHaveLength(2);
+		expect(passes.at(-1)).toMatchObject({
+			score: 1,
+			grader: world.teacher.username,
+			comment: CHALLENGE_COMMENT,
+		});
+	});
+
+	await test.step("undo takes the automatic grade back, keeps the history and empties the list at the end", async () => {
+		await overrides
+			.getByRole("row")
+			.filter({ hasText: "Bia Lima" })
+			.getByRole("button", { name: objectiveLabel("undo") })
+			.click();
+		await expect(overrides.getByRole("heading")).toContainText("(1)");
+		await expect(summary).toContainText(/25\s*%/);
+		const bia = await passesOf(world.bia.submission);
+		expect(bia).toHaveLength(3);
+		expect(bia.at(-1)?.ref).toMatch(/^revert-/);
+		expect(grade(bia)).toBe(0);
+
+		await overrides
+			.getByRole("row")
+			.filter({ hasText: "Ana Prado" })
+			.getByRole("button", { name: objectiveLabel("undo") })
+			.click();
+		await expect(overrides).toHaveCount(0);
+		const ana = await passesOf(world.ana.submission);
+		expect(ana).toHaveLength(3);
+		expect(ana.at(-1)?.ref).toMatch(/^revert-/);
+		expect(grade(ana)).toBe(0);
+	});
+
+	await test.step("the edit button leads to the question and the page carries the note about pinned versions", async () => {
+		await expect(
+			page.getByRole("link", { name: objectiveLabel("edit_question") }),
+		).toHaveAttribute("href", new RegExp(`${world.href}/questions/q-choice`));
+		await expect(page.getByRole("note")).toBeVisible();
 	});
 });
