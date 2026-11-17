@@ -9,6 +9,10 @@ interface Props {
 	/// Called when the dialog closes by itself (Escape, backdrop, button).
 	onClose: () => void;
 	children: JSX.Element;
+	/// Width class of the box; defaults to a wide one.
+	size?: string;
+	/// Primary action; when given the footer is Cancelar on the left and this on the right.
+	action?: { label: string; tone: "btn-primary" | "btn-error" };
 }
 
 /// A wide DaisyUI modal on a `<dialog>` that follows `open`.
@@ -26,16 +30,29 @@ export default function Dialog(props: Props): JSX.Element {
 			aria-labelledby={`${props.id}-title`}
 			onClose={() => props.onClose()}
 		>
-			<div class="modal-box max-w-4xl whitespace-normal text-left font-normal text-base-content">
+			<div
+				class={`modal-box ${props.size ?? "max-w-4xl"} whitespace-normal text-left font-normal text-base-content`}
+			>
 				<h3 id={`${props.id}-title`} class="text-lg font-bold">
 					{props.title}
 				</h3>
 				<div class="mt-4">{props.children}</div>
 				<div class="modal-action">
-					<form method="dialog">
-						<button type="submit" class="btn btn-sm">
-							Fechar
+					<form
+						method="dialog"
+						class={props.action ? "flex w-full justify-between" : undefined}
+					>
+						<button
+							type="submit"
+							class={props.action ? "btn btn-ghost btn-sm" : "btn btn-sm"}
+						>
+							{props.action ? "Cancelar" : "Fechar"}
 						</button>
+						{props.action && (
+							<button type="submit" class={`btn btn-sm ${props.action.tone}`}>
+								{props.action.label}
+							</button>
+						)}
 					</form>
 				</div>
 			</div>

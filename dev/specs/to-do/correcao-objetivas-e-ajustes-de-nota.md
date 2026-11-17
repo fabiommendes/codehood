@@ -345,7 +345,14 @@ Depois da liberação das notas (mesma regra de `feedback.read` da
     (`User.schoolId`, "—" quando ausente), que os alunos lembram melhor que o
     nome de usuário. As setas anterior/próximo ficam como
     atalho: com 80 alunos, passar um a um não serve para achar alguém;
-  - por questão, o lápis "Alterar nota" (B1);
+  - o "Sancionar" ao lado do nome vale só para a prova inteira; cada questão
+    tem, lado a lado, o lápis "Alterar nota" (B1) e o martelo "Sancionar
+    questão" (`FACTOR < 1`, zerar ou % que fica), porque a decisão sobre uma
+    questão é tomada olhando a questão;
+  - os quatro diálogos (bônus, sanção da prova, alterar nota, sanção da
+    questão) são compactos e iguais: operação em controle segmentado, valor
+    com unidade no campo e prévia na mesma linha, motivo curto, "Cancelar" à
+    esquerda e a ação principal à direita;
   - o resumo "Ajustes de nota" lista o total original, um ajuste por linha
     (alterar, remover) e o total final.
 - G2. `sanctions.astro` vira `adjustments.astro`: lista ativos e revogados;

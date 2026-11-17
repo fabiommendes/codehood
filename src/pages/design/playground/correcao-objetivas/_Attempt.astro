@@ -95,7 +95,7 @@ const back = "/design/playground/correcao-objetivas";
         <svg viewBox="0 0 24 24" class="size-5" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m9 5 7 7-7 7"></path></svg>
       </a>
     </div>
-    <AttemptActions client:load base={here} current={student.username} autoTotal={autoTotal} questions={ATTEMPT_QUESTIONS.length} />
+    <AttemptActions client:load base={here} current={student.username} autoTotal={autoTotal} />
   </div>
 
   <dl class="mt-4 grid grid-cols-1 gap-x-8 gap-y-3 rounded-box border border-edge bg-base-100 p-6 sm:grid-cols-3">
@@ -157,7 +157,10 @@ const back = "/design/playground/correcao-objetivas";
         <QuestionFrame number={q.number} title={q.title} tone={STATE[stateOf(q)].tone} points={q.points}>
           <div class="flex flex-wrap items-start justify-between gap-2">
             <p class="text-sm">{q.stem}</p>
-            <button type="button" class="btn btn-ghost btn-sm btn-square" aria-label="Alterar nota" title="Alterar nota"><Icon name="pencil" /></button>
+            <span class="flex shrink-0">
+              <button type="button" data-open="grade" data-q={q.number} class="btn btn-ghost btn-sm btn-square" aria-label="Alterar nota" title="Alterar nota"><Icon name="pencil" /></button>
+              <button type="button" data-open="question-sanction" data-q={q.number} class="btn btn-ghost btn-sm btn-square text-error" aria-label="Sancionar questão" title="Sancionar questão"><Icon name="gavel" /></button>
+            </span>
           </div>
           {q.auto === null ? (
             <p class="text-muted">Não respondida.</p>
@@ -176,8 +179,8 @@ const back = "/design/playground/correcao-objetivas";
           )}
 
           {perQuestion ? (
-            <details class="mt-2 border-t border-edge pt-3" open={q.openForm}>
-              <summary class="flex cursor-pointer list-none flex-wrap items-center gap-x-3 gap-y-2">
+            <div class="mt-2 border-t border-edge pt-3">
+              <div class="flex flex-wrap items-center gap-x-3 gap-y-2">
                 <span class="tabular-nums">
                   {changed ? (
                     <><span class="text-muted line-through">{q.auto === null ? "sem resposta" : `${q.auto}%`}</span> → <strong class="text-success">{q.override?.score}%</strong> <span class="badge badge-info badge-soft badge-sm">alterada à mão</span></>
@@ -188,22 +191,9 @@ const back = "/design/playground/correcao-objetivas";
                 {changed && <span class="min-w-40 flex-1 text-sm text-muted">{q.override?.comment}{q.auto === null ? " Nota atribuída sem resposta enviada." : ""}</span>}
                 {!changed && <span class="flex-1"></span>}
                 {!changed && q.auto !== 100 && <button type="button" class="btn btn-success btn-soft btn-xs">Marcar como certa</button>}
-                <span class="btn btn-ghost btn-sm btn-square" role="img" aria-label="Alterar nota" title="Alterar nota"><Icon name="pencil" />
-                </span>
                 {changed && <button type="button" class="btn btn-ghost btn-sm btn-square text-error" aria-label="Desfazer" title="Desfazer"><Icon name="undo" /></button>}
-              </summary>
-              <form class="mt-3 flex flex-wrap items-end gap-3 rounded-box bg-base-200/40 p-3">
-                <label class="flex flex-col gap-1 text-xs text-muted">Nota (0 a 100)
-                  <input type="number" min="0" max="100" value={q.override?.score ?? q.auto ?? 0} class="input input-sm w-24 text-base-content" />
-                </label>
-                <button type="button" class="btn btn-success btn-soft btn-sm">Marcar como certa</button>
-                <label class="flex min-w-48 grow flex-col gap-1 text-xs text-muted">Comentário (opcional)
-                  <input type="text" value={q.override?.comment ?? ""} class="input input-sm w-full text-base-content" />
-                </label>
-                <button type="button" class="btn btn-primary btn-sm">Salvar</button>
-                {q.auto === null && <p class="w-full text-xs text-muted">O aluno não enviou resposta. A nota fica registrada sem resposta associada.</p>}
-              </form>
-            </details>
+              </div>
+            </div>
           ) : (
             <p class="mt-2 font-semibold tabular-nums">{q.auto === null ? "Não respondida: 0%" : `${q.auto}%`}</p>
           )}
@@ -214,7 +204,7 @@ const back = "/design/playground/correcao-objetivas";
   <script>
     document.addEventListener("click", (e) => {
       const el = (e.target as Element).closest<HTMLElement>("[data-open]");
-      if (el) window.dispatchEvent(new CustomEvent("open-attempt-dialog", { detail: el.dataset.open }));
+      if (el) window.dispatchEvent(new CustomEvent("open-attempt-dialog", { detail: { name: el.dataset.open, q: el.dataset.q === undefined ? undefined : Number(el.dataset.q) } }));
     });
   </script>
 </Shell>

@@ -8,11 +8,21 @@ import {
 	Show,
 } from "solid-js";
 import Dialog from "./_Dialog";
-import { ATTEMPT_LIST, type AttemptStatus, fmt } from "./_data";
+import {
+	ATTEMPT_LIST,
+	ATTEMPT_QUESTIONS,
+	type AttemptStatus,
+	fmt,
+} from "./_data";
 import Icon from "./_Icon";
 import SortTable from "./_SortTable";
 
-type DialogName = "sanction" | "bonus" | "students";
+type DialogName =
+	| "sanction"
+	| "bonus"
+	| "students"
+	| "question-sanction"
+	| "grade";
 type BonusOp = "OFFSET" | "FACTOR" | "SET";
 
 interface Props {
@@ -22,8 +32,6 @@ interface Props {
 	current: string;
 	/// Total of the student before any adjustment, out of 100.
 	autoTotal: number;
-	/// Number of questions of the exam.
-	questions: number;
 }
 
 const STATUS_BADGE: Record<AttemptStatus, string> = {
@@ -41,7 +49,115 @@ const STATUS_ORDER: AttemptStatus[] = [
 	"entregue",
 ];
 
-const field = "flex flex-col gap-1 text-xs text-muted";
+/// "from → to" with the unit after both numbers.
+function Preview(props: {
+	from: number;
+	to: number;
+	tone: string;
+	unit?: string;
+	testId?: string;
+}): JSX.Element {
+	return (
+		<p
+			class="whitespace-nowrap text-sm tabular-nums"
+			data-testid={props.testId}
+		>
+			<span class="text-muted">
+				{fmt(props.from, props.unit ? 0 : 1)}
+				{props.unit}
+			</span>{" "}
+			→{" "}
+			<strong class={props.tone}>
+				{fmt(props.to, props.unit ? 0 : 1)}
+				{props.unit}
+			</strong>
+		</p>
+	);
+}
+
+/// "Zerar" or the percentage that stays, with the preview and a hint.
+function PercentRow(props: {
+	base: number;
+	hint: string;
+	unit?: string;
+}): JSX.Element {
+	const [zero, setZero] = createSignal(false);
+	const [factor, setFactor] = createSignal(50);
+	return (
+		<fieldset class="fieldset py-0">
+			<div class="flex items-center gap-3">
+				<label class="input input-sm w-40">
+					<input
+						type="number"
+						aria-label="Nota que fica"
+						min="0"
+						max="99"
+						disabled={zero()}
+						value={zero() ? 0 : factor()}
+						onInput={(e) => setFactor(e.currentTarget.valueAsNumber || 0)}
+					/>
+					<span class="label">%</span>
+				</label>
+				<Preview
+					from={props.base}
+					to={zero() ? 0 : (props.base * factor()) / 100}
+					tone="text-error"
+					unit={props.unit}
+				/>
+				<label class="label ml-auto cursor-pointer gap-2 text-sm">
+					<input
+						type="checkbox"
+						class="checkbox checkbox-xs"
+						checked={zero()}
+						onChange={(e) => setZero(e.currentTarget.checked)}
+					/>
+					Zerar
+				</label>
+			</div>
+			<p class="label whitespace-normal">{props.hint}</p>
+		</fieldset>
+	);
+}
+
+/// Reason shown to the student, plus an optional internal note behind a link.
+function ReasonField(props: { placeholder: string }): JSX.Element {
+	const [note, setNote] = createSignal(false);
+	return (
+		<>
+			<fieldset class="fieldset py-0">
+				<legend class="fieldset-legend py-0.5">
+					Motivo (visível ao aluno)
+				</legend>
+				<textarea
+					class="textarea textarea-sm w-full"
+					rows={2}
+					placeholder={props.placeholder}
+				/>
+			</fieldset>
+			<Show
+				when={note()}
+				fallback={
+					<button
+						type="button"
+						class="link link-hover self-start text-xs text-muted"
+						onClick={() => setNote(true)}
+					>
+						Adicionar nota interna
+					</button>
+				}
+			>
+				<fieldset class="fieldset py-0">
+					<legend class="fieldset-legend py-0.5">Nota interna</legend>
+					<textarea
+						class="textarea textarea-sm w-full"
+						rows={2}
+						placeholder="Só os instrutores veem"
+					/>
+				</fieldset>
+			</Show>
+		</>
+	);
+}
 
 /// The three actions beside the student's name and the dialogs they open.
 export default function AttemptActions(props: Props): JSX.Element {
@@ -49,11 +165,20 @@ export default function AttemptActions(props: Props): JSX.Element {
 	const [query, setQuery] = createSignal("");
 	const [op, setOp] = createSignal<BonusOp>("OFFSET");
 	const [value, setValue] = createSignal(15);
-	const [scope, setScope] = createSignal("exam");
-	const [zero, setZero] = createSignal(false);
-	const [factor, setFactor] = createSignal(50);
+	const [target, setTarget] = createSignal(1);
+	const [grade, setGrade] = createSignal(0);
+	const question = () => ATTEMPT_QUESTIONS.find((q) => q.number === target());
 
-	const onOpen = (e: Event) => setOpen((e as CustomEvent<DialogName>).detail);
+	const onOpen = (e: Event) => {
+		const { name, q } = (e as CustomEvent<{ name: DialogName; q?: number }>)
+			.detail;
+		if (q !== undefined) {
+			setTarget(q);
+			const found = ATTEMPT_QUESTIONS.find((x) => x.number === q);
+			setGrade(found?.override?.score ?? found?.auto ?? 0);
+		}
+		setOpen(name);
+	};
 	onMount(() => {
 		window.addEventListener("open-attempt-dialog", onOpen);
 		onCleanup(() => window.removeEventListener("open-attempt-dialog", onOpen));
@@ -206,12 +331,13 @@ export default function AttemptActions(props: Props): JSX.Element {
 			<Dialog
 				id="bonus-dialog"
 				title="Adicionar bônus"
+				size="max-w-md"
 				open={open() === "bonus"}
 				onClose={() => setOpen(null)}
+				action={{ label: "Adicionar bônus", tone: "btn-primary" }}
 			>
-				<form class="flex flex-col gap-4" onSubmit={(e) => e.preventDefault()}>
-					<fieldset class="flex flex-wrap gap-2">
-						<legend class="mb-1 text-xs text-muted">Operação</legend>
+				<div class="flex flex-col gap-3">
+					<div class="join w-full" role="radiogroup" aria-label="Operação">
 						<For
 							each={
 								[
@@ -222,140 +348,129 @@ export default function AttemptActions(props: Props): JSX.Element {
 							}
 						>
 							{([key, label, initial]) => (
-								<label
-									class={`btn btn-sm ${op() === key ? "btn-success" : "btn-outline"}`}
-								>
-									<input
-										type="radio"
-										name="bonus-op"
-										class="sr-only"
-										checked={op() === key}
-										onChange={() => {
-											setOp(key);
-											setValue(initial);
-										}}
-									/>
-									{label}
-								</label>
+								<input
+									type="radio"
+									name="bonus-op"
+									class="btn btn-sm join-item flex-1"
+									aria-label={label}
+									checked={op() === key}
+									onChange={() => {
+										setOp(key);
+										setValue(initial);
+									}}
+								/>
 							)}
 						</For>
-					</fieldset>
-					<label class={field}>
-						{op() === "OFFSET"
-							? "Pontos (% da prova)"
-							: op() === "FACTOR"
-								? "Nota que fica (%)"
-								: "Nota (%)"}
-						<input
-							type="number"
-							class="input input-sm w-32 text-base-content"
-							value={value()}
-							step={op() === "OFFSET" ? 0.5 : 1}
-							onInput={(e) => setValue(e.currentTarget.valueAsNumber || 0)}
-						/>
-						<span>{bonusHint()}</span>
-					</label>
-					<label class={field}>
-						Motivo (visível ao aluno)
-						<input
-							type="text"
-							class="input input-sm w-full text-base-content"
-							value="Resolveu o desafio de ordenação em aula."
-						/>
-					</label>
-					<p
-						class="rounded-field bg-base-200/60 px-3 py-2 text-sm tabular-nums"
-						data-testid="bonus-preview"
-					>
-						Total <span class="text-muted">{fmt(props.autoTotal, 1)}</span> →{" "}
-						<strong class="text-success">{fmt(bonusResult(), 1)}</strong>
-						<span class="text-muted"> de 100</span>
-					</p>
-					<div>
-						<button
-							type="button"
-							class="btn btn-success btn-sm"
-							onClick={() => setOpen(null)}
-						>
-							Adicionar bônus
-						</button>
 					</div>
-				</form>
+					<fieldset class="fieldset py-0">
+						<div class="flex items-center gap-3">
+							<label class="input input-sm w-40">
+								<input
+									type="number"
+									aria-label="Valor"
+									value={value()}
+									step={op() === "OFFSET" ? 0.5 : 1}
+									onInput={(e) => setValue(e.currentTarget.valueAsNumber || 0)}
+								/>
+								<span class="label">{op() === "OFFSET" ? "pontos" : "%"}</span>
+							</label>
+							<Preview
+								from={props.autoTotal}
+								to={bonusResult()}
+								tone="text-success"
+								testId="bonus-preview"
+							/>
+						</div>
+						<p class="label whitespace-normal">{bonusHint()}</p>
+					</fieldset>
+					<ReasonField placeholder="Ex.: resolveu o desafio em aula" />
+				</div>
 			</Dialog>
 
 			<Dialog
 				id="sanction-dialog"
 				title="Sancionar"
+				size="max-w-md"
 				open={open() === "sanction"}
 				onClose={() => setOpen(null)}
+				action={{ label: "Sancionar", tone: "btn-error" }}
 			>
-				<form class="flex flex-col gap-4" onSubmit={(e) => e.preventDefault()}>
-					<label class={field}>
-						Alvo
-						<select
-							class="select select-sm w-64 text-base-content"
-							value={scope()}
-							onChange={(e) => setScope(e.currentTarget.value)}
-						>
-							<option value="exam">A prova inteira</option>
-							<For
-								each={Array.from({ length: props.questions }, (_, i) => i + 1)}
+				<div class="flex flex-col gap-3">
+					<PercentRow
+						base={props.autoTotal}
+						hint="Nota que fica, abaixo de 100: 50 = ×0,5."
+					/>
+					<ReasonField placeholder="Ex.: consulta a material não permitido" />
+				</div>
+			</Dialog>
+
+			<Dialog
+				id="question-sanction-dialog"
+				title={`Sancionar questão Q${target()}`}
+				size="max-w-md"
+				open={open() === "question-sanction"}
+				onClose={() => setOpen(null)}
+				action={{ label: "Sancionar questão", tone: "btn-error" }}
+			>
+				<div class="flex flex-col gap-3">
+					<PercentRow
+						base={question()?.auto ?? 0}
+						unit="%"
+						hint="Nota que fica na questão, abaixo de 100: 50 = ×0,5."
+					/>
+					<ReasonField placeholder="Ex.: respostas copiadas de um colega" />
+				</div>
+			</Dialog>
+
+			<Dialog
+				id="grade-dialog"
+				title={`Alterar nota da questão Q${target()}`}
+				size="max-w-md"
+				open={open() === "grade"}
+				onClose={() => setOpen(null)}
+				action={{ label: "Salvar nota", tone: "btn-primary" }}
+			>
+				<div class="flex flex-col gap-3">
+					<fieldset class="fieldset py-0">
+						<div class="flex items-center gap-3">
+							<label class="input input-sm w-40">
+								<input
+									type="number"
+									aria-label="Nota"
+									min="0"
+									max="100"
+									value={grade()}
+									onInput={(e) => setGrade(e.currentTarget.valueAsNumber || 0)}
+								/>
+								<span class="label">%</span>
+							</label>
+							<Preview
+								from={question()?.auto ?? 0}
+								to={Math.max(0, Math.min(100, grade()))}
+								tone="text-success"
+								unit="%"
+							/>
+							<button
+								type="button"
+								class="btn btn-success btn-soft btn-xs ml-auto"
+								onClick={() => setGrade(100)}
 							>
-								{(n) => <option value={String(n)}>Questão Q{n}</option>}
-							</For>
-						</select>
-					</label>
-					<label class="flex cursor-pointer items-center gap-2 text-sm">
-						<input
-							type="checkbox"
-							class="checkbox checkbox-sm"
-							checked={zero()}
-							onChange={(e) => setZero(e.currentTarget.checked)}
+								Marcar como certa
+							</button>
+						</div>
+						<p class="label whitespace-normal">Nota da questão, de 0 a 100.</p>
+					</fieldset>
+					<fieldset class="fieldset py-0">
+						<legend class="fieldset-legend py-0.5">
+							Comentário (opcional)
+						</legend>
+						<textarea
+							class="textarea textarea-sm w-full"
+							rows={2}
+							value={question()?.override?.comment ?? ""}
 						/>
-						Zerar (fator 0)
-					</label>
-					<label class={field}>
-						Nota que fica (%)
-						<input
-							type="number"
-							min="0"
-							max="99"
-							class="input input-sm w-32 text-base-content"
-							disabled={zero()}
-							value={zero() ? 0 : factor()}
-							onInput={(e) => setFactor(e.currentTarget.valueAsNumber || 0)}
-						/>
-						<span>
-							Menor que 100: 50 = ×0,5.
-							{scope() === "exam" ? "" : " Na questão só é possível reduzir."}
-						</span>
-					</label>
-					<label class={field}>
-						Motivo (visível ao aluno)
-						<input
-							type="text"
-							class="input input-sm w-full text-base-content"
-							placeholder="Ex.: consulta a material não permitido"
-						/>
-					</label>
-					<Show when={scope() === "exam"}>
-						<p class="rounded-field bg-base-200/60 px-3 py-2 text-sm tabular-nums">
-							Total <span class="text-muted">{fmt(props.autoTotal, 1)}</span> →{" "}
-							<strong class="text-error">
-								{fmt(zero() ? 0 : (props.autoTotal * factor()) / 100, 1)}
-							</strong>
-						</p>
-					</Show>
-					<div>
-						<button
-							type="button"
-							class="btn btn-error btn-sm"
-							onClick={() => setOpen(null)}
-						>
-							Sancionar
-						</button>
-					</div>
-				</form>
+					</fieldset>
+				</div>
 			</Dialog>
 		</>
 	);
