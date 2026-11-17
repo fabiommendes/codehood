@@ -399,7 +399,7 @@ const sections = [
           data-variant={state.key}
           hidden={selected.results !== state.key}
         >
-          <ExamResults client:load href="#" rows={state.rows} />
+          <ExamResults client:load href="#" discipline="cs101" course="ada_2026-1" exam="midterm" rows={state.rows} questions={[]} />
         </div>
       ))
     }

@@ -59,6 +59,7 @@ export * from "./edition";
 export * from "./enrollment";
 export * from "./exam";
 export * from "./exam-exception";
+export * from "./exam-sanction";
 export * from "./feedback";
 export * from "./grade-column";
 export * from "./grading-job";

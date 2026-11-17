@@ -620,6 +620,7 @@ function result(...statuses: QuestionOutcomeStatus[]): ExamResult {
 			comments: [],
 		})),
 		total: null,
+		pending: statuses.filter((status) => status === "pending").length,
 	};
 }
 
@@ -908,6 +909,30 @@ test("gradeReleaseBlocker: pending is reported once every personal window is ove
 			[makeup(2000)],
 		),
 	).toBe("pending");
+});
+
+// ---------------------------------------------------------------------------
+// Sanctions and pending answers
+// ---------------------------------------------------------------------------
+
+/// A result whose only pending answer sits in an exam sanctioned at factor 0.
+function zeroedResult(): ExamResult {
+	return {
+		...result("pending"),
+		total: 0,
+		pending: 0,
+		sanction: { factor: 0, reason: null, original: { total: null } },
+	};
+}
+
+test("pendingAnswerCount: sums result.pending, so a zeroed exam counts none", () => {
+	expect(
+		examState.pendingAnswerCount([zeroedResult(), result("pending", "graded")]),
+	).toBe(1);
+});
+
+test("gradeReleaseBlocker: an exam zeroed with a pending answer does not block the release", () => {
+	expect(gradeReleaseBlocker(timed(), [zeroedResult()], at(10_000))).toBeNull();
 });
 
 // ---------------------------------------------------------------------------

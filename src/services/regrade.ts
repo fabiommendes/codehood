@@ -22,6 +22,7 @@ const DAY_MS = 86_400_000;
 const BLOCKER_MESSAGES: Record<RegradeBlocker, () => string> = {
 	practice: m.errors_regrade_practice,
 	"not-released": m.errors_regrade_not_released,
+	sanctioned: m.errors_regrade_sanctioned,
 	"not-counting": m.errors_regrade_not_counting,
 	"not-gradable": m.errors_regrade_not_gradable,
 	exists: m.errors_regrade_exists,
@@ -32,6 +33,7 @@ const BLOCKER_MESSAGES: Record<RegradeBlocker, () => string> = {
 export type RegradeBlocker =
 	| "practice"
 	| "not-released"
+	| "sanctioned"
 	| "not-counting"
 	| "not-gradable"
 	| "exists"
@@ -49,6 +51,8 @@ export interface RegradeContext {
 	outcome: QuestionOutcome;
 	/// The `publicId` of the contested submission.
 	submission: string;
+	/// Whether the attempt has an active sanction on the whole exam.
+	examSanctioned: boolean;
 	/// Whether a request (open or resolved) already exists for `submission`.
 	requested: boolean;
 }
@@ -61,6 +65,8 @@ export interface RegradeContext {
  * - `practice`: the exam is a `PRACTICE` exam.
  * - `not-released`: `attemptOf(schedule, author, attempt, now)` is not
  *   `results`.
+ * - `sanctioned`: `ctx.examSanctioned` is `true`, or the outcome carries a
+ *   sanction.
  * - `not-counting`: `ctx.submission` is not `ctx.outcome.submission`, the
  *   answer that counts for its question.
  * - `not-gradable`: the outcome is `pending` or `unanswered`.
@@ -79,6 +85,8 @@ export function regradeBlocker(
 
 	const state = attemptOf(schedule, ctx.author, ctx.attempt, now);
 	if (state.kind !== "results") return "not-released";
+
+	if (ctx.examSanctioned || outcome.sanction) return "sanctioned";
 
 	if (outcome.submission !== ctx.submission) return "not-counting";
 	if (outcome.status === "pending" || outcome.status === "unanswered") {

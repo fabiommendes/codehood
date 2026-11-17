@@ -5,7 +5,7 @@ import { prisma } from "@/db/client";
 import { persistedCourseFactory } from "@/fixtures/course.factory";
 import { persistedExamFactory } from "@/fixtures/exam.factory";
 import { capitalShortAnswerManual } from "@/mdq/fixtures";
-import { unweighted } from "@/services/exam-result";
+import { type ResultSanction, unweighted } from "@/services/exam-result";
 import type { ExamTiming, ExceptionTiming } from "@/services/exam-state";
 import {
 	attemptRows,
@@ -81,6 +81,7 @@ function attempt(
 	overrides: Partial<GradingAttempt> = {},
 ): GradingAttempt {
 	return {
+		publicId: `attempt-${author}`,
 		author,
 		createdAt: at(-60),
 		acceptingSubmissions: false,
@@ -119,12 +120,14 @@ function rowsOf(
 	feedback: GradingFeedback[] = [],
 	students: GradedStudent[] = [student("ana", "Ana")],
 	exam: ExamTiming = openExam(),
+	sanctions: ReadonlyMap<string, ResultSanction[]> = new Map(),
 ) {
 	return attemptRows(
 		exam,
 		unweighted(QUESTIONS),
 		attempts,
 		feedback,
+		sanctions,
 		students,
 		NOW,
 	);
@@ -194,6 +197,7 @@ test("attemptRows: an attempt past its own deadline is submitted", () => {
 		unweighted(QUESTIONS),
 		[running],
 		[],
+		new Map(),
 		[],
 		at(61),
 	);
@@ -202,6 +206,7 @@ test("attemptRows: an attempt past its own deadline is submitted", () => {
 		unweighted(QUESTIONS),
 		[running],
 		[],
+		new Map(),
 		[],
 		at(30),
 	);
@@ -767,6 +772,7 @@ test("attemptRows: a student whose extra time is still running is in progress wh
 		unweighted(QUESTIONS),
 		[unclosed("ana"), unclosed("bob")],
 		[],
+		new Map(),
 		[student("ana", "Ana"), student("bob", "Bob")],
 		NOW,
 		new Map([["ana", extraMinutes(45)]]),
@@ -784,6 +790,7 @@ test("attemptRows: extra time that has run out leaves the attempt submitted", ()
 		unweighted(QUESTIONS),
 		[unclosed("ana")],
 		[],
+		new Map(),
 		[student("ana", "Ana")],
 		NOW,
 		new Map([["ana", extraMinutes(30)]]),
@@ -803,6 +810,7 @@ test("attemptRows: a makeup in progress keeps the attempt open on an exam comple
 		unweighted(QUESTIONS),
 		[unclosed("ana")],
 		[],
+		new Map(),
 		[student("ana", "Ana")],
 		NOW,
 		new Map([["ana", makeup]]),
@@ -825,4 +833,81 @@ test("countingAnswers: an answer waits until its author's extra time is over", (
 
 	expect(counted(45)).toEqual(["bob"]);
 	expect(counted(30).sort()).toEqual(["ana", "bob"]);
+});
+
+//
+// attemptRows: sanctions
+//
+
+/// The sanctions of `author`'s attempt as `attempt()` keys them.
+function sanctionsOf(author: string, ...sanctions: ResultSanction[]) {
+	return new Map([[`attempt-${author}`, sanctions]]);
+}
+
+test("attemptRows: a zeroed question without a grade is not pending and the total shows", () => {
+	const rows = rowsOf(
+		[attempt("ana", [submission("a1", "q1", 5)])],
+		[],
+		[student("ana", "Ana")],
+		openExam(),
+		sanctionsOf("ana", { question: "q1", factor: "0", reason: null }),
+	);
+
+	expect(rows[0]?.pending).toBe(0);
+	expect(rows[0]?.total).toBe(0);
+});
+
+test("attemptRows: an exam zeroed with a pending answer has total 0 and no pending", () => {
+	const rows = rowsOf(
+		[attempt("ana", [submission("a1", "q1", 5)])],
+		[],
+		[student("ana", "Ana")],
+		openExam(),
+		sanctionsOf("ana", { question: null, factor: "0", reason: "cola" }),
+	);
+
+	expect(rows[0]).toMatchObject({
+		pending: 0,
+		total: 0,
+		sanction: { factor: 0, reason: "cola" },
+	});
+});
+
+test("attemptRows: an in-progress attempt stays in-progress with a null total even when sanctioned", () => {
+	const rows = rowsOf(
+		[
+			attempt("ana", [submission("a1", "q1", 5)], {
+				acceptingSubmissions: true,
+			}),
+		],
+		[],
+		[student("ana", "Ana")],
+		openExam(),
+		sanctionsOf("ana", { question: null, factor: "0", reason: null }),
+	);
+
+	expect(rows[0]).toMatchObject({
+		state: "in-progress",
+		pending: 0,
+		total: null,
+	});
+});
+
+test("attemptRows: sanctions of another attempt do not leak", () => {
+	const rows = rowsOf(
+		[
+			attempt("ana", [submission("a1", "q1", 5)]),
+			attempt("bia", [submission("b1", "q1", 6)]),
+		],
+		[pass("a1", "1", 20), pass("b1", "1", 21)],
+		[student("ana", "Ana"), student("bia", "Bia")],
+		openExam(),
+		sanctionsOf("ana", { question: null, factor: "0.5", reason: null }),
+	);
+
+	const [ana, bia] = rows;
+	expect(ana?.sanction).toMatchObject({ factor: 0.5 });
+	expect(ana?.total).toBeCloseTo(1 / 6, 10);
+	expect(bia?.sanction).toBeUndefined();
+	expect(bia?.total).toBeCloseTo(1 / 3, 10);
 });

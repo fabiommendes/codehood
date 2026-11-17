@@ -8,7 +8,11 @@ import { db, groupExamsForStudent } from "@/db";
 import { loadResultPolicy } from "@/db/result-policy";
 import { m } from "@/i18n";
 import AppLayout from "@/layouts/AppLayout.astro";
-import { examResult, formatScore } from "@/services/exam-result";
+import {
+	examResult,
+	formatScore,
+	sanctionsByResponse,
+} from "@/services/exam-result";
 import {
 	type AttemptState,
 	attemptOf,
@@ -53,7 +57,7 @@ const groups = canWrite ? [] : groupExamsForStudent(exams, now, ownExceptions);
 const states = new Map<string, AttemptState>();
 const scores = new Map<string, string>();
 if (!canWrite) {
-	const [attempts, feedback, policyOf] = await Promise.all([
+	const [attempts, feedback, sanctions, policyOf] = await Promise.all([
 		db.response.findMany(
 			{ course: course.id, author: actor.username, practice: false },
 			{ actor },
@@ -62,8 +66,13 @@ if (!canWrite) {
 			{ course: course.id, author: actor.username },
 			{ actor },
 		),
+		db.examSanction.findMany(
+			{ course: course.id, author: actor.username },
+			{ actor },
+		),
 		loadResultPolicy(course.id),
 	]);
+	const sanctionsOf = sanctionsByResponse(sanctions);
 	for (const exam of exams) {
 		const attempt = attempts.find((entry) => entry.exam === exam.slug);
 		const schedule = examSchedule(exam, exceptions.get(exam.slug));
@@ -76,6 +85,7 @@ if (!canWrite) {
 			exam.questions,
 			attempt.submissions,
 			feedback,
+			sanctionsOf.get(attempt.publicId) ?? [],
 			policyOf(exam),
 		);
 		if (total !== null) scores.set(exam.slug, formatScore(total));

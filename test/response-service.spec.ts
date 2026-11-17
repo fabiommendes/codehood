@@ -638,3 +638,68 @@ for (const status of ["SCHEDULED", "COMPLETED"] as const) {
 		expect(response.author).toBe(student.username);
 	});
 }
+
+//
+// delete() and exam sanctions
+//
+
+/// An attempt of an enrolled student on an ongoing exam, sanctioned by the instructor.
+async function sanctionedAttempt() {
+	const { course, instructor } = await makeCourse();
+	const student = await enrollStudent(course.id);
+	const question = await makeQuestion(course.id);
+	const exam = await makeExam(course.id, [question.slug]);
+	const response = await persistedResponseFactory.create({
+		course: course.id,
+		exam: exam.slug,
+		author: student.username,
+	});
+	const [sanction] = await db.examSanction.create(
+		{ course: course.id, exam: exam.slug, usernames: [student.username] },
+		{ actor: instructor },
+	);
+	if (!sanction) throw new Error("no sanction created");
+	return { course, instructor, exam, response, sanction };
+}
+
+test("delete: an attempt with an active sanction is refused 409 and kept", async () => {
+	const { instructor, response } = await sanctionedAttempt();
+
+	const attempt = db.response.delete(
+		{ publicId: response.publicId },
+		{ actor: instructor },
+	);
+
+	await expect(attempt).rejects.toBeInstanceOf(NotAllowed);
+	await expect(attempt).rejects.toMatchObject({
+		status: 409,
+		action: "response.delete",
+	});
+	expect(
+		await prisma.response.findUnique({ where: { id: response.id } }),
+	).not.toBeNull();
+	expect(
+		await prisma.examSanction.count({ where: { responseId: response.id } }),
+	).toBe(1);
+});
+
+test("delete: an attempt whose sanction was revoked is removed with the sanction", async () => {
+	const { course, instructor, exam, response, sanction } =
+		await sanctionedAttempt();
+	await db.examSanction.revoke(
+		{ course: course.id, exam: exam.slug, publicId: sanction.publicId },
+		{ actor: instructor },
+	);
+
+	await db.response.delete(
+		{ publicId: response.publicId },
+		{ actor: instructor },
+	);
+
+	expect(
+		await prisma.response.findUnique({ where: { id: response.id } }),
+	).toBeNull();
+	expect(
+		await prisma.examSanction.count({ where: { responseId: response.id } }),
+	).toBe(0);
+});

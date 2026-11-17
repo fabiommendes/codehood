@@ -672,6 +672,17 @@ export async function fillDatabase(
 			"createdAt",
 			"updatedAt",
 		]);
+		const insertSanction = insert("ExamSanction", [
+			"publicId",
+			"responseId",
+			"questionRefId",
+			"factor",
+			"reason",
+			"notes",
+			"createdById",
+			"createdAt",
+			"updatedAt",
+		]);
 		const insertRubric = insert("Rubric", [
 			"id",
 			"examId",
@@ -1649,6 +1660,20 @@ export async function fillDatabase(
 						iso(from),
 						iso(open ? (last?.at ?? from) : to),
 					);
+					if (!open && !practice && rng.chance(0.01)) {
+						const at = iso(to + DAY);
+						insertSanction(
+							publicId(),
+							responseId,
+							null,
+							"0",
+							"copied",
+							"same code as a classmate",
+							instructor,
+							at,
+							at,
+						);
+					}
 					if (tracked && typed.length > 0 && rng.chance(0.35))
 						histories.push({ responseId, from, to, typed });
 				}

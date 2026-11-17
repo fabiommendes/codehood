@@ -184,6 +184,7 @@ test("extra time granted after the pass lets the student answer again, and the n
 				submission: s.publicId,
 			})),
 		),
+		[],
 	).questions;
 	expect(outcome?.submission).toBe(submissions[1]?.publicId);
 	expect(outcome?.score).toBe(1);

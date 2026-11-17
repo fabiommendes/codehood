@@ -91,6 +91,7 @@ function result(pending: number, graded = 1): ExamResult {
 			outcome("unanswered"),
 		],
 		total: pending > 0 ? null : 1,
+		pending,
 	};
 }
 
@@ -273,6 +274,7 @@ test("toGrade: only pending answers count, not unanswered ones", () => {
 		result: {
 			questions: [outcome("unanswered"), outcome("unanswered")],
 			total: 0,
+			pending: 0,
 		},
 	};
 

@@ -111,6 +111,24 @@ const openRegrades = new Map(
 	).map((request) => [request.submission, request.publicId]),
 );
 const regradesHref = `${href}/exams/${exam.slug}/regrades`;
+// The sanctions of the exam, and the factor of each student's on this question.
+const sanctions = await db.examSanction.findMany(
+	{ course: course.id, exam: exam.slug },
+	{ actor },
+);
+const sanctioned = new Map(
+	sanctions
+		.filter((sanction) => sanction.question === questionSlug)
+		.map((sanction) => [sanction.author, Number(sanction.factor)]),
+);
+/// The badge text for a sanctioned answer, or undefined when it is not.
+const sanctionLabel = (author: string) => {
+	const factor = sanctioned.get(author);
+	if (factor === undefined) return undefined;
+	return factor === 0
+		? m.grades_sanction_zeroed()
+		: m.grades_sanction_reduced({ factor });
+};
 
 const listView = wantsList(Astro.url);
 
@@ -193,7 +211,7 @@ const shown = (
 
 <AppLayout title={m.grades_question_title({ question: `${m.exams_attempt_question_short({ number: position + 1 })} ${title}`, exam: exam.title })}
   trail={breadcrumbs(Astro.url, { course, item: exam.title, question: title })}
-  nav={await gradingExamNav(result, actor)}
+  nav={await gradingExamNav(result, actor, undefined, sanctions)}
 >
   <main class:list={["mx-auto px-4 py-10", listView ? "max-w-4xl" : "max-w-6xl"]}>
     <CourseHeader course={course} tabs={tabs} active="exams" />
@@ -268,6 +286,7 @@ const shown = (
                   {openRegrades.has(answer.submission) && (
                     <a href={`${regradesHref}#regrade-${openRegrades.get(answer.submission)}`} class="badge badge-warning badge-sm">{m.grades_regrade_requested()}</a>
                   )}
+                  {sanctionLabel(answer.author) && <span class="badge badge-error badge-sm">{sanctionLabel(answer.author)}</span>}
                   {answer.passes.some((pass) => pass.notes !== undefined) && (
                     <span class="badge badge-error badge-sm">{m.grades_question_suspicious()}</span>
                   )}
@@ -314,6 +333,7 @@ const shown = (
                 {openRegrades.has(answer.submission) && (
                   <a href={`${regradesHref}#regrade-${openRegrades.get(answer.submission)}`} class="badge badge-warning badge-sm">{m.grades_regrade_requested()}</a>
                 )}
+                {sanctionLabel(answer.author) && <span class="badge badge-error badge-sm">{sanctionLabel(answer.author)}</span>}
                 {answer.passes.some((pass) => pass.notes !== undefined) && (
                   <span class="badge badge-error badge-sm">{m.grades_question_suspicious()}</span>
                 )}

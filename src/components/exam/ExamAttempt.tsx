@@ -1081,6 +1081,28 @@ export default function ExamAttempt(props: ExamAttemptProps): JSX.Element {
 						kind() === "results"
 					}
 				>
+					<Show
+						when={kind() === "results" ? props.result?.sanction : undefined}
+					>
+						{(sanction) => (
+							<p role="alert" class="alert alert-warning text-sm">
+								<span class="whitespace-pre-wrap">
+									<strong>
+										{sanction().factor === 0
+											? m.exams_sanction_exam_zeroed()
+											: m.exams_sanction_exam_reduced({
+													percent: formatPercent(sanction().factor),
+												})}
+									</strong>
+									<Show when={sanction().reason}>
+										{(reason) => (
+											<> {m.exams_sanction_reason({ reason: reason() })}</>
+										)}
+									</Show>
+								</span>
+							</p>
+						)}
+					</Show>
 					{/* Once the results are out, the score above says it all. */}
 					<Show
 						when={kind() === "in-progress"}
@@ -1749,7 +1771,12 @@ function Outcome(props: {
 				<div class="mt-2 border-t border-edge pt-3">
 					<p class="font-semibold">
 						<Switch>
-							<Match when={outcome().status === "graded"}>
+							<Match
+								when={
+									outcome().status === "graded" ||
+									outcome().status === "sanctioned"
+								}
+							>
 								<span class="font-normal text-muted">
 									{m.exams_attempt_score_label()}
 								</span>{" "}
@@ -1772,6 +1799,26 @@ function Outcome(props: {
 							</Match>
 						</Switch>
 					</p>
+					<Show when={outcome().sanction}>
+						{(sanction) => (
+							<p class="mt-1">
+								<span class="badge badge-warning badge-sm">
+									{sanction().factor === 0
+										? m.exams_sanction_question_zeroed()
+										: m.exams_sanction_question_reduced({
+												percent: formatPercent(sanction().factor),
+											})}
+								</span>
+								<Show when={sanction().reason}>
+									{(reason) => (
+										<span class="ml-2 text-sm text-base-content/70">
+											{reason()}
+										</span>
+									)}
+								</Show>
+							</p>
+						)}
+					</Show>
 					<AppliedItems items={outcome().rubricItems ?? []} />
 					<For each={outcome().comments}>
 						{(comment) => (
@@ -1795,4 +1842,9 @@ function Outcome(props: {
 			)}
 		</Show>
 	);
+}
+
+/// A factor in `[0, 1]` as a whole percentage, without the sign.
+function formatPercent(factor: number): string {
+	return String(Math.round(factor * 100));
 }

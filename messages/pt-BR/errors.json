@@ -142,6 +142,7 @@
 	"errors_exam_exception_released": "Os resultados desta prova já foram liberados, então suas exceções não podem mais mudar",
 	"errors_regrade_practice": "Provas de prática não têm nota a contestar",
 	"errors_regrade_not_released": "Os resultados desta prova ainda não estão visíveis para você",
+	"errors_regrade_sanctioned": "Uma resposta sancionada não pode ser contestada",
 	"errors_regrade_not_counting": "Só a resposta que vale para a questão pode ser contestada",
 	"errors_regrade_not_gradable": "Esta resposta não tem nota a contestar",
 	"errors_regrade_exists": "Já existe um pedido de revisão para esta resposta",
@@ -171,5 +172,10 @@
 	"errors_feedback_adjustment_needs_rubric": "`adjustment` exige uma correção feita pela rubrica",
 	"errors_code_send_waiting": "Aguarde a correção do envio anterior",
 	"errors_code_sends_spent": "Você não tem mais envios para esta questão",
-	"errors_code_not_sendable": "Esta questão não é enviada a um worker: só aceita salvamentos"
+	"errors_code_not_sendable": "Esta questão não é enviada a um worker: só aceita salvamentos",
+	"errors_exam_sanction_no_attempt": "\"{username}\" não tem tentativa nesta prova",
+	"errors_exam_sanction_duplicate": "\"{username}\" aparece mais de uma vez",
+	"errors_exam_sanction_exists": "\"{username}\" já tem uma sanção ativa neste alvo",
+	"errors_exam_sanction_practice": "Provas de prática não têm sanções",
+	"errors_exam_sanction_question": "\"{question}\" não é uma questão desta prova"
 }

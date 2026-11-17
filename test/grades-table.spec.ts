@@ -1,6 +1,7 @@
 import { expect, test } from "@playwright/test";
 import fc from "fast-check";
 import type { Exam } from "@/db";
+import type { ResultSanction } from "@/services/exam-result";
 import type { ExceptionTiming } from "@/services/exam-state";
 import {
 	type GradeCell,
@@ -124,6 +125,7 @@ function sat(
 	return {
 		attempt: {
 			exam: slug,
+			publicId: `${slug}-${author}`,
 			author,
 			createdAt: at(-30),
 			acceptingSubmissions: options.open ?? false,
@@ -139,12 +141,14 @@ function tableOf(
 	students: GradedStudent[],
 	sittings: ReturnType<typeof sat>[] = [],
 	now = NOW,
+	sanctions: ReadonlyMap<string, ResultSanction[]> = new Map(),
 ) {
 	return gradesTable(
 		exams,
 		students,
 		sittings.map((s) => s.attempt),
 		sittings.flatMap((s) => s.feedback),
+		sanctions,
 		now,
 	);
 }
@@ -542,6 +546,7 @@ test("gradesTable: withDropped lists the students who dropped, marked as such", 
 		[ana, dan],
 		[sitting.attempt],
 		sitting.feedback,
+		new Map(),
 		NOW,
 		{ withDropped: true },
 	);
@@ -573,6 +578,7 @@ test("gradesCsvRows: one column per exam headed by its slug, totals from 0 to 10
 			[ana, bia, dan],
 			sittings.map((s) => s.attempt),
 			sittings.flatMap((s) => s.feedback),
+			new Map(),
 			NOW,
 			{ withDropped: true },
 		),
@@ -634,6 +640,7 @@ function personalCells(
 		[ana, bob],
 		sittings.map((s) => s.attempt),
 		sittings.flatMap((s) => s.feedback),
+		new Map(),
 		now,
 		{ exceptions },
 	);
@@ -662,4 +669,52 @@ test("gradesTable: an unclosed attempt inside the personal window is in progress
 		["ana", "in-progress"],
 		["bob", "pending"],
 	]);
+});
+
+//
+// Sanctions
+//
+
+/// The sanctions of the attempt `sat(slug, author)` builds, keyed by its `publicId`.
+function sanctionsOf(
+	slug: string,
+	author: string,
+	...sanctions: ResultSanction[]
+): ReadonlyMap<string, ResultSanction[]> {
+	return new Map([[`${slug}-${author}`, sanctions]]);
+}
+
+test("gradesTable: an exam zeroed with a pending answer is a total cell carrying the sanction", () => {
+	const sittings = [
+		sat("e1", "ana", { q1: "1", q2: null }),
+		sat("e1", "bia", { q1: "1", q2: "1" }),
+	];
+	const bia = student("bia", "Bia");
+
+	const table = tableOf(
+		[exam("e1")],
+		[ana, bia],
+		sittings,
+		NOW,
+		sanctionsOf("e1", "ana", { question: null, factor: "0", reason: "cola" }),
+	);
+
+	expect(table.rows[0]?.cells[0]).toMatchObject({
+		kind: "total",
+		total: 0,
+		sanction: { factor: 0, reason: "cola" },
+	});
+	expect(table.columns[0]?.mean).toBeCloseTo(0.5, 10);
+});
+
+test("gradesTable: a question zeroed without a grade leaves a total cell, not pending", () => {
+	const table = tableOf(
+		[exam("e1")],
+		[ana],
+		[sat("e1", "ana", { q1: "1", q2: null })],
+		NOW,
+		sanctionsOf("e1", "ana", { question: "q2", factor: "0", reason: null }),
+	);
+
+	expect(table.rows[0]?.cells[0]).toMatchObject({ kind: "total", total: 0.5 });
 });

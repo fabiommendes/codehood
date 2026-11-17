@@ -79,6 +79,8 @@ model User {
   regradesResolved RegradeRequest[]
   reports          Report[]           @relation("ReportAuthor")
   reportsTriaged   Report[]           @relation("ReportTriagedBy")
+  sanctionsCreated ExamSanction[]     @relation("SanctionCreatedBy")
+  sanctionsRevoked ExamSanction[]     @relation("SanctionRevokedBy")
 
   @@index([role])
 }
@@ -787,6 +789,7 @@ model QuestionRef {
   groupId            Int?
   submissions        Submission[]
   answerEditFields   AnswerEditField[]
+  sanctions          ExamSanction[]
 
   @@unique([slug, courseId])
   @@index([courseId])
@@ -812,7 +815,7 @@ model QuestionData {
   privatePayload Json
   /// Map from file name to sha256 of each link attachment of this version.
   /// Null when the version has no link attachments.
-  files Json?
+  files          Json?
 
   createdAt DateTime @default(now())
 
@@ -903,10 +906,57 @@ model Response {
 
   submissions Submission[]
   editHistory AnswerEditHistory?
+  sanctions   ExamSanction[]
 
   @@unique([authorId, examId, slotKey])
   @@index([examId])
   @@map("ResponseRef")
+}
+
+/// An instructor's decision to cancel or reduce one student's score on an
+/// exam, or on one question of it, for misconduct or another problem. Applied
+/// on top of every grading pass, so regrading never undoes it.
+///
+/// At most one active sanction per attempt and target (question or exam
+/// total). The service enforces it: revoked rows stay as a record, and SQLite
+/// would let duplicates with a null `questionRefId` through a unique index.
+model ExamSanction {
+  id       Int    @id @default(autoincrement())
+  publicId String @unique
+
+  /// The sanctioned attempt.
+  responseId Int
+  response   Response @relation(fields: [responseId], references: [id], onDelete: Cascade)
+
+  /// The question whose score is affected. Null affects the exam total. A
+  /// sanction on a question the exam no longer has is ignored.
+  questionRefId Int?
+  questionRef   QuestionRef? @relation(fields: [questionRefId], references: [id], onDelete: Cascade)
+
+  /// Multiplier on the score, a decimal string in [0, 1). "0" zeroes it.
+  factor String @default("0")
+
+  /// Shown to the student. Optional.
+  reason String?
+
+  /// Instructor-only free text: evidence, how it was caught, who else took part.
+  notes String?
+
+  createdById String
+  createdBy   User   @relation("SanctionCreatedBy", fields: [createdById], references: [username])
+
+  /// Set when the sanction was lifted. The row stays as a record.
+  revokedAt   DateTime?
+  revokedById String?
+  revokedBy   User?     @relation("SanctionRevokedBy", fields: [revokedById], references: [username])
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  /// Every grade read loads the active sanctions of a set of attempts.
+  @@index([responseId])
+  /// Deleting a question looks for the sanctions that target it.
+  @@index([questionRefId])
 }
 
 /// One student's attempt at a single question, within their response to an exam.
@@ -1039,9 +1089,9 @@ model Feedback {
 
   rubricItems FeedbackRubricItem[]
 
+  @@unique([submissionId, ref])
   /// A change to a rubric rescores the passes graded with it.
   @@index([rubricId])
-  @@unique([submissionId, ref])
 }
 
 /// Grading criteria of one question in one exam. Copied from the question's
@@ -1259,7 +1309,7 @@ model Exam {
   attachments Json?
   /// Map from file name to sha256 of each link attachment of the exam's
   /// questions, same shape as `QuestionData.files`.
-  files Json?
+  files       Json?
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -1317,7 +1367,6 @@ model QuestionsForExam {
   position Int @default(0)
 
   @@id([examId, questionRefId])
-
   @@index([questionRefId])
 }
 

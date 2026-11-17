@@ -170,6 +170,8 @@ function scoreRows(
 			unweighted(questions),
 			attempt.submissions,
 			feedback,
+			// Statistics measure the question, not the conduct: they use the original grade.
+			[],
 			policy,
 		);
 		if (result.total === null) continue;

@@ -1166,6 +1166,88 @@
           "username"
         ]
       },
+      "Exam Sanction": {
+        "type": "object",
+        "properties": {
+          "publicId": {
+            "type": "string",
+            "maxLength": 64,
+            "pattern": "^[A-Za-z0-9_\\-]+$",
+            "example": "k3Vx9QpL2a"
+          },
+          "response": {
+            "type": "string",
+            "maxLength": 64,
+            "pattern": "^[A-Za-z0-9_\\-]+$",
+            "example": "k3Vx9QpL2a"
+          },
+          "exam": {
+            "type": "string",
+            "maxLength": 200,
+            "pattern": "^[a-z0-9][a-z0-9._\\-]*$",
+            "example": "intro-to-recursion"
+          },
+          "author": {
+            "type": "string",
+            "pattern": "^[A-Za-z0-9][A-Za-z0-9_\\-]{1,30}$",
+            "example": "ada"
+          },
+          "question": {
+            "type": "string",
+            "nullable": true,
+            "maxLength": 200,
+            "pattern": "^[a-z0-9][a-z0-9._\\-]*$",
+            "example": "intro-to-recursion"
+          },
+          "factor": {
+            "type": "string"
+          },
+          "reason": {
+            "type": "string",
+            "nullable": true
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "revokedAt": {
+            "type": "string",
+            "nullable": true,
+            "format": "date-time"
+          },
+          "notes": {
+            "type": "string",
+            "nullable": true
+          },
+          "createdBy": {
+            "type": "string",
+            "pattern": "^[A-Za-z0-9][A-Za-z0-9_\\-]{1,30}$",
+            "example": "ada"
+          },
+          "revokedBy": {
+            "type": "string",
+            "nullable": true,
+            "pattern": "^[A-Za-z0-9][A-Za-z0-9_\\-]{1,30}$",
+            "example": "ada"
+          }
+        },
+        "required": [
+          "publicId",
+          "response",
+          "exam",
+          "author",
+          "question",
+          "factor",
+          "reason",
+          "createdAt",
+          "updatedAt",
+          "revokedAt"
+        ]
+      },
       "Grade Column": {
         "type": "object",
         "properties": {
@@ -14346,6 +14428,664 @@
         }
       }
     },
+    "/api/course/{discipline}/{course}/exam/{slug}/sanction/{publicId}": {
+      "get": {
+        "operationId": "readExam-sanction",
+        "summary": "Find a single Exam Sanction.",
+        "tags": [
+          "Exams"
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string"
+            },
+            "required": true,
+            "name": "discipline",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": "string"
+            },
+            "required": true,
+            "name": "course",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": "string"
+            },
+            "required": true,
+            "name": "slug",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": "string"
+            },
+            "required": true,
+            "name": "publicId",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "headers": {
+              "ETag": {
+                "schema": {
+                  "type": "string",
+                  "description": "The row's `updatedAt`, in quotes. Send it back as If-Match."
+                },
+                "required": true,
+                "description": "The row's `updatedAt`, in quotes. Send it back as If-Match."
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "publicId": {
+                      "type": "string",
+                      "maxLength": 64,
+                      "pattern": "^[A-Za-z0-9_\\-]+$",
+                      "example": "k3Vx9QpL2a"
+                    },
+                    "response": {
+                      "type": "string",
+                      "maxLength": 64,
+                      "pattern": "^[A-Za-z0-9_\\-]+$",
+                      "example": "k3Vx9QpL2a"
+                    },
+                    "exam": {
+                      "type": "string",
+                      "maxLength": 200,
+                      "pattern": "^[a-z0-9][a-z0-9._\\-]*$",
+                      "example": "intro-to-recursion"
+                    },
+                    "author": {
+                      "type": "string",
+                      "pattern": "^[A-Za-z0-9][A-Za-z0-9_\\-]{1,30}$",
+                      "example": "ada"
+                    },
+                    "question": {
+                      "type": "string",
+                      "nullable": true,
+                      "maxLength": 200,
+                      "pattern": "^[a-z0-9][a-z0-9._\\-]*$",
+                      "example": "intro-to-recursion"
+                    },
+                    "factor": {
+                      "type": "string"
+                    },
+                    "reason": {
+                      "type": "string",
+                      "nullable": true
+                    },
+                    "createdAt": {
+                      "type": "string",
+                      "format": "date-time"
+                    },
+                    "updatedAt": {
+                      "type": "string",
+                      "format": "date-time"
+                    },
+                    "revokedAt": {
+                      "type": "string",
+                      "nullable": true,
+                      "format": "date-time"
+                    },
+                    "notes": {
+                      "type": "string",
+                      "nullable": true
+                    },
+                    "createdBy": {
+                      "type": "string",
+                      "pattern": "^[A-Za-z0-9][A-Za-z0-9_\\-]{1,30}$",
+                      "example": "ada"
+                    },
+                    "revokedBy": {
+                      "type": "string",
+                      "nullable": true,
+                      "pattern": "^[A-Za-z0-9][A-Za-z0-9_\\-]{1,30}$",
+                      "example": "ada"
+                    }
+                  },
+                  "required": [
+                    "publicId",
+                    "response",
+                    "exam",
+                    "author",
+                    "question",
+                    "factor",
+                    "reason",
+                    "createdAt",
+                    "updatedAt",
+                    "revokedAt"
+                  ]
+                }
+              }
+            }
+          }
+        }
+      },
+      "patch": {
+        "operationId": "updateExam-sanction",
+        "summary": "Update a single Exam Sanction.",
+        "tags": [
+          "Exams"
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string"
+            },
+            "required": true,
+            "name": "discipline",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": "string"
+            },
+            "required": true,
+            "name": "course",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": "string"
+            },
+            "required": true,
+            "name": "slug",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": "string"
+            },
+            "required": true,
+            "name": "publicId",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "description": "Write only if the row is at this version: its `updatedAt` in quotes, e.g. `\"2026-01-01T12:00:00.000Z\"`. A stale version answers 412."
+            },
+            "required": false,
+            "description": "Write only if the row is at this version: its `updatedAt` in quotes, e.g. `\"2026-01-01T12:00:00.000Z\"`. A stale version answers 412.",
+            "name": "If-Match",
+            "in": "header"
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "factor": {
+                    "type": "string",
+                    "pattern": "^0(\\.\\d+)?$",
+                    "example": "0"
+                  },
+                  "reason": {
+                    "type": "string",
+                    "nullable": true,
+                    "maxLength": 2000
+                  },
+                  "notes": {
+                    "type": "string",
+                    "nullable": true,
+                    "maxLength": 2000
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Success",
+            "headers": {
+              "ETag": {
+                "schema": {
+                  "type": "string",
+                  "description": "The row's `updatedAt`, in quotes. Send it back as If-Match."
+                },
+                "required": true,
+                "description": "The row's `updatedAt`, in quotes. Send it back as If-Match."
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "publicId": {
+                      "type": "string",
+                      "maxLength": 64,
+                      "pattern": "^[A-Za-z0-9_\\-]+$",
+                      "example": "k3Vx9QpL2a"
+                    },
+                    "response": {
+                      "type": "string",
+                      "maxLength": 64,
+                      "pattern": "^[A-Za-z0-9_\\-]+$",
+                      "example": "k3Vx9QpL2a"
+                    },
+                    "exam": {
+                      "type": "string",
+                      "maxLength": 200,
+                      "pattern": "^[a-z0-9][a-z0-9._\\-]*$",
+                      "example": "intro-to-recursion"
+                    },
+                    "author": {
+                      "type": "string",
+                      "pattern": "^[A-Za-z0-9][A-Za-z0-9_\\-]{1,30}$",
+                      "example": "ada"
+                    },
+                    "question": {
+                      "type": "string",
+                      "nullable": true,
+                      "maxLength": 200,
+                      "pattern": "^[a-z0-9][a-z0-9._\\-]*$",
+                      "example": "intro-to-recursion"
+                    },
+                    "factor": {
+                      "type": "string"
+                    },
+                    "reason": {
+                      "type": "string",
+                      "nullable": true
+                    },
+                    "createdAt": {
+                      "type": "string",
+                      "format": "date-time"
+                    },
+                    "updatedAt": {
+                      "type": "string",
+                      "format": "date-time"
+                    },
+                    "revokedAt": {
+                      "type": "string",
+                      "nullable": true,
+                      "format": "date-time"
+                    },
+                    "notes": {
+                      "type": "string",
+                      "nullable": true
+                    },
+                    "createdBy": {
+                      "type": "string",
+                      "pattern": "^[A-Za-z0-9][A-Za-z0-9_\\-]{1,30}$",
+                      "example": "ada"
+                    },
+                    "revokedBy": {
+                      "type": "string",
+                      "nullable": true,
+                      "pattern": "^[A-Za-z0-9][A-Za-z0-9_\\-]{1,30}$",
+                      "example": "ada"
+                    }
+                  },
+                  "required": [
+                    "publicId",
+                    "response",
+                    "exam",
+                    "author",
+                    "question",
+                    "factor",
+                    "reason",
+                    "createdAt",
+                    "updatedAt",
+                    "revokedAt"
+                  ]
+                }
+              }
+            }
+          },
+          "412": {
+            "description": "The row is not at the version the request expected.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PreconditionFailed"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/course/{discipline}/{course}/exam/{slug}/sanction": {
+      "get": {
+        "operationId": "listExam-sanction",
+        "summary": "Find multiple Exam Sanctions.",
+        "tags": [
+          "Exams"
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string"
+            },
+            "required": true,
+            "name": "discipline",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": "string"
+            },
+            "required": true,
+            "name": "course",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": "string"
+            },
+            "required": true,
+            "name": "slug",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "pattern": "^[A-Za-z0-9][A-Za-z0-9_\\-]{1,30}$",
+              "example": "ada"
+            },
+            "required": false,
+            "name": "author",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "boolean",
+              "default": false
+            },
+            "required": false,
+            "name": "revoked",
+            "in": "query"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "items": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "publicId": {
+                            "type": "string",
+                            "maxLength": 64,
+                            "pattern": "^[A-Za-z0-9_\\-]+$",
+                            "example": "k3Vx9QpL2a"
+                          },
+                          "response": {
+                            "type": "string",
+                            "maxLength": 64,
+                            "pattern": "^[A-Za-z0-9_\\-]+$",
+                            "example": "k3Vx9QpL2a"
+                          },
+                          "exam": {
+                            "type": "string",
+                            "maxLength": 200,
+                            "pattern": "^[a-z0-9][a-z0-9._\\-]*$",
+                            "example": "intro-to-recursion"
+                          },
+                          "author": {
+                            "type": "string",
+                            "pattern": "^[A-Za-z0-9][A-Za-z0-9_\\-]{1,30}$",
+                            "example": "ada"
+                          },
+                          "question": {
+                            "type": "string",
+                            "nullable": true,
+                            "maxLength": 200,
+                            "pattern": "^[a-z0-9][a-z0-9._\\-]*$",
+                            "example": "intro-to-recursion"
+                          },
+                          "factor": {
+                            "type": "string"
+                          },
+                          "reason": {
+                            "type": "string",
+                            "nullable": true
+                          },
+                          "createdAt": {
+                            "type": "string",
+                            "format": "date-time"
+                          },
+                          "updatedAt": {
+                            "type": "string",
+                            "format": "date-time"
+                          },
+                          "revokedAt": {
+                            "type": "string",
+                            "nullable": true,
+                            "format": "date-time"
+                          },
+                          "notes": {
+                            "type": "string",
+                            "nullable": true
+                          },
+                          "createdBy": {
+                            "type": "string",
+                            "pattern": "^[A-Za-z0-9][A-Za-z0-9_\\-]{1,30}$",
+                            "example": "ada"
+                          },
+                          "revokedBy": {
+                            "type": "string",
+                            "nullable": true,
+                            "pattern": "^[A-Za-z0-9][A-Za-z0-9_\\-]{1,30}$",
+                            "example": "ada"
+                          }
+                        },
+                        "required": [
+                          "publicId",
+                          "response",
+                          "exam",
+                          "author",
+                          "question",
+                          "factor",
+                          "reason",
+                          "createdAt",
+                          "updatedAt",
+                          "revokedAt"
+                        ]
+                      }
+                    },
+                    "next": {
+                      "type": "string",
+                      "nullable": true
+                    },
+                    "prev": {
+                      "type": "string",
+                      "nullable": true
+                    }
+                  },
+                  "required": [
+                    "items",
+                    "next",
+                    "prev"
+                  ]
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "operationId": "examSanctionCreate",
+        "summary": "Sanction one or more students on an exam.",
+        "description": "Creates one sanction per student of `usernames`, all or none, and answers them in that order. `question` narrows the sanction to one question of the exam; without it the sanction hits the exam total. Only the course's instructor, by session or CLI key; a BOT key gets 403. A student without a real attempt, or already sanctioned on the same target, is a 400 keyed on `usernames`.",
+        "tags": [
+          "Exams"
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string"
+            },
+            "required": true,
+            "name": "discipline",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": "string"
+            },
+            "required": true,
+            "name": "course",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": "string"
+            },
+            "required": true,
+            "name": "slug",
+            "in": "path"
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "usernames": {
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "pattern": "^[A-Za-z0-9][A-Za-z0-9_\\-]{1,30}$",
+                      "example": "ada"
+                    },
+                    "minItems": 1
+                  },
+                  "question": {
+                    "type": "string",
+                    "maxLength": 200,
+                    "pattern": "^[a-z0-9][a-z0-9._\\-]*$",
+                    "example": "intro-to-recursion"
+                  },
+                  "factor": {
+                    "type": "string",
+                    "pattern": "^0(\\.\\d+)?$",
+                    "default": "0",
+                    "example": "0"
+                  },
+                  "reason": {
+                    "type": "string",
+                    "nullable": true,
+                    "maxLength": 2000
+                  },
+                  "notes": {
+                    "type": "string",
+                    "nullable": true,
+                    "maxLength": 2000
+                  }
+                },
+                "required": [
+                  "usernames"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/Exam Sanction"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/course/{discipline}/{course}/exam/{slug}/sanction/{publicId}/revoke": {
+      "post": {
+        "operationId": "examSanctionRevoke",
+        "summary": "Revoke a sanction of an exam.",
+        "description": "Lifts an active sanction and answers it with `revokedAt` and `revokedBy` set. The row stays as a record. Revoking a revoked sanction is a 409. Only the course's instructor, by session or CLI key; a BOT key gets 403.",
+        "tags": [
+          "Exams"
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string"
+            },
+            "required": true,
+            "name": "discipline",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": "string"
+            },
+            "required": true,
+            "name": "course",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": "string"
+            },
+            "required": true,
+            "name": "slug",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": "string"
+            },
+            "required": true,
+            "name": "publicId",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "headers": {
+              "ETag": {
+                "schema": {
+                  "type": "string",
+                  "description": "The row's `updatedAt`, in quotes. Send it back as If-Match."
+                },
+                "required": true,
+                "description": "The row's `updatedAt`, in quotes. Send it back as If-Match."
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Exam Sanction"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/course/{discipline}/{course}/grade-column": {
       "post": {
         "operationId": "createGrade-column",
@@ -15278,6 +16018,35 @@
                                     },
                                     "total": {
                                       "type": "number"
+                                    },
+                                    "sanction": {
+                                      "type": "object",
+                                      "properties": {
+                                        "factor": {
+                                          "type": "number"
+                                        },
+                                        "reason": {
+                                          "type": "string",
+                                          "nullable": true
+                                        },
+                                        "original": {
+                                          "type": "object",
+                                          "properties": {
+                                            "total": {
+                                              "type": "number",
+                                              "nullable": true
+                                            }
+                                          },
+                                          "required": [
+                                            "total"
+                                          ]
+                                        }
+                                      },
+                                      "required": [
+                                        "factor",
+                                        "reason",
+                                        "original"
+                                      ]
                                     }
                                   },
                                   "required": [

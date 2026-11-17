@@ -3,8 +3,10 @@ import { hasPerm } from "@/auth/permissions";
 import { NotAllowed, NotFound } from "@/core/error";
 import type { CourseRef } from "@/core/schemas";
 import { db } from "@/db";
+import { activeSanctionsOf } from "@/db/active-sanctions";
 import { loadResultPolicy } from "@/db/result-policy";
 import { attendancePercent } from "@/services/attendance-table";
+import { sanctionsByResponse } from "@/services/exam-result";
 import {
 	type CourseGradesReport,
 	courseGradesReport,
@@ -35,25 +37,42 @@ export async function loadCourseGrades(
 	}
 
 	const opts: { actor: Actor } = { actor };
-	const [exams, active, dropped, attempts, feedback, exceptions, policy] =
-		await Promise.all([
-			db.exam.findMany({ course: found.id }, opts),
-			db.enrollment.findMany({ course: found.id, status: "ACTIVE" }, opts),
-			db.enrollment.findMany({ course: found.id, status: "DROPPED" }, opts),
-			db.response.findMany({ course: found.id, practice: false }, opts),
-			db.feedback.findMany({ course: found.id }, opts),
-			loadCourseExceptions(found.id),
-			loadResultPolicy(found.id),
-		]);
+	const [
+		exams,
+		active,
+		dropped,
+		attempts,
+		feedback,
+		sanctions,
+		exceptions,
+		policy,
+	] = await Promise.all([
+		db.exam.findMany({ course: found.id }, opts),
+		db.enrollment.findMany({ course: found.id, status: "ACTIVE" }, opts),
+		db.enrollment.findMany({ course: found.id, status: "DROPPED" }, opts),
+		db.response.findMany({ course: found.id, practice: false }, opts),
+		db.feedback.findMany({ course: found.id }, opts),
+		activeSanctionsOf(found.id),
+		loadCourseExceptions(found.id),
+		loadResultPolicy(found.id),
+	]);
 	const students = [
 		...active.map(({ username, name }) => ({ username, name, dropped: false })),
 		...dropped.map(({ username, name }) => ({ username, name, dropped: true })),
 	];
-	const table = gradesTable(exams, students, attempts, feedback, now, {
-		withDropped: true,
-		exceptions,
-		policy,
-	});
+	const table = gradesTable(
+		exams,
+		students,
+		attempts,
+		feedback,
+		sanctionsByResponse(sanctions),
+		now,
+		{
+			withDropped: true,
+			exceptions,
+			policy,
+		},
+	);
 	return courseGradesReport(table, [...active, ...dropped]);
 }
 

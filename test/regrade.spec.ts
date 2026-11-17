@@ -116,6 +116,7 @@ function context(overrides: ContextOverrides = {}): RegradeContext {
 		outcome: outcome(),
 		submission: "s1",
 		requested: false,
+		examSanctioned: false,
 		...rest,
 	};
 }
@@ -302,6 +303,70 @@ test("regradeBlocker precedence: not-gradable over expired", () => {
 	const late = plusMs(DEADLINE, DAY);
 	const ctx = context({ outcome: outcome({ status: "pending", score: null }) });
 	expect(regradeBlocker(ctx, late)).toBe("not-gradable");
+});
+
+//
+// regradeBlocker: sanctions
+//
+
+/// An outcome whose answer carries a sanction, `original` being what it scored before.
+function sanctionedOutcome(
+	overrides: Partial<QuestionOutcome> = {},
+): QuestionOutcome {
+	return outcome({
+		status: "sanctioned",
+		score: 0,
+		sanction: {
+			factor: 0,
+			reason: null,
+			original: { status: "graded", score: 0.5 },
+		},
+		...overrides,
+	});
+}
+
+test("regradeBlocker: an exam sanction blocks with sanctioned", () => {
+	const ctx = context({ examSanctioned: true });
+	expect(regradeBlocker(ctx, NOW)).toBe("sanctioned");
+});
+
+test("regradeBlocker: not-released comes before sanctioned", () => {
+	const ctx = context({
+		exam: exam({ gradesReleasedAt: null }),
+		examSanctioned: true,
+	});
+	expect(regradeBlocker(ctx, NOW)).toBe("not-released");
+});
+
+test("regradeBlocker: sanctioned comes before not-counting", () => {
+	const ctx = context({
+		examSanctioned: true,
+		outcome: outcome({ submission: "s2" }),
+	});
+	expect(regradeBlocker(ctx, NOW)).toBe("sanctioned");
+});
+
+test("regradeBlocker: a sanctioned question outcome blocks with sanctioned", () => {
+	const ctx = context({
+		examSanctioned: false,
+		outcome: sanctionedOutcome(),
+	});
+	expect(regradeBlocker(ctx, NOW)).toBe("sanctioned");
+});
+
+test("regradeBlocker: a pending question with a sanction is sanctioned, not not-gradable", () => {
+	const ctx = context({
+		outcome: outcome({
+			status: "pending",
+			score: null,
+			sanction: {
+				factor: 0.5,
+				reason: null,
+				original: { status: "pending", score: null },
+			},
+		}),
+	});
+	expect(regradeBlocker(ctx, NOW)).toBe("sanctioned");
 });
 
 //

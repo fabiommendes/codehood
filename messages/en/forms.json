@@ -84,5 +84,8 @@
 	"forms_schema_repository_path_prefix": "\"{path}\" is a file and also a directory of \"{other}\".",
 	"forms_schema_git_sha_invalid": "Not a git object name: expected 40 lowercase hex digits.",
 	"forms_schema_rubric_group": "Group path: segments separated by '/', none empty and none containing ':'.",
-	"forms_schema_rubric_base": "The base must be a number between 0 and 1."
+	"forms_schema_rubric_base": "The base must be a number between 0 and 1.",
+	"forms_schema_sanction_factor_invalid": "The factor must be a decimal from 0 up to, but not including, 1, such as 0 or 0.5.",
+	"forms_schema_sanction_text_max": "The text must have at most {max} characters.",
+	"forms_schema_sanction_usernames_required": "Choose at least one student."
 }

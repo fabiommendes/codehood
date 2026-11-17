@@ -25,7 +25,42 @@ export type QuestionOutcomeStatus =
 	| "graded"
 	| "pending"
 	| "unanswered"
-	| "not-graded";
+	| "not-graded"
+	| "sanctioned";
+
+/// An active sanction on an attempt: on one question by slug, or on the whole exam when `question` is `null`.
+export interface ResultSanction {
+	question: string | null;
+	/// The factor as a decimal string in `[0, 1)`.
+	factor: string;
+	reason: string | null;
+}
+
+/**
+ * Groups sanctions by the `publicId` of the attempt they hit.
+ *
+ * @example
+ * sanctionsByResponse([{ response: "r1", question: null, factor: "0", reason: null }]).get("r1")
+ * // [{ question: null, factor: "0", reason: null }]
+ */
+export function sanctionsByResponse(
+	views: readonly {
+		response: string;
+		question: string | null;
+		factor: string;
+		reason: string | null;
+	}[],
+): ReadonlyMap<string, ResultSanction[]> {
+	const byResponse = new Map<string, ResultSanction[]>();
+	for (const { response, question, factor, reason } of views) {
+		// Copied field by field: a staff view also carries the private notes, which must not ride along.
+		const sanction = { question, factor, reason };
+		const list = byResponse.get(response);
+		if (list) list.push(sanction);
+		else byResponse.set(response, [sanction]);
+	}
+	return byResponse;
+}
 
 /// The part of a submission the result depends on. A missing `status` reads as `PENDING_GRADE`, a missing `kind` as `AUTOSAVE`.
 export type ResultSubmission = Pick<
@@ -120,6 +155,15 @@ export interface QuestionOutcome {
 	comments: string[];
 	/// The graded submissions of a `code` question, oldest first. Absent for other questions.
 	codeAttempts?: CodeAttemptOutcome[];
+	/// The sanction on the question, with what it was before the factor applied.
+	sanction?: {
+		factor: number;
+		reason: string | null;
+		original: {
+			status: Exclude<QuestionOutcomeStatus, "sanctioned">;
+			score: number | null;
+		};
+	};
 }
 
 /// An exam question as `examResult` takes it: its slug and its weight in the total.
@@ -144,6 +188,14 @@ export interface ExamResult {
 	/// Weighted mean of the question scores in `[-1, 1]`, unanswered and
 	/// not-graded counting as zero; `null` while any answered question is still `pending`.
 	total: number | null;
+	/// How many questions are `pending` after the sanctions; 0 when the exam has factor 0.
+	pending: number;
+	/// The sanction on the whole exam; `original.total` is the total before its factor, after the question sanctions.
+	sanction?: {
+		factor: number;
+		reason: string | null;
+		original: { total: number | null };
+	};
 }
 
 /**
@@ -158,6 +210,19 @@ export interface ExamResult {
  * whatever feedback it has: its score is `null`, it counts as zero in the
  * total, it is not pending, and it keeps its comments.
  *
+ * A sanction on a question with factor 0 makes it `sanctioned` with score 0,
+ * even without a grade, and it is not pending.
+ * A sanction with factor above 0 makes a graded question `sanctioned` with
+ * its score times the factor, and leaves one without a grade as it is.
+ * A negative score is never multiplied.
+ * On a `code` question the factor applies to the discounted score and
+ * `codeAttempts` stays as it was.
+ * A sanction on the exam multiplies a positive total by its factor, and a
+ * factor 0 gives total 0 even with pending questions.
+ * `pending` counts the pending questions after the sanctions, and is 0 when
+ * the exam has factor 0.
+ * A sanction on a question the exam does not have is ignored.
+ *
  * @params questions The exam's questions in exam order, with their weights.
  * @params submissions Every submission of the attempt, any order.
  * A question with `SUBMIT` or `FINAL` submissions is a `code` question sent for
@@ -165,32 +230,99 @@ export interface ExamResult {
  * from the newest alone. Autosaves do not count then.
  *
  * @params feedback The feedback the viewer may see on those submissions.
+ * @params sanctions The active sanctions of the attempt.
  * @params policy How the exam discounts `code` submissions; defaults apply when missing.
  */
 export function examResult(
 	questions: readonly WeightedQuestion[],
 	submissions: ResultSubmission[],
 	feedback: ResultFeedback[],
+	sanctions: readonly ResultSanction[],
 	policy: ResultPolicy = {},
 ): ExamResult {
-	const outcomes = questions.map(({ slug }) => {
-		const sent = submissions.filter(
-			(submission) =>
-				submission.question === slug &&
-				(submission.kind === "SUBMIT" || submission.kind === "FINAL"),
+	const outcomes = questions
+		.map(({ slug }) => {
+			const sent = submissions.filter(
+				(submission) =>
+					submission.question === slug &&
+					(submission.kind === "SUBMIT" || submission.kind === "FINAL"),
+			);
+			if (sent.length === 0) return outcomeOf(slug, submissions, feedback);
+			const penalty = policy.practice
+				? 0
+				: (policy.codePenalty?.[slug] ?? DEFAULT_CODE_PENALTY);
+			return codeOutcomeOf(slug, sent, feedback, penalty);
+		})
+		.map((outcome) =>
+			sanctionOutcome(
+				outcome,
+				harshest(
+					sanctions.filter((entry) => entry.question === outcome.question),
+				),
+			),
 		);
-		if (sent.length === 0) return outcomeOf(slug, submissions, feedback);
-		const penalty = policy.practice
-			? 0
-			: (policy.codePenalty?.[slug] ?? DEFAULT_CODE_PENALTY);
-		return codeOutcomeOf(slug, sent, feedback, penalty);
-	});
+	const weights = questions.map((question) => question.weight);
+	const total = totalOf(outcomes, weights);
+	const pending = outcomes.filter(
+		(outcome) => outcome.status === "pending",
+	).length;
+	const exam = harshest(sanctions.filter((entry) => entry.question === null));
+	if (!exam) return { questions: outcomes, total, pending };
+	const factor = Number(exam.factor);
 	return {
 		questions: outcomes,
-		total: totalOf(
-			outcomes,
-			questions.map((question) => question.weight),
-		),
+		total:
+			factor === 0
+				? factorOf(total ?? 0, 0)
+				: total === null
+					? null
+					: factorOf(total, factor),
+		pending: factor === 0 ? 0 : pending,
+		sanction: {
+			factor,
+			reason: exam.reason,
+			original: { total },
+		},
+	};
+}
+
+/// The sanction with the lowest factor, or `undefined` with none.
+function harshest(list: readonly ResultSanction[]): ResultSanction | undefined {
+	return list.reduce<ResultSanction | undefined>(
+		(lowest, entry) =>
+			!lowest || Number(entry.factor) < Number(lowest.factor) ? entry : lowest,
+		undefined,
+	);
+}
+
+/// `value` times `factor`, unless `value` is negative.
+function factorOf(value: number, factor: number): number {
+	return value > 0 ? value * factor : value;
+}
+
+/// The outcome after `sanction`, or the outcome itself without one.
+function sanctionOutcome(
+	outcome: QuestionOutcome,
+	sanction: ResultSanction | undefined,
+): QuestionOutcome {
+	if (!sanction) return outcome;
+	const factor = Number(sanction.factor);
+	const info = {
+		factor,
+		reason: sanction.reason,
+		original: {
+			status: outcome.status as Exclude<QuestionOutcomeStatus, "sanctioned">,
+			score: outcome.score,
+		},
+	};
+	if (outcome.score === null && factor > 0) {
+		return { ...outcome, sanction: info };
+	}
+	return {
+		...outcome,
+		status: "sanctioned",
+		score: factorOf(outcome.score ?? 0, factor),
+		sanction: info,
 	};
 }
 

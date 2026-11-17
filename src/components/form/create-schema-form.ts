@@ -71,14 +71,17 @@ function issuesByField(issues: core.$ZodIssue[]): Record<string, string[]> {
 	return grouped;
 }
 
-/// The control named `name` in `form`, or undefined when it has none.
+/// The visible control named `name` in `form`, or undefined when it has none; a hidden input has nowhere to show an error.
 function controlOf(
 	form: HTMLFormElement,
 	name: string,
 ): HTMLElement | undefined {
 	const found = form.elements.namedItem(name);
 	const first = found instanceof RadioNodeList ? found[0] : found;
-	return first instanceof HTMLElement ? first : undefined;
+	if (!(first instanceof HTMLElement)) return undefined;
+	return first instanceof HTMLInputElement && first.type === "hidden"
+		? undefined
+		: first;
 }
 
 /**

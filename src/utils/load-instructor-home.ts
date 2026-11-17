@@ -2,7 +2,7 @@ import type { UserActor } from "@/auth/actor";
 import { type Course, db } from "@/db";
 import { loadResultPolicy } from "@/db/result-policy";
 import { questionProblems } from "@/mdq";
-import { examResult } from "@/services/exam-result";
+import { examResult, sanctionsByResponse } from "@/services/exam-result";
 import {
 	type ExamRegrades,
 	type InstructorHome,
@@ -55,23 +55,30 @@ export async function loadInstructorHome(
 					? course.edition.slug
 					: undefined,
 			};
-			const [exams, attempts, feedback, questions, exceptions, open, policyOf] =
-				await Promise.all([
-					db.exam.findMany({ course: course.id }, { actor }),
-					db.response.findMany(
-						{ course: course.id, practice: false },
-						{ actor },
-					),
-					db.feedback.findMany({ course: course.id }, { actor }),
-					db.question.findMany({ course: course.id, public: false }, { actor }),
-					loadCourseExceptions(course.id),
-					db.regradeRequest.findMany(
-						{ course: course.id, status: "OPEN" },
-						{ actor },
-					),
-					loadResultPolicy(course.id),
-				]);
+			const [
+				exams,
+				attempts,
+				feedback,
+				sanctions,
+				questions,
+				exceptions,
+				open,
+				policyOf,
+			] = await Promise.all([
+				db.exam.findMany({ course: course.id }, { actor }),
+				db.response.findMany({ course: course.id, practice: false }, { actor }),
+				db.feedback.findMany({ course: course.id }, { actor }),
+				db.examSanction.findMany({ course: course.id }, { actor }),
+				db.question.findMany({ course: course.id, public: false }, { actor }),
+				loadCourseExceptions(course.id),
+				db.regradeRequest.findMany(
+					{ course: course.id, status: "OPEN" },
+					{ actor },
+				),
+				loadResultPolicy(course.id),
+			]);
 
+			const sanctionsOf = sanctionsByResponse(sanctions);
 			const taughtExams: TaughtExam[] = exams.map((exam) => ({
 				course: home,
 				exam,
@@ -85,6 +92,7 @@ export async function loadInstructorHome(
 							exam.questions,
 							attempt.submissions,
 							feedback,
+							sanctionsOf.get(attempt.publicId) ?? [],
 							policyOf(exam),
 						),
 					})),

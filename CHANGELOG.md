@@ -2,6 +2,18 @@
 
 ## Unreleased
 
+### Added
+
+- Sanção de nota. O professor zera uma questão ou zera (ou reduz por um
+  fator) a nota da prova inteira de um ou mais alunos, por cola ou outro
+  problema, com motivo para o aluno e anotações privadas. A sanção vale por
+  cima de toda correção (recorreção, rubrica e revisão não a desfazem), é
+  revogável e fica registrada (`ExamSanction`). Telas: seleção em lote nos
+  resultados, página "Sanções" da prova, botões na tentativa, marca vermelha
+  na tabela de notas. O aluno vê a sanção junto com a nota liberada e não pede
+  revisão do que foi sancionado. REST em
+  `/api/course/{discipline}/{course}/exam/{slug}/sanction`.
+
 ## 0.5.1 (2026-11-17)
 
 ### Fixed

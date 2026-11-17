@@ -627,6 +627,7 @@ async function outcomeOf(scenario: Scenario): Promise<QuestionOutcome> {
 			feedback: pass.feedback,
 			updatedAt: pass.updatedAt,
 		})),
+		[],
 	);
 	const [outcome] = result.questions;
 	if (!outcome) throw new Error("examResult returned no outcome");
@@ -844,4 +845,111 @@ test("accept is atomic: when the pass cannot be written the request stays OPEN",
 		feedbackId: null,
 	});
 	expect(await passesOf(scenario)).toHaveLength(before);
+});
+
+//
+// exam sanctions
+//
+
+/// Sanctions the scenario's student on the whole exam, or on its question.
+function sanctionScenario(
+	{ course, instructor, student, open }: Scenario,
+	question?: string,
+) {
+	return db.examSanction.create(
+		{
+			course: course.id,
+			exam: open.exam.slug,
+			usernames: [student.username],
+			reason: "copied",
+			...(question ? { question } : {}),
+		},
+		{ actor: instructor },
+	);
+}
+
+/// The student's outcome for the scenario's question with the exam's active sanctions applied.
+async function sanctionedOutcomeOf(scenario: Scenario) {
+	const { course, instructor, student, submission, open } = scenario;
+	const passes = await db.feedback.findMany(
+		{ course: course.id, submission: { publicId: submission.publicId } },
+		{ actor: student },
+	);
+	const sanctions = await db.examSanction.findMany(
+		{ course: course.id, exam: open.exam.slug },
+		{ actor: instructor },
+	);
+	const result = examResult(
+		unweighted([open.question.slug]),
+		[
+			{
+				publicId: submission.publicId,
+				question: open.question.slug,
+				createdAt: submission.createdAt,
+			},
+		],
+		passes.map((pass) => ({
+			submission: pass.submission,
+			score: pass.score,
+			feedback: pass.feedback,
+			updatedAt: pass.updatedAt,
+		})),
+		sanctions.map(({ question, factor, reason }) => ({
+			question,
+			factor,
+			reason,
+		})),
+	);
+	const [outcome] = result.questions;
+	if (!outcome) throw new Error("examResult returned no outcome");
+	return outcome;
+}
+
+test("create: an exam sanction blocks the request with sanctioned", async () => {
+	const scenario = await makeScenario("0");
+	await sanctionScenario(scenario);
+
+	const attempt = openRequest(scenario);
+
+	await expect(attempt).rejects.toBeInstanceOf(InvalidData);
+	await expect(attempt).rejects.toMatchObject({
+		...refusal("sanctioned"),
+	});
+});
+
+test("create: a revoked exam sanction does not block", async () => {
+	const scenario = await makeScenario("0");
+	const [sanction] = await sanctionScenario(scenario);
+	await db.examSanction.revoke(
+		{
+			course: scenario.course.id,
+			exam: scenario.open.exam.slug,
+			publicId: sanction?.publicId ?? "",
+		},
+		{ actor: scenario.instructor },
+	);
+
+	await expect(openRequest(scenario)).resolves.toMatchObject({
+		status: "OPEN",
+	});
+});
+
+test("accept: an open request on a zeroed question changes the original score, not the zero", async () => {
+	const scenario = await makeScenario("0");
+	const request = await openRequest(scenario);
+	await sanctionScenario(scenario, scenario.open.question.slug);
+	expect(await sanctionedOutcomeOf(scenario)).toMatchObject({
+		status: "sanctioned",
+		score: 0,
+	});
+
+	await db.regradeRequest.accept(
+		{ publicId: request.publicId },
+		{ score: "3/4", reply: "Revised." },
+		{ actor: scenario.instructor },
+	);
+
+	const outcome = await sanctionedOutcomeOf(scenario);
+	expect(outcome).toMatchObject({ status: "sanctioned", score: 0 });
+	expect(outcome.sanction?.original.score).toBe(0.75);
 });

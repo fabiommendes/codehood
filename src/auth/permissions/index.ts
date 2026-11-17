@@ -38,6 +38,7 @@ export type RoleEntity =
 	| "response"
 	| "submission"
 	| "feedback"
+	| "exam-sanction"
 	| "regrade"
 	| "report"
 	| "api-key"
@@ -57,6 +58,7 @@ type ExtraPerms =
 	| "roll-call.manage"
 	| "exam.manage-exceptions"
 	| "exam.release-grades"
+	| "exam-sanction.revoke"
 	| "rubric.read"
 	| "rubric.write"
 	| "grading-job.work"
@@ -385,6 +387,20 @@ const PERMISSIONS = {
 		other: (actor, target) => isCourseOwner(actor, target) && !actor.bot,
 		audit: auditCourse,
 	} satisfies PermDef<CourseTarget>,
+
+	// EXAM SANCTION --------------------------------------------------------------
+	// Rule: the course's instructor alone imposes, edits, revokes and reads in
+	// full (with the private notes and the revoked ones) the sanctions on a
+	// student's score. SYSTEM, a BOT key and a non-owning admin never do, in
+	// line with `feedback.create`: a bot grades, it never punishes. The
+	// sanctioned student reads their own active, released sanction without the
+	// private fields, which the service decides from the row, not from here.
+	"exam-sanction.create | exam-sanction.update | exam-sanction.revoke | exam-sanction.read":
+		{
+			system: false,
+			other: (actor, target) => isCourseOwner(actor, target) && !actor.bot,
+			audit: auditCourse,
+		} satisfies PermDef<CourseTarget>,
 
 	// QUESTION ------------------------------------------------------------------
 	// Rule: the whole document goes to whoever may write it — identical to

@@ -416,6 +416,29 @@ request is marked on the grading page, and once accepted the student's grade
 is the new one.
 
 
+### Sanction a student's grade
+
+    status: implemented
+    url: /<discipline>/<course>/exams/<exam>/results
+
+Instructor catches a student cheating, or has another serious reason to
+cancel a grade, and does not want a regrade to undo the decision. In the
+exam's results they select the students, one or many, and sanction them: on the
+whole exam, with a factor between 0 and 1 that is 0 by default, or later on a
+single question of one attempt, which they zero from the student's attempt. A
+factor that is not a number from 0 up to, but not including, 1, and a reason
+that is too long, are refused and nothing is saved. They write a reason, which
+the student reads once the grades are out, and private notes with the evidence,
+which only instructors read.
+
+The results then show the sanctioned total in red with the original struck
+through, and the course's grades mark that student's total. The exam's
+Sanctions page lists every sanction, active and revoked, with who it hit, the
+target, the reason and the notes. From there they edit the factor, the reason
+and the notes of an active one, or revoke it after a confirmation. A revoked
+sanction stays listed as revoked and the student gets the original total back.
+
+
 ### Give a student extra time or a makeup exam
 
     status: implemented

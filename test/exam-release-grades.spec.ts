@@ -278,3 +278,24 @@ test("releaseGrades: an exam that does not exist is NotFound", async () => {
 		),
 	).rejects.toBeInstanceOf(NotFound);
 });
+
+test("releaseGrades: a student zeroed on the exam with an answer pending does not block the release", async () => {
+	const { pk, exam, instructor, feedback, student } = await gradedExam(
+		{ status: "COMPLETED" },
+		{ essay: true },
+	);
+	await prisma.feedback.delete({ where: { id: feedback.id } });
+	await db.examSanction.create(
+		{
+			course: pk.course,
+			exam: exam.slug,
+			usernames: [student.username],
+		},
+		{ actor: instructor },
+	);
+
+	const released = await db.exam.releaseGrades(pk, { actor: instructor });
+
+	expect(released.gradesReleasedAt).not.toBeNull();
+	expect(await storedRelease(exam.id)).not.toBeNull();
+});

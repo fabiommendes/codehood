@@ -447,7 +447,9 @@ export const makeResponseService = defineService<ResponseT>()(() => {
 	 * @throws {@link NotFound}
 	 * If no attempt matches `filter`, or the actor may not read the one that
 	 * does.
-	 * @throws {@link NotAllowed} If `actor` may read the attempt but not write it.
+	 * @throws {@link NotAllowed}
+	 * If `actor` may read the attempt but not write it, or the attempt has an
+	 * active sanction (409).
 	 */
 	const remove = op({
 		args: [responsePK],
@@ -470,6 +472,13 @@ export const makeResponseService = defineService<ResponseT>()(() => {
 					);
 					// Before anything is measured or deleted: a stale caller loses nothing.
 					await checkVersion(inner, "response", { id: response.id }, opts);
+					// A sanction is a record of a decision: only a revoked one goes with the attempt.
+					const sanctioned = await inner.examSanction.count({
+						where: { responseId: response.id, revokedAt: null },
+					});
+					if (sanctioned > 0) {
+						throw new NotAllowed("response.delete", { status: 409 });
+					}
 
 					await measure({ responseIds: [response.id] });
 					await inner.submission.deleteMany({

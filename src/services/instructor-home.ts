@@ -277,8 +277,7 @@ function personalWindowsOf(schedule: ExamSchedule, now: Date): number {
 
 /// How many answered questions of one attempt have no verdict yet.
 function pendingIn(result: ExamResult): number {
-	return result.questions.filter((outcome) => outcome.status === "pending")
-		.length;
+	return result.pending;
 }
 
 /// The regrade requests of one exam of a course the instructor teaches, any status.

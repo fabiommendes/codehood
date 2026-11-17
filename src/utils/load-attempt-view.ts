@@ -7,7 +7,11 @@ import { db, type Exam, type QuestionPublic, type Response } from "@/db";
 import { loadResultPolicy } from "@/db/result-policy";
 import { shufflePool } from "@/mdq/shuffle";
 import { DEFAULT_CODE_PENALTY } from "@/services/code-grading";
-import { type ExamResult, examResult } from "@/services/exam-result";
+import {
+	type ExamResult,
+	examResult,
+	sanctionsByResponse,
+} from "@/services/exam-result";
 import type { AttemptState, ExamSchedule } from "@/services/exam-state";
 import { regradeBlocker } from "@/services/regrade";
 import type { ReviewResult } from "@/services/review";
@@ -71,6 +75,15 @@ export async function loadAttemptView(
 	const preview = attempt?.preview ?? false;
 	const policy = (await loadResultPolicy(course))(exam);
 
+	const sanctions =
+		state.kind === "results" && attempt && !preview
+			? sanctionsByResponse(
+					await db.examSanction.findMany(
+						{ course, exam: exam.slug, author },
+						{ actor },
+					),
+				).get(attempt.publicId)
+			: undefined;
 	const result =
 		state.kind === "results" && attempt
 			? examResult(
@@ -80,6 +93,7 @@ export async function loadAttemptView(
 						{ course, exam: exam.slug, author, preview },
 						{ actor },
 					),
+					sanctions ?? [],
 					policy,
 				)
 			: undefined;
@@ -110,6 +124,7 @@ export async function loadAttemptView(
 						author,
 						attempt,
 						outcome,
+						examSanctioned: result?.sanction !== undefined,
 						submission: outcome.submission,
 						requested: request !== null,
 					},

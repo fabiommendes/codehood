@@ -134,6 +134,7 @@ export function CRUD<
 	Scope,
 	CreateExtra,
 	UpsertFlag extends false | undefined = undefined,
+	SkipDelete extends boolean | undefined = undefined,
 >(
 	path: `/api/${string}`,
 	options: CrudOptions<
@@ -144,7 +145,8 @@ export function CRUD<
 		UpdateSchema,
 		Scope,
 		CreateExtra,
-		UpsertFlag
+		UpsertFlag,
+		SkipDelete
 	>,
 ) {
 	// `create: null` withholds every route that would call `create` or
@@ -170,7 +172,8 @@ type OutputOf<Schema> = Schema extends ZodType<infer T> ? T : never;
 
 /// The options `CRUD()` takes. The service only needs the operations the
 /// routes call: `create: null` drops `create` and `upsert`, `upsert: false`
-/// drops `upsert`, and `update: null` drops `update`.
+/// drops `upsert`, `skipDelete: true` drops `delete`, and `update: null` drops
+/// `update`.
 type CrudOptions<
 	EntityT,
 	CreateSchema extends ZodType | null,
@@ -180,6 +183,7 @@ type CrudOptions<
 	ScopeT,
 	CreateExtra,
 	UpsertFlag extends false | undefined = undefined,
+	SkipDelete extends boolean | undefined = undefined,
 > = Omit<
 	CrudRouteOptions<
 		EntityT,
@@ -190,15 +194,16 @@ type CrudOptions<
 		ScopeT,
 		CreateExtra
 	>,
-	"create" | "update" | "service" | "upsert"
+	"create" | "update" | "service" | "upsert" | "skipDelete"
 > & {
+	skipDelete?: SkipDelete;
 	create: CreateSchema;
 	update: UpdateSchema;
 	upsert?: UpsertFlag;
 	service: FindOne<KeyT, EntityT> &
 		FindMany<FilterT & ScopeT, EntityT> &
 		Partial<FindPage<FilterT & ScopeT, EntityT>> &
-		Delete<KeyT> &
+		([SkipDelete] extends [true] ? unknown : Delete<KeyT>) &
 		// Not distributed over `ZodX | null`, and `CreateExtra` comes from the
 		// path parsers only, never inferred from the service it should check.
 		([UpdateSchema] extends [null]

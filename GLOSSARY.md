@@ -509,6 +509,14 @@ grades each answer to a question with a [Grader](#grader) in chalk's sandbox
 and writes the score through the [REST API](#rest-api) as a
 [Grading bot](#grading-bot).
 
+## Sanção
+
+Type: domain
+
+The instructor's decision to zero or reduce a student's score on one
+[Question](#question) or on the whole [Exam](#exam). It is applied on top of
+every grade and can be revoked. Stored as an `ExamSanction`.
+
 ## Service
 
 Also: service class, db service 

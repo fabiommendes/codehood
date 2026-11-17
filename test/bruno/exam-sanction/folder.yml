@@ -1,0 +1,7 @@
+info:
+  name: exam-sanction
+  type: folder
+  seq: 21
+
+request:
+  auth: inherit

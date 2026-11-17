@@ -68,6 +68,7 @@ function closedAttempt(
 	overrides: Partial<GradingAttempt> = {},
 ): GradingAttempt {
 	return {
+		publicId: `attempt-${author}`,
 		author,
 		createdAt: at(-60),
 		acceptingSubmissions: false,

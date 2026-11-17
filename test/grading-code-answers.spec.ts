@@ -86,6 +86,7 @@ function answerOf(
 	practice = false,
 ): CountingAnswer {
 	const attempt: GradingAttempt = {
+		publicId: "attempt-ana",
 		author: "ana",
 		createdAt: at(-60),
 		acceptingSubmissions: false,
@@ -151,6 +152,7 @@ test("sends that only failed the pretest are graded 0", () => {
 			send("a", 1, { status: "PRETEST_FAILED" as Row["status"] }, 1),
 			send("b", 2, { status: "PRETEST_FAILED" as Row["status"] }, 2),
 		],
+		[],
 		[],
 	).questions;
 	expect(answer.state).toBe(outcome?.status);
@@ -258,6 +260,7 @@ test("property: verdict and state agree with examResult", () => {
 					unweighted(["q"]),
 					rows,
 					feedback,
+					[],
 					policy,
 				).questions;
 				const answer = answerOf(rows, feedback, practice);
@@ -360,6 +363,7 @@ test("loadExamGrading: the answers of a code question agree with examResult", as
 			unweighted([slug]),
 			(attempt as NonNullable<typeof attempt>).submissions,
 			feedback,
+			[],
 			policy,
 		).questions;
 		expect(answer?.state, author).toBe(expected?.status);

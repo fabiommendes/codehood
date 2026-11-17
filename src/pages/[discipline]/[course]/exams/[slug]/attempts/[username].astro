@@ -8,13 +8,18 @@ import Answer from "@/components/grading/Answer.astro";
 import AnswerEditSummary from "@/components/grading/AnswerEditSummary.astro";
 import AppliedItems from "@/components/grading/AppliedItems";
 import { attemptTotalLabel } from "@/components/grading/attempt-total";
+import SanctionDialog from "@/components/grading/SanctionDialog";
 import AttachmentList from "@/components/question/AttachmentList";
 import { db } from "@/db";
 import { loadResultPolicy } from "@/db/result-policy";
 import { m } from "@/i18n";
 import AppLayout from "@/layouts/AppLayout.astro";
 import { publicForm } from "@/mdq";
-import { examResult, formatScore } from "@/services/exam-result";
+import {
+	examResult,
+	formatScore,
+	sanctionsByResponse,
+} from "@/services/exam-result";
 import {
 	answeredAfterDeadline,
 	attemptClosedAt,
@@ -52,13 +57,18 @@ if (!attempt) return Astro.rewrite("/404");
 // biome-ignore lint/style/noNonNullAssertion: loadGrading already redirected an anonymous visitor.
 const actor = Astro.locals.actor!;
 const now = new Date();
-const [students, stored] = await Promise.all([
+const [students, stored, sanctions] = await Promise.all([
 	loadStudents(course.id, actor),
 	db.question.findMany(
 		{ course: course.id, public: false, slugs: questions },
 		{ actor },
 	),
+	db.examSanction.findMany(
+		{ course: course.id, exam: exam.slug, author: attempt.author },
+		{ actor },
+	),
 ]);
+const sanctionsOf = sanctionsByResponse(sanctions);
 const docs = new Map(stored.map((entry) => [entry.slug, entry.question]));
 const versions = new Map(stored.map((entry) => [entry.slug, entry.version]));
 const publicIds = new Map(stored.map((entry) => [entry.slug, entry.publicId]));
@@ -71,6 +81,7 @@ const [row] = attemptRows(
 	exam.questions,
 	[attempt],
 	feedback,
+	sanctionsOf,
 	students,
 	now,
 	exceptions,
@@ -119,8 +130,19 @@ const outcomes = examResult(
 	exam.questions,
 	attempt.submissions,
 	feedback,
+	sanctionsOf.get(attempt.publicId) ?? [],
 	policy,
 );
+
+// The sanction on the whole exam, and whether this attempt can take one at all.
+const examSanction = sanctions
+	.filter(
+		(entry) => entry.response === attempt.publicId && entry.question === null,
+	)
+	.sort((a, b) => Number(a.factor) - Number(b.factor))[0];
+const examSanctionNotes =
+	examSanction && "notes" in examSanction ? examSanction.notes : null;
+const sanctionable = exam.type !== "PRACTICE";
 
 const points = pointsByPosition(exam.questions);
 const rows = outcomes.questions.map((outcome, index) => {
@@ -165,7 +187,8 @@ const attachmentBlocks = await highlightQuestionCodeBlocks(
 
 const stateLabel = (status: string, score: number | null): string => {
 	if (status === "not-graded") return m.exams_attempt_not_graded();
-	if (status === "graded" && score !== null) return formatScore(score);
+	if ((status === "graded" || status === "sanctioned") && score !== null)
+		return formatScore(score);
 	return m.exams_attempt_waiting();
 };
 ---
@@ -213,6 +236,39 @@ const stateLabel = (status: string, score: number | null): string => {
     }
 
     {
+      examSanction && (
+        <div role="status" class="alert alert-error alert-soft mt-4 block text-sm">
+          <p class="font-semibold">{m.grades_sanction_banner_title()}</p>
+          <p>{Number(examSanction.factor) === 0 ? m.grades_sanction_banner_zeroed() : m.grades_sanction_banner_factor({ percent: Math.round(Number(examSanction.factor) * 100) })}</p>
+          {examSanction.reason && <p class="whitespace-pre-wrap">{m.grades_sanction_banner_reason({ reason: examSanction.reason })}</p>}
+          {examSanctionNotes && (
+            <p class="whitespace-pre-wrap">{m.grades_sanction_banner_notes({ notes: examSanctionNotes })}</p>
+          )}
+          <p class="mt-1"><a class="link" href={`${href}/exams/${exam.slug}/sanctions`}>{m.grades_sanction_manage()}</a></p>
+        </div>
+      )
+    }
+
+    {
+      sanctionable && !examSanction && (
+        <div class="mt-4">
+          <SanctionDialog
+            client:load
+            discipline={discipline!}
+            course={courseSegment!}
+            exam={exam.slug}
+            usernames={[row.author]}
+            questions={rows.map((entry) => ({ slug: entry.outcome.question, title: entry.title }))}
+            triggerLabel={m.grades_sanction_exam_button()}
+            triggerClass="btn btn-outline btn-error btn-sm"
+            title={m.grades_sanction_exam_button()}
+            submitLabel={m.grades_sanction_submit()}
+          />
+        </div>
+      )
+    }
+
+    {
       canReopen && (
         <div class="mt-4">
           <ReopenAttempt
@@ -232,7 +288,29 @@ const stateLabel = (status: string, score: number | null): string => {
           <article id={counting ? `answer-${counting.publicId}` : undefined} aria-label={label} class="card card-border bg-base-100">
             <div class="card-body">
               <p class="text-sm"><QuestionNumber number={number} points={points} /></p>
-              <h3 class="text-lg font-semibold">{title}</h3>
+              <div class="flex flex-wrap items-center justify-between gap-2">
+                <h3 class="text-lg font-semibold">{title}</h3>
+                {outcome.sanction ? (
+                  <a class="badge badge-error badge-sm" href={`${href}/exams/${exam.slug}/sanctions`}>
+                    {outcome.sanction.factor === 0 ? m.grades_sanction_zeroed() : m.grades_sanction_reduced({ factor: outcome.sanction.factor })}
+                  </a>
+                ) : (
+                  sanctionable && (
+                    <SanctionDialog
+                      client:load
+                      discipline={discipline!}
+                      course={courseSegment!}
+                      exam={exam.slug}
+                      usernames={[row.author]}
+                      question={outcome.question}
+                      triggerLabel={m.grades_sanction_zero_button()}
+                      triggerClass="btn btn-outline btn-error btn-xs"
+                      title={m.grades_sanction_zero_button()}
+                      submitLabel={m.grades_sanction_zero_button()}
+                    />
+                  )
+                )}
+              </div>
               <AttachmentList attachments={asked?.attachments} url={attachmentUrl} codeBlocks={attachmentBlocks} />
               {counting && answeredAfterDeadline(deadline, counting.createdAt) && (
                 <span class="badge badge-warning badge-sm">{m.exams_attempt_answered_late({ seconds: Math.round((counting.createdAt.getTime() - deadline!.getTime()) / 1000) })}</span>

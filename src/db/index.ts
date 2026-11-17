@@ -18,6 +18,7 @@ import { makeEditionService } from "./services/edition.service";
 import { makeEnrollmentService } from "./services/enrollment.service";
 import { makeExamService } from "./services/exam.service";
 import { makeExamExceptionService } from "./services/exam-exception.service";
+import { makeExamSanctionService } from "./services/exam-sanction.service";
 import { makeFeedbackService } from "./services/feedback.service";
 import { makeGradeColumnService } from "./services/grade-column.service";
 import { makeGradingJobService } from "./services/grading-job.service";
@@ -161,6 +162,15 @@ export type {
 	ExamExceptionView,
 } from "./services/exam-exception.service";
 export type {
+	ExamSanction,
+	ExamSanctionCreate,
+	ExamSanctionFilter,
+	ExamSanctionPK,
+	ExamSanctionPublic,
+	ExamSanctionUpdate,
+	ExamSanctionView,
+} from "./services/exam-sanction.service";
+export type {
 	Feedback,
 	FeedbackCreate,
 	FeedbackFilter,
@@ -299,6 +309,7 @@ export const db = {
 	enrollment: makeEnrollmentService(),
 	exam: makeExamService(attachmentService, blobService),
 	examException: makeExamExceptionService(),
+	examSanction: makeExamSanctionService(),
 	feedback: feedbackService,
 	gradeColumn: makeGradeColumnService(),
 	gradingJob: makeGradingJobService(),

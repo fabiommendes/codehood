@@ -12,7 +12,7 @@ import type { courseGradesSchema } from "@/core/schemas";
 import type { Enrollment } from "@/db/services/enrollment.service";
 import type { Exam } from "@/db/services/exam.service";
 import type { GradeColumn } from "@/db/services/grade-column.service";
-import type { ResultPolicy } from "./exam-result";
+import type { ExamResult, ResultPolicy, ResultSanction } from "./exam-result";
 import {
 	type ExceptionTiming,
 	examPhase,
@@ -31,7 +31,7 @@ import {
 /// What one student's cell reads for one exam.
 export type GradeCell =
 	/// A closed attempt with no answer pending, with its total in `[-1, 1]`.
-	| { kind: "total"; total: number }
+	| { kind: "total"; total: number; sanction?: ExamResult["sanction"] }
 	/// A closed attempt with some answer waiting for a grade.
 	| { kind: "pending" }
 	/// An attempt the student can still answer.
@@ -120,12 +120,14 @@ export interface GradesTableOptions {
  *
  * @params attempts Every non-practice attempt of the course.
  * @params feedback Every grading pass of the course, released or not.
+ * @params sanctions The active sanctions of each attempt, by the attempt's `publicId`.
  */
 export function gradesTable(
 	exams: Exam[],
 	students: GradedStudent[],
 	attempts: TableAttempt[],
 	feedback: GradingFeedback[],
+	sanctions: ReadonlyMap<string, ResultSanction[]>,
 	now: Date,
 	options: GradesTableOptions = {},
 ): GradesTable {
@@ -152,6 +154,7 @@ export function gradesTable(
 					attempt.exam === exam.slug && usernames.has(attempt.author),
 			),
 			feedback,
+			sanctions,
 			listed,
 			now,
 			exceptions,
@@ -166,7 +169,11 @@ export function gradesTable(
 			}
 			if (row.state === "in-progress") return { kind: "in-progress" };
 			return row.pending === 0 && row.total !== null
-				? { kind: "total", total: row.total }
+				? {
+						kind: "total",
+						total: row.total,
+						...(row.sanction ? { sanction: row.sanction } : {}),
+					}
 				: { kind: "pending" };
 		});
 	});

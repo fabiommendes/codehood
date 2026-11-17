@@ -86,7 +86,7 @@ function event(
 }
 
 function result(total: number | null): ExamResult {
-	return { questions: [], total };
+	return { questions: [], total, pending: 0 };
 }
 
 /// An exam open right now: scheduled 10 minutes ago, 60 minutes long, so it ends at `NOW + 50m`.

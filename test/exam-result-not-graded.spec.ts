@@ -61,6 +61,7 @@ test("examResult: a will-not-grade submission with no pass is not-graded with a 
 		unweighted(["q1"]),
 		[submission("s1", "q1", 0, "WILL_NOT_GRADE")],
 		[],
+		[],
 	);
 
 	expect(result.questions).toEqual([
@@ -84,6 +85,7 @@ test("examResult: a will-not-grade submission stays not-graded with passes on it
 			feedback("s1", "0.5", 10, null),
 			feedback("s1", "0.5", 15, ""),
 		],
+		[],
 	);
 
 	expect(result.questions).toEqual([
@@ -102,6 +104,7 @@ test("examResult: a not-graded answer is never pending and never zero", () => {
 		unweighted(["q1"]),
 		[submission("s1", "q1", 0, "WILL_NOT_GRADE")],
 		[feedback("s1", "0", 5)],
+		[],
 	);
 
 	expect(result.questions[0]?.status).not.toBe("pending");
@@ -122,6 +125,7 @@ test("examResult: two answers graded 100% and a third will-not-grade total 2/3, 
 			submission("s3", "q3", 2, "WILL_NOT_GRADE"),
 		],
 		[feedback("s1", "1", 10), feedback("s2", "1", 11)],
+		[],
 	);
 
 	expect(result.total).not.toBeNull();
@@ -134,6 +138,7 @@ test("examResult: a will-not-grade answer alone totals zero, not null", () => {
 		unweighted(["q1"]),
 		[submission("s1", "q1", 0, "WILL_NOT_GRADE")],
 		[],
+		[],
 	);
 
 	expect(result.total).toBe(0);
@@ -143,6 +148,7 @@ test("examResult: a pending answer next to a will-not-grade one still makes the 
 	const result = examResult(
 		unweighted(["q1", "q2"]),
 		[submission("s1", "q1", 0, "WILL_NOT_GRADE"), submission("s2", "q2", 1)],
+		[],
 		[],
 	);
 
@@ -161,6 +167,7 @@ test("examResult: an older will-not-grade submission followed by a newer ungrade
 			submission("new", "q1", 10, "PENDING_GRADE"),
 		],
 		[],
+		[],
 	);
 
 	expect(result.questions[0]).toMatchObject({
@@ -177,6 +184,7 @@ test("examResult: an older ungraded submission followed by a newer will-not-grad
 			submission("new", "q1", 10, "WILL_NOT_GRADE"),
 		],
 		[feedback("old", "1", 20)],
+		[],
 	);
 
 	expect(result.questions[0]).toMatchObject({
@@ -192,6 +200,7 @@ test("examResult: the newest submission counts whatever order they arrive in, fo
 			submission("new", "q1", 10, "WILL_NOT_GRADE"),
 			submission("old", "q1", 0, "PENDING_GRADE"),
 		],
+		[],
 		[],
 	);
 
@@ -215,6 +224,7 @@ for (const status of otherStatuses) {
 			unweighted(["q1"]),
 			[submission("s1", "q1", 0, status)],
 			[],
+			[],
 		);
 
 		expect(result.questions).toEqual([
@@ -233,6 +243,7 @@ for (const status of otherStatuses) {
 			unweighted(["q1"]),
 			[submission("s1", "q1", 0, status)],
 			[feedback("s1", "3/4", 5, "Good")],
+			[],
 		);
 
 		expect(result.questions).toEqual([
@@ -287,7 +298,11 @@ function outcome(status: QuestionOutcome["status"]): QuestionOutcome {
 }
 
 function resultOf(...statuses: QuestionOutcome["status"][]): ExamResult {
-	return { questions: statuses.map(outcome), total: null };
+	return {
+		questions: statuses.map(outcome),
+		total: null,
+		pending: statuses.filter((status) => status === "pending").length,
+	};
 }
 
 test("gradeReleaseBlocker: a closed, unreleased EXAM whose only unresolved answers are not-graded may be released", () => {

@@ -12,11 +12,13 @@ import type { Response } from "@/db/services/response.service";
 import type { Submission } from "@/db/services/submission.service";
 import {
 	type CodeAttemptOutcome,
+	type ExamResult,
 	examResult,
 	isNewerSubmission,
 	newestPassesFirst,
 	type QuestionOutcome,
 	type ResultPolicy,
+	type ResultSanction,
 	unweighted,
 	type WeightedQuestion,
 } from "./exam-result";
@@ -98,7 +100,7 @@ export interface QueueEntry {
 /// The part of an attempt the grading rules read.
 export type GradingAttempt = Pick<
 	Response,
-	"author" | "createdAt" | "acceptingSubmissions" | "submissions"
+	"publicId" | "author" | "createdAt" | "acceptingSubmissions" | "submissions"
 >;
 
 /// The part of a grading pass the grading rules read.
@@ -278,6 +280,8 @@ function codeAnswer(
 		submissions.flatMap(
 			(submission) => passesBySubmission.get(submission.publicId) ?? [],
 		),
+		// The queue works on the original grade: a sanction must not hide a question from it.
+		[],
 		policy,
 	).questions[0] as QuestionOutcome;
 	const sent = sentOf(submissions);
@@ -441,6 +445,8 @@ export interface AttemptRow {
 	pending: number;
 	/// The attempt's total in `[-1, 1]`, or `null` while `in-progress` or with an answer pending.
 	total: number | null;
+	/// The sanction on the whole exam, when the attempt is closed and has one.
+	sanction?: ExamResult["sanction"];
 	/// When the student started the attempt.
 	startedAt: Date;
 }
@@ -454,6 +460,7 @@ export interface AttemptRow {
  *
  * @params questions The exam's questions with their weights, in exam order.
  * @params feedback Every grading pass on the exam, released or not.
+ * @params sanctions The active sanctions of each attempt, by the attempt's `publicId`.
  * @params students The course's students, dropped ones included.
  * @params exceptions The exam's exceptions, by username; each attempt is `in-progress` or `submitted` by its author's personal timing, as in {@link countingAnswers}.
  * @params policy How the exam discounts `code` submissions, as in `examResult`.
@@ -463,6 +470,7 @@ export function attemptRows(
 	questions: readonly WeightedQuestion[],
 	attempts: GradingAttempt[],
 	feedback: GradingFeedback[],
+	sanctions: ReadonlyMap<string, ResultSanction[]>,
 	students: GradedStudent[],
 	now: Date,
 	exceptions: ReadonlyMap<string, ExceptionTiming> = new Map(),
@@ -473,22 +481,6 @@ export function attemptRows(
 	const studentsByUsername = new Map(
 		students.map((student) => [student.username, student]),
 	);
-	const pendingByAuthor = new Map<string, number>();
-	for (const answer of countingAnswers(
-		exam,
-		slugs,
-		attempts,
-		feedback,
-		now,
-		exceptions,
-	)) {
-		if (answer.state !== "pending") continue;
-		pendingByAuthor.set(
-			answer.author,
-			(pendingByAuthor.get(answer.author) ?? 0) + 1,
-		);
-	}
-
 	const rows = attempts.map((attempt): AttemptRow => {
 		const closed = isFinished(
 			attemptOf(schedule, attempt.author, attempt, now),
@@ -499,6 +491,15 @@ export function attemptRows(
 				.map((submission) => submission.question)
 				.filter((slug) => slugs.includes(slug)),
 		).size;
+		const result = closed
+			? examResult(
+					questions,
+					attempt.submissions,
+					feedback,
+					sanctions.get(attempt.publicId) ?? [],
+					policy,
+				)
+			: null;
 		return {
 			author: attempt.author,
 			name: student?.name ?? attempt.author,
@@ -506,10 +507,9 @@ export function attemptRows(
 			state: closed ? "submitted" : "in-progress",
 			answered,
 			questions: slugs.length,
-			pending: closed ? (pendingByAuthor.get(attempt.author) ?? 0) : 0,
-			total: closed
-				? examResult(questions, attempt.submissions, feedback, policy).total
-				: null,
+			pending: result?.pending ?? 0,
+			total: result?.total ?? null,
+			...(result?.sanction ? { sanction: result.sanction } : {}),
 			startedAt: attempt.createdAt,
 		};
 	});

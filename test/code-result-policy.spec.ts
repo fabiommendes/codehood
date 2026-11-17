@@ -120,6 +120,7 @@ async function resultOf(type: "EXAM" | "PRACTICE", penalty = 0.2) {
 		unweighted([slug]),
 		attempt?.submissions ?? [],
 		feedback,
+		[],
 		policyOf({ type }),
 	);
 }

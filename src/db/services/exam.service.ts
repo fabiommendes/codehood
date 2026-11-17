@@ -63,7 +63,11 @@ import {
 	serveAttachmentFile,
 	type WithAttachments,
 } from "@/services/attachment-files";
-import { type ExamResult, examResult } from "@/services/exam-result";
+import {
+	type ExamResult,
+	examResult,
+	sanctionsByResponse,
+} from "@/services/exam-result";
 import {
 	attachmentsOpen,
 	type ExceptionTiming,
@@ -76,6 +80,7 @@ import {
 	releaseBlocker,
 	viewerTiming,
 } from "@/services/exam-state";
+import { activeSanctionsOf } from "../active-sanctions";
 import {
 	DbNull,
 	type Prisma,
@@ -895,6 +900,7 @@ async function attemptResults(
 	const attempts = await tx.response.findMany({
 		where: { examId: exam.id, ...realAttempt },
 		select: {
+			publicId: true,
 			submissions: {
 				select: {
 					publicId: true,
@@ -915,13 +921,17 @@ async function attemptResults(
 		weight: weights[i] ?? 1,
 	}));
 	const policy = (await loadResultPolicy(exam.courseId, tx))(exam);
-	return attempts.map(({ submissions }) =>
+	const sanctions = sanctionsByResponse(
+		await activeSanctionsOf(exam.courseId, [exam.id], tx),
+	);
+	return attempts.map(({ publicId, submissions }) =>
 		examResult(
 			slugs,
 			submissions.map((s) => ({ ...s, question: s.question.slug })),
 			submissions.flatMap((s) =>
 				s.feedbacks.map((f) => ({ ...f, submission: s.publicId })),
 			),
+			sanctions.get(publicId) ?? [],
 			policy,
 		),
 	);

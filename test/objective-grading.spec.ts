@@ -282,6 +282,7 @@ test("a later manual grade stays the verdict over the automatic one", async () =
 			updatedAt: f.updatedAt,
 			submission: rows.publicId,
 		})),
+		[],
 	);
 	expect(result.questions[0]).toMatchObject({ status: "graded", score: 1 });
 });

@@ -1114,7 +1114,7 @@ async function createDemoCoursesIfMissing(): Promise<void> {
 		},
 		FULL_ACCESS,
 	);
-	await seedReleasedQuiz(cs101, { hopper, hamilton });
+	await seedReleasedQuiz(cs101, ada, { hopper, hamilton });
 	await seedElmQuestion(cs101.id);
 	await seedGradingShowcase(cs101.id, ada, {
 		hopper,
@@ -2033,6 +2033,7 @@ async function answerExam(
  */
 async function seedReleasedQuiz(
 	cs101: Course,
+	instructor: User,
 	students: { hopper: User; hamilton: User },
 ): Promise<void> {
 	const course = cs101.id;
@@ -2065,6 +2066,18 @@ async function seedReleasedQuiz(
 		"factorial-of-five": 25,
 		"base-case-blanks": { stop: "recursive", smaller: "smaller" },
 	});
+
+	// A correct answer zeroed by the instructor: the sanction applies on top of the grade.
+	await db.examSanction.create(
+		{
+			course,
+			exam,
+			usernames: [students.hopper.username],
+			question: "factorial-of-five",
+			factor: "0",
+		},
+		{ actor: instructor },
+	);
 
 	await db.exam.update(
 		{ course, slug: exam },
@@ -3116,6 +3129,28 @@ async function seedGradingShowcase(
 		},
 		FULL_ACCESS,
 	);
+
+	// Exam-level halving of hamilton's total, and a zeroed blank of hopper's that is still waiting for grading.
+	await db.examSanction.create(
+		{
+			course,
+			exam,
+			usernames: [hamilton.username],
+			factor: "0.5",
+			reason: "Penalidade aplicada pelo professor.",
+		},
+		{ actor: instructor },
+	);
+	await db.examSanction.create(
+		{
+			course,
+			exam,
+			usernames: [hopper.username],
+			question: blanks,
+			factor: "0",
+		},
+		{ actor: instructor },
+	);
 }
 
 /// The directory of the Elm example question, the one the grading worker's example course also uses.
@@ -3745,6 +3780,42 @@ async function seedReleasedExam(
 			duration: { hours: 2 },
 		},
 		FULL_ACCESS,
+	);
+	// Sanctions go before the release, so the students see them with their grades.
+	await db.examSanction.create(
+		{
+			course,
+			exam,
+			usernames: [students[2]?.username ?? "", students[3]?.username ?? ""],
+			factor: "0",
+			reason: "Respostas idênticas às de outro aluno.",
+			notes: "Mesma sequência de respostas nas questões de ordenação.",
+		},
+		{ actor: instructor },
+	);
+	await db.examSanction.create(
+		{
+			course,
+			exam,
+			usernames: [students[4]?.username ?? ""],
+			question: "fastest-sort",
+			factor: "0",
+		},
+		{ actor: instructor },
+	);
+	const [withdrawn] = await db.examSanction.create(
+		{
+			course,
+			exam,
+			usernames: [students[5]?.username ?? ""],
+			question: "n-log-n",
+			factor: "0",
+		},
+		{ actor: instructor },
+	);
+	await db.examSanction.revoke(
+		{ course, exam, publicId: withdrawn?.publicId ?? "" },
+		{ actor: instructor },
 	);
 	await db.exam.releaseGrades({ course, slug: exam }, FULL_ACCESS);
 

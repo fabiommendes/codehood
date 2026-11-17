@@ -241,6 +241,100 @@ export const examExceptionApi = CRUD(
 	},
 );
 
+/// A sanction as the API answers it: no row id, and the instructor-only fields are absent for the sanctioned student.
+const examSanctionEntity = schema.examSanctionSchema
+	.omit({ id: true, notes: true, createdBy: true, revokedBy: true })
+	.extend({
+		notes: z.string().nullable().optional(),
+		createdBy: schema.examSanctionSchema.shape.createdBy.optional(),
+		revokedBy: schema.examSanctionSchema.shape.revokedBy.optional(),
+	});
+
+export const examSanctionApi = CRUD(
+	"/api/course/[discipline]/[course]/exam/[slug]/sanction",
+	{
+		name: "Exam Sanction",
+		plural: "Exam Sanctions",
+		keySegment: "/[publicId]",
+
+		entity: examSanctionEntity,
+		create: null,
+		upsert: false,
+		update: schema.examSanctionUpdate,
+		filter: schema.examSanctionFilter.omit({
+			course: true,
+			exam: true,
+		}),
+		scope: z.object({
+			course: schema.courseRef,
+			exam: schema.examSanctionPK.shape.exam,
+		}),
+		key: schema.examSanctionPK,
+		skipDelete: true,
+
+		tags: ["Exams"],
+		service: db.examSanction,
+
+		parseKeyParams(params) {
+			return {
+				course: parseCourseParams(params),
+				exam: params.slug as string,
+				publicId: params.publicId as string,
+			};
+		},
+		parseScopeParams(params) {
+			return {
+				course: parseCourseParams(params),
+				exam: params.slug as string,
+			};
+		},
+	},
+);
+
+export const examSanctionCreateApi = POST(
+	"/api/course/[discipline]/[course]/exam/[slug]/sanction",
+	{
+		in: schema.examSanctionCreate.omit({ course: true, exam: true }),
+		out: z.array(examSanctionEntity.openapi("Exam Sanction")),
+		summary: "Sanction one or more students on an exam.",
+		description:
+			"Creates one sanction per student of `usernames`, all or none, and answers them in that order. `question` narrows the sanction to one question of the exam; without it the sanction hits the exam total. Only the course's instructor, by session or CLI key; a BOT key gets 403. A student without a real attempt, or already sanctioned on the same target, is a 400 keyed on `usernames`.",
+		operationId: "examSanctionCreate",
+		tags: ["Exams"],
+		handler: async ({ actor, body, params }) =>
+			db.examSanction.create(
+				{
+					...body,
+					course: parseCourseParams(params),
+					exam: params.slug as string,
+				},
+				{ actor },
+			),
+	},
+);
+
+export const examSanctionRevokeApi = POST(
+	"/api/course/[discipline]/[course]/exam/[slug]/sanction/[publicId]/revoke",
+	{
+		out: examSanctionEntity.openapi("Exam Sanction"),
+		summary: "Revoke a sanction of an exam.",
+		description:
+			"Lifts an active sanction and answers it with `revokedAt` and `revokedBy` set. The row stays as a record. Revoking a revoked sanction is a 409. Only the course's instructor, by session or CLI key; a BOT key gets 403.",
+		operationId: "examSanctionRevoke",
+		tags: ["Exams"],
+		versioned: true,
+		handler: async ({ actor, params, precondition }) =>
+			db.examSanction.revoke(
+				{
+					course: parseCourseParams(params),
+					exam: params.slug as string,
+					publicId: params.publicId as string,
+				},
+				{ actor, ...precondition },
+			),
+	},
+);
+
 export const gradeColumnApi = CRUD(
 	"/api/course/[discipline]/[course]/grade-column",
 	{

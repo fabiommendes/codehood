@@ -12,6 +12,7 @@ import { courseHref } from "@/urls";
 import { expect, type Page, test } from "../fixtures";
 import { logInAs, resetDatabase, seedUser } from "./helpers";
 import { REGRADE_MESSAGE, releasedExam } from "./regrade-setup";
+import { gradedExam, NOTES, REASON } from "./sanction-support";
 import { weightedExam } from "./weighted-exam-support";
 
 test.beforeEach(resetDatabase);
@@ -588,6 +589,86 @@ test("student: ask for a regrade", async ({ page }) => {
 		await expect(item).toContainText("Typed capital");
 		await expect(item).not.toContainText("q-short");
 		await expect(item).toContainText("Regrade rejected");
+	});
+});
+
+/**
+ * Interface the steps rely on, on `exams/<slug>` once the grades are out:
+ *
+ * - An alert, `role="alert"`, reading "Your grade on this exam was zeroed"
+ *   (or "Your grade on this exam was reduced to 50%" for a factor of 0.5),
+ *   with the reason in its text and nothing the instructor kept private.
+ * - A badge "Zeroed" on each question with its own sanction.
+ * - No "Request regrade" button on a sanctioned attempt.
+ */
+test("student: see that my grade was sanctioned", async ({ page }) => {
+	const world = await gradedExam("honour-stu");
+	const { ana, bia } = world;
+	await db.examSanction.create(
+		{
+			course: world.course.id,
+			exam: world.exam.slug,
+			usernames: [ana.username],
+			reason: REASON,
+			notes: NOTES,
+		},
+		{ actor: world.teacher },
+	);
+	await db.examSanction.create(
+		{
+			course: world.course.id,
+			exam: world.exam.slug,
+			usernames: [ana.username],
+			question: "q-first",
+			reason: REASON,
+			notes: NOTES,
+		},
+		{ actor: world.teacher },
+	);
+	const alert = () =>
+		page
+			.getByRole("alert")
+			.filter({ hasText: "Your grade on this exam was zeroed" });
+	await logInAs(page, ana);
+
+	await test.step("before the release nothing shows that a sanction exists", async () => {
+		await page.goto(world.examUrl);
+
+		await expect(
+			page.getByRole("heading", { name: world.exam.title }).first(),
+		).toBeVisible();
+		await expect(page.getByText(/sanction|zeroed/i)).toHaveCount(0);
+		await expect(page.getByText(REASON)).toHaveCount(0);
+		expect(await page.content()).not.toContain(REASON);
+		expect(await page.content()).not.toContain(NOTES);
+	});
+
+	await test.step("after the release the alert says why, and the private notes stay private", async () => {
+		await world.release();
+		await page.reload();
+
+		await expect(alert()).toBeVisible();
+		await expect(alert()).toContainText(REASON);
+		await expect(page.getByText(NOTES)).toHaveCount(0);
+		expect(await page.content()).not.toContain(NOTES);
+	});
+
+	await test.step("the zeroed question is marked and no grade of the attempt can be contested", async () => {
+		await expect(page.getByText("Zeroed", { exact: true })).toHaveCount(1);
+		await expect(
+			page.getByRole("button", { name: "Request regrade" }),
+		).toHaveCount(0);
+	});
+
+	await test.step("a classmate with no sanction sees none of it and can still ask for a regrade", async () => {
+		await logInAs(page, bia);
+		await page.goto(world.examUrl);
+
+		await expect(
+			page.getByRole("button", { name: "Request regrade" }).first(),
+		).toBeVisible();
+		await expect(alert()).toHaveCount(0);
+		await expect(page.getByText("Zeroed", { exact: true })).toHaveCount(0);
 	});
 });
 

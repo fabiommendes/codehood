@@ -31,6 +31,7 @@ test("examResult code: pretest failure, 0.6 then 1.0 with penalty 0.2 is 0.8", (
 		unweighted(["q"]),
 		[sent("a", 1, "SUBMIT", "PRETEST_FAILED"), sent("b", 2), sent("c", 3)],
 		[pass("b", "3/5", 5), pass("c", "1", 6)],
+		[],
 		POLICY,
 	);
 
@@ -47,6 +48,7 @@ test("examResult code: the question lists each graded submission with its discou
 		unweighted(["q"]),
 		[sent("b", 2), sent("c", 3)],
 		[pass("b", "3/5", 5), pass("c", "1", 6)],
+		[],
 		POLICY,
 	);
 
@@ -61,6 +63,7 @@ test("examResult code: a practice exam has no discount", () => {
 		unweighted(["q"]),
 		[sent("b", 2), sent("c", 3)],
 		[pass("b", "3/5", 5), pass("c", "1", 6)],
+		[],
 		{ ...POLICY, practice: true },
 	);
 
@@ -72,6 +75,7 @@ test("examResult code: without a penalty for the question it is 0.2", () => {
 		unweighted(["q"]),
 		[sent("b", 2), sent("c", 3)],
 		[pass("b", "3/5", 5), pass("c", "1", 6)],
+		[],
 	);
 
 	expect(result.questions[0]?.score).toBe(0.8);
@@ -82,6 +86,7 @@ test("examResult code: an earlier better submission counts over a later worse on
 		unweighted(["q"]),
 		[sent("b", 2), sent("c", 3)],
 		[pass("b", "9/10", 5), pass("c", "1/2", 6)],
+		[],
 		POLICY,
 	);
 
@@ -93,6 +98,7 @@ test("examResult code: a human pass replaces the bot's grade on that submission"
 		unweighted(["q"]),
 		[sent("b", 2)],
 		[pass("b", "1/2", 5), pass("b", "1", 9)],
+		[],
 		POLICY,
 	);
 
@@ -104,6 +110,7 @@ test("examResult code: the newest submission still waiting makes the question pe
 		unweighted(["q"]),
 		[sent("b", 2), sent("c", 3)],
 		[pass("b", "3/5", 5)],
+		[],
 		POLICY,
 	);
 
@@ -116,6 +123,7 @@ test("examResult code: only submissions that failed the pretest score zero", () 
 		unweighted(["q"]),
 		[sent("b", 2, "SUBMIT", "PRETEST_FAILED")],
 		[],
+		[],
 		POLICY,
 	);
 
@@ -127,6 +135,7 @@ test("examResult code: autosaves do not count once a submission exists", () => {
 		unweighted(["q"]),
 		[sent("b", 2), sent("auto", 9, "AUTOSAVE")],
 		[pass("b", "1", 5)],
+		[],
 		POLICY,
 	);
 
@@ -138,6 +147,7 @@ test("examResult code: a final submission counts as a submission", () => {
 		unweighted(["q"]),
 		[sent("b", 2, "FINAL")],
 		[pass("b", "1/2", 5)],
+		[],
 		POLICY,
 	);
 
@@ -149,6 +159,7 @@ test("examResult code: with autosaves only, the newest one is judged as before",
 		unweighted(["q"]),
 		[sent("a", 1, "AUTOSAVE"), sent("b", 2, "AUTOSAVE")],
 		[pass("b", "1/2", 5)],
+		[],
 		POLICY,
 	);
 
@@ -161,6 +172,7 @@ test("examResult code: a submission marked will-not-grade is left out", () => {
 		unweighted(["q"]),
 		[sent("b", 2), sent("c", 3, "SUBMIT", "WILL_NOT_GRADE")],
 		[pass("b", "1/2", 5)],
+		[],
 		POLICY,
 	);
 
@@ -172,6 +184,7 @@ test("examResult code: a score below zero counts as zero, discounted or not", ()
 		unweighted(["q"]),
 		[sent("b", 2)],
 		[pass("b", "-1", 5)],
+		[],
 		POLICY,
 	);
 
@@ -186,6 +199,7 @@ test("examResult code: the discount of later submissions follows the grade a hum
 		unweighted(["q"]),
 		[sent("b", 2), sent("c", 3)],
 		[pass("b", "1/2", 5), pass("b", "1", 9), pass("c", "1", 6)],
+		[],
 		POLICY,
 	);
 
@@ -200,8 +214,46 @@ test("examResult code: every earlier wrong submission costs one discount", () =>
 		unweighted(["q"]),
 		[sent("a", 1), sent("b", 2), sent("c", 3)],
 		[pass("a", "1/2", 5), pass("b", "1/2", 6), pass("c", "1", 7)],
+		[],
 		POLICY,
 	);
 
 	expect(result.questions[0]).toMatchObject({ score: 0.6, submission: "c" });
+});
+
+test("examResult code: a zeroed question with a submission waiting for the worker is sanctioned at 0", () => {
+	const result = examResult(
+		unweighted(["q"]),
+		[sent("b", 2)],
+		[],
+		[{ question: "q", factor: "0", reason: null }],
+		POLICY,
+	);
+
+	expect(result.questions[0]).toMatchObject({
+		status: "sanctioned",
+		score: 0,
+		sanction: { original: { status: "pending", score: null } },
+	});
+	expect(result.pending).toBe(0);
+});
+
+test("examResult code: the factor applies to the discounted score and leaves codeAttempts intact", () => {
+	const submissions = [sent("b", 2), sent("c", 3)];
+	const grades = [pass("b", "3/5", 5), pass("c", "1", 6)];
+
+	const plain = examResult(unweighted(["q"]), submissions, grades, [], POLICY);
+	const reduced = examResult(
+		unweighted(["q"]),
+		submissions,
+		grades,
+		[{ question: "q", factor: "0.5", reason: null }],
+		POLICY,
+	);
+
+	expect(reduced.questions[0]?.status).toBe("sanctioned");
+	expect(reduced.questions[0]?.score).toBeCloseTo(0.4, 10);
+	expect(reduced.questions[0]?.codeAttempts).toEqual(
+		plain.questions[0]?.codeAttempts,
+	);
 });

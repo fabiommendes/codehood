@@ -147,6 +147,26 @@
 		]
 	},
 	{
+		"pattern": "/api/course/[discipline]/[course]/exam/[slug]/sanction",
+		"methods": [
+			"get",
+			"post"
+		]
+	},
+	{
+		"pattern": "/api/course/[discipline]/[course]/exam/[slug]/sanction/[publicId]",
+		"methods": [
+			"get",
+			"patch"
+		]
+	},
+	{
+		"pattern": "/api/course/[discipline]/[course]/exam/[slug]/sanction/[publicId]/revoke",
+		"methods": [
+			"post"
+		]
+	},
+	{
 		"pattern": "/api/course/[discipline]/[course]/grade-column",
 		"methods": [
 			"get",

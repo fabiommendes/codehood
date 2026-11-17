@@ -1,6 +1,6 @@
 import { readdirSync, readFileSync } from "node:fs";
 import { expect, test } from "@playwright/test";
-import { FULL_ACCESS } from "@/auth/actor";
+import { FULL_ACCESS, type UserActor } from "@/auth/actor";
 import { PreconditionFailed } from "@/core/error";
 import type { CourseId } from "@/core/schemas";
 import { isoDate } from "@/core/schemas";
@@ -485,6 +485,39 @@ const HONORED: Record<string, Record<string, Case>> = {
 			},
 		};
 	})(),
+	examSanction: (() => {
+		const row = async () => {
+			const { course, instructor, student, exam } = await makeResponse();
+			const [sanction] = await db.examSanction.create(
+				{ course: course.id, exam: exam.slug, usernames: [student.username] },
+				actorOf(instructor),
+			);
+			if (!sanction) throw new Error("no sanction created");
+			const key = {
+				course: course.id,
+				exam: exam.slug,
+				publicId: sanction.publicId,
+			};
+			return { key, sanction, actor: actorOf(instructor).actor };
+		};
+		const as = (
+			{ sanction, actor }: { sanction: { updatedAt: Date }; actor: UserActor },
+			version: Version,
+		) => ({
+			actor,
+			expectedUpdatedAt: version === "stale" ? STALE : sanction.updatedAt,
+		});
+		return {
+			update: async (v) => {
+				const made = await row();
+				return db.examSanction.update(made.key, { reason: "x" }, as(made, v));
+			},
+			revoke: async (v) => {
+				const made = await row();
+				return db.examSanction.revoke(made.key, as(made, v));
+			},
+		};
+	})(),
 	response: (() => ({
 		update: async (v) => {
 			const { response } = await makeResponse();
@@ -756,6 +789,7 @@ const UNGUARDED: Record<string, string> = {
 			"rollCall",
 			"exam",
 			"examException",
+			"examSanction",
 			"report",
 			"feedback",
 			"regradeRequest",

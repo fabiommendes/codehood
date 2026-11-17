@@ -81,7 +81,18 @@ export const gradeColumnFilter = gradeColumnFilterBase.extend({
 
 /// What one student's result at one exam reads, as the grades table shows it.
 export const gradeCellSchema = z.discriminatedUnion("kind", [
-	z.object({ kind: z.literal("total"), total: z.number() }),
+	z.object({
+		kind: z.literal("total"),
+		total: z.number(),
+		/// The sanction on the exam, when there is one: `total` is already after its factor.
+		sanction: z
+			.object({
+				factor: z.number(),
+				reason: z.string().nullable(),
+				original: z.object({ total: z.number().nullable() }),
+			})
+			.optional(),
+	}),
 	z.object({ kind: z.literal("pending") }),
 	z.object({ kind: z.literal("in-progress") }),
 	z.object({ kind: z.literal("missed") }),

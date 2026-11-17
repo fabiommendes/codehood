@@ -21,7 +21,12 @@ export async function loadReviews(
 	const reviews: Record<string, ReviewResult> = {};
 	await Promise.all(
 		result.questions.map(async (outcome) => {
-			if (outcome.status !== "graded" && outcome.status !== "pending") return;
+			if (
+				outcome.status !== "graded" &&
+				outcome.status !== "pending" &&
+				outcome.status !== "sanctioned"
+			)
+				return;
 			const payload = submissions.find(
 				(submission) => submission.publicId === outcome.submission,
 			)?.payload;

@@ -31,6 +31,7 @@ test.describe("examNav", () => {
 			"Exceptions",
 			"Grading",
 			"Regrade requests",
+			"Sanctions",
 			"Results",
 		]);
 	});
@@ -50,6 +51,7 @@ test.describe("examNav", () => {
 			`${href}/exceptions`,
 			`${href}/grading`,
 			`${href}/regrades`,
+			`${href}/sanctions`,
 			`${href}/results`,
 		]);
 	});

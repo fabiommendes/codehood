@@ -407,12 +407,7 @@ export function openExceptionCount(schedule: ExamSchedule, now: Date): number {
 
 /** How many answers in `results` still wait for a grade, see {@link gradeReleaseBlocker}. */
 export function pendingAnswerCount(results: ExamResult[]): number {
-	return results.reduce(
-		(total, result) =>
-			total +
-			result.questions.filter((outcome) => outcome.status === "pending").length,
-		0,
-	);
+	return results.reduce((total, result) => total + result.pending, 0);
 }
 
 /// Why an instructor may not release an exam's grades, see {@link gradeReleaseBlocker}.
@@ -446,9 +441,7 @@ export function gradeReleaseBlocker(
 	if (examPhase(exam, now) !== "closed") return "not-closed";
 	if (exam.gradesReleasedAt) return "released";
 	if (hasOpenException(exam, now, exceptions)) return "exception-open";
-	const pending = results.some((result) =>
-		result.questions.some((outcome) => outcome.status === "pending"),
-	);
+	const pending = results.some((result) => result.pending > 0);
 	return pending ? "pending" : null;
 }
 

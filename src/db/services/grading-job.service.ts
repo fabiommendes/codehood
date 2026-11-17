@@ -579,6 +579,8 @@ export const makeGradingJobService = defineService()((client) => {
 							submission: row.publicId,
 						})),
 					),
+					// The queue works on the original grade, not the sanctioned one.
+					[],
 					policy,
 				).questions;
 				const weighed = new Map(

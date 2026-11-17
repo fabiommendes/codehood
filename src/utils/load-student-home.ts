@@ -1,7 +1,7 @@
 import type { UserActor } from "@/auth/actor";
 import { db } from "@/db";
 import { loadResultPolicy } from "@/db/result-policy";
-import { examResult } from "@/services/exam-result";
+import { examResult, sanctionsByResponse } from "@/services/exam-result";
 import { examSchedule, released } from "@/services/exam-state";
 import {
 	type HomeCourse,
@@ -41,25 +41,37 @@ export async function loadStudentHome(
 				code: course.discipline.slug,
 				name: course.discipline.name,
 			};
-			const [exams, attempts, feedback, exceptions, requests, policyOf] =
-				await Promise.all([
-					db.exam.findMany({ course: course.id }, { actor }),
-					db.response.findMany(
-						{ course: course.id, author: actor.username, practice: false },
-						{ actor },
-					),
-					db.feedback.findMany(
-						{ course: course.id, author: actor.username },
-						{ actor },
-					),
-					loadCourseExceptions(course.id),
-					db.regradeRequest.findMany(
-						{ course: course.id, author: actor.username },
-						{ actor },
-					),
-					loadResultPolicy(course.id),
-				]);
+			const [
+				exams,
+				attempts,
+				feedback,
+				sanctions,
+				exceptions,
+				requests,
+				policyOf,
+			] = await Promise.all([
+				db.exam.findMany({ course: course.id }, { actor }),
+				db.response.findMany(
+					{ course: course.id, author: actor.username, practice: false },
+					{ actor },
+				),
+				db.feedback.findMany(
+					{ course: course.id, author: actor.username },
+					{ actor },
+				),
+				db.examSanction.findMany(
+					{ course: course.id, author: actor.username },
+					{ actor },
+				),
+				loadCourseExceptions(course.id),
+				db.regradeRequest.findMany(
+					{ course: course.id, author: actor.username },
+					{ actor },
+				),
+				loadResultPolicy(course.id),
+			]);
 
+			const sanctionsOf = sanctionsByResponse(sanctions);
 			const homeExams: HomeExam[] = exams.map((exam) => {
 				const attempt = attempts.find((entry) => entry.exam === exam.slug);
 				const schedule = examSchedule(exam, exceptions.get(exam.slug));
@@ -75,6 +87,7 @@ export async function loadStudentHome(
 									exam.questions,
 									attempt.submissions,
 									feedback,
+									sanctionsOf.get(attempt.publicId) ?? [],
 									policyOf(exam),
 								)
 							: null,

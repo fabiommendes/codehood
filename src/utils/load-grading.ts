@@ -8,7 +8,7 @@ import {
 	type Feedback,
 } from "@/db";
 import { loadResultPolicy } from "@/db/result-policy";
-import { resultPolicy } from "@/services/exam-result";
+import { resultPolicy, sanctionsByResponse } from "@/services/exam-result";
 import type { ExceptionTiming } from "@/services/exam-state";
 import {
 	type GradesTable,
@@ -194,25 +194,50 @@ export async function loadGrades(
 	actor: UserActor,
 	now: Date,
 ): Promise<CourseGrades> {
-	const [exams, students, attempts, feedback, columns, exceptions, policy] =
-		await Promise.all([
-			db.exam.findMany({ course }, { actor }),
-			loadStudents(course, actor),
-			db.response.findMany({ course, practice: false }, { actor }),
-			db.feedback.findMany({ course }, { actor }),
-			db.gradeColumn.findMany({ course }, { actor }),
-			loadCourseExceptions(course),
-			loadResultPolicy(course),
-		]);
-	const table = gradesTable(exams, students, attempts, feedback, now, {
+	const [
+		exams,
+		students,
+		attempts,
+		feedback,
+		sanctions,
+		columns,
 		exceptions,
 		policy,
-	});
-	const csvTable = gradesTable(exams, students, attempts, feedback, now, {
-		withDropped: true,
-		exceptions,
-		policy,
-	});
+	] = await Promise.all([
+		db.exam.findMany({ course }, { actor }),
+		loadStudents(course, actor),
+		db.response.findMany({ course, practice: false }, { actor }),
+		db.feedback.findMany({ course }, { actor }),
+		db.examSanction.findMany({ course }, { actor }),
+		db.gradeColumn.findMany({ course }, { actor }),
+		loadCourseExceptions(course),
+		loadResultPolicy(course),
+	]);
+	const table = gradesTable(
+		exams,
+		students,
+		attempts,
+		feedback,
+		sanctionsByResponse(sanctions),
+		now,
+		{
+			exceptions,
+			policy,
+		},
+	);
+	const csvTable = gradesTable(
+		exams,
+		students,
+		attempts,
+		feedback,
+		sanctionsByResponse(sanctions),
+		now,
+		{
+			withDropped: true,
+			exceptions,
+			policy,
+		},
+	);
 	return {
 		table,
 		pushed: pushedGrades(table, columns),
@@ -224,6 +249,7 @@ export async function loadGrades(
  * The course card of an exam's grading pages: the same list every page of the exam shows.
  *
  * `context` replaces the exam's title when the page belongs to something else, a student's attempt.
+ * A page that already loaded the exam's `sanctions` passes them to spare the query.
  */
 export async function gradingExamNav(
 	loaded: Pick<
@@ -232,12 +258,22 @@ export async function gradingExamNav(
 	>,
 	actor: UserActor,
 	context?: string,
+	sanctions?: readonly unknown[],
 ): Promise<CourseNav> {
 	const { course, href, exam, answers } = loaded;
-	const regrades = await db.regradeRequest.findMany(
-		{ course: course.id, exam: exam.slug, status: "OPEN" },
-		{ actor },
-	);
+	const [regrades, known] = await Promise.all([
+		db.regradeRequest.findMany(
+			{ course: course.id, exam: exam.slug, status: "OPEN" },
+			{ actor },
+		),
+		exam.type === "PRACTICE"
+			? []
+			: (sanctions ??
+				db.examSanction.findMany(
+					{ course: course.id, exam: exam.slug },
+					{ actor },
+				)),
+	]);
 	const nav = examNav({
 		href: `${href}/exams/${exam.slug}`,
 		title: exam.title,
@@ -245,6 +281,7 @@ export async function gradingExamNav(
 		practice: exam.type === "PRACTICE",
 		pending: answers.filter((answer) => answer.state === "pending").length,
 		regrades: regrades.length,
+		sanctions: known.length,
 	});
 	return context ? { ...nav, context } : nav;
 }

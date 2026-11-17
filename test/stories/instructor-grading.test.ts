@@ -13,6 +13,7 @@ import { courseHref } from "@/urls";
 import { expect, test } from "../fixtures";
 import { logInAs, resetDatabase, seedUser } from "./helpers";
 import { releasedExam, requestRegrade } from "./regrade-setup";
+import { gradedExam, NOTES, REASON } from "./sanction-support";
 import { weightedExam } from "./weighted-exam-support";
 
 test.beforeEach(resetDatabase);
@@ -1226,5 +1227,290 @@ test("instructor: grade an exam whose questions have different weights", async (
 
 		await page.goto(`${world.examUrl}/regrades`);
 		await expect(page.getByRole("article")).toContainText(/Q1.*75\/100/);
+	});
+});
+
+/**
+ * Interface the steps rely on, by screen:
+ *
+ * `exams/<slug>/results`
+ *   - Table "Results", one row per attempt, with a checkbox named "Select <name>".
+ *   - Button "Sanction selected", disabled while nothing is selected.
+ *   - Dialog with the fields "Target" (select: "Whole exam", then each
+ *     question's title), "Factor" (text, "0"), "Reason" and "Private notes";
+ *     buttons "Sanction" and "Cancel".
+ *   - A sanctioned total is an `<ins>` holding the new total beside a `<del>`
+ *     holding the original.
+ *   - The exam's nav has a link "Sanctions" followed by the count of active ones.
+ *
+ * `exams/<slug>/sanctions`
+ *   - Heading "Sanctions" and a table "Sanctions", one row per sanction, showing
+ *     the student, the target ("Whole exam" or the question title), the reason,
+ *     the notes and the state ("Active" or "Revoked").
+ *   - An active row has buttons "Edit" (dialog "Edit sanction": "Factor",
+ *     "Reason", "Private notes", "Save", "Cancel") and "Revoke" (dialog
+ *     "Revoke sanction": "Revoke sanction", "Cancel"); a revoked row has neither.
+ *
+ * `exams/<slug>/attempts/<username>`
+ *   - Status "This attempt was sanctioned" with the reason, the notes and a
+ *     link "Manage sanctions".
+ *   - Each question's article has a button "Zero question" (dialog "Zero
+ *     question": "Reason", "Private notes", "Zero question", "Cancel") and,
+ *     once zeroed, the badge "Zeroed" in place of the button.
+ *
+ * `grades`
+ *   - The link of a sanctioned total has a `title` starting with "Sanctioned"
+ *     and carrying the reason, never the notes.
+ */
+test("instructor: sanction a student's grade", async ({ page }) => {
+	const world = await gradedExam("honour-ins");
+	const { ana, caio } = world;
+	const NEW_NOTES = "Confirmed by the neighbour, who admitted it";
+	const FACTOR_ERROR =
+		"The factor must be a decimal from 0 up to, but not including, 1, such as 0 or 0.5.";
+	await world.release();
+	await logInAs(page, world.teacher);
+
+	const results = () =>
+		page.getByRole("table", { name: "Results", exact: true });
+	const resultRow = (name: string) =>
+		results().getByRole("row").filter({ hasText: name });
+	const sanctions = () =>
+		page.getByRole("table", { name: "Sanctions", exact: true });
+	const sanctionRow = (name: string) =>
+		sanctions().getByRole("row").filter({ hasText: name });
+	const active = () =>
+		db.examSanction.findMany(
+			{ course: world.course.id, exam: world.exam.slug },
+			{ actor: world.teacher },
+		);
+
+	await test.step("with nobody selected there is nothing to sanction", async () => {
+		await page.goto(`${world.examUrl}/results`);
+
+		await expect(resultRow("Ana Prado")).toBeVisible();
+		for (const name of ["Ana Prado", "Bia Lima", "Caio Nunes", "Davi Rocha"]) {
+			await expect(resultRow(name).getByRole("cell").last()).toHaveText("100%");
+		}
+		await expect(
+			page.getByRole("button", { name: "Sanction selected" }),
+		).toBeDisabled();
+	});
+
+	await test.step("a factor outside [0, 1) is refused and nothing is saved", async () => {
+		await resultRow("Ana Prado")
+			.getByRole("checkbox", { name: "Select Ana Prado" })
+			.check();
+		await resultRow("Bia Lima")
+			.getByRole("checkbox", { name: "Select Bia Lima" })
+			.check();
+		await page.getByRole("button", { name: "Sanction selected" }).click();
+
+		const dialog = page.getByRole("dialog");
+		await expect(dialog.getByText("2 students selected")).toBeVisible();
+		await expect(dialog.getByLabel("Target").getByRole("option")).toHaveText([
+			"Whole exam",
+			"First question",
+			"Second question",
+		]);
+		await dialog.getByLabel("Factor").fill("1");
+		await dialog.getByRole("button", { name: "Sanction", exact: true }).click();
+
+		await expect(dialog.getByText(FACTOR_ERROR)).toBeVisible();
+		expect(await active()).toHaveLength(0);
+	});
+
+	await test.step("two students are sanctioned on the whole exam at once", async () => {
+		const dialog = page.getByRole("dialog");
+		await dialog.getByLabel("Target").selectOption({ label: "Whole exam" });
+		await dialog.getByLabel("Factor").fill("0");
+		await dialog.getByLabel("Reason", { exact: true }).fill(REASON);
+		await dialog.getByLabel("Private notes").fill(NOTES);
+		await dialog.getByRole("button", { name: "Sanction", exact: true }).click();
+
+		await expect(dialog).toBeHidden();
+		for (const name of ["Ana Prado", "Bia Lima"]) {
+			await expect(resultRow(name).getByRole("deletion")).toHaveText("100%");
+			await expect(resultRow(name).getByRole("insertion")).toHaveText("0%");
+		}
+		for (const name of ["Caio Nunes", "Davi Rocha"]) {
+			await expect(resultRow(name).getByRole("deletion")).toHaveCount(0);
+			await expect(resultRow(name).getByRole("cell").last()).toHaveText("100%");
+		}
+		await expect(
+			page.getByRole("button", { name: "Sanction selected" }),
+		).toBeDisabled();
+	});
+
+	await test.step("sanctioning the same student on the same target again shows the error in the dialog", async () => {
+		await resultRow("Ana Prado")
+			.getByRole("checkbox", { name: "Select Ana Prado" })
+			.check();
+		await page.getByRole("button", { name: "Sanction selected" }).click();
+		const dialog = page.getByRole("dialog");
+		await dialog.getByRole("button", { name: "Sanction", exact: true }).click();
+
+		await expect(dialog.getByRole("alert")).toBeVisible();
+		await expect(dialog.getByRole("alert")).toContainText(ana.username);
+		expect(await active()).toHaveLength(2);
+
+		await dialog.getByRole("button", { name: "Cancel" }).click();
+		await expect(dialog).toBeHidden();
+		await resultRow("Ana Prado")
+			.getByRole("checkbox", { name: "Select Ana Prado" })
+			.uncheck();
+	});
+
+	await test.step("the sanctions page lists both with their notes", async () => {
+		await expect(
+			page.getByRole("link", { name: /^Sanctions\s*2$/ }).first(),
+		).toBeVisible();
+		await page
+			.getByRole("link", { name: /^Sanctions/ })
+			.first()
+			.click();
+
+		await expect(page).toHaveURL(`${world.examUrl}/sanctions`);
+		await expect(
+			page.getByRole("heading", { name: "Sanctions", exact: true }),
+		).toBeVisible();
+		for (const name of ["Ana Prado", "Bia Lima"]) {
+			const row = sanctionRow(name);
+			await expect(row).toContainText("Whole exam");
+			await expect(row).toContainText(REASON);
+			await expect(row).toContainText(NOTES);
+			await expect(row).toContainText("Active");
+		}
+		await expect(sanctionRow("Caio Nunes")).toHaveCount(0);
+	});
+
+	await test.step("editing refuses a bad factor, then saves the new notes", async () => {
+		await sanctionRow("Ana Prado")
+			.getByRole("button", { name: "Edit" })
+			.click();
+		const dialog = page.getByRole("dialog", { name: "Edit sanction" });
+		await expect(dialog.getByLabel("Factor")).toHaveValue("0");
+		await expect(dialog.getByLabel("Reason", { exact: true })).toHaveValue(
+			REASON,
+		);
+		await expect(dialog.getByLabel("Private notes")).toHaveValue(NOTES);
+
+		await dialog.getByLabel("Factor").fill("1");
+		await dialog.getByRole("button", { name: "Save" }).click();
+		await expect(dialog.getByText(FACTOR_ERROR)).toBeVisible();
+
+		await dialog.getByLabel("Factor").fill("0");
+		await dialog.getByLabel("Private notes").fill(NEW_NOTES);
+		await dialog.getByRole("button", { name: "Save" }).click();
+
+		await expect(dialog).toBeHidden();
+		await expect(sanctionRow("Ana Prado")).toContainText(NEW_NOTES);
+		await expect(sanctionRow("Ana Prado")).not.toContainText(NOTES);
+		await expect(sanctionRow("Bia Lima")).toContainText(NOTES);
+	});
+
+	await test.step("revoking asks for confirmation and leaves the sanction listed as revoked", async () => {
+		await sanctionRow("Bia Lima")
+			.getByRole("button", { name: "Revoke" })
+			.click();
+		const dialog = page.getByRole("dialog", { name: "Revoke sanction" });
+		await dialog.getByRole("button", { name: "Cancel" }).click();
+		await expect(dialog).toBeHidden();
+		await expect(sanctionRow("Bia Lima")).toContainText("Active");
+
+		await sanctionRow("Bia Lima")
+			.getByRole("button", { name: "Revoke" })
+			.click();
+		await dialog
+			.getByRole("button", { name: "Revoke sanction", exact: true })
+			.click();
+
+		await expect(dialog).toBeHidden();
+		await expect(sanctionRow("Bia Lima")).toContainText("Revoked");
+		await expect(sanctionRow("Bia Lima")).toContainText(REASON);
+		await expect(sanctionRow("Bia Lima").getByRole("button")).toHaveCount(0);
+		await expect(sanctionRow("Ana Prado")).toContainText("Active");
+	});
+
+	await test.step("the attempt of a sanctioned student says so, with the notes", async () => {
+		await page.goto(`${world.examUrl}/attempts/${ana.username}`);
+
+		const banner = page
+			.getByRole("status")
+			.filter({ hasText: "This attempt was sanctioned" });
+		await expect(banner).toContainText(REASON);
+		await expect(banner).toContainText(NEW_NOTES);
+		await banner.getByRole("link", { name: "Manage sanctions" }).click();
+		await expect(page).toHaveURL(`${world.examUrl}/sanctions`);
+	});
+
+	await test.step("a question is zeroed from the student's attempt, after a refused reason", async () => {
+		await page.goto(`${world.examUrl}/attempts/${caio.username}`);
+		const first = page.getByRole("article", {
+			name: "Question 1",
+			exact: true,
+		});
+		const second = page.getByRole("article", {
+			name: "Question 2",
+			exact: true,
+		});
+		await expect(first.getByText("Zeroed", { exact: true })).toHaveCount(0);
+
+		await first.getByRole("button", { name: "Zero question" }).click();
+		const dialog = page.getByRole("dialog", { name: "Zero question" });
+		// The field itself stops a reason longer than the schema allows.
+		await expect(dialog.getByLabel("Reason", { exact: true })).toHaveAttribute(
+			"maxlength",
+			"2000",
+		);
+
+		await dialog.getByLabel("Reason", { exact: true }).fill(REASON);
+		await dialog.getByLabel("Private notes").fill(NOTES);
+		await dialog
+			.getByRole("button", { name: "Zero question", exact: true })
+			.click();
+
+		await expect(dialog).toBeHidden();
+		await expect(first.getByText("Zeroed", { exact: true })).toBeVisible();
+		await expect(
+			first.getByRole("button", { name: "Zero question" }),
+		).toHaveCount(0);
+		await expect(second.getByText("Zeroed", { exact: true })).toHaveCount(0);
+		await expect(
+			second.getByRole("button", { name: "Zero question" }),
+		).toBeVisible();
+
+		await page.goto(`${world.examUrl}/results`);
+		await expect(resultRow("Caio Nunes").getByRole("deletion")).toHaveText(
+			"100%",
+		);
+		await expect(resultRow("Caio Nunes").getByRole("insertion")).toHaveText(
+			"50%",
+		);
+		// Revoking Bia's sanction gave her the original total back.
+		await expect(resultRow("Bia Lima").getByRole("deletion")).toHaveCount(0);
+		await expect(resultRow("Bia Lima").getByRole("cell").last()).toHaveText(
+			"100%",
+		);
+	});
+
+	await test.step("the course grades mark the sanctioned total and only that one", async () => {
+		await page.goto(`${world.href}/grades`);
+
+		const cell = (name: string) =>
+			page
+				.getByRole("row")
+				.filter({ has: page.getByRole("rowheader", { name, exact: true }) })
+				.getByRole("cell");
+		await expect(cell("Ana Prado")).toHaveText([/^0%/]);
+		const marked = cell("Ana Prado").getByRole("link");
+		await expect(marked).toHaveAttribute("title", /^Sanctioned/);
+		await expect(marked).toHaveAttribute("title", new RegExp(REASON));
+		expect(await marked.getAttribute("title")).not.toContain(NEW_NOTES);
+
+		await expect(cell("Bia Lima")).toHaveText(["100%"]);
+		await expect(cell("Bia Lima").getByTitle(/^Sanctioned/)).toHaveCount(0);
+		await expect(cell("Davi Rocha")).toHaveText(["100%"]);
+		await expect(cell("Davi Rocha").getByTitle(/^Sanctioned/)).toHaveCount(0);
 	});
 });

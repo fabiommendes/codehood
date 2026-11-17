@@ -42,6 +42,12 @@ const phase = examPhase(
 	new Date(),
 );
 const examHref = `${href}/exams/${exam.slug}`;
+// A sanctioned attempt carries the total it would have without the sanctions.
+const resultRows = data.resultRows.map((row) =>
+	data.originalTotals.has(row.author)
+		? { ...row, original: data.originalTotals.get(row.author) ?? null }
+		: row,
+);
 ---
 
 <AppLayout title={`${m.grades_results_title()} · ${exam.title}`}
@@ -52,6 +58,7 @@ const examHref = `${href}/exams/${exam.slug}`;
     manage: true,
     pending: data.pending,
     regrades: data.openRegrades,
+    sanctions: data.sanctions,
   })}
 >
   <main class="mx-auto max-w-4xl px-4 py-10">
@@ -81,7 +88,15 @@ const examHref = `${href}/exams/${exam.slug}`;
       <QuestionStatsTable client:load href={examHref} stats={data.statsRows} titles={titles} points={pointsByPosition(exam.questions)} />
     </div>
     <div id="by-student" class="scroll-mt-20">
-      <ExamResults client:load href={examHref} rows={data.resultRows} />
+      <ExamResults
+        client:load
+        href={examHref}
+        discipline={discipline!}
+        course={courseSegment!}
+        exam={exam.slug}
+        rows={resultRows}
+        questions={exam.questions.map((question) => ({ slug: question.slug, title: titles.get(question.slug) ?? question.slug }))}
+      />
     </div>
   </main>
 </AppLayout>
