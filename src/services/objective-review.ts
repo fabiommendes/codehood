@@ -20,7 +20,7 @@ import {
 	isManualChange,
 } from "./grading";
 import { discriminationFlag, type QuestionStats } from "./question-stats";
-import { responseSummary } from "./response-summary";
+import { plain, responseSummary } from "./response-summary";
 import { reviewResult } from "./review";
 
 /// The fewest students a group needs for its mean on the other questions to show.
@@ -208,15 +208,6 @@ function averageOf(values: readonly (number | null)[]): number | null {
 function letter(index: number): string {
 	const head = index >= 26 ? letter(Math.floor(index / 26) - 1) : "";
 	return head + String.fromCharCode(65 + (index % 26));
-}
-
-/// Text with the inline markdown marks dropped and whitespace collapsed.
-function plain(markdown: string): string {
-	return markdown
-		.replace(/!?\[([^\]]*)\]\([^)]*\)/g, "$1")
-		.replace(/[`*_~]/g, "")
-		.replace(/\s+/g, " ")
-		.trim();
 }
 
 /// The answer's passes oldest first, as `isManualChange` and `autoScoreOf` read them.

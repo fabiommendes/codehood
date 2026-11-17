@@ -28,8 +28,8 @@ export interface SummaryGroup extends ResponseSummary {
 	count: number;
 }
 
-/// Text with the inline markdown marks dropped and whitespace collapsed.
-function plain(markdown: string): string {
+/** Text with the inline markdown marks dropped and whitespace collapsed. */
+export function plain(markdown: string): string {
 	return markdown
 		.replace(/!?\[([^\]]*)\]\([^)]*\)/g, "$1")
 		.replace(/[`*_~]/g, "")
