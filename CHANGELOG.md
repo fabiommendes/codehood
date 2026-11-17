@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+## 0.5.1 (2026-11-17)
+
 ### Fixed
 
 - Entregar uma lista (prova do tipo prática) devolvia "recurso não encontrado".
