@@ -918,6 +918,8 @@ Depende de T1. Paralela a tudo.
 
 ### T6. Telas do professor (G1 a G5)
 
+Débito herdado da revisão do T2: `GradesTable.astro` mostra só o primeiro `FACTOR < 1`; com `SET`/`OFFSET` o total muda sem sinal, e dois fatores 0,5 aparecem como 50%. Mostrar `original.total` riscado e o total final, com a lista de ajustes; total com bônus não fica em `text-error` (`ExamResults.tsx`).
+
 Depende de T2, T4 e T5b. Paralela a T7.
 
 **TESTER T6**
@@ -959,6 +961,8 @@ Depende de T2, T4 e T5b. Paralela a T7.
   `test/grades-table.spec.ts`, `test/exam-nav.spec.ts`; lint 0.
 
 ### T7. Aluno (F1 a F4)
+
+Débito herdado da revisão do T2: `ExamAttempt.tsx` mostra só o primeiro `FACTOR < 1` (mesmo problema do T6). Teste do loader ou e2e: com `OFFSET +0.1`, o pedido de revisão continua disponível (`examReduced` em `load-attempt-view.ts:128`).
 
 Depende de T2 e T4. Paralela a T6. Antes: `ExamAttempt.tsx` limpo em `main`.
 
