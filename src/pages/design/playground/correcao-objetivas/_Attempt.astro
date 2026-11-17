@@ -1,7 +1,8 @@
 ---
 /// The student attempt page with a grade change, either per question or as a bonus on the exam.
-import QuestionNumber from "@/components/exam/QuestionNumber.astro";
-import { ATTEMPT_QUESTIONS, ATTEMPT_STUDENT, fmt } from "./_data";
+import { QuestionFrame } from "@/components/exam/QuestionFrame";
+import AttemptActions from "./_AttemptActions";
+import { ATTEMPT_LIST, ATTEMPT_QUESTIONS, ATTEMPT_STUDENT, fmt } from "./_data";
 import type { Grading } from "./_guard";
 import Icon from "./_Icon.astro";
 import Shell from "./_Shell.astro";
@@ -21,19 +22,80 @@ const autoTotal = ATTEMPT_QUESTIONS.reduce((s, q) => s + earned(q.auto), 0);
 const finalTotal = perQuestion
 	? ATTEMPT_QUESTIONS.reduce((s, q) => s + earned(q.auto, q.override), 0)
 	: Math.min(100, autoTotal + BONUS);
+const here = Astro.url.pathname;
+const listIndex = Math.max(
+	0,
+	ATTEMPT_LIST.findIndex(
+		(r) => r.student.username === Astro.url.searchParams.get("u"),
+	),
+);
+const student =
+	ATTEMPT_LIST[
+		Astro.url.searchParams.has("u") ? listIndex : ATTEMPT_STUDENT.id - 1
+	]?.student ?? ATTEMPT_STUDENT;
+const at = (offset: number) =>
+	ATTEMPT_LIST[
+		(student.id - 1 + offset + ATTEMPT_LIST.length) % ATTEMPT_LIST.length
+	]?.student.username;
+type State = "correct" | "partial" | "wrong" | "blank" | "changed";
+const stateOf = (q: (typeof ATTEMPT_QUESTIONS)[number]): State =>
+	perQuestion && q.override
+		? "changed"
+		: q.auto === null
+			? "blank"
+			: q.auto >= 100
+				? "correct"
+				: q.auto > 0
+					? "partial"
+					: "wrong";
+const STATE = {
+	correct: {
+		label: "certa",
+		chip: "btn-success",
+		dot: "bg-success",
+		tone: "text-success",
+	},
+	partial: {
+		label: "parcial",
+		chip: "btn-warning",
+		dot: "bg-warning",
+		tone: "text-warning",
+	},
+	wrong: {
+		label: "errada",
+		chip: "btn-error",
+		dot: "bg-error",
+		tone: "text-error",
+	},
+	blank: {
+		label: "em branco",
+		chip: "btn-outline border-base-content/20 text-base-content/50",
+		dot: "border border-base-content/30",
+		tone: "text-base-content/50",
+	},
+	changed: {
+		label: "alterada à mão",
+		chip: "btn-info",
+		dot: "bg-info",
+		tone: "text-info",
+	},
+} as const;
 const back = "/design/playground/correcao-objetivas";
 ---
 
-<Shell title={ATTEMPT_STUDENT.name} grading={grading}>
+<Shell title={student.name} grading={grading}>
   <a href={back} class="text-sm text-muted hover:text-primary">← Mockups da correção</a>
-  <div class="relative mt-6 flex items-center gap-2">
-    <a href="#" class="btn btn-ghost btn-sm btn-square text-base-content/60 lg:absolute lg:right-full lg:mr-1" aria-label="Aluno anterior" title="Aluno anterior">
-      <svg viewBox="0 0 24 24" class="size-5" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m15 5-7 7 7 7"></path></svg>
-    </a>
-    <h2 class="page-subheader">{ATTEMPT_STUDENT.name}</h2>
-    <a href="#" class="btn btn-ghost btn-sm btn-square text-base-content/60" aria-label="Próximo aluno" title="Próximo aluno">
-      <svg viewBox="0 0 24 24" class="size-5" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m9 5 7 7-7 7"></path></svg>
-    </a>
+  <div class="mt-6 flex flex-wrap items-center justify-between gap-2">
+    <div class="flex items-center gap-1">
+      <a href={`${here}?u=${at(-1)}`} class="btn btn-ghost btn-sm btn-square text-base-content/60" aria-label="Aluno anterior" title="Aluno anterior">
+        <svg viewBox="0 0 24 24" class="size-5" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m15 5-7 7 7 7"></path></svg>
+      </a>
+      <h2 class="page-subheader">{student.name}</h2>
+      <a href={`${here}?u=${at(1)}`} class="btn btn-ghost btn-sm btn-square text-base-content/60" aria-label="Próximo aluno" title="Próximo aluno">
+        <svg viewBox="0 0 24 24" class="size-5" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m9 5 7 7-7 7"></path></svg>
+      </a>
+    </div>
+    <AttemptActions client:load base={here} current={student.username} autoTotal={autoTotal} questions={ATTEMPT_QUESTIONS.length} />
   </div>
 
   <dl class="mt-4 grid grid-cols-1 gap-x-8 gap-y-3 rounded-box border border-edge bg-base-100 p-6 sm:grid-cols-3">
@@ -45,102 +107,114 @@ const back = "/design/playground/correcao-objetivas";
         {perQuestion ? (
           <>{fmt(finalTotal, 1)} <span class="text-sm font-normal text-muted">(automática {fmt(autoTotal, 1)}, 2 questões alteradas)</span></>
         ) : (
-          <>{fmt(autoTotal, 1)} <span class="text-success">+ {fmt(BONUS, 1)} bônus</span> = {fmt(finalTotal, 1)} <span class="text-sm font-normal text-muted">de 100</span></>
+          <>{fmt(finalTotal, 1)} <span class="text-sm font-normal text-muted">de 100</span></>
         )}
       </dd>
     </div>
   </dl>
 
   {!perQuestion && (
-    <div role="status" class="alert alert-success alert-soft mt-4 block text-sm">
-      <p class="font-semibold">Bônus de +{fmt(BONUS, 1)} pontos na nota da prova</p>
-      <p>Motivo: resolveu o desafio de ordenação em aula.</p>
-      <p class="mt-1 text-muted">O total soma o bônus à nota das questões e é limitado a 100.</p>
-      <p class="mt-2 flex gap-2"><button type="button" class="btn btn-outline btn-sm">Alterar</button><button type="button" class="btn btn-outline btn-error btn-sm">Remover</button></p>
-    </div>
+    <section aria-label="Ajustes de nota" class="mt-4 rounded-box border border-edge bg-base-100 p-4 text-sm">
+      <h3 class="font-semibold">Ajustes de nota</h3>
+      <dl class="mt-2 grid grid-cols-[1fr_auto_auto] items-center gap-y-1 tabular-nums">
+        <dt class="text-muted">Total original</dt><dd class="px-3 text-right">{fmt(autoTotal, 1)}</dd><span class="w-18"></span>
+        <dt>
+          <span class="text-success font-medium">Bônus +{fmt(BONUS, 1)}</span>
+          <span class="text-muted"> · Resolveu o desafio de ordenação em aula.</span>
+        </dt>
+        <dd class="px-3 text-right text-success">+{fmt(BONUS, 1)}</dd>
+        <span class="flex w-18 justify-end">
+          <button type="button" data-open="bonus" class="btn btn-ghost btn-sm btn-square" aria-label="Alterar" title="Alterar"><Icon name="pencil" /></button>
+          <button type="button" class="btn btn-ghost btn-sm btn-square text-error" aria-label="Remover" title="Remover"><Icon name="trash2" /></button>
+        </span>
+        <dt class="border-t border-edge pt-1 font-semibold">Total final</dt>
+        <dd class="border-t border-edge px-3 pt-1 text-right font-semibold">{fmt(finalTotal, 1)}</dd>
+        <span class="w-18 border-t border-edge pt-1"></span>
+      </dl>
+    </section>
   )}
 
-  <div class="mt-4 flex flex-wrap items-start gap-3">
-    <button type="button" class="btn btn-ghost btn-sm btn-square text-error" aria-label="Aplicar sanção à prova" title="Aplicar sanção à prova"><Icon name="gavel" /></button>
-    {!perQuestion && (
-      <details class="rounded-box border border-edge bg-base-100" open>
-        <summary class="btn btn-outline btn-success btn-sm">Alterar o bônus</summary>
-        <form class="flex flex-wrap items-end gap-3 p-4">
-          <label class="flex flex-col gap-1 text-xs text-muted">Pontos (sobre 100)
-            <input type="number" value={BONUS} step="0.5" class="input input-sm w-28 text-base-content" />
-          </label>
-          <label class="flex min-w-64 grow flex-col gap-1 text-xs text-muted">Motivo
-            <input type="text" value="Resolveu o desafio de ordenação em aula." class="input input-sm w-full text-base-content" />
-          </label>
-          <button type="button" class="btn btn-primary btn-sm">Salvar</button>
-        </form>
-      </details>
-    )}
-  </div>
+  <nav aria-label="Questões" class="sticky top-14 z-20 mt-6 flex flex-wrap items-center gap-x-4 gap-y-2 rounded-box border border-edge bg-base-100/90 px-3 py-2 backdrop-blur">
+    <div class="flex flex-wrap gap-1.5">
+      {ATTEMPT_QUESTIONS.map((q) => {
+        const st = STATE[stateOf(q)];
+        return (
+          <a href={`#question-${q.number}`} class={`btn btn-sm min-w-12 font-mono ${st.chip}`} aria-label={`Questão ${q.number}: ${st.label}`} title={`Q${q.number}: ${st.label}`}>Q{q.number}</a>
+        );
+      })}
+    </div>
+    <ul class="flex flex-wrap gap-x-3 gap-y-1 text-xs text-muted" aria-label="Legenda">
+      {(Object.keys(STATE) as State[]).filter((k) => perQuestion || k !== "changed").map((k) => (
+        <li class="flex items-center gap-1"><span class={`inline-block size-2.5 rounded-full ${STATE[k].dot}`}></span>{STATE[k].label}</li>
+      ))}
+    </ul>
+  </nav>
 
-  <div class="mt-8 flex flex-col gap-6">
+  <div class="mt-6 flex flex-col gap-8">
     {ATTEMPT_QUESTIONS.map((q) => {
       const changed = perQuestion && q.override;
       return (
-        <article aria-label={`Questão ${q.number}`} class="card card-border bg-base-100">
-          <div class="card-body">
-            <p class="text-sm"><QuestionNumber number={q.number} points={q.points} /></p>
-            <div class="flex flex-wrap items-center justify-between gap-2">
-              <h3 class="text-lg font-semibold">{q.title}</h3>
-              <button type="button" class="btn btn-outline btn-error btn-xs">Zerar</button>
-            </div>
+        <QuestionFrame number={q.number} title={q.title} tone={STATE[stateOf(q)].tone} points={q.points}>
+          <div class="flex flex-wrap items-start justify-between gap-2">
             <p class="text-sm">{q.stem}</p>
-            {q.auto === null ? (
-              <p class="text-muted">Não respondida.</p>
-            ) : q.choices ? (
-              <ul class="flex flex-col gap-1 text-sm">
-                {q.choices.map((c) => (
-                  <li class={`flex items-center gap-2 rounded-field px-3 py-1.5 ${c.chosen ? (c.key ? "bg-success/15" : "bg-error/15") : c.key ? "outline outline-1 outline-success/60" : ""}`}>
-                    <span class="size-4 rounded-full border border-base-content/40" style={c.chosen ? "background: currentColor; box-shadow: inset 0 0 0 3px var(--color-base-100)" : ""}></span>
-                    {c.text}
-                    {c.key && <span class="ml-auto text-xs text-success">gabarito</span>}
-                  </li>
-                ))}
-              </ul>
-            ) : (
-              <p class="rounded-field bg-error/15 px-3 py-1.5 text-sm">{q.text}</p>
-            )}
-
-            {perQuestion ? (
-              <details class="mt-2 border-t border-edge pt-3" open={q.openForm}>
-                <summary class="flex cursor-pointer list-none flex-wrap items-center gap-x-3 gap-y-2">
-                  <span class="tabular-nums">
-                    {changed ? (
-                      <><span class="text-muted line-through">{q.auto === null ? "sem resposta" : `${q.auto}%`}</span> → <strong class="text-success">{q.override?.score}%</strong> <span class="badge badge-info badge-soft badge-sm">alterada à mão</span></>
-                    ) : (
-                      <span class={q.auto === 100 ? "font-semibold text-success" : "font-semibold"}>{q.auto === null ? "0% (sem resposta)" : `${q.auto}%`}</span>
-                    )}
-                  </span>
-                  {changed && <span class="min-w-40 flex-1 text-sm text-muted">{q.override?.comment}{q.auto === null ? " Nota atribuída sem resposta enviada." : ""}</span>}
-                  {!changed && <span class="flex-1"></span>}
-                  {!changed && q.auto !== 100 && <button type="button" class="btn btn-success btn-soft btn-xs">Marcar como certa</button>}
-                  <span class="btn btn-ghost btn-sm btn-square" role="img" aria-label="Alterar nota" title="Alterar nota"><Icon name="pencil" />
-                  </span>
-                  {changed && <button type="button" class="btn btn-ghost btn-sm btn-square text-error" aria-label="Desfazer" title="Desfazer"><Icon name="undo" /></button>}
-                </summary>
-                <form class="mt-3 flex flex-wrap items-end gap-3 rounded-box bg-base-200/40 p-3">
-                  <label class="flex flex-col gap-1 text-xs text-muted">Nota (0 a 100)
-                    <input type="number" min="0" max="100" value={q.override?.score ?? q.auto ?? 0} class="input input-sm w-24 text-base-content" />
-                  </label>
-                  <button type="button" class="btn btn-success btn-soft btn-sm">Marcar como certa</button>
-                  <label class="flex min-w-48 grow flex-col gap-1 text-xs text-muted">Comentário (opcional)
-                    <input type="text" value={q.override?.comment ?? ""} class="input input-sm w-full text-base-content" />
-                  </label>
-                  <button type="button" class="btn btn-primary btn-sm">Salvar</button>
-                  {q.auto === null && <p class="w-full text-xs text-muted">O aluno não enviou resposta. A nota fica registrada sem resposta associada.</p>}
-                </form>
-              </details>
-            ) : (
-              <p class="mt-2 font-semibold tabular-nums">{q.auto === null ? "Não respondida: 0%" : `${q.auto}%`}</p>
-            )}
+            <button type="button" class="btn btn-ghost btn-sm btn-square" aria-label="Alterar nota" title="Alterar nota"><Icon name="pencil" /></button>
           </div>
-        </article>
+          {q.auto === null ? (
+            <p class="text-muted">Não respondida.</p>
+          ) : q.choices ? (
+            <ul class="flex flex-col gap-1 text-sm">
+              {q.choices.map((c) => (
+                <li class={`flex items-center gap-2 rounded-field px-3 py-1.5 ${c.chosen ? (c.key ? "bg-success/15" : "bg-error/15") : c.key ? "outline outline-1 outline-success/60" : ""}`}>
+                  <span class="size-4 rounded-full border border-base-content/40" style={c.chosen ? "background: currentColor; box-shadow: inset 0 0 0 3px var(--color-base-100)" : ""}></span>
+                  {c.text}
+                  {c.key && <span class="ml-auto text-xs text-success">gabarito</span>}
+                </li>
+              ))}
+            </ul>
+          ) : (
+            <p class="rounded-field bg-error/15 px-3 py-1.5 text-sm">{q.text}</p>
+          )}
+
+          {perQuestion ? (
+            <details class="mt-2 border-t border-edge pt-3" open={q.openForm}>
+              <summary class="flex cursor-pointer list-none flex-wrap items-center gap-x-3 gap-y-2">
+                <span class="tabular-nums">
+                  {changed ? (
+                    <><span class="text-muted line-through">{q.auto === null ? "sem resposta" : `${q.auto}%`}</span> → <strong class="text-success">{q.override?.score}%</strong> <span class="badge badge-info badge-soft badge-sm">alterada à mão</span></>
+                  ) : (
+                    <span class={q.auto === 100 ? "font-semibold text-success" : "font-semibold"}>{q.auto === null ? "0% (sem resposta)" : `${q.auto}%`}</span>
+                  )}
+                </span>
+                {changed && <span class="min-w-40 flex-1 text-sm text-muted">{q.override?.comment}{q.auto === null ? " Nota atribuída sem resposta enviada." : ""}</span>}
+                {!changed && <span class="flex-1"></span>}
+                {!changed && q.auto !== 100 && <button type="button" class="btn btn-success btn-soft btn-xs">Marcar como certa</button>}
+                <span class="btn btn-ghost btn-sm btn-square" role="img" aria-label="Alterar nota" title="Alterar nota"><Icon name="pencil" />
+                </span>
+                {changed && <button type="button" class="btn btn-ghost btn-sm btn-square text-error" aria-label="Desfazer" title="Desfazer"><Icon name="undo" /></button>}
+              </summary>
+              <form class="mt-3 flex flex-wrap items-end gap-3 rounded-box bg-base-200/40 p-3">
+                <label class="flex flex-col gap-1 text-xs text-muted">Nota (0 a 100)
+                  <input type="number" min="0" max="100" value={q.override?.score ?? q.auto ?? 0} class="input input-sm w-24 text-base-content" />
+                </label>
+                <button type="button" class="btn btn-success btn-soft btn-sm">Marcar como certa</button>
+                <label class="flex min-w-48 grow flex-col gap-1 text-xs text-muted">Comentário (opcional)
+                  <input type="text" value={q.override?.comment ?? ""} class="input input-sm w-full text-base-content" />
+                </label>
+                <button type="button" class="btn btn-primary btn-sm">Salvar</button>
+                {q.auto === null && <p class="w-full text-xs text-muted">O aluno não enviou resposta. A nota fica registrada sem resposta associada.</p>}
+              </form>
+            </details>
+          ) : (
+            <p class="mt-2 font-semibold tabular-nums">{q.auto === null ? "Não respondida: 0%" : `${q.auto}%`}</p>
+          )}
+        </QuestionFrame>
       );
     })}
   </div>
+  <script>
+    document.addEventListener("click", (e) => {
+      const el = (e.target as Element).closest<HTMLElement>("[data-open]");
+      if (el) window.dispatchEvent(new CustomEvent("open-attempt-dialog", { detail: el.dataset.open }));
+    });
+  </script>
 </Shell>

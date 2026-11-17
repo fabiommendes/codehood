@@ -788,3 +788,68 @@ export const ATTEMPT_QUESTIONS: AttemptQuestion[] = [
 export function studentLabel(s: Student, _names?: boolean): string {
 	return s.name;
 }
+
+export type AttemptStatus =
+	| "entregue"
+	| "pendente"
+	| "sem tentativa"
+	| "ajustada";
+
+/// A student's attempt in the exam the attempt mockups show, with a status spread over the class.
+export interface AttemptListRow {
+	student: Student;
+	/// Mirrors `User.schoolId`; null for a student without one.
+	schoolId: string | null;
+	status: AttemptStatus;
+	/// Exam total out of 100; null while there is nothing to total.
+	total: number | null;
+}
+
+const EXTRA_FIRST = [
+	"Alice",
+	"Caio",
+	"Elisa",
+	"Fábio",
+	"Heitor",
+	"Irene",
+	"Jonas",
+	"Larissa",
+	"Murilo",
+	"Natália",
+	"Otávio",
+	"Paula",
+	"Rafael",
+	"Sofia",
+	"Tiago",
+];
+const EXTRA_LAST = ["Andrade", "Barbosa", "Cardoso"];
+const EXTRA_STUDENTS: Student[] = Array.from({ length: 45 }, (_, i) => {
+	const name = `${EXTRA_FIRST[i % EXTRA_FIRST.length]} ${EXTRA_LAST[Math.floor(i / EXTRA_FIRST.length)]}`;
+	return {
+		id: STUDENTS.length + i + 1,
+		name,
+		username: slug(name),
+		avg: Math.round(38 + ((i * 37) % 58)),
+	};
+});
+
+export const ATTEMPT_LIST: AttemptListRow[] = [
+	...STUDENTS,
+	...EXTRA_STUDENTS,
+].map((student) => {
+	const status: AttemptStatus =
+		student.id === ATTEMPT_STUDENT.id
+			? "ajustada"
+			: student.id % 11 === 0
+				? "sem tentativa"
+				: student.id % 7 === 0
+					? "pendente"
+					: student.id % 5 === 0
+						? "ajustada"
+						: "entregue";
+	const total =
+		status === "sem tentativa" || status === "pendente" ? null : student.avg;
+	const schoolId =
+		student.id % 6 === 0 ? null : String(231012300 + student.id * 7);
+	return { student, schoolId, status, total };
+});
