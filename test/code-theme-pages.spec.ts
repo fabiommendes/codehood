@@ -53,9 +53,14 @@ test("the grading page draws the answer and the model answer in the code themes"
 
 	for (const theme of ["light", "dark"] as const) {
 		await openIn(page, theme, `${world.href}/grading/${QUESTION}?view=list`);
-		for (const selector of ["[data-answer-code]", "[data-model-answer]"]) {
-			const block = page.locator(selector).first();
-			await expect(block).toHaveClass(/code-block/);
+		const model = page.locator("[data-model-answer]").first();
+		await expect(model).toHaveClass(/code-block/);
+		// The answer is a runner widget in review mode, on the editor's surface.
+		const answer = page
+			.locator("[data-code-runner][data-mode=review] [data-editor-static]")
+			.first()
+			.locator("xpath=..");
+		for (const block of [model, answer]) {
 			await expect(block).toHaveCSS("background-color", BACKGROUND[theme]);
 			await expect(
 				block.locator('pre.shiki span[style*="--shiki-dark"]').first(),

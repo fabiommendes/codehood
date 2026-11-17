@@ -45,10 +45,7 @@ const shown = displayAnswer(
 			: undefined,
 );
 const runLanguage =
-	shown.kind === "code" &&
-	question.type === "essay" &&
-	submission &&
-	RUNNER_ORIGIN !== null
+	shown.kind === "code" && submission && RUNNER_ORIGIN !== null
 		? runnerLanguage(shown.highlight)
 		: null;
 const codeHtml =
