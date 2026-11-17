@@ -5,7 +5,7 @@
  */
 
 import { m } from "@/i18n";
-import { type QuestionDocument, ResponseError, scoreBlanks } from "@/mdq";
+import type { QuestionDocument } from "@/mdq";
 import {
 	examResult,
 	type ResultPolicy,
@@ -21,6 +21,7 @@ import {
 } from "./grading";
 import { discriminationFlag, type QuestionStats } from "./question-stats";
 import { responseSummary } from "./response-summary";
+import { reviewResult } from "./review";
 
 /// The fewest students a group needs for its mean on the other questions to show.
 export const GROUP_MEAN_MIN = 3;
@@ -209,6 +210,15 @@ function letter(index: number): string {
 	return head + String.fromCharCode(65 + (index % 26));
 }
 
+/// Text with the inline markdown marks dropped and whitespace collapsed.
+function plain(markdown: string): string {
+	return markdown
+		.replace(/!?\[([^\]]*)\]\([^)]*\)/g, "$1")
+		.replace(/[`*_~]/g, "")
+		.replace(/\s+/g, " ")
+		.trim();
+}
+
 /// The answer's passes oldest first, as `isManualChange` and `autoScoreOf` read them.
 function oldestFirst(answer: ReviewAnswer): GradingPass[] {
 	return [...answer.passes].reverse();
@@ -256,9 +266,9 @@ function groupOf(
 	cell: ResponseCell,
 	members: readonly Member[],
 	total: number,
-	right: boolean,
+	right: boolean | null,
 	reference: number | null,
-	sub?: string,
+	extra: { sub?: string; score?: number | "varies" | null } = {},
 ): AnswerGroup {
 	const rests = members
 		.map(({ answer }) => answer.restMean)
@@ -268,24 +278,34 @@ function groupOf(
 	return {
 		id,
 		cell,
-		...(sub === undefined ? {} : { sub }),
+		...(extra.sub === undefined ? {} : { sub: extra.sub }),
 		count: members.length,
 		share: total === 0 ? 0 : members.length / total,
-		score: commonScore(members),
+		score: extra.score === undefined ? commonScore(members) : extra.score,
 		changed: cards.filter((card) => card.changed).length,
 		mean,
-		review: needsReview({ mean, right }, reference),
+		review: right !== null && needsReview({ mean, right }, reference),
 		members: cards,
 	};
 }
 
-/// The mean on the other questions of whoever got the answer fully right.
+/// Whether the automatic score of `answer` is full, or `null` when it has none.
+function autoFull(answer: ReviewAnswer): boolean | null {
+	const score = autoScoreOf(oldestFirst(answer));
+	return score === null ? null : score >= FULL;
+}
+
+/// Whether a row is right given whether each member is: any full member, `null` when none has a score to judge.
+function rightOf(fulls: readonly (boolean | null)[]): boolean | null {
+	if (fulls.some((full) => full === true)) return true;
+	return fulls.every((full) => full === null) ? null : false;
+}
+
+/// The mean on the other questions of whoever got the answer fully right by the automatic score.
 function referenceMean(answers: readonly ReviewAnswer[]): number | null {
 	return averageOf(
 		answers
-			.filter(
-				(answer) => answer.state === "graded" && (answer.verdict ?? 0) >= FULL,
-			)
+			.filter((answer) => autoFull(answer) === true)
 			.map((answer) => answer.restMean),
 	);
 }
@@ -360,7 +380,7 @@ function choiceSections(
 				},
 				asMembers(list),
 				total,
-				false,
+				null,
 				reference,
 			),
 		);
@@ -377,7 +397,7 @@ function choiceSections(
 				},
 				asMembers(blank),
 				total,
-				false,
+				null,
 				reference,
 			),
 		);
@@ -406,7 +426,7 @@ function selectionSections(
 				kind: "choice",
 				marker: "checkbox",
 				key: choice.correct === true,
-				text: `${letter(index)}. ${choice.text}`,
+				text: `${letter(index)}. ${plain(choice.text)}`,
 			},
 			members.map(({ answer }) => ({
 				answer,
@@ -465,7 +485,7 @@ function selectionSections(
 				{ kind: "text", text: m.grades_objective_others() },
 				rest.map((answer) => ({ answer })),
 				total,
-				false,
+				null,
 				reference,
 			),
 		);
@@ -504,7 +524,7 @@ function statementSections(
 			id,
 			{
 				kind: "statement",
-				text: choice.text,
+				text: plain(choice.text),
 				truth,
 				marked: { true: markedTrue, false: markedFalse },
 			},
@@ -535,17 +555,36 @@ function spelling(text: string): string {
 	return text.replace(/\s+/g, " ").trim();
 }
 
-/**
- * The rows of free texts: those that match once case, accents and spacing are ignored form one row.
- *
- * `texts` holds the answers with their text, in order; a blank text gets its own row.
- */
-function textRows(
-	entries: readonly { answer: ReviewAnswer; text: string }[],
-	total: number,
-	reference: number | null,
-): AnswerGroup[] {
-	const groups = new Map<string, { answer: ReviewAnswer; text: string }[]>();
+/// One answer's text for `textRows`, with whether it is fully right (`null`: nothing to judge by) and its own score.
+interface TextEntry {
+	answer: ReviewAnswer;
+	text: string;
+	full: boolean | null;
+	mark?: number | null;
+}
+
+/// The common score of `marks`, `"varies"` when they differ, `null` with none.
+function commonMark(
+	marks: readonly (number | null)[],
+): number | "varies" | null {
+	const known = marks.filter((mark): mark is number => mark !== null);
+	const [first] = known;
+	if (first === undefined) return null;
+	return known.every((mark) => Math.abs(mark - first) < SAME_SCORE)
+		? first
+		: "varies";
+}
+
+/// The rows of free texts, where texts that match once case, accents and spacing are ignored form one row.
+///
+/// A blank text gets its own row, and no review. A row's score is the entries' `mark` when they have one.
+function textRows(entries: readonly TextEntry[], total: number): AnswerGroup[] {
+	const reference = averageOf(
+		entries
+			.filter((entry) => entry.full === true)
+			.map((entry) => entry.answer.restMean),
+	);
+	const groups = new Map<string, TextEntry[]>();
 	for (const entry of entries) {
 		const key = textKey(entry.text);
 		groups.set(key, [...(groups.get(key) ?? []), entry]);
@@ -567,28 +606,24 @@ function textRows(
 				? {}
 				: { detail: spelling(own) }),
 		}));
-		const row = groupOf(
+		return groupOf(
 			key,
 			{ kind: "text", text },
 			members,
 			total,
-			false,
+			key === "" ? null : rightOf(list.map((entry) => entry.full)),
 			reference,
-			spellings > 1
-				? m.grades_objective_spellings({ count: spellings })
-				: undefined,
+			{
+				...(spellings > 1
+					? { sub: m.grades_objective_spellings({ count: spellings }) }
+					: {}),
+				...(list.some((entry) => entry.mark !== undefined)
+					? { score: commonMark(list.map((entry) => entry.mark ?? null)) }
+					: {}),
+			},
 		);
-		return withRight(row, reference);
 	});
 	return byCount(rows);
-}
-
-/// `row` with `review` set from its own score: a row that is not at full score asks for review by its mean.
-function withRight(row: AnswerGroup, reference: number | null): AnswerGroup {
-	return {
-		...row,
-		review: needsReview({ mean: row.mean, right: row.score === 1 }, reference),
-	};
 }
 
 function shortAnswerSections(
@@ -597,13 +632,14 @@ function shortAnswerSections(
 	const entries = answers.map((answer) => ({
 		answer,
 		text: typeof answer.payload === "string" ? answer.payload : "",
+		full: autoFull(answer),
 	}));
 	return [
 		{
 			kind: "groups",
 			block: "texts",
 			column: "accepted",
-			rows: textRows(entries, answers.length, referenceMean(answers)),
+			rows: textRows(entries, answers.length),
 		},
 	];
 }
@@ -617,7 +653,7 @@ function blankValue(
 	if (blank.type === "multiple-choice") {
 		if (typeof value !== "string" || value === "") return "";
 		const choice = blank.choices.find((entry) => entry.id === value);
-		return choice ? choice.text : m.grades_summary_removed();
+		return choice ? plain(choice.text) : m.grades_summary_removed();
 	}
 	if (typeof value === "object") {
 		const { value: amount, unit } = value as { value?: unknown; unit?: string };
@@ -630,19 +666,20 @@ function blankValue(
 	return String(value).trim();
 }
 
-/// The blanks of each answer that the library scored below full credit.
-function missedBlanks(
+/// The score of each blank of the answer, `null` for one still pending or when the response is not valid.
+function blankMarks(
 	question: Extract<QuestionDocument, { type: "fill-in" }>,
-	payload: unknown,
-): number {
-	try {
-		return Object.values(scoreBlanks(question, payload)).filter(
-			(blank) => blank !== null && blank.score < FULL,
-		).length;
-	} catch (error) {
-		if (error instanceof ResponseError) return 0;
-		throw error;
-	}
+	answer: ReviewAnswer,
+): Record<string, number | null> {
+	const { blanks } = reviewResult(question, answer.payload, {
+		score: answer.verdict,
+	});
+	return Object.fromEntries(
+		question.blanks.map((blank) => [
+			blank.id,
+			blanks?.[blank.id]?.score ?? null,
+		]),
+	);
 }
 
 function fillInSections(
@@ -650,23 +687,31 @@ function fillInSections(
 	answers: readonly ReviewAnswer[],
 ): ReviewSection[] {
 	const values = answers.map((answer) => recordOf(answer.payload));
+	const marks = answers.map((answer) => blankMarks(question, answer));
 	const blanks: ReviewSection[] = question.blanks.map((blank, index) => {
-		const entries = answers.map((answer, at) => ({
-			answer,
-			text: blankValue(blank, values[at]?.[blank.id]),
-		}));
+		const entries = answers.map((answer, at) => {
+			const mark = marks[at]?.[blank.id] ?? null;
+			return {
+				answer,
+				text: blankValue(blank, values[at]?.[blank.id]),
+				full: mark === null ? null : mark >= FULL,
+				mark,
+			};
+		});
 		return {
 			kind: "groups",
 			block: "blank",
 			label: m.grades_objective_blank({ number: index + 1 }),
 			column: "accepted",
-			rows: textRows(entries, answers.length, null),
+			rows: textRows(entries, answers.length),
 		};
 	});
 	const missed = answers
-		.map((answer) => ({
+		.map((answer, at) => ({
 			answer,
-			misses: missedBlanks(question, answer.payload),
+			misses: Object.values(marks[at] ?? {}).filter(
+				(mark) => mark !== null && mark < FULL,
+			).length,
 		}))
 		.filter(({ misses }) => misses > 0)
 		.sort((a, b) => b.misses - a.misses)
@@ -707,6 +752,11 @@ function histogramFrame(
 	};
 }
 
+/// Whether a payload is no answer at all.
+function isBlank(payload: unknown): boolean {
+	return payload === null || payload === undefined || payload === "";
+}
+
 function numericSections(
 	question: Extract<QuestionDocument, { type: "numeric" }>,
 	answers: readonly ReviewAnswer[],
@@ -720,15 +770,14 @@ function numericSections(
 	}
 	const rows = byCount(
 		[...texts.entries()].map(([text, list]) =>
-			withRight(
-				groupOf(
-					text,
-					{ kind: "text", text },
-					list.map((answer) => ({ answer })),
-					total,
-					false,
-					reference,
-				),
+			groupOf(
+				text,
+				{ kind: "text", text },
+				list.map((answer) => ({ answer })),
+				total,
+				list.every((answer) => isBlank(answer.payload))
+					? null
+					: rightOf(list.map(autoFull)),
 				reference,
 			),
 		),
@@ -830,7 +879,7 @@ function orderingSections(
 					{ kind: "text", text: m.grades_summary_blank() },
 					members,
 					answers.length,
-					false,
+					null,
 					reference,
 				);
 			}
@@ -941,10 +990,9 @@ export function answerSections(
 	}
 }
 
-/// The score of a sanctioned answer: the factor applies to a positive score only.
+/// The score of a sanctioned answer: the factor applies to a positive score only, and an unscored one is 0 under a factor of 0.
 function sanctioned(score: number | null, value: number): number | null {
-	if (value === 0) return 0;
-	if (score === null) return null;
+	if (score === null) return value === 0 ? 0 : null;
 	return score > 0 ? score * value : score;
 }
 
@@ -974,7 +1022,7 @@ function overrideRows(
 		const auto = answer?.verdict ?? null;
 		rows.push({
 			author,
-			submission: answer?.submission ?? "",
+			...(answer ? { submission: answer.submission } : {}),
 			kind: "sanction",
 			auto,
 			final: sanctioned(auto, adjustment.value),
@@ -992,6 +1040,7 @@ function overrideRows(
 /// The input of `objectiveReview`.
 interface ObjectiveInput {
 	question: QuestionDocument;
+	/// The question's slug; the model does not read it.
 	slug: string;
 	answers: readonly ReviewAnswer[];
 	stats: Pick<QuestionStats, "correct" | "discrimination">;
