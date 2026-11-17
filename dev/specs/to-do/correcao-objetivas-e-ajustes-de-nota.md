@@ -430,8 +430,12 @@ continua a de fator até T2).
   `src/db/index.ts`, `src/auth/permissions/index.ts`, `src/actions/index.ts`
   e `src/actions/exam-adjustment.ts`, `messages/{pt-BR,en}/*.json`.
 - Aceite: `pnpm run db:reset`, `pnpm run typecheck` e `pnpm run test:unit`
-  saem 0; `grep -ril sanction src prisma messages test` só acha o termo
-  "sanção" como texto de penalidade (e `ExamSanction` em lugar nenhum).
+  saem 0; `ExamSanction`, `examSanction` e `exam-sanction` não aparecem em
+  lugar nenhum. T1 renomeia model, service, permissões e actions; os nomes
+  de conta (`sanctionsByResponse`, `ExamResult.sanction`) ficam com T2, as
+  rotas REST com T3 e os componentes `Sanction*` com T6. Não pode haver
+  release entre T1 e T2: até a T2, um `FACTOR` acima de 1 sozinho dá total
+  acima de 100%.
 - Raio de ação (de `grep -rli sanction`, fora `node_modules`, `.git`,
   `.claude/skills`):
   - `prisma/schema.prisma`;
