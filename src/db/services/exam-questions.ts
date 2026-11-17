@@ -8,6 +8,7 @@
 import type { ExamId } from "@/core/schemas/base";
 import type { ExamTiming, ExceptionTiming } from "@/services/exam-state";
 import type { Prisma, PrismaTx } from "../client";
+import { writeCache } from "../conditional-write";
 import { fromMs } from "../utils";
 
 /// The exam columns {@link examTimingFromDb} reads.
@@ -117,4 +118,60 @@ export async function unsafePinnedDocuments<
 				? byHash.get(`${q.id}:${q.version}`)
 				: byId.get(q.latestId ?? -1)) ?? null,
 	) as (Prisma.QuestionDataGetPayload<{ select: S }> | null)[];
+}
+
+/**
+ * Pins the latest version on every unpinned question of the exam and sets `questionsFrozenAt`.
+ *
+ * It does nothing for a `PRACTICE` exam or one that is already frozen, and leaves a pinned question and a question with no version as they are. Each pin is written only where `version` is still null, so two concurrent calls agree. The stamp keeps the exam's `updatedAt`: freezing is a side effect of an attempt, not an edit that a client holding the old version should lose to.
+ */
+export async function freezeQuestionVersions(
+	tx: PrismaTx,
+	examId: ExamId,
+): Promise<void> {
+	const exam = await tx.exam.findUnique({
+		where: { id: examId },
+		select: { type: true, questionsFrozenAt: true },
+	});
+	if (!exam || exam.type === "PRACTICE" || exam.questionsFrozenAt) return;
+
+	const unpinned = await tx.questionsForExam.findMany({
+		where: { examId, version: null },
+		select: {
+			questionRefId: true,
+			questionRef: { select: { latest: { select: { versionHash: true } } } },
+		},
+	});
+	for (const row of unpinned) {
+		const hash = row.questionRef.latest?.versionHash;
+		if (!hash) continue;
+		await tx.questionsForExam.updateMany({
+			where: { examId, questionRefId: row.questionRefId, version: null },
+			data: { version: hash },
+		});
+	}
+	await writeCache(
+		tx,
+		"exam",
+		{ id: examId },
+		{
+			questionsFrozenAt: new Date(),
+		},
+	);
+}
+
+/** The latest version of each question ref in `refIds`, by ref id; a question with no version is absent. */
+export async function latestVersions(
+	tx: PrismaTx,
+	refIds: number[],
+): Promise<Map<number, string>> {
+	const refs = await tx.questionRef.findMany({
+		where: { id: { in: refIds } },
+		select: { id: true, latest: { select: { versionHash: true } } },
+	});
+	return new Map(
+		refs.flatMap((ref) =>
+			ref.latest ? [[ref.id, ref.latest.versionHash] as const] : [],
+		),
+	);
 }

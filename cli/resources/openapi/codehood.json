@@ -731,6 +731,11 @@
             "nullable": true,
             "format": "date-time"
           },
+          "questionsFrozenAt": {
+            "type": "string",
+            "nullable": true,
+            "format": "date-time"
+          },
           "author": {
             "type": "string"
           },
@@ -835,6 +840,7 @@
           "allowCodeRun",
           "answerHistory",
           "gradesReleasedAt",
+          "questionsFrozenAt",
           "author",
           "rev",
           "tags",
@@ -12097,6 +12103,11 @@
                             "nullable": true,
                             "format": "date-time"
                           },
+                          "questionsFrozenAt": {
+                            "type": "string",
+                            "nullable": true,
+                            "format": "date-time"
+                          },
                           "author": {
                             "type": "string"
                           },
@@ -12201,6 +12212,7 @@
                           "allowCodeRun",
                           "answerHistory",
                           "gradesReleasedAt",
+                          "questionsFrozenAt",
                           "author",
                           "rev",
                           "tags",
@@ -12564,6 +12576,11 @@
                       "nullable": true,
                       "format": "date-time"
                     },
+                    "questionsFrozenAt": {
+                      "type": "string",
+                      "nullable": true,
+                      "format": "date-time"
+                    },
                     "author": {
                       "type": "string"
                     },
@@ -12668,6 +12685,7 @@
                     "allowCodeRun",
                     "answerHistory",
                     "gradesReleasedAt",
+                    "questionsFrozenAt",
                     "author",
                     "rev",
                     "tags",
@@ -12833,6 +12851,11 @@
                       "nullable": true,
                       "format": "date-time"
                     },
+                    "questionsFrozenAt": {
+                      "type": "string",
+                      "nullable": true,
+                      "format": "date-time"
+                    },
                     "author": {
                       "type": "string"
                     },
@@ -12937,6 +12960,7 @@
                     "allowCodeRun",
                     "answerHistory",
                     "gradesReleasedAt",
+                    "questionsFrozenAt",
                     "author",
                     "rev",
                     "tags",
@@ -13283,6 +13307,11 @@
                       "nullable": true,
                       "format": "date-time"
                     },
+                    "questionsFrozenAt": {
+                      "type": "string",
+                      "nullable": true,
+                      "format": "date-time"
+                    },
                     "author": {
                       "type": "string"
                     },
@@ -13387,6 +13416,7 @@
                     "allowCodeRun",
                     "answerHistory",
                     "gradesReleasedAt",
+                    "questionsFrozenAt",
                     "author",
                     "rev",
                     "tags",
@@ -13608,6 +13638,11 @@
                       "nullable": true,
                       "format": "date-time"
                     },
+                    "questionsFrozenAt": {
+                      "type": "string",
+                      "nullable": true,
+                      "format": "date-time"
+                    },
                     "author": {
                       "type": "string"
                     },
@@ -13712,6 +13747,7 @@
                     "allowCodeRun",
                     "answerHistory",
                     "gradesReleasedAt",
+                    "questionsFrozenAt",
                     "author",
                     "rev",
                     "tags",

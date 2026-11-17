@@ -25,6 +25,7 @@ function exam(overrides: Partial<Exam> = {}): Exam {
 		allowCodeRun: null,
 		answerHistory: null,
 		gradesReleasedAt: null,
+		questionsFrozenAt: null,
 		author: "instructor",
 		rev: null,
 		tags: [],

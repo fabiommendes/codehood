@@ -15,6 +15,7 @@ import { realAttempt } from "./preview-filter";
 import {
 	examTimingFromDb,
 	examTimingSelect,
+	freezeQuestionVersions,
 	loadExceptionTiming,
 } from "./services/exam-questions";
 import { valueOrNotFound } from "./utils";
@@ -131,6 +132,7 @@ export async function attemptOrEmpty(
 			},
 			select: { id: true, publicId: true },
 		});
+		await freezeQuestionVersions(tx, input.examId);
 		return { ...created, created: true };
 	} catch (error) {
 		// A concurrent create won the unique `(author, exam, slotKey)`: use its attempt.

@@ -76,6 +76,9 @@ export const examSchema = z.object({
 	/// When the instructor released an `EXAM`'s grades. Read-only here.
 	gradesReleasedAt: z.date().nullable(),
 
+	/// When the versions of the questions were frozen. Output only.
+	questionsFrozenAt: z.date().nullable(),
+
 	author: z.string(),
 	rev: rev.nullable(),
 
@@ -112,6 +115,7 @@ export const examCreate = examSchema
 		extraTime: true,
 		answerHistory: true,
 		gradesReleasedAt: true,
+		questionsFrozenAt: true,
 		createdAt: true,
 		updatedAt: true,
 	})

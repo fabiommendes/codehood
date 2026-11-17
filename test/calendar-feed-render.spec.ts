@@ -81,6 +81,7 @@ function examEntry(overrides: Partial<Exam> = {}): CalendarEntry {
 		allowCodeRun: null,
 		answerHistory: null,
 		gradesReleasedAt: null,
+		questionsFrozenAt: null,
 		author: "ada",
 		rev: null,
 		tags: [],

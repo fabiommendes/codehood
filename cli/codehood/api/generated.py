@@ -595,6 +595,7 @@ class Exam(Model):
     allow_code_run: bool | None = Field(alias="allowCodeRun")
     answer_history: bool | None = Field(alias="answerHistory")
     grades_released_at: str | None = Field(alias="gradesReleasedAt")
+    questions_frozen_at: str | None = Field(alias="questionsFrozenAt")
     author: str
     rev: str | None
     tags: list[str]

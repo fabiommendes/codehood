@@ -45,6 +45,8 @@ import { courseContentsWhere } from "@/db/services/course.service";
 import {
 	examTimingFromDb,
 	examTimingSelect,
+	freezeQuestionVersions,
+	latestVersions,
 	loadExceptionTiming,
 	unsafePinnedDocument,
 	unsafePinnedDocuments,
@@ -417,7 +419,7 @@ const buildExamService = (deps: Deps) =>
 				const exam = await writableExam(tx, filter, opts, "exam.update");
 				// Before the validation: a stale caller changes nothing and sees no 400.
 				await checkVersion(tx, "exam", { id: exam.id }, opts);
-				const questions = fields.questions
+				const resolved = fields.questions
 					? await resolveQuestions(tx, exam.courseId, fields.questions)
 					: undefined;
 				const attachments = await prepareAttachments(tx, deps, fields, opts);
@@ -438,6 +440,13 @@ const buildExamService = (deps: Deps) =>
 						});
 					}
 				}
+
+				// Completing the exam freezes the versions before its questions are rewritten.
+				if (fields.status === "COMPLETED") {
+					await freezeQuestionVersions(tx, exam.id as ExamId);
+				}
+				const questions =
+					resolved && (await keepPins(tx, exam.id as ExamId, resolved));
 
 				// The tags and questions are owned children of the exam: replacing them
 				// is part of this write, which moves the exam's version.
@@ -527,6 +536,7 @@ const buildExamService = (deps: Deps) =>
 					});
 				}
 
+				await freezeQuestionVersions(tx, exam.id as ExamId);
 				let row: DbExam;
 				if (exam.status === "COMPLETED") {
 					row = await tx.exam.findUniqueOrThrow({
@@ -658,6 +668,7 @@ const buildExamService = (deps: Deps) =>
 					});
 				}
 
+				await freezeQuestionVersions(tx, row.id as ExamId);
 				const updated = await guardedUpdate(
 					tx,
 					"exam",
@@ -1051,6 +1062,38 @@ async function resolveQuestions(
 	}));
 }
 
+/// `questions` as they are written to a frozen exam: a question that stays keeps its pin and the version sent is ignored, a new one is pinned to its latest version. An exam that is not frozen takes `questions` as they are.
+async function keepPins(
+	tx: PrismaTx,
+	examId: ExamId,
+	questions: Awaited<ReturnType<typeof resolveQuestions>>,
+): ReturnType<typeof resolveQuestions> {
+	const exam = await tx.exam.findUniqueOrThrow({
+		where: { id: examId },
+		select: { type: true, questionsFrozenAt: true },
+	});
+	if (exam.type === "PRACTICE" || !exam.questionsFrozenAt) return questions;
+
+	const current = new Map(
+		(
+			await tx.questionsForExam.findMany({
+				where: { examId },
+				select: { questionRefId: true, version: true },
+			})
+		).map((row) => [row.questionRefId, row.version]),
+	);
+	const latest = await latestVersions(
+		tx,
+		questions.map((q) => q.questionRefId).filter((id) => !current.has(id)),
+	);
+	return questions.map((q) => ({
+		...q,
+		version: current.has(q.questionRefId)
+			? (current.get(q.questionRefId) ?? null)
+			: (latest.get(q.questionRefId) ?? null),
+	}));
+}
+
 /** One of the four fixed groups the student exam list renders, empty groups omitted. */
 export interface ExamGroup {
 	key: "open" | "practice" | "upcoming" | "past";
@@ -1373,6 +1416,7 @@ function fromDb(
 		extraTime: fromMs(row.extraTimeMs),
 		author: row.authorId,
 		gradesReleasedAt: row.gradesReleasedAt,
+		questionsFrozenAt: row.questionsFrozenAt,
 		rev: row.rev,
 		tags: row.examTags.map((t) => t.tag),
 		questions:
