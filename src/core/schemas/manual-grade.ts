@@ -12,3 +12,10 @@ export const unansweredGrade = z.object({
 	score: z.string(),
 	comment: z.string().nullish(),
 });
+
+/// What undoing a change by hand takes: the answer is the submission's `publicId`, checked against the course and exam.
+export const manualChangeRevert = z.object({
+	course: courseRef,
+	exam: slug,
+	submission: z.string().min(1),
+});

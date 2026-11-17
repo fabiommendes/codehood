@@ -1,5 +1,8 @@
 import type { z } from "zod";
-import { unansweredGrade } from "@/core/schemas/manual-grade";
+import {
+	manualChangeRevert,
+	unansweredGrade,
+} from "@/core/schemas/manual-grade";
 import { submissionSchema } from "@/core/schemas/submission";
 import type { ServiceOptsWithoutTx } from "@/db/base-service";
 import { defineService, op } from "@/db/define-service";
@@ -33,5 +36,27 @@ export const makeManualGradeService = defineService()(() => {
 		},
 	});
 
-	return { gradeUnanswered };
+	/**
+	 * Undoes a change by hand: writes a pass by the actor whose `ref` starts with `REVERT_REF_PREFIX` and whose score is
+	 * the automatic one (`autoScoreOf`), or 0 when the answer has no automatic pass (an instructor-created submission).
+	 *
+	 * Deletes nothing: the history stays and the new pass is the newest, so `isManualChange` turns false.
+	 *
+	 * @throws {@link NotFound} the submission, or one that belongs to another course or exam.
+	 * @throws {@link NotAllowed} actor lacks `course.update-contents` on the course.
+	 * @throws {@link InvalidData} keyed on `submission` when the answer is not a change by hand.
+	 */
+	const revert = op({
+		args: [manualChangeRevert],
+		returns: submissionSchema,
+		run: async (
+			_tx: PrismaTx,
+			_input: z.input<typeof manualChangeRevert>,
+			_opts: ServiceOptsWithoutTx,
+		): Promise<Submission> => {
+			throw new Error("not implemented");
+		},
+	});
+
+	return { gradeUnanswered, revert };
 });
