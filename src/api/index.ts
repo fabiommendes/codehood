@@ -251,10 +251,10 @@ const examAdjustmentEntity = schema.examAdjustmentSchema
 	});
 
 export const examAdjustmentApi = CRUD(
-	"/api/course/[discipline]/[course]/exam/[slug]/sanction",
+	"/api/course/[discipline]/[course]/exam/[slug]/adjustment",
 	{
-		name: "Exam Sanction",
-		plural: "Exam Sanctions",
+		name: "Exam Adjustment",
+		plural: "Exam Adjustments",
 		keySegment: "/[publicId]",
 
 		entity: examAdjustmentEntity,
@@ -292,10 +292,10 @@ export const examAdjustmentApi = CRUD(
 );
 
 export const examAdjustmentCreateApi = POST(
-	"/api/course/[discipline]/[course]/exam/[slug]/sanction",
+	"/api/course/[discipline]/[course]/exam/[slug]/adjustment",
 	{
 		in: schema.examAdjustmentCreateBody,
-		out: z.array(examAdjustmentEntity.openapi("Exam Sanction")),
+		out: z.array(examAdjustmentEntity.openapi("Exam Adjustment")),
 		summary: "Adjust the score of one or more students on an exam.",
 		description:
 			"Creates one adjustment per student of `usernames`, all or none, and answers them in that order. `op` is `SET` (replaces the exam total), `FACTOR` (multiplies it, or one question) or `OFFSET` (adds to it), and `value` is a decimal string: `SET` in [0, 1], `FACTOR` in [0, 2], `OFFSET` in [-1, 1] and not 0. `question` narrows the adjustment to one question of the exam, which only takes a `FACTOR` below 1; without it the adjustment hits the exam total. Only the course's instructor, by session or CLI key; a BOT key gets 403. A student without a real attempt, or that already has an active `SET`, or an active adjustment on the same question, is a 400 keyed on `usernames`. A `value` the operation refuses is a 400 keyed on `value`.",
@@ -314,12 +314,12 @@ export const examAdjustmentCreateApi = POST(
 );
 
 export const examAdjustmentRevokeApi = POST(
-	"/api/course/[discipline]/[course]/exam/[slug]/sanction/[publicId]/revoke",
+	"/api/course/[discipline]/[course]/exam/[slug]/adjustment/[publicId]/revoke",
 	{
-		out: examAdjustmentEntity.openapi("Exam Sanction"),
+		out: examAdjustmentEntity.openapi("Exam Adjustment"),
 		summary: "Revoke an adjustment of an exam.",
 		description:
-			"Lifts an active sanction and answers it with `revokedAt` and `revokedBy` set. The row stays as a record. Revoking a revoked sanction is a 409. Only the course's instructor, by session or CLI key; a BOT key gets 403.",
+			"Lifts an active adjustment and answers it with `revokedAt` and `revokedBy` set. The row stays as a record. Revoking a revoked adjustment is a 409. Only the course's instructor, by session or CLI key; a BOT key gets 403.",
 		operationId: "examAdjustmentRevoke",
 		tags: ["Exams"],
 		versioned: true,

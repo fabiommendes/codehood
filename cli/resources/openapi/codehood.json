@@ -1166,7 +1166,7 @@
           "username"
         ]
       },
-      "Exam Sanction": {
+      "Exam Adjustment": {
         "type": "object",
         "properties": {
           "publicId": {
@@ -14438,10 +14438,10 @@
         }
       }
     },
-    "/api/course/{discipline}/{course}/exam/{slug}/sanction/{publicId}": {
+    "/api/course/{discipline}/{course}/exam/{slug}/adjustment/{publicId}": {
       "get": {
-        "operationId": "readExam-sanction",
-        "summary": "Find a single Exam Sanction.",
+        "operationId": "readExam-adjustment",
+        "summary": "Find a single Exam Adjustment.",
         "tags": [
           "Exams"
         ],
@@ -14592,8 +14592,8 @@
         }
       },
       "patch": {
-        "operationId": "updateExam-sanction",
-        "summary": "Update a single Exam Sanction.",
+        "operationId": "updateExam-adjustment",
+        "summary": "Update a single Exam Adjustment.",
         "tags": [
           "Exams"
         ],
@@ -14799,10 +14799,10 @@
         }
       }
     },
-    "/api/course/{discipline}/{course}/exam/{slug}/sanction": {
+    "/api/course/{discipline}/{course}/exam/{slug}/adjustment": {
       "get": {
-        "operationId": "listExam-sanction",
-        "summary": "Find multiple Exam Sanctions.",
+        "operationId": "listExam-adjustment",
+        "summary": "Find multiple Exam Adjustments.",
         "tags": [
           "Exams"
         ],
@@ -15070,7 +15070,7 @@
                 "schema": {
                   "type": "array",
                   "items": {
-                    "$ref": "#/components/schemas/Exam Sanction"
+                    "$ref": "#/components/schemas/Exam Adjustment"
                   }
                 }
               }
@@ -15079,11 +15079,11 @@
         }
       }
     },
-    "/api/course/{discipline}/{course}/exam/{slug}/sanction/{publicId}/revoke": {
+    "/api/course/{discipline}/{course}/exam/{slug}/adjustment/{publicId}/revoke": {
       "post": {
         "operationId": "examAdjustmentRevoke",
         "summary": "Revoke an adjustment of an exam.",
-        "description": "Lifts an active sanction and answers it with `revokedAt` and `revokedBy` set. The row stays as a record. Revoking a revoked sanction is a 409. Only the course's instructor, by session or CLI key; a BOT key gets 403.",
+        "description": "Lifts an active adjustment and answers it with `revokedAt` and `revokedBy` set. The row stays as a record. Revoking a revoked adjustment is a 409. Only the course's instructor, by session or CLI key; a BOT key gets 403.",
         "tags": [
           "Exams"
         ],
@@ -15137,7 +15137,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/Exam Sanction"
+                  "$ref": "#/components/schemas/Exam Adjustment"
                 }
               }
             }
