@@ -13,6 +13,12 @@
   na tabela de notas. O aluno vê a sanção junto com a nota liberada e não pede
   revisão do que foi sancionado. REST em
   `/api/course/{discipline}/{course}/exam/{slug}/sanction`.
+- Janela do editor de código: barra de título com o nome do arquivo e três
+  bolinhas que deixam o editor na página, recolhido à barra de título ou
+  maximizado sobre a área de conteúdo. Maximizado, o enunciado fica num painel
+  lateral que pode ser escondido. Esc sai do modo maximizado, exceto dentro do
+  editor. Vale nos trechos de código das notas e recursos e nas respostas de
+  código das provas.
 
 ### Changed
 

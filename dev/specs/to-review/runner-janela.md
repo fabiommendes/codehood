@@ -1,6 +1,6 @@
 ---
 type: spec
-status: to-do
+status: to-review
 tags: [runner, editor, ui]
 relatedTo: [runner-widget, code-question]
 created: 2026-11-17

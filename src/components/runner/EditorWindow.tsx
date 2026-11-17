@@ -37,6 +37,8 @@ export interface EditorWindowProps {
 	below?: JSX.Element;
 	/// Shows `below` while the window is collapsed (a run produced output).
 	peek?: boolean;
+	/// The state the window starts in. Maximized is not allowed: it pins the shell bars, so it is reached by a click.
+	initialState?: Exclude<WindowState, "maximized">;
 	/// Called once the window is maximized, to move the focus into the host's editor.
 	onFocusEditor?: () => void;
 	/// Called after every change of state.
@@ -82,7 +84,9 @@ let windows = 0;
 /** A code editor in a window frame whose dots work. */
 export default function EditorWindow(props: EditorWindowProps): JSX.Element {
 	const id = ++windows;
-	const [state, setState] = createSignal<WindowState>("inline");
+	const [state, setState] = createSignal<WindowState>(
+		props.initialState ?? "inline",
+	);
 	const [box, setBox] = createSignal({ top: 0, left: 0 });
 	const [held, setHeld] = createSignal(0);
 	const [stemOpen, setStemOpen] = createSignal(true);

@@ -1,4 +1,5 @@
 ---
+import EditorWindowDemo from "@/components/design/EditorWindowDemo";
 // Diagnostic page of the client-side runner: pick a driver, write code and
 // stdin, run and stop it, and watch status, output, the stdin transport in use
 // and timings. Meant for developers; the real editor and terminal come later.
@@ -16,6 +17,10 @@ const widgetsView = Astro.url.searchParams.get("view") === "widgets";
 const reviewView = Astro.url.searchParams.get("view") === "review";
 // `?view=review-orphan` renders a `review` widget with no submission, which must fail.
 const orphanView = Astro.url.searchParams.get("view") === "review-orphan";
+const themes = [
+	{ id: "codehood", title: "Cerrado (light)" },
+	{ id: "codehood-dark", title: "Forest (dark)" },
+] as const;
 const reviewSubmissions = [
 	{
 		id: "sub-a",
@@ -185,6 +190,28 @@ const reviewSubmissions = [
             <dd id="t-exit">-</dd>
           </dl>
         </div>
+      )
+    }
+
+    {
+      !widgetsView && !reviewView && !orphanView && (
+        <section class="mt-14" id="editor-window">
+          <h2 class="text-xl font-bold">Editor window</h2>
+          <p class="mt-2 max-w-2xl text-base-content/70">
+            The window in its inline and collapsed states, in both themes. The
+            maximized state is not shown here: it pins the shell bars over the
+            page, so it needs a click on the middle dot of a window.
+          </p>
+          {themes.map((theme) => (
+            <div data-theme={theme.id} class="mt-6 rounded-box bg-base-100 p-6 text-base-content">
+              <p class="mb-4 text-sm font-semibold">{theme.title}</p>
+              <div class="grid gap-6 lg:grid-cols-2">
+                <EditorWindowDemo client:load initialState="inline" />
+                <EditorWindowDemo client:load initialState="collapsed" />
+              </div>
+            </div>
+          ))}
+        </section>
       )
     }
   </div>

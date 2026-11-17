@@ -283,6 +283,15 @@ An invite fixes the [Role](#role) it grants and expires. Redeeming it creates
 the [User](#user). Comes in two kinds: [Personal](#personal-invite) and
 [Classroom](#classroom-invite).
 
+## Janela do editor
+
+Type: domain
+
+The frame of a code editor in a page: a title bar with the file name and three
+dots that put it inline, collapsed to the title bar, or maximized over the
+content. Call it the editor window, not "runner": the [Runner](#runner) is the
+sandbox that executes the code.
+
 ## Lacuna de edição
 
 Also: edit gap
