@@ -311,6 +311,21 @@ test("Ctrl+D adds the next occurrence as another cursor", async ({ page }) => {
 	expect(await lines(w)).toEqual(["bar + bar"]);
 });
 
+test("Esc drops the extra cursors and keeps the first selection", async ({
+	page,
+}) => {
+	await open(page);
+	const w = widget(page, 1);
+	await setCode(w, "foo + foo");
+	const content = w.locator(".cm-content");
+	await content.press("Control+Home");
+	await content.press("Control+D");
+	await content.press("Control+D");
+	await content.press("Escape");
+	await page.keyboard.type("bar");
+	expect(await lines(w)).toEqual(["bar + foo"]);
+});
+
 test("typing offers completions, and Tab accepts one", async ({ page }) => {
 	await open(page);
 	const w = widget(page, 1);

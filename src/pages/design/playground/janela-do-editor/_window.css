@@ -1,0 +1,36 @@
+/* The window morphs between its inline place and the content area: the
+   snapshots are clipped, not scaled, so the code does not stretch. */
+::view-transition-group(*.editor-window) {
+	animation-duration: 220ms;
+	animation-timing-function: cubic-bezier(0.2, 0.8, 0.2, 1);
+	overflow: clip;
+}
+
+::view-transition-old(*.editor-window),
+::view-transition-new(*.editor-window) {
+	height: 100%;
+	width: 100%;
+	object-fit: none;
+	object-position: left top;
+}
+
+/* No cross-fade: two half-transparent snapshots let the page show through.
+   The new state is drawn opaque from the start and the box grows around it. */
+::view-transition-old(*.editor-window) {
+	display: none;
+}
+
+::view-transition-new(*.editor-window) {
+	animation: none;
+}
+
+/* The rest of the page does not change: no cross-fade of the whole page. */
+::view-transition-old(root),
+::view-transition-new(root) {
+	animation: none;
+}
+
+/* The page behind does not scroll while a window is maximized. */
+html.editor-window-open {
+	overflow: hidden;
+}

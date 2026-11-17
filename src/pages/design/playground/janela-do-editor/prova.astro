@@ -1,0 +1,67 @@
+---
+// Prototype of the editor window in an exam: the exam bar stays above the
+// maximized window, and the stem moves into a side panel of the window.
+import AppLayout from "@/layouts/AppLayout.astro";
+import EditorWindow from "./_EditorWindow";
+
+export const prerender = false;
+
+const stem = `
+<h3>Questão 3: soma de uma lista</h3>
+<p>Escreva a função <code>soma(valores)</code>, que devolve a soma dos números da lista.
+Uma lista vazia soma 0.</p>
+<p><strong>Exemplos</strong></p>
+<pre><code>soma([1, 2, 3])  # 6
+soma([])         # 0
+soma([-1, 1])    # 0</code></pre>
+<p>Não use a função <code>sum</code> da biblioteca padrão.</p>
+`;
+---
+
+<AppLayout title="Prova (protótipo)">
+  <div data-shell-bar class="sticky top-16 z-20 -mx-4 border-b border-edge bg-base-100 px-4 py-3">
+    <div class="flex flex-wrap items-center gap-x-4 gap-y-1 text-sm">
+      <span class="font-semibold tabular-nums text-warning">00:42:17</span>
+      <span class="text-muted">3 de 5 respondidas</span>
+      <span class="badge badge-soft badge-success badge-sm">Roda código</span>
+      <span class="hidden sm:inline">Todas as respostas salvas</span>
+    </div>
+    <nav aria-label="Questões" class="mt-2 flex gap-1.5">
+      {[1, 2, 3, 4, 5].map((n) => (
+        <a href={`#q${n}`} class={`btn btn-sm h-11 w-12 font-mono ${n === 3 ? "btn-outline border-base-content/70" : ""}`}>{n}</a>
+      ))}
+    </nav>
+  </div>
+
+  <section id="q3" class="mt-8">
+    <div class="prose max-w-none" set:html={stem} />
+    <div class="mt-4">
+      <EditorWindow
+        client:load
+        filename="soma.py"
+        language="python"
+        stemHtml={stem}
+        exam
+        code={`def soma(valores):\n    total = 0\n    for v in valores:\n        total += v\n    return total\n`}
+      />
+    </div>
+  </section>
+
+  <section id="q4" class="mt-12">
+    <div class="prose max-w-none">
+      <h3>Questão 4: explique a recursão</h3>
+      <p>Escreva uma função recursiva que calcule o fatorial e comente cada caso.</p>
+    </div>
+    <div class="mt-4">
+      <EditorWindow
+        client:load
+        filename="fatorial.py"
+        language="python"
+        stemHtml="<h3>Questão 4: explique a recursão</h3><p>Escreva uma função recursiva que calcule o fatorial e comente cada caso.</p>"
+        code={`def fatorial(n):\n    # caso base\n    if n == 0:\n        return 1\n    return n * fatorial(n - 1)\n`}
+      />
+    </div>
+  </section>
+
+  <div class="h-96" />
+</AppLayout>

@@ -257,6 +257,9 @@ export async function createEditor(
 						preventDefault: true,
 					},
 				]),
+				// Esc drops extra cursors and selections, as in VS Code; with a
+				// single cursor it does nothing, so Esc then Tab still leaves.
+				keymap.of([{ key: "Escape", run: commands.simplifySelection }]),
 				keymap.of(vscode.vscodeKeymap),
 				commands.history(),
 				EditorState.allowMultipleSelections.of(true),
