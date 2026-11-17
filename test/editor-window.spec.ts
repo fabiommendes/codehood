@@ -132,8 +132,11 @@ async function geometry(page: Page): Promise<Geometry> {
 	});
 }
 
-async function expectCoversContentArea(page: Page) {
-	await expect(win(page, 0)).toHaveAttribute("data-window-state", "maximized");
+async function expectCoversContentArea(page: Page, index = 0) {
+	await expect(win(page, index)).toHaveAttribute(
+		"data-window-state",
+		"maximized",
+	);
 	// The view transition may still be running.
 	await expect
 		.poll(async () => {
@@ -693,5 +696,124 @@ test.describe("view transitions (R23, R24, A8)", () => {
 		await dot(win(page), "collapsed").click();
 		await expect(win(page)).toHaveAttribute("data-window-state", "collapsed");
 		expect(await count(page)).toBe(0);
+	});
+});
+
+test.describe("review findings", () => {
+	test("a second window maximized after the first covers the area and keeps the breadcrumb pinned", async ({
+		page,
+	}) => {
+		await open(page);
+		const bar = page.locator("[data-breadcrumbs]");
+		const position = () => bar.evaluate((el) => getComputedStyle(el).position);
+		const before = await bar.evaluate((el) => el.getAttribute("style") ?? "");
+		await dot(win(page, 0), "maximized").click();
+		await expect(win(page, 0)).toHaveAttribute(
+			"data-window-state",
+			"maximized",
+		);
+		// The first window hides the second one's dots: dispatch the click.
+		await dot(win(page, 1), "maximized").dispatchEvent("click");
+		await expect(win(page, 1)).toHaveAttribute(
+			"data-window-state",
+			"maximized",
+		);
+		await expect(win(page, 0)).toHaveAttribute("data-window-state", "inline");
+		await expectCoversContentArea(page, 1);
+		await expect.poll(position).toBe("fixed");
+		await dot(win(page, 1), "maximized").click();
+		await expect(win(page, 1)).toHaveAttribute("data-window-state", "inline");
+		await expect
+			.poll(() => bar.evaluate((el) => el.getAttribute("style") ?? ""))
+			.toBe(before);
+		expect(await position()).toBe("sticky");
+	});
+
+	test("two fast clicks on the green dot keep the spacer at the inline height", async ({
+		page,
+	}) => {
+		await open(page);
+		const w = win(page, 0);
+		const heightBefore = (await w.boundingBox())?.height ?? 0;
+		await dot(w, "maximized").evaluate((button) => {
+			(button as HTMLButtonElement).click();
+			(button as HTMLButtonElement).click();
+		});
+		await page.waitForTimeout(600);
+		const spacers = await widget(page, 0).evaluate((root) =>
+			[...root.querySelectorAll<HTMLElement>('[aria-hidden="true"]')]
+				.filter(
+					(el) =>
+						el.tagName.toLowerCase() !== "svg" &&
+						!el.closest("svg") &&
+						(el.textContent ?? "").trim() === "" &&
+						el.querySelector("button, input, a") === null &&
+						el.offsetHeight > 50,
+				)
+				.map((el) => el.offsetHeight),
+		);
+		for (const height of spacers)
+			expect(Math.abs(height - heightBefore)).toBeLessThan(2);
+		const state = await w.getAttribute("data-window-state");
+		expect(spacers).toHaveLength(state === "maximized" ? 1 : 0);
+	});
+
+	test("resizing the viewport while maximized still covers the content area", async ({
+		page,
+	}) => {
+		await open(page);
+		await dot(win(page), "maximized").click();
+		await expectCoversContentArea(page);
+		await page.setViewportSize({ width: 1180, height: 640 });
+		await expectCoversContentArea(page);
+		await page.setViewportSize({ width: 1440, height: 900 });
+		await expectCoversContentArea(page);
+	});
+
+	test("Esc on a title bar action goes back inline", async ({ page }) => {
+		await open(page);
+		const w = win(page, 0);
+		await dot(w, "maximized").click();
+		await expect(w).toHaveAttribute("data-window-state", "maximized");
+		await widget(page, 0).locator("[data-action=run]").focus();
+		await expect(widget(page, 0).locator("[data-action=run]")).toBeFocused();
+		await page.keyboard.press("Escape");
+		await expect(w).toHaveAttribute("data-window-state", "inline");
+	});
+
+	test("while maximized the content outside the window is inert and Tab stays out of it", async ({
+		page,
+	}) => {
+		await open(page);
+		const inertCount = () =>
+			page.evaluate(() => document.querySelectorAll("#content [inert]").length);
+		const before = await inertCount();
+		const w = win(page, 0);
+		await dot(w, "maximized").click();
+		await expect(w).toHaveAttribute("data-window-state", "maximized");
+		// The second snippet lies behind the window.
+		await expect
+			.poll(() =>
+				widget(page, 1).evaluate((el) => el.closest("[inert]") !== null),
+			)
+			.toBe(true);
+		const escaped: string[] = [];
+		for (let i = 0; i < 30; i++) {
+			await page.keyboard.press(i < 20 ? "Tab" : "Shift+Tab");
+			const outside = await page.evaluate(() => {
+				const active = document.activeElement;
+				const win = document.querySelector("[data-window-state=maximized]");
+				if (!active || !win) return null;
+				const inContent = active.closest("#content") !== null;
+				const allowed =
+					win.contains(active) || active.closest("[data-shell-bar]") !== null;
+				return inContent && !allowed ? active.outerHTML.slice(0, 80) : null;
+			});
+			if (outside) escaped.push(outside);
+		}
+		expect(escaped).toEqual([]);
+		await dot(w, "maximized").click();
+		await expect(w).toHaveAttribute("data-window-state", "inline");
+		await expect.poll(inertCount).toBe(before);
 	});
 });

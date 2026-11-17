@@ -196,7 +196,7 @@ export function CodeRunner(props: CodeRunnerProps): JSX.Element {
 	/// Course material: no toolbar, code in an editor window with Run in its
 	/// title bar, and the terminal hidden until the first run.
 	const minimal = props.mode === "snippet";
-	/// The code sits in daisyUI's code mockup: course snippets and editable answers. A submission under review stays plain.
+	/// The code has a frame: a snippet sits in the editor window and an answer in daisyUI's code mockup. A submission under review stays plain.
 	const framed = minimal || props.mode === "answer";
 	const [terminalShown, setTerminalShown] = createSignal(
 		!props.compact && !minimal,
@@ -661,18 +661,12 @@ export function CodeRunner(props: CodeRunnerProps): JSX.Element {
 		</Show>
 	) : null;
 
-	/// Snippet mode: the editor fills the maximized window instead of stopping at a height.
+	/// Snippet mode: the window is maximized, and the terminal fills the room under the editor.
 	const filled = () => minimal && windowState() === "maximized";
-	const surfaceHeight = () =>
-		filled() ? "h-full" : props.compact ? "max-h-56" : "max-h-96";
 	const frameClass = () =>
-		minimal
-			? filled()
-				? "h-full"
-				: ""
-			: framed
-				? `${terminalShown() ? "rounded-b-none" : ""} mockup-code code-surface overflow-hidden pt-3 pb-1 before:mb-2 before:ml-1 [&_pre]:before:hidden`
-				: "";
+		framed && !minimal
+			? `${terminalShown() ? "rounded-b-none" : ""} mockup-code code-surface overflow-hidden pt-3 pb-1 before:mb-2 before:ml-1 [&_pre]:before:hidden`
+			: "";
 
 	const editorBox = (
 		<>
@@ -680,7 +674,7 @@ export function CodeRunner(props: CodeRunnerProps): JSX.Element {
 			    scrolling box would be painted under the editor's sticky gutter.
 			    An answer's wrapper is daisyUI's code mockup, with its dots and
 			    without the gap it puts before each `pre`. */}
-			<div class={`${EDITOR_FOCUS_RING} ${frameClass()}`}>
+			<div class={`${EDITOR_FOCUS_RING} ${frameClass()}`} data-editor-fill>
 				<Show when={minimal}>
 					<div class="absolute top-1.5 right-2 z-10 flex items-center gap-1">
 						<Show when={!editing()}>
@@ -721,7 +715,10 @@ export function CodeRunner(props: CodeRunnerProps): JSX.Element {
 						</Show>
 					</div>
 				</Show>
-				<div class={`${EDITOR_SURFACE} ${surfaceHeight()}`}>
+				<div
+					class={`${EDITOR_SURFACE} ${props.compact ? "max-h-56" : "max-h-96"}`}
+					data-editor-fill
+				>
 					<Show when={!editorReady()}>
 						{/* biome-ignore lint/a11y/useSemanticElements: a read-only code view, replaced by the editor on first focus */}
 						<div
@@ -777,7 +774,8 @@ export function CodeRunner(props: CodeRunnerProps): JSX.Element {
 					</Show>
 					<div
 						ref={editorParent}
-						class={editorReady() ? (filled() ? "h-full" : "") : "hidden"}
+						class={editorReady() ? "" : "hidden"}
+						data-editor-fill
 						data-editor
 					/>
 				</div>

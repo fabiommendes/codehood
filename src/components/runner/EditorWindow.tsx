@@ -90,6 +90,12 @@ export default function EditorWindow(props: EditorWindowProps): JSX.Element {
 	const dots: HTMLButtonElement[] = [];
 	let section!: HTMLElement;
 	let pinned: Pinned[] = [];
+	/// What the content outside the window had for `inert` before it was maximized.
+	let inerted: { element: HTMLElement; was: boolean }[] = [];
+	/// The state the last `go` asked for, which `state()` reaches only once a view transition runs its update.
+	let wanted: WindowState = "inline";
+	/// The view transition in progress, if any.
+	let transition: ViewTransition | null = null;
 
 	/// Pins each sticky `[data-shell-bar]` where it sticks, as if the page had
 	/// been scrolled past it, stretched over the content area. The padding
@@ -146,6 +152,50 @@ export default function EditorWindow(props: EditorWindowProps): JSX.Element {
 		pinned = [];
 	};
 
+	/// Makes inert whatever is in `#content` outside the window, except the
+	/// shell bars and the ancestors of the window, so Tab does not reach what
+	/// is hidden behind it.
+	const isolate = () => {
+		const content = document.getElementById("content");
+		if (!content?.contains(section)) return;
+		const path = new Set<Element>();
+		for (
+			let up = section.parentElement;
+			up && up !== content;
+			up = up.parentElement
+		)
+			path.add(up);
+		const visit = (parent: Element) => {
+			for (const child of parent.children) {
+				if (!(child instanceof HTMLElement) || child === section) continue;
+				if (child.matches("[data-shell-bar]")) continue;
+				if (path.has(child) || child.querySelector("[data-shell-bar]"))
+					visit(child);
+				else {
+					inerted.push({ element: child, was: child.inert });
+					child.inert = true;
+				}
+			}
+		};
+		visit(content);
+	};
+
+	const restore = () => {
+		for (const { element, was } of inerted) element.inert = was;
+		inerted = [];
+	};
+
+	/// The page behind does not scroll while some other window than `except` is maximized.
+	const syncOpenClass = (except?: Element) => {
+		const others = [
+			...document.querySelectorAll("[data-window-state=maximized]"),
+		].filter((window) => window !== except);
+		document.documentElement.classList.toggle(
+			"editor-window-open",
+			others.length > 0,
+		);
+	};
+
 	/// The content area: below the navbar and the lowest pinned bar, right of the sidebar.
 	const measure = () => {
 		const bars = [
@@ -169,28 +219,33 @@ export default function EditorWindow(props: EditorWindowProps): JSX.Element {
 	};
 
 	const apply = (next: WindowState) => {
+		wanted = next;
+		if (next === state()) return;
 		if (next === "maximized") {
-			setHeld(section.offsetHeight);
-			pin();
-			measure();
+			// Another maximized window goes back first, so its bars are free to pin.
 			document.dispatchEvent(
 				new CustomEvent("editor-window:maximize", { detail: id }),
 			);
+			setHeld(section.offsetHeight);
+			pin();
+			measure();
+			isolate();
 		}
-		if (state() === "maximized") unpin();
+		if (state() === "maximized") {
+			unpin();
+			restore();
+		}
 		setState(next);
-		// The page behind does not scroll while a window is maximized.
-		document.documentElement.classList.toggle(
-			"editor-window-open",
-			document.querySelector("[data-window-state=maximized]") !== null,
-		);
+		syncOpenClass();
 		props.onStateChange?.(next);
 	};
 
 	const go = (next: WindowState) => {
-		if (next === state()) return;
+		if (next === wanted) return;
+		wanted = next;
 		const viaMax = next === "maximized" || state() === "maximized";
 		const settle = () => {
+			if (next !== wanted) return;
 			if (next === "maximized") props.onFocusEditor?.();
 			else dots[DOTS.findIndex((dot) => dot.state === next)]?.focus();
 		};
@@ -204,8 +259,12 @@ export default function EditorWindow(props: EditorWindowProps): JSX.Element {
 		}
 		section.style.setProperty("view-transition-name", `editor-window-${id}`);
 		section.style.setProperty("view-transition-class", "editor-window");
-		const transition = document.startViewTransition(() => apply(next));
-		void transition.finished.finally(() => {
+		const mine = document.startViewTransition(() => apply(next));
+		transition = mine;
+		void mine.finished.finally(() => {
+			// A later transition owns the name now.
+			if (transition !== mine) return;
+			transition = null;
 			section.style.removeProperty("view-transition-name");
 			section.style.removeProperty("view-transition-class");
 			settle();
@@ -213,8 +272,12 @@ export default function EditorWindow(props: EditorWindowProps): JSX.Element {
 	};
 
 	const onOtherMaximized = (event: Event) => {
-		if ((event as CustomEvent<number>).detail !== id && state() === "maximized")
+		if (
+			(event as CustomEvent<number>).detail !== id &&
+			state() === "maximized"
+		) {
 			apply("inline");
+		}
 	};
 
 	/// Red and green toggle between their state and inline; gray goes inline.
@@ -244,8 +307,11 @@ export default function EditorWindow(props: EditorWindowProps): JSX.Element {
 		addEventListener("resize", onResize);
 		// Registered here, not at the top: cleanups also run in server rendering, where there is no DOM.
 		onCleanup(() => {
-			unpin();
-			document.documentElement.classList.remove("editor-window-open");
+			if (state() === "maximized") {
+				unpin();
+				restore();
+				syncOpenClass(section);
+			}
 			document.removeEventListener("editor-window:maximize", onOtherMaximized);
 			removeEventListener("resize", onResize);
 		});
@@ -329,61 +395,73 @@ export default function EditorWindow(props: EditorWindowProps): JSX.Element {
 					<div class="ml-auto flex items-center gap-1.5">{props.actions}</div>
 				</header>
 
-				{/* Collapsing animates the rows from 1fr to 0fr: the page below slides along. */}
-				<div
-					class={`grid transition-[grid-template-rows] duration-200 ease-out motion-reduce:transition-none ${
-						maximized() ? "min-h-0 flex-1" : ""
-					}`}
-					style={{ "grid-template-rows": hidden() ? "0fr" : "1fr" }}
-					inert={hidden()}
-				>
-					<div
-						class={`flex min-h-0 overflow-hidden ${maximized() ? "flex-col lg:flex-row" : ""}`}
-					>
-						<Show when={stem()}>
-							{(render) => (
-								<Show when={stemOpen()}>
-									<aside
-										aria-label={m.runner_window_stem_show()}
-										data-window-stem
-										class="prose prose-sm max-h-[40%] max-w-none shrink-0 overflow-auto border-b border-(--code-border) bg-base-100 p-4 text-base-content lg:max-h-none lg:w-[38%] lg:border-r lg:border-b-0"
-									>
-										{render()()}
-									</aside>
-								</Show>
-							)}
-						</Show>
-						<div
-							class={`min-w-0 flex-1 ${maximized() ? "overflow-hidden " : ""}`}
-						>
-							{props.children}
-						</div>
-					</div>
-				</div>
-
-				{/* Maximized, the output takes at most 30% of the window and scrolls. */}
 				<div
 					class={
 						maximized()
-							? "flex max-h-[30%] min-h-0 shrink-0 flex-col"
-							: "grid transition-[grid-template-rows] duration-200 ease-out motion-reduce:transition-none"
+							? "flex min-h-0 flex-1 flex-col lg:flex-row"
+							: "contents"
 					}
-					style={
-						maximized()
-							? {}
-							: {
-									"grid-template-rows": hidden() && !props.peek ? "0fr" : "1fr",
-								}
-					}
-					inert={hidden() && !props.peek}
-					data-window-below
 				>
+					<Show when={stem()}>
+						{(render) => (
+							<Show when={stemOpen()}>
+								<aside
+									aria-label={m.runner_window_stem_show()}
+									data-window-stem
+									class="prose prose-sm max-h-[40%] max-w-none shrink-0 overflow-auto border-b border-(--code-border) bg-base-100 p-4 text-base-content lg:max-h-none lg:w-[38%] lg:border-r lg:border-b-0"
+								>
+									{render()()}
+								</aside>
+							</Show>
+						)}
+					</Show>
+					{/* The editor and what goes under it share a column, beside the stem. */}
 					<div
 						class={
-							maximized() ? "flex min-h-0 flex-col" : "min-h-0 overflow-hidden"
+							maximized() ? "flex min-h-0 min-w-0 flex-1 flex-col" : "contents"
 						}
 					>
-						{props.below}
+						{/* Collapsing animates the rows from 1fr to 0fr: the page below slides along. */}
+						<div
+							class={`grid transition-[grid-template-rows] duration-200 ease-out motion-reduce:transition-none ${
+								maximized() ? "min-h-0 flex-1" : ""
+							}`}
+							style={{ "grid-template-rows": hidden() ? "0fr" : "1fr" }}
+							inert={hidden()}
+						>
+							<div class="min-h-0 min-w-0 overflow-hidden">
+								<div class={maximized() ? "h-full" : ""}>{props.children}</div>
+							</div>
+						</div>
+
+						{/* Maximized, the output takes at most 30% of the window. */}
+						<div
+							class={
+								maximized()
+									? "flex max-h-[30%] min-h-0 shrink-0 flex-col"
+									: "grid transition-[grid-template-rows] duration-200 ease-out motion-reduce:transition-none"
+							}
+							style={
+								maximized()
+									? {}
+									: {
+											"grid-template-rows":
+												hidden() && !props.peek ? "0fr" : "1fr",
+										}
+							}
+							inert={hidden() && !props.peek}
+							data-window-below
+						>
+							<div
+								class={
+									maximized()
+										? "flex min-h-0 flex-col"
+										: "min-h-0 overflow-hidden"
+								}
+							>
+								{props.below}
+							</div>
+						</div>
 					</div>
 				</div>
 			</section>

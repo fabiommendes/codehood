@@ -35,7 +35,10 @@ html.editor-window-open {
 	overflow: hidden;
 }
 
-/* A maximized window gives its editor the height that is left. */
-[data-editor-window][data-window-state="maximized"] .cm-editor {
+/* A maximized window gives its editor the height that is left: the host
+   marks the boxes around the editor with `data-editor-fill`. */
+[data-editor-window][data-window-state="maximized"] .cm-editor,
+[data-editor-window][data-window-state="maximized"] [data-editor-fill] {
 	height: 100%;
+	max-height: none;
 }

@@ -167,7 +167,10 @@ A implementação parte de `_EditorWindow.tsx`. O protótipo é removido no fim
   lista de envios já corrigidos (`data-sends`) fica fora da janela, abaixo
   dela. O editor cresce para a altura livre
   (`[&_.cm-editor]:h-full`); o limite `max-h-96` / `max-h-56` não vale nesse
-  estado. A saída fica com no máximo 30% da altura, com rolagem.
+  estado. A saída fica com no máximo 30% da altura, com rolagem. Quem tira
+  o limite de altura é a janela (CSS sobre `data-window-state`), não cada
+  host. Com o painel do enunciado aberto, a saída fica na coluna do editor,
+  não embaixo do enunciado.
 - R13. Enunciado. Nos dois lugares de prova, a janela maximizada mostra o
   enunciado num painel: à esquerda (`lg:w-[38%]`) em tela larga, em cima
   (`max-h-[40%]`) em tela estreita, com rolagem própria e fundo
@@ -185,6 +188,10 @@ A implementação parte de `_EditorWindow.tsx`. O protótipo é removido no fim
 - R15. A página atrás não rola: classe `editor-window-open` no `<html>` com
   `overflow: hidden`. O `z-index` do `#content` não muda (subi-lo cobriria o
   drawer do celular).
+- R15a. Enquanto maximizada, o conteúdo de `#content` fora da janela fica
+  `inert` (o Tab não cai em elementos escondidos atrás dela), exceto as
+  barras do shell (`[data-shell-bar]`) e os ancestrais da janela. Ao sair de
+  `maximized`, ou ao desmontar, o `inert` original de cada elemento volta.
 - R16. Esc com o foco fora do editor (bolinhas, barra de título, saída) volta
   a `inline`. Esc dentro do CodeMirror é do editor: fecha o autocomplete ou a
   busca, cancela os cursores extras (`simplifySelection`, já ligado em
