@@ -901,6 +901,25 @@ test("student: run my code answer before submitting", async ({ page }) => {
 		await expect(editor).toContainText("console.log(1 + 2)");
 	});
 
+	await test.step("submitting a practice exam closes the attempt without an error", async () => {
+		await page.getByRole("button", { name: "Submit practice exam" }).click();
+		await page
+			.getByRole("dialog")
+			.getByRole("button", { name: /submit|confirm/i })
+			.click();
+
+		await expect
+			.poll(async () => {
+				const [attempt] = await db.response.findMany(
+					{ course: course.id, exam: practice.slug, author: student.username },
+					FULL_ACCESS,
+				);
+				return attempt?.acceptingSubmissions;
+			})
+			.toBe(false);
+		await expect(page.getByText("Resource not found")).toHaveCount(0);
+	});
+
 	await test.step("a quiz does not run code by default, and the answer is still written and saved", async () => {
 		await page.goto(`${href}/exams/${quiz.slug}`);
 		await page.getByRole("button", { name: /^Start/ }).click();

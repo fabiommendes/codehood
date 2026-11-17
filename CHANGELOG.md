@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+### Fixed
+
+- Entregar uma lista (prova do tipo prática) devolvia "recurso não encontrado".
+  `response.finish` só procurava a tentativa de `slotKey` 0, a de uma prova
+  avaliada; agora fecha a tentativa mais recente do aluno na lista.
+
 ## 0.5.0 (2026-11-16)
 
 ### Changed

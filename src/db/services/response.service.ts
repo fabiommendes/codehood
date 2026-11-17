@@ -481,9 +481,9 @@ export const makeResponseService = defineService<ResponseT>()(() => {
 	});
 
 	/**
-	 * Closes the author's graded attempt at an exam to further answers.
+	 * Closes the author's attempt at an exam to further answers.
 	 *
-	 * The student's "Submit exam". Calling it on an attempt that is already
+	 * The student's "Submit exam". On a practice exam it is the newest attempt, the current session's; a simulation has its own slot. Calling it on an attempt that is already
 	 * closed returns it unchanged. The author may close their own attempt; the
 	 * course's instructor may close anyone's.
 	 *
@@ -520,17 +520,28 @@ export const makeResponseService = defineService<ResponseT>()(() => {
 				"exam",
 				await tx.exam.findUnique({
 					where: { courseId_slug: { courseId: course.id, slug: input.exam } },
-					select: { id: true },
+					select: { id: true, type: true },
 				}),
 			);
+			const include = responseInclude(opts.actor);
 			const row = valueOrNotFound(
 				"response",
-				await tx.response.findUnique({
-					where: {
-						authorId_examId_slotKey: { authorId, examId: exam.id, slotKey: 0 },
-					},
-					include: responseInclude(opts.actor),
-				}),
+				exam.type === "PRACTICE" && !isSimulation(opts.actor, authorId, course)
+					? await tx.response.findFirst({
+							where: { authorId, examId: exam.id, preview: false },
+							orderBy: { slotKey: "desc" },
+							include,
+						})
+					: await tx.response.findUnique({
+							where: {
+								authorId_examId_slotKey: {
+									authorId,
+									examId: exam.id,
+									slotKey: 0,
+								},
+							},
+							include,
+						}),
 			);
 			if (!row.acceptingSubmissions) return fromDb(row);
 

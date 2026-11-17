@@ -474,6 +474,89 @@ test("response.finish() closes the student's own attempt and keeps its submissio
 	).toBe(false);
 });
 
+test("response.finish() closes a practice attempt, whose slot is its session start", async () => {
+	const { course, student, question } = await setup();
+	const exam = await makeExam(course.id, question.slug, { type: "PRACTICE" });
+	const attempt = await db.response.submit(
+		{
+			course: course.id,
+			exam: exam.slug,
+			question: question.slug,
+			payload: null,
+		},
+		{ actor: student },
+	);
+
+	const finished = await db.response.finish(
+		{ course: course.id, exam: exam.slug },
+		{ actor: student },
+	);
+	expect(finished.id).toBe(attempt.id);
+	expect(finished.acceptingSubmissions).toBe(false);
+	expect(finished.closedAt).not.toBeNull();
+
+	const again = await db.response.finish(
+		{ course: course.id, exam: exam.slug },
+		{ actor: student },
+	);
+	expect(again.id).toBe(attempt.id);
+	expect(again.closedAt).toEqual(finished.closedAt);
+});
+
+test("response.finish() closes the newest practice attempt when there are several sessions", async () => {
+	const { course, student, question } = await setup();
+	const exam = await makeExam(course.id, question.slug, { type: "PRACTICE" });
+	const old = await db.response.create(
+		{
+			course: course.id,
+			exam: exam.slug,
+			practiceSession: new Date(Date.now() - 3 * 24 * 60 * MINUTE),
+		},
+		{ actor: student },
+	);
+	await db.response.finish(
+		{ course: course.id, exam: exam.slug },
+		{ actor: student },
+	);
+	const fresh = await db.response.submit(
+		{
+			course: course.id,
+			exam: exam.slug,
+			question: question.slug,
+			payload: null,
+		},
+		{ actor: student },
+	);
+	expect(fresh.id).not.toBe(old.id);
+
+	const finished = await db.response.finish(
+		{ course: course.id, exam: exam.slug },
+		{ actor: student },
+	);
+	expect(finished.id).toBe(fresh.id);
+	expect(finished.acceptingSubmissions).toBe(false);
+});
+
+test("response.finish() closes the instructor's simulation of a practice exam", async () => {
+	const { course, instructor, question } = await setup();
+	const exam = await makeExam(course.id, question.slug, { type: "PRACTICE" });
+	const attempt = await db.response.submit(
+		{
+			course: course.id,
+			exam: exam.slug,
+			question: question.slug,
+			payload: null,
+		},
+		{ actor: instructor },
+	);
+	const finished = await db.response.finish(
+		{ course: course.id, exam: exam.slug },
+		{ actor: instructor },
+	);
+	expect(finished.id).toBe(attempt.id);
+	expect(finished.acceptingSubmissions).toBe(false);
+});
+
 test("response.finish() accepts the author naming themselves", async () => {
 	const { course, student, exam } = await withAttempt();
 
