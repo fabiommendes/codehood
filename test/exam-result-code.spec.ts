@@ -226,14 +226,14 @@ test("examResult code: a zeroed question with a submission waiting for the worke
 		unweighted(["q"]),
 		[sent("b", 2)],
 		[],
-		[{ question: "q", factor: "0", reason: null }],
+		[{ question: "q", op: "FACTOR", value: "0", reason: null }],
 		POLICY,
 	);
 
 	expect(result.questions[0]).toMatchObject({
 		status: "sanctioned",
 		score: 0,
-		sanction: { original: { status: "pending", score: null } },
+		adjustment: { original: { status: "pending", score: null } },
 	});
 	expect(result.pending).toBe(0);
 });
@@ -247,12 +247,17 @@ test("examResult code: the factor applies to the discounted score and leaves cod
 		unweighted(["q"]),
 		submissions,
 		grades,
-		[{ question: "q", factor: "0.5", reason: null }],
+		[{ question: "q", op: "FACTOR", value: "0.5", reason: null }],
 		POLICY,
 	);
 
 	expect(reduced.questions[0]?.status).toBe("sanctioned");
 	expect(reduced.questions[0]?.score).toBeCloseTo(0.4, 10);
+	expect(reduced.questions[0]?.adjustment).toMatchObject({
+		op: "FACTOR",
+		value: 0.5,
+		original: { status: "graded", score: 0.8 },
+	});
 	expect(reduced.questions[0]?.codeAttempts).toEqual(
 		plain.questions[0]?.codeAttempts,
 	);

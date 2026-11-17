@@ -851,18 +851,21 @@ test("accept is atomic: when the pass cannot be written the request stays OPEN",
 // exam sanctions
 //
 
-/// Sanctions the scenario's student on the whole exam, or on its question.
+/// Adjusts the scenario's student on the whole exam, or on its question: a FACTOR 0 unless `adjustment` says otherwise.
 function sanctionScenario(
 	{ course, instructor, student, open }: Scenario,
 	question?: string,
+	adjustment: { op: "SET" | "FACTOR" | "OFFSET"; value: string } = {
+		op: "FACTOR",
+		value: "0",
+	},
 ) {
 	return db.examAdjustment.create(
 		{
 			course: course.id,
 			exam: open.exam.slug,
 			usernames: [student.username],
-			op: "FACTOR",
-			value: "0",
+			...adjustment,
 			reason: "copied",
 			...(question ? { question } : {}),
 		},
@@ -896,9 +899,10 @@ async function sanctionedOutcomeOf(scenario: Scenario) {
 			feedback: pass.feedback,
 			updatedAt: pass.updatedAt,
 		})),
-		sanctions.map(({ question, value, reason }) => ({
+		sanctions.map(({ question, op, value, reason }) => ({
 			question,
-			factor: value,
+			op,
+			value,
 			reason,
 		})),
 	);
@@ -916,6 +920,51 @@ test("create: an exam sanction blocks the request with sanctioned", async () => 
 	await expect(attempt).rejects.toBeInstanceOf(InvalidData);
 	await expect(attempt).rejects.toMatchObject({
 		...refusal("sanctioned"),
+	});
+});
+
+test("create: a FACTOR below 1 on the exam blocks the request with sanctioned", async () => {
+	const scenario = await makeScenario("0");
+	await sanctionScenario(scenario, undefined, { op: "FACTOR", value: "0.5" });
+
+	await expect(openRequest(scenario)).rejects.toMatchObject({
+		...refusal("sanctioned"),
+	});
+});
+
+test("create: an OFFSET bonus on the exam does not block the request", async () => {
+	const scenario = await makeScenario("0");
+	await sanctionScenario(scenario, undefined, { op: "OFFSET", value: "0.1" });
+
+	await expect(openRequest(scenario)).resolves.toMatchObject({
+		status: "OPEN",
+	});
+});
+
+test("create: an OFFSET penalty on the exam does not block the request", async () => {
+	const scenario = await makeScenario("0");
+	await sanctionScenario(scenario, undefined, { op: "OFFSET", value: "-0.1" });
+
+	await expect(openRequest(scenario)).resolves.toMatchObject({
+		status: "OPEN",
+	});
+});
+
+test("create: a SET on the exam does not block the request", async () => {
+	const scenario = await makeScenario("0");
+	await sanctionScenario(scenario, undefined, { op: "SET", value: "0.8" });
+
+	await expect(openRequest(scenario)).resolves.toMatchObject({
+		status: "OPEN",
+	});
+});
+
+test("create: a FACTOR above 1 on the exam does not block the request", async () => {
+	const scenario = await makeScenario("0");
+	await sanctionScenario(scenario, undefined, { op: "FACTOR", value: "1.1" });
+
+	await expect(openRequest(scenario)).resolves.toMatchObject({
+		status: "OPEN",
 	});
 });
 
@@ -953,5 +1002,5 @@ test("accept: an open request on a zeroed question changes the original score, n
 
 	const outcome = await sanctionedOutcomeOf(scenario);
 	expect(outcome).toMatchObject({ status: "sanctioned", score: 0 });
-	expect(outcome.sanction?.original.score).toBe(0.75);
+	expect(outcome.adjustment?.original.score).toBe(0.75);
 });
