@@ -806,7 +806,7 @@ test("examResult: SET reports the adjustment and the total it replaced", () => {
 		{ op: "SET", value: 0.8, reason: "reposição" },
 	]);
 	expect(result.original?.total).toBeCloseTo(0.5, 10);
-	expect(result.sanction).toBeUndefined();
+	expect(result).not.toHaveProperty("sanction");
 });
 
 test("examResult: the original total is null when a SET hides a question waiting for a grade", () => {
