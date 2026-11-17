@@ -1,11 +1,11 @@
 info:
   name: Revoke
   type: http
-  seq: 3
+  seq: 4
 
 http:
   method: POST
-  url: http://localhost:4321/api/course/cs101/ada_{{edition}}/exam/test-01/sanction/{{sanctionId}}/revoke
+  url: http://localhost:4321/api/course/cs101/ada_{{edition}}/exam/test-01/adjustment/{{adjustmentId}}/revoke
   auth: inherit
 
 settings:

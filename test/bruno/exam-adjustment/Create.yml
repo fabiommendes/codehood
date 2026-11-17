@@ -5,7 +5,7 @@ info:
 
 http:
   method: POST
-  url: http://localhost:4321/api/course/cs101/ada_{{edition}}/exam/test-01/sanction
+  url: http://localhost:4321/api/course/cs101/ada_{{edition}}/exam/test-01/adjustment
   body:
     type: json
     data: |-

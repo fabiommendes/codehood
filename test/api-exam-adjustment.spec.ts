@@ -8,7 +8,7 @@ import { persistedResponseFactory } from "@/fixtures/response.factory";
 import { idempotenceEssay } from "@/mdq/fixtures";
 import { type APIRequestContext, expect, test } from "./fixtures";
 
-/// `.../exam/[slug]/sanction` over HTTP: who reads and writes, what each role sees, the conditional write and the course grades cell.
+/// `.../exam/[slug]/adjustment` over HTTP: who reads and writes, what each role sees, the conditional write and the course grades cell.
 
 const PASSWORD = "correct-horse-battery-staple";
 const STALE = '"2000-01-01T00:00:00.000Z"';
@@ -87,7 +87,7 @@ async function setup() {
 		exam,
 		student,
 		base,
-		url: `${base}/exam/${exam.slug}/sanction`,
+		url: `${base}/exam/${exam.slug}/adjustment`,
 	};
 }
 
@@ -104,8 +104,8 @@ function release(ctx: Ctx) {
 	});
 }
 
-/// Sanctions `usernames` through the API, as the holder of `headers`, and answers the created rows.
-async function sanction(
+/// Adjusts `usernames` through the API, as the holder of `headers`, and answers the created rows.
+async function adjust(
 	request: APIRequestContext,
 	url: string,
 	headers: Record<string, string>,
@@ -120,7 +120,7 @@ async function sanction(
 	return (await res.json()) as Array<{ publicId: string }>;
 }
 
-test("POST creates two sanctions with a CLI key, GET lists and reads them with notes and no raw id", async ({
+test("POST creates two adjustments with a CLI key, GET lists and reads them with notes and no raw id", async ({
 	request,
 }) => {
 	const ctx = await setup();
@@ -128,7 +128,7 @@ test("POST creates two sanctions with a CLI key, GET lists and reads them with n
 	const bia = await ctx.student();
 	const headers = await keyHeaders(ctx.instructor, "CLI", "cli");
 
-	const created = await sanction(
+	const created = await adjust(
 		request,
 		ctx.url,
 		headers,
@@ -201,7 +201,7 @@ test("PATCH with a stale If-Match is a 412 and changes nothing; with the current
 	const ctx = await setup();
 	const ana = await ctx.student();
 	const headers = await loginHeaders(request, ctx.instructor.username);
-	const [created] = await sanction(request, ctx.url, headers, [ana.username], {
+	const [created] = await adjust(request, ctx.url, headers, [ana.username], {
 		reason: "first",
 	});
 	const item = `${ctx.url}/${created?.publicId}`;
@@ -230,13 +230,13 @@ test("PATCH with a stale If-Match is a 412 and changes nothing; with the current
 	});
 });
 
-test("revoke answers the revoked sanction; revoking again and patching it are 409s; ?revoked=true lists it, the default does not", async ({
+test("revoke answers the revoked adjustment; revoking again and patching it are 409s; ?revoked=true lists it, the default does not", async ({
 	request,
 }) => {
 	const ctx = await setup();
 	const ana = await ctx.student();
 	const headers = await loginHeaders(request, ctx.instructor.username);
-	const [created] = await sanction(request, ctx.url, headers, [ana.username]);
+	const [created] = await adjust(request, ctx.url, headers, [ana.username]);
 	const item = `${ctx.url}/${created?.publicId}`;
 
 	const revoked = await request.post(`${item}/revoke`, { headers });
@@ -263,7 +263,7 @@ test("revoke answers the revoked sanction; revoking again and patching it are 40
 	]);
 });
 
-test("a publicId of another exam's sanction under this exam is a 404", async ({
+test("a publicId of another exam's adjustment under this exam is a 404", async ({
 	request,
 }) => {
 	const ctx = await setup();
@@ -280,8 +280,8 @@ test("a publicId of another exam's sanction under this exam is a 404", async ({
 		exam: otherExam.slug,
 		author: ana.username,
 	});
-	const otherUrl = `${ctx.base}/exam/${otherExam.slug}/sanction`;
-	const [foreign] = await sanction(request, otherUrl, headers, [ana.username]);
+	const otherUrl = `${ctx.base}/exam/${otherExam.slug}/adjustment`;
+	const [foreign] = await adjust(request, otherUrl, headers, [ana.username]);
 	const crossed = `${ctx.url}/${foreign?.publicId}`;
 
 	expect((await request.get(crossed, { headers })).status()).toBe(404);
@@ -298,14 +298,14 @@ test("a publicId of another exam's sanction under this exam is a 404", async ({
 	).toBe(200);
 });
 
-test("a student sees an empty list and a 404 before the release, and after it reads their sanction without notes, createdBy or revokedBy", async ({
+test("a student sees an empty list and a 404 before the release, and after it reads their adjustment without notes, createdBy or revokedBy", async ({
 	request,
 }) => {
 	const ctx = await setup();
 	const ana = await ctx.student();
 	const bia = await ctx.student();
 	const owner = await loginHeaders(request, ctx.instructor.username);
-	const [mine, theirs] = await sanction(
+	const [mine, theirs] = await adjust(
 		request,
 		ctx.url,
 		owner,
@@ -375,7 +375,7 @@ test("the instructor's BOT key and an instructor of another course are refused",
 	const ctx = await setup();
 	const ana = await ctx.student();
 	const owner = await loginHeaders(request, ctx.instructor.username);
-	await sanction(request, ctx.url, owner, [ana.username]);
+	await adjust(request, ctx.url, owner, [ana.username]);
 
 	const bot = await keyHeaders(ctx.instructor, "BOT", "runner");
 	const refused = await request.post(ctx.url, {
@@ -394,7 +394,7 @@ test("the instructor's BOT key and an instructor of another course are refused",
 	expect(list.items).toHaveLength(1);
 });
 
-test("GET /grades: a zeroed student's cell is a total of 0 with its sanction; another student's cell has no sanction key", async ({
+test("GET /grades: a student zeroed by an adjustment has a cell with a total of 0; another student's cell keeps the total", async ({
 	request,
 }) => {
 	const ctx = await setup();
@@ -450,9 +450,9 @@ test("GET /grades: a zeroed student's cell is a total of 0 with its sanction; an
 		data: { status: "COMPLETED" },
 	});
 	const headers = await loginHeaders(request, ctx.instructor.username);
-	await sanction(
+	await adjust(
 		request,
-		`${ctx.base}/exam/${exam.slug}/sanction`,
+		`${ctx.base}/exam/${exam.slug}/adjustment`,
 		headers,
 		[zeroed.username],
 		{ reason: "copied" },
@@ -466,11 +466,201 @@ test("GET /grades: a zeroed student's cell is a total of 0 with its sanction; an
 			(row: { username: string }) => row.username === username,
 		)?.results[exam.slug];
 
-	expect(cell(zeroed.username)).toMatchObject({
-		kind: "total",
-		total: 0,
-		sanction: { factor: 0, reason: "copied", original: { total: 1 } },
-	});
+	expect(cell(zeroed.username)).toMatchObject({ kind: "total", total: 0 });
 	expect(cell(untouched.username)).toMatchObject({ kind: "total", total: 1 });
-	expect(cell(untouched.username)).not.toHaveProperty("sanction");
+});
+
+test("POST an OFFSET adjustment answers the created row with op and value; the list and the item carry them", async ({
+	request,
+}) => {
+	const ctx = await setup();
+	const ana = await ctx.student();
+	const headers = await loginHeaders(request, ctx.instructor.username);
+
+	const res = await request.post(ctx.url, {
+		headers,
+		data: { usernames: [ana.username], op: "OFFSET", value: "0.1" },
+	});
+
+	expect(res.status()).toBe(200);
+	const [created] = await res.json();
+	expect(created).toMatchObject({
+		author: ana.username,
+		question: null,
+		op: "OFFSET",
+		value: "0.1",
+	});
+	const item = await request.get(`${ctx.url}/${created.publicId}`, { headers });
+	expect(await item.json()).toMatchObject({ op: "OFFSET", value: "0.1" });
+});
+
+test("POST a SET above 1 is a 400 keyed on value and creates nothing", async ({
+	request,
+}) => {
+	const ctx = await setup();
+	const ana = await ctx.student();
+	const headers = await loginHeaders(request, ctx.instructor.username);
+
+	const res = await request.post(ctx.url, {
+		headers,
+		data: { usernames: [ana.username], op: "SET", value: "1.5" },
+	});
+
+	expect(res.status()).toBe(400);
+	const body = await res.json();
+	expect(body.code).toBe("invalid-data");
+	expect(JSON.stringify(body)).toContain("value");
+	const list = await (await request.get(ctx.url, { headers })).json();
+	expect(list.items).toEqual([]);
+});
+
+test("POST an OFFSET on a question is a 400 keyed on op", async ({
+	request,
+}) => {
+	const ctx = await setup();
+	const ana = await ctx.student();
+	const headers = await loginHeaders(request, ctx.instructor.username);
+	const question = await db.question.create(
+		{
+			course: ctx.course.id,
+			slug: tag("q-"),
+			status: "PUBLISHED",
+			version: "1",
+			question: idempotenceEssay,
+		},
+		FULL_ACCESS,
+	);
+	const exam = await persistedExamFactory.create({
+		course: ctx.course.id,
+		slug: tag("exam-"),
+		type: "EXAM",
+		status: "ONGOING",
+		questions: [{ slug: question.slug }],
+	});
+	await persistedResponseFactory.create({
+		course: ctx.course.id,
+		exam: exam.slug,
+		author: ana.username,
+	});
+	const url = `${ctx.base}/exam/${exam.slug}/adjustment`;
+
+	const res = await request.post(url, {
+		headers,
+		data: {
+			usernames: [ana.username],
+			question: question.slug,
+			op: "OFFSET",
+			value: "0.1",
+		},
+	});
+
+	expect(res.status()).toBe(400);
+	const body = await res.json();
+	expect(body.code).toBe("invalid-data");
+	expect(JSON.stringify(body)).toContain("op");
+	const list = await (await request.get(url, { headers })).json();
+	expect(list.items).toEqual([]);
+});
+
+test("a second active SET for the same student is a 400 keyed on usernames; after revoking the first, a new SET is accepted", async ({
+	request,
+}) => {
+	const ctx = await setup();
+	const ana = await ctx.student();
+	const headers = await loginHeaders(request, ctx.instructor.username);
+	const set = { usernames: [ana.username], op: "SET", value: "0.8" };
+	const first = await request.post(ctx.url, { headers, data: set });
+	expect(first.status()).toBe(200);
+	const [created] = await first.json();
+
+	const second = await request.post(ctx.url, { headers, data: set });
+
+	expect(second.status()).toBe(400);
+	const body = await second.json();
+	expect(body.code).toBe("invalid-data");
+	expect(JSON.stringify(body)).toContain("usernames");
+	const list = await (await request.get(ctx.url, { headers })).json();
+	expect(list.items).toHaveLength(1);
+
+	await request.post(`${ctx.url}/${created.publicId}/revoke`, { headers });
+	const third = await request.post(ctx.url, { headers, data: set });
+	expect(third.status()).toBe(200);
+});
+
+test("a student reads an OFFSET adjustment with op and value after the release and nothing before it", async ({
+	request,
+}) => {
+	const ctx = await setup();
+	const ana = await ctx.student();
+	const owner = await loginHeaders(request, ctx.instructor.username);
+	await request.post(ctx.url, {
+		headers: owner,
+		data: {
+			usernames: [ana.username],
+			op: "OFFSET",
+			value: "-0.1",
+			reason: "late",
+			notes: "private",
+		},
+	});
+	const headers = await loginHeaders(request, ana.username);
+
+	const before = await (await request.get(ctx.url, { headers })).json();
+	expect(before.items).toEqual([]);
+
+	await release(ctx);
+
+	const after = await (await request.get(ctx.url, { headers })).json();
+	expect(after.items).toHaveLength(1);
+	expect(after.items[0]).toMatchObject({
+		op: "OFFSET",
+		value: "-0.1",
+		reason: "late",
+	});
+	expect(JSON.stringify(after)).not.toContain("private");
+});
+
+test("PATCH changes op and value of an adjustment", async ({ request }) => {
+	const ctx = await setup();
+	const ana = await ctx.student();
+	const headers = await loginHeaders(request, ctx.instructor.username);
+	const [created] = await adjust(request, ctx.url, headers, [ana.username]);
+	const item = `${ctx.url}/${created?.publicId}`;
+	const etag = (await request.get(item, { headers })).headers().etag as string;
+
+	const res = await request.patch(item, {
+		headers: { ...headers, "If-Match": etag },
+		data: { op: "OFFSET", value: "0.2" },
+	});
+
+	expect(res.status()).toBe(200);
+	expect(await res.json()).toMatchObject({ op: "OFFSET", value: "0.2" });
+});
+
+test("the old /sanction routes are gone: list, create, read, patch and revoke are all 404", async ({
+	request,
+}) => {
+	const ctx = await setup();
+	const ana = await ctx.student();
+	const headers = await loginHeaders(request, ctx.instructor.username);
+	const [created] = await adjust(request, ctx.url, headers, [ana.username]);
+	const old = ctx.url.replace(/\/adjustment$/, "/sanction");
+	const item = `${old}/${created?.publicId}`;
+
+	expect((await request.get(old, { headers })).status()).toBe(404);
+	expect(
+		(
+			await request.post(old, {
+				headers,
+				data: { usernames: [ana.username], op: "FACTOR", value: "0" },
+			})
+		).status(),
+	).toBe(404);
+	expect((await request.get(item, { headers })).status()).toBe(404);
+	expect(
+		(await request.patch(item, { headers, data: { reason: "x" } })).status(),
+	).toBe(404);
+	expect((await request.post(`${item}/revoke`, { headers })).status()).toBe(
+		404,
+	);
 });
