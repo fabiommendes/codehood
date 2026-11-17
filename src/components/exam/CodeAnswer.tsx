@@ -189,6 +189,7 @@ export function CodeAnswer(props: CodeAnswerProps): JSX.Element {
 		const send = onSubmit();
 		if (!send || sending()) return;
 		setSending(true);
+		setPeek(true);
 		setNotice(null);
 		try {
 			const outcome = await send(code());

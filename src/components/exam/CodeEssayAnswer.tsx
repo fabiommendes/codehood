@@ -166,7 +166,7 @@ export function CodeEssayAnswer(props: CodeEssayAnswerProps): JSX.Element {
 			data-code-footer
 		>
 			<Show when={!props.codeRun}>
-				<span class="text-muted">{m.exams_code_run_off_hint()}</span>
+				<span class="text-(--code-muted)">{m.exams_code_run_off_hint()}</span>
 			</Show>
 			<Show
 				when={props.save.failingSince}
@@ -177,7 +177,7 @@ export function CodeEssayAnswer(props: CodeEssayAnswerProps): JSX.Element {
 							<Show when={savedAt()}>
 								{(at) => (
 									<span
-										class={`text-muted transition-opacity ${props.save.state === "unsaved" ? "opacity-40" : ""}`}
+										class={`text-(--code-muted) transition-opacity ${props.save.state === "unsaved" ? "opacity-40" : ""}`}
 										data-save="saved"
 									>
 										{m.exams_code_saved_at({ time: clockOf(at()) })}
@@ -186,7 +186,7 @@ export function CodeEssayAnswer(props: CodeEssayAnswerProps): JSX.Element {
 							</Show>
 						}
 					>
-						<span class="text-muted" data-save="saving">
+						<span class="text-(--code-muted)" data-save="saving">
 							{m.exams_attempt_saving()}
 						</span>
 					</Show>
@@ -250,6 +250,7 @@ export function CodeEssayAnswer(props: CodeEssayAnswerProps): JSX.Element {
 								starterCode={props.starterCode}
 								compact
 								stem={stemPanel}
+								peekFooter={props.save.failingSince != null}
 								footer={footer()}
 							/>
 						)}

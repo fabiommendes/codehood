@@ -60,7 +60,11 @@ interface Prepared {
 async function setup(
 	page: Page,
 	kind: Kind,
-	options: { grader?: boolean; question?: "sum" | "elm" } = {},
+	options: {
+		grader?: boolean;
+		question?: "sum" | "elm";
+		type?: "EXAM" | "QUIZ";
+	} = {},
 ): Promise<Prepared> {
 	const student = await seedUser({ role: "STUDENT" });
 	const course = await persistedCourseFactory.create();
@@ -96,7 +100,7 @@ async function setup(
 	const exam = await persistedExamFactory.create({
 		course: course.id,
 		slug: "window-exam",
-		type: kind === "essay" ? "EXAM" : "QUIZ",
+		type: options.type ?? (kind === "essay" ? "EXAM" : "QUIZ"),
 		status: "ONGOING",
 		duration: { minutes: 30 },
 		questions: [{ slug }],
@@ -153,8 +157,13 @@ const examBar = (page: Page) =>
 		.locator("[data-shell-bar]")
 		.filter({ has: page.locator("a[href^='#question-']") });
 
-async function open(page: Page, kind: Kind, grader = false) {
-	const s = await setup(page, kind, { grader });
+async function open(
+	page: Page,
+	kind: Kind,
+	grader = false,
+	type?: "EXAM" | "QUIZ",
+) {
+	const s = await setup(page, kind, { grader, type });
 	await page.goto(s.url);
 	await expect(win(page)).toHaveCount(1);
 	await expect(win(page)).toHaveAttribute("data-window-state", "inline");
@@ -225,9 +234,7 @@ async function savedCode(s: Prepared): Promise<string | null> {
 		{ course: s.course.id, exam: s.exam.slug, author: s.student.username },
 		FULL_ACCESS,
 	);
-	const payload = attempt?.submissions
-		.filter((submission) => submission.question === "code")
-		.at(-1)?.payload;
+	const payload = attempt?.submissions.at(-1)?.payload;
 	return typeof payload === "string" ? payload : null;
 }
 
@@ -584,6 +591,65 @@ test.describe("collapsed (R19, R20, A5)", () => {
 	});
 });
 
+test.describe("collapsed, status the student must see (R20)", () => {
+	/// Fails unless `locator` is shown below the title bar of `w`, with height and not inert.
+	async function expectShownBelowBar(w: Locator, locator: Locator) {
+		await expect(locator).toBeVisible();
+		const bar = await box(titleBar(w));
+		const b = await box(locator);
+		expect(b.height).toBeGreaterThan(5);
+		expect(b.y).toBeGreaterThanOrEqual(bar.bottom - 1);
+		expect(await locator.evaluate((el) => el.closest("[inert]") === null)).toBe(
+			true,
+		);
+	}
+
+	test("code: submitting with the window collapsed shows the result below the bar", async ({
+		page,
+	}) => {
+		await open(page, "code", true);
+		const w = win(page);
+		await dot(w, "collapsed").click();
+		await expect(w).toHaveAttribute("data-window-state", "collapsed");
+		await expect.poll(() => codeIsHidden(w)).toBe(true);
+
+		await titleBar(w).locator("[data-action=submit]").click();
+		const status = w.locator("[data-submit-status]");
+		await expect(status).toHaveAttribute("data-submit-status", "sent");
+		await expectShownBelowBar(w, status);
+		await expect(w).toHaveAttribute("data-window-state", "collapsed");
+		expect(await codeIsHidden(w)).toBe(true);
+	});
+
+	test("essay: a failing save shows its notice below the bar when collapsed", async ({
+		page,
+	}) => {
+		await open(page, "essay");
+		const w = win(page);
+		await page.route(ANSWER_ACTION, (route) => route.abort());
+		await content(w).fill("console.log('not saved')");
+		const failing = w.locator("[data-save=failing]");
+		await expect(failing).toBeVisible();
+
+		await dot(w, "collapsed").click();
+		await expect(w).toHaveAttribute("data-window-state", "collapsed");
+		await expect.poll(() => codeIsHidden(w)).toBe(true);
+		await expectShownBelowBar(w, failing);
+	});
+});
+
+test("code: Ctrl+Enter in the editor runs the pretests", async ({ page }) => {
+	test.setTimeout(240_000);
+	const s = await setup(page, "code", { question: "elm" });
+	await page.goto(s.url);
+	const w = win(page);
+	await content(w).click();
+	await page.keyboard.press("ControlOrMeta+Enter");
+	await expect(w.locator("[data-pretest-result] [data-status]")).toBeVisible({
+		timeout: 150_000,
+	});
+});
+
 test.describe("code survives the window states (A4)", () => {
 	for (const via of ["collapsed", "maximized"] as const) {
 		test(`essay: typed code and Ctrl+Z survive ${via}`, async ({ page }) => {
@@ -626,47 +692,49 @@ test.describe("code survives the window states (A4)", () => {
 });
 
 test.describe("no save, no history from the window states (R21, A9)", () => {
-	test("collapsing and maximizing sends no save and adds no edit history", async ({
-		page,
-	}) => {
-		const s = await open(page, "essay");
-		const w = win(page);
-		await monitorReady(page);
-		await content(w).fill("console.log('before')");
-		await expect.poll(() => savedCode(s)).toBe("console.log('before')");
-		await flushHistory(page);
-		await expect
-			.poll(() => batchCount(s), { timeout: 20_000 })
-			.toBeGreaterThan(0);
-		const batches = await batchCount(s);
+	for (const kind of KINDS) {
+		test(`${kind}: collapsing and maximizing sends no save and adds no edit history`, async ({
+			page,
+		}) => {
+			const s = await open(page, kind, false, "EXAM");
+			const w = win(page);
+			await monitorReady(page);
+			await content(w).fill("console.log('before')");
+			await expect.poll(() => savedCode(s)).toBe("console.log('before')");
+			await flushHistory(page);
+			await expect
+				.poll(() => batchCount(s), { timeout: 20_000 })
+				.toBeGreaterThan(0);
+			const batches = await batchCount(s);
 
-		const requests: string[] = [];
-		await page.route(ANSWER_ACTION, (route) => {
-			requests.push(route.request().url());
-			return route.continue();
+			const requests: string[] = [];
+			await page.route(ANSWER_ACTION, (route) => {
+				requests.push(route.request().url());
+				return route.continue();
+			});
+			await page.route("**/_actions/answerHistory.**", (route) => {
+				requests.push(route.request().url());
+				return route.continue();
+			});
+
+			for (const state of [
+				"collapsed",
+				"inline",
+				"maximized",
+				"inline",
+			] as const) {
+				await dot(w, state).click();
+				await expect(w).toHaveAttribute("data-window-state", state);
+			}
+			await page.waitForTimeout(2500);
+			await flushHistory(page);
+			await page.waitForTimeout(1000);
+
+			expect(requests).toEqual([]);
+			expect(await batchCount(s)).toBe(batches);
+			expect(await savedCode(s)).toBe("console.log('before')");
 		});
-		await page.route("**/_actions/answerHistory.**", (route) => {
-			requests.push(route.request().url());
-			return route.continue();
-		});
-
-		for (const state of [
-			"collapsed",
-			"inline",
-			"maximized",
-			"inline",
-		] as const) {
-			await dot(w, state).click();
-			await expect(w).toHaveAttribute("data-window-state", state);
-		}
-		await page.waitForTimeout(2500);
-		await flushHistory(page);
-		await page.waitForTimeout(1000);
-
-		expect(requests).toEqual([]);
-		expect(await batchCount(s)).toBe(batches);
-		expect(await savedCode(s)).toBe("console.log('before')");
-	});
+	}
 
 	test("a collapsed answer is still saved", async ({ page }) => {
 		const s = await open(page, "essay");
@@ -674,7 +742,7 @@ test.describe("no save, no history from the window states (R21, A9)", () => {
 		await content(w).click();
 		await dot(w, "collapsed").click();
 		await expect(w).toHaveAttribute("data-window-state", "collapsed");
-		// Typing before collapsing was not saved yet: it still goes out.
+		// The answer typed while inline is saved with the window collapsed.
 		await dot(w, "inline").click();
 		await content(w).fill("console.log('kept')");
 		await dot(w, "collapsed").click();

@@ -208,7 +208,10 @@ A implementação parte de `_EditorWindow.tsx`. O protótipo é removido no fim
   editor e a saída ficam escondidos, mas não são desmontados: o código, o
   histórico de desfazer e a execução em curso continuam.
 - R20. Rodar (ou executar os pré-testes) com a janela recolhida mostra a
-  saída abaixo da barra, sem abrir o editor.
+  saída abaixo da barra, sem abrir o editor. O mesmo vale para Enviar (a
+  linha de status do envio aparece) e para uma falha de salvamento
+  (`data-save="failing"`): com a janela recolhida, o rodapé aparece abaixo
+  da barra enquanto o salvamento falha, para o aviso não ficar escondido.
 - R21. Uma resposta de prova recolhida continua sendo salva como hoje;
   recolher ou maximizar não dispara salvamento nem entra no histórico de
   edição.

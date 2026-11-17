@@ -92,6 +92,8 @@ export interface CodeRunnerProps {
 	stem?: () => JSX.Element;
 	/// Extra controls at the start of the toolbar (review: submission navigation).
 	toolbar?: JSX.Element;
+	/// Answer mode: shows `footer` under the title bar of a collapsed window (e.g. a failing save).
+	peekFooter?: boolean;
 	/// Content under the terminal (answer: autosave status, run-off hint); inside the window.
 	footer?: JSX.Element;
 }
@@ -200,7 +202,6 @@ export function CodeRunner(props: CodeRunnerProps): JSX.Element {
 	const minimal = props.mode === "snippet";
 	/// The code sits in the editor window (snippet and answer). A submission under review stays plain.
 	const windowed = minimal || props.mode === "answer";
-	const framed = windowed;
 	const [terminalShown, setTerminalShown] = createSignal(
 		!props.compact && !minimal,
 	);
@@ -590,7 +591,7 @@ export function CodeRunner(props: CodeRunnerProps): JSX.Element {
 	const progressBar = () => (
 		<Show when={state().phase === "preparing" && state().progress}>
 			<div
-				class={`flex items-center gap-3 px-3 py-2 text-xs ${framed ? "" : "border-b border-edge bg-base-200/30"}`}
+				class={`flex items-center gap-3 px-3 py-2 text-xs ${windowed ? "" : "border-b border-edge bg-base-200/30"}`}
 			>
 				<span class="shrink-0">{m.runner_downloading()}</span>
 				<progress
@@ -610,7 +611,7 @@ export function CodeRunner(props: CodeRunnerProps): JSX.Element {
 			{(message) => (
 				<p
 					role="status"
-					class={`flex items-center gap-2 px-3 py-2 text-xs text-base-content/70 ${framed ? (minimal ? "justify-center" : "") : "border-b border-edge bg-base-200/30"}`}
+					class={`flex items-center gap-2 px-3 py-2 text-xs text-base-content/70 ${windowed ? (minimal ? "justify-center" : "") : "border-b border-edge bg-base-200/30"}`}
 				>
 					{message()}
 				</p>
@@ -691,8 +692,7 @@ export function CodeRunner(props: CodeRunnerProps): JSX.Element {
 	const editorBox = (
 		<>
 			{/* The focus ring is an overlay of this wrapper: an outline on the
-			    scrolling box would be painted under the editor's sticky gutter.
-			*/}
+			    scrolling box would be painted under the editor's sticky gutter. */}
 			<div class={EDITOR_FOCUS_RING} data-editor-fill>
 				<Show when={minimal}>
 					<div class="absolute top-1.5 right-2 z-10 flex items-center gap-1">
@@ -1153,7 +1153,7 @@ export function CodeRunner(props: CodeRunnerProps): JSX.Element {
 							{props.footer}
 						</>
 					}
-					peek={peek()}
+					peek={peek() || props.peekFooter}
 					onFocusEditor={() => void ensureEditor(true)}
 					onStateChange={(next) => {
 						setWindowState(next);
