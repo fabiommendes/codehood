@@ -13,6 +13,7 @@ import {
 import { submissionSchema } from "@/core/schemas/submission";
 import { scoreValue } from "@/core/score";
 import type { ServiceOptsWithoutTx } from "@/db/base-service";
+import { touch } from "@/db/conditional-write";
 import { defineService, op } from "@/db/define-service";
 import { m } from "@/i18n";
 import {
@@ -148,6 +149,7 @@ export const makeManualGradeService = defineService()(() => {
 					feedback: input.comment?.trim() ? input.comment : null,
 				},
 			});
+			await touch(tx, "response", { id: attempt.id }, {});
 			return fromDb(row);
 		},
 	});
@@ -235,6 +237,7 @@ export const makeManualGradeService = defineService()(() => {
 				data: { status: "GRADED_MANUALLY" },
 				include: submissionInclude,
 			});
+			await touch(tx, "response", { id: row.responseId }, {});
 			return fromDb(updated);
 		},
 	});

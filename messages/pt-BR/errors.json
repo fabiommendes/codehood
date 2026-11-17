@@ -173,7 +173,6 @@
 	"errors_code_send_waiting": "Aguarde a correção do envio anterior",
 	"errors_code_sends_spent": "Você não tem mais envios para esta questão",
 	"errors_code_not_sendable": "Esta questão não é enviada a um worker: só aceita salvamentos",
-	"errors_exam_adjustment_no_attempt": "\"{username}\" não tem tentativa nesta prova",
 	"errors_exam_adjustment_duplicate": "\"{username}\" aparece mais de uma vez",
 	"errors_exam_adjustment_exists": "\"{username}\" já tem um ajuste ativo nesta questão",
 	"errors_exam_adjustment_set_exists": "\"{username}\" já tem uma nota substituta ativa: edite a existente",
