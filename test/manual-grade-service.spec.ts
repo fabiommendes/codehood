@@ -377,6 +377,47 @@ test("gradeUnanswered: an attempt still in progress is refused on author", async
 	expect(await rows(ctx)).toEqual(before);
 });
 
+test("gradeUnanswered: a student who delivered early while the exam is still open is graded, as the attempt is finished", async () => {
+	const ctx = await setup({}, "ONGOING");
+	const student = await enroll(ctx.course.id);
+	await deliver(ctx, student, ctx.q2.slug);
+	const before = await rows(ctx);
+
+	const created = await grade(ctx, student.username, { score: "0.5" });
+
+	expect(created).toMatchObject({ question: ctx.q1.slug, payload: null });
+	const after = await rows(ctx);
+	expect(after.responses).toBe(before.responses);
+	expect(after.submissions).toBe(before.submissions + 1);
+	expect(after.feedbacks).toBe(before.feedbacks + 1);
+});
+
+test("gradeUnanswered: an attempt whose own deadline passed while the exam is still open is graded", async () => {
+	// Unscheduled and timed: each student has `duration` from the moment they started.
+	const ctx = await setup({ scheduledAt: null }, "ONGOING");
+	const student = await enroll(ctx.course.id);
+	await db.response.submit(
+		{
+			course: ctx.course.id,
+			exam: ctx.exam.slug,
+			question: ctx.q2.slug,
+			payload: "my answer",
+		},
+		{ actor: student },
+	);
+	await prisma.response.updateMany({
+		where: { examId: ctx.exam.id, authorId: student.username },
+		data: { createdAt: new Date(Date.now() - 3 * HOUR) },
+	});
+	const before = await rows(ctx);
+
+	await grade(ctx, student.username);
+
+	const after = await rows(ctx);
+	expect(after.submissions).toBe(before.submissions + 1);
+	expect(after.feedbacks).toBe(before.feedbacks + 1);
+});
+
 test("gradeUnanswered: a question the student already answered is refused on question", async () => {
 	const ctx = await setup({}, "ONGOING");
 	const student = await enroll(ctx.course.id);
