@@ -269,7 +269,9 @@ Em `src/services/exam-result.ts`, nesta ordem:
   decisão do professor.
 - D6. **Fator 0 é terminal**: qualquer `FACTOR` com valor 0 dá total 0,
   ignorando `SET` e `OFFSET`. Por quê: é o "zerar" da sanção original, que
-  deve continuar zerando.
+  deve continuar zerando. Exceção: um total calculado negativo continua
+  negativo (D3), porque zerar por cola nunca pode melhorar a nota. Com `SET`
+  presente, a base é o valor do `SET` (≥ 0) e o total é 0.
 - D7. Com `SET` ou fator 0, o total é definido mesmo com questões pendentes e
   `pending` vale 0. Sem eles, o total segue `null` com pendência, como hoje.
   Por quê: o professor fixou a nota, então esperar a correção da questão não
