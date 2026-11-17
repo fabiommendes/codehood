@@ -330,10 +330,22 @@ Depois da liberação das notas (mesma regra de `feedback.read` da
 
 ### G. Telas do professor
 
-- G1. Página da tentativa: diálogo "Ajustar nota" (generalização do
-  `SanctionDialog`) com seletor de operação, valor em porcentagem, motivo e
-  notas. Por questão: "Alterar nota" (B1) e "Sanção" (`FACTOR < 1`, padrão
-  0).
+- G1. Página da tentativa, como no mockup `aluno-bonus` do playground
+  `correcao-objetivas`:
+  - as questões aparecem como na prova aplicada (`QuestionFrame`, "Qn" e
+    pontos ao lado) e uma barra Q1…QN fixa no topo leva a cada questão, com a
+    cor do estado (certa, parcial, errada, em branco, alterada à mão);
+  - à direita do nome do aluno, três botões de ícone: "Sancionar" (alvo prova
+    ou questão, zerar ou porcentagem que fica, motivo), "Adicionar bônus"
+    (somar pontos, multiplicar ou substituir a nota, motivo e prévia do total)
+    e "Lista de alunos";
+  - "Lista de alunos" abre um diálogo com todos os alunos da prova, busca e
+    colunas ordenáveis (aluno, usuário, total, situação: pendente, sem
+    tentativa, ajustada, entregue). As setas anterior/próximo ficam como
+    atalho: com 80 alunos, passar um a um não serve para achar alguém;
+  - por questão, o lápis "Alterar nota" (B1);
+  - o resumo "Ajustes de nota" lista o total original, um ajuste por linha
+    (alterar, remover) e o total final.
 - G2. `sanctions.astro` vira `adjustments.astro`: lista ativos e revogados;
   criação em lote por nomes de usuário, **inclusive de aluno sem tentativa**
   (E1); edita e revoga. Item no `examNav` com o contador de ativos.
@@ -380,11 +392,9 @@ Depois da liberação das notas (mesma regra de `feedback.read` da
 
 ## Questões em aberto
 
-- Q8. **Unidade do formulário por operação** (decidido, aguarda
-  confirmação). "10 = 10%" é claro para `SET` (`10` vira `0.10`) e `OFFSET`
-  (`+10` vira `0.10` do total). Para `FACTOR`, `10` poderia ser "×0,1" ou
-  "+10%". A spec adota "porcentagem da nota que fica" (50 = ×0,5;
-  110 = ×1,1) e rótulo no campo, mas o usuário não confirmou.
+Nenhuma. Q8 (unidade do formulário) foi aceita pelo usuário: `SET` e
+`OFFSET` em pontos percentuais (10 = 0,10 do total); `FACTOR` em
+"porcentagem da nota que fica" (50 = ×0,5; 110 = ×1,1), com rótulo no campo.
 
 ## Plano de ação
 
