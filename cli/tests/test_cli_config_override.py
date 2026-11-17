@@ -5,6 +5,7 @@ Tests for the global `--config` option and `CODEHOOD_CONFIG`. See
 
 from __future__ import annotations
 
+import re
 from pathlib import Path
 
 import httpx
@@ -225,7 +226,10 @@ def test_a_second_invocation_without_the_option_reads_codehood_toml(course):
 
 
 def test_help_lists_the_option_and_the_env_var():
+    # GITHUB_ACTIONS makes Rich color the help, which splits "--config" with
+    # escape codes; strip them so the test reads the same everywhere.
     result = runner.invoke(app, ["--help"], terminal_width=200)
-    assert "--config" in result.output
-    assert "-c" in result.output
-    assert "CODEHOOD_CONFIG" in result.output
+    output = re.sub(r"\x1b\[[0-9;]*m", "", result.output)
+    assert "--config" in output
+    assert "-c" in output
+    assert "CODEHOOD_CONFIG" in output
