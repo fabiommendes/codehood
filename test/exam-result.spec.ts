@@ -532,6 +532,8 @@ interface TotalCase {
 	/// `null` means the total is `null` (waiting for a grade).
 	total: number | null;
 	pending: number;
+	/// Compare with `toBe` instead of `toBeCloseTo`, for the clamp bounds.
+	exact?: boolean;
 }
 
 const totalCases: TotalCase[] = [
@@ -618,6 +620,38 @@ const totalCases: TotalCase[] = [
 		adjustments: [onExam("SET", "0.9"), onExam("OFFSET", "0.3")],
 		total: 1,
 		pending: 0,
+	},
+	{
+		name: "a penalty OFFSET clamps a non-negative base at 0",
+		a: "0.1",
+		b: "0",
+		adjustments: [onExam("OFFSET", "-0.1")],
+		total: 0,
+		pending: 0,
+		exact: true,
+	},
+	{
+		name: "a SET and a penalty OFFSET clamp at 0",
+		a: "1",
+		b: "0",
+		adjustments: [onExam("SET", "0.1"), onExam("OFFSET", "-0.3")],
+		total: 0,
+		pending: 0,
+		exact: true,
+	},
+	{
+		name: "the cap holds when the float sum overshoots 1",
+		a: "1",
+		b: "0",
+		adjustments: [
+			onExam("SET", "0.2"),
+			onExam("OFFSET", "0.4"),
+			onExam("OFFSET", "0.3"),
+			onExam("OFFSET", "0.1"),
+		],
+		total: 1,
+		pending: 0,
+		exact: true,
 	},
 	{
 		name: "a bonus OFFSET lifts a negative base",
@@ -789,11 +823,12 @@ test("examResult: without adjustments the total is the mean and nothing is repor
 	expect(result.original).toBeUndefined();
 });
 
-for (const { name, a, b, adjustments, total, pending } of totalCases) {
+for (const { name, a, b, adjustments, total, pending, exact } of totalCases) {
 	test(`examResult: ${name}`, () => {
 		const result = attempt(a, b, adjustments);
 
 		if (total === null) expect(result.total).toBeNull();
+		else if (exact) expect(result.total).toBe(total);
 		else expect(result.total).toBeCloseTo(total, 10);
 		expect(result.pending).toBe(pending);
 	});
@@ -1003,6 +1038,7 @@ const adjustTotalCases: Array<
 		number | null,
 		Array<{ op: AdjustmentOp; value: string | number }>,
 		number | null,
+		boolean?,
 	]
 > = [
 	["nothing to adjust", null, [], null],
@@ -1050,14 +1086,46 @@ const adjustTotalCases: Array<
 	["a numeric OFFSET adds", 0.5, [{ op: "OFFSET", value: -0.25 }], 0.25],
 	["the result is capped at 1", 0.9, [{ op: "OFFSET", value: "0.3" }], 1],
 	["a SET beats the base", 0.5, [{ op: "SET", value: "0.2" }], 0.2],
+	[
+		"a penalty OFFSET clamps a non-negative base at 0",
+		0.05,
+		[{ op: "OFFSET", value: "-0.1" }],
+		0,
+		true,
+	],
+	[
+		"a SET and a penalty OFFSET clamp at 0",
+		0.5,
+		[
+			{ op: "SET", value: "0.1" },
+			{ op: "OFFSET", value: "-0.3" },
+		],
+		0,
+		true,
+	],
+	[
+		"the cap holds when the float sum overshoots 1",
+		0.5,
+		[
+			{ op: "SET", value: "0.2" },
+			{ op: "OFFSET", value: "0.4" },
+			{ op: "OFFSET", value: "0.3" },
+			{ op: "OFFSET", value: "0.1" },
+		],
+		1,
+		true,
+	],
 ];
 
-for (const [name, base, adjustments, expected] of adjustTotalCases) {
+for (const [name, base, adjustments, expected, exact] of adjustTotalCases) {
 	test(`adjustTotal: ${name}`, () => {
 		const result = adjustTotal(base, adjustments);
 
 		if (expected === null) expect(result).toBeNull();
-		else expect(result).toBeCloseTo(expected, 10);
+		else if (exact) {
+			expect(result).toBe(expected);
+			expect(result).toBeLessThanOrEqual(1);
+		} else expect(result).toBeCloseTo(expected, 10);
 	});
 }
 
