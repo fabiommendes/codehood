@@ -807,6 +807,8 @@ Depende de T1. Paralela a T2, T3, T5a, T5c. Antes: `response.service.ts` e
 
 ### T5a. Modelo puro da página objetiva
 
+Aviso do T4: `CountingAnswer.passes` vem do mais novo ao mais antigo, mas `isManualChange` e `autoScoreOf` (`src/services/grading.ts`) esperam do mais antigo ao mais novo (o empate de `updatedAt` decide pelo índice). Inverta uma cópia antes de chamá-las e teste um empate no mesmo ms.
+
 Depende de T4 (tipos `createdBy`, `isManualChange`, `autoScoreOf`); pode
 começar com os stubs do T4 mergeados. Paralela a T2, T3, T5c.
 
