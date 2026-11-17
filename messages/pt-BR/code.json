@@ -2,6 +2,7 @@
 	"code_answer_label": "Sua solução",
 	"code_examples_title": "Exemplos",
 	"code_pretest_run": "Rodar pré-testes",
+	"code_pretest_run_hint": "Rodar pré-testes (Ctrl+Enter)",
 	"code_pretest_running": "Rodando pré-testes…",
 	"code_pretest_hint": "Os pré-testes são os testes públicos. A nota vem do envio.",
 	"code_pretest_none": "Esta questão não tem pré-testes.",

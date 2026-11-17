@@ -25,6 +25,7 @@ import { m } from "@/i18n";
 import { languageLabel } from "@/runner/languages";
 import type { PretestSource } from "@/utils/pretest-sources";
 import { AnsiText } from "../runner/AnsiText";
+import EditorWindow from "../runner/EditorWindow";
 import { createEditor, type RunnerEditor } from "../runner/editor";
 import { EDITOR_FOCUS_RING, EDITOR_SURFACE } from "../runner/editor-surface";
 import {
@@ -115,6 +116,8 @@ export function CodeAnswer(props: CodeAnswerProps): JSX.Element {
 	const [code, setCode] = createSignal(props.value ?? template);
 	const [ready, setReady] = createSignal(false);
 	const [state, setState] = createSignal<PretestState>({ kind: "idle" });
+	/// A pretest run shows its report under the title bar of a collapsed window.
+	const [peek, setPeek] = createSignal(false);
 	const [sending, setSending] = createSignal(false);
 	const [notice, setNotice] = createSignal<{
 		kind: "sent" | "refused";
@@ -162,6 +165,7 @@ export function CodeAnswer(props: CodeAnswerProps): JSX.Element {
 		const { signal } = controller;
 		const ranCode = code();
 		setState({ kind: "running" });
+		setPeek(true);
 		try {
 			const report = await (props.runTests ?? runBrowserTests)(
 				{
@@ -217,6 +221,57 @@ export function CodeAnswer(props: CodeAnswerProps): JSX.Element {
 		);
 	};
 
+	/// The example tests, collapsed one by one.
+	const examplesSection = () => (
+		<Show when={examples.length > 0}>
+			<section class="flex flex-col gap-2" data-code-examples>
+				<h3 class="text-xs font-semibold uppercase tracking-wide text-muted">
+					{m.code_examples_title()}
+				</h3>
+				<For each={examples}>
+					{(example, index) => (
+						<details
+							class="collapse collapse-arrow overflow-hidden rounded-box border border-edge bg-base-200/50"
+							data-example
+							data-format={example.format}
+						>
+							<summary class="collapse-title min-h-0 px-3 py-2 text-xs text-muted">
+								{m.code_example_summary({
+									line: String(example.firstLine),
+								})}
+							</summary>
+							<div class="collapse-content p-0">
+								<div
+									class={`${EDITOR_SURFACE} [&_pre]:text-(length:--code-font-size) [&_pre]:leading-5`}
+								>
+									<ExampleCode
+										text={example.text}
+										firstLine={example.firstLine}
+										html={props.exampleHtml?.[index()]}
+									/>
+								</div>
+							</div>
+						</details>
+					)}
+				</For>
+			</section>
+		</Show>
+	);
+
+	/// The stem, attachments and example tests, for the panel of the maximized window.
+	const stemPanel = () => (
+		<div class="mdq-question flex flex-col gap-4" data-type="code">
+			<div class="mdq-stem">
+				<Markdown text={props.question.stem} />
+			</div>
+			<AttachmentList
+				attachments={props.attachments}
+				url={props.attachmentUrl ?? (() => null)}
+			/>
+			{examplesSection()}
+		</div>
+	);
+
 	return (
 		<div
 			class="mdq-question flex flex-col gap-4"
@@ -231,142 +286,152 @@ export function CodeAnswer(props: CodeAnswerProps): JSX.Element {
 				url={props.attachmentUrl ?? (() => null)}
 			/>
 
-			<Show when={examples.length > 0}>
-				<section class="flex flex-col gap-2" data-code-examples>
-					<h3 class="text-xs font-semibold uppercase tracking-wide text-muted">
-						{m.code_examples_title()}
-					</h3>
-					<For each={examples}>
-						{(example, index) => (
-							<details
-								class="collapse collapse-arrow overflow-hidden rounded-box border border-edge bg-base-200/50"
-								data-example
-								data-format={example.format}
-							>
-								<summary class="collapse-title min-h-0 px-3 py-2 text-xs text-muted">
-									{m.code_example_summary({
-										line: String(example.firstLine),
-									})}
-								</summary>
-								<div class="collapse-content p-0">
-									<div
-										class={`${EDITOR_SURFACE} [&_pre]:text-(length:--code-font-size) [&_pre]:leading-5`}
-									>
-										<ExampleCode
-											text={example.text}
-											firstLine={example.firstLine}
-											html={props.exampleHtml?.[index()]}
-										/>
-									</div>
-								</div>
-							</details>
-						)}
-					</For>
-				</section>
-			</Show>
+			{examplesSection()}
 
 			<div class="flex flex-col" data-code-editor>
-				<div class="flex flex-wrap items-center gap-2 px-1 py-1.5">
-					<span class="font-mono text-xs">{filename}</span>
-					<span class="badge badge-ghost badge-xs">
-						{languageLabel(language)}
-					</span>
-					<div class="ml-auto flex items-center gap-2">
-						<button
-							type="button"
-							class="btn btn-soft btn-success btn-sm"
-							data-action="run-pretests"
-							disabled={running() || offReason() !== null}
-							onClick={() => void runPretests()}
-						>
-							<Show when={running()}>
-								<span class="loading loading-spinner loading-xs" />
-							</Show>
-							{running() ? m.code_pretest_running() : m.code_pretest_run()}
-						</button>
-						<Show when={onSubmit()}>
+				<EditorWindow
+					filename={filename}
+					language={languageLabel(language)}
+					stem={stemPanel}
+					peek={peek()}
+					onFocusEditor={() => editor?.focus()}
+					onStateChange={(next) => {
+						if (next === "collapsed") setPeek(false);
+					}}
+					actions={
+						<>
 							<button
 								type="button"
-								class="btn btn-primary btn-sm"
-								data-action="submit"
-								disabled={sending() || exhausted()}
-								onClick={() => void submit()}
+								class="btn btn-ghost btn-xs"
+								data-action="run-pretests"
+								title={m.code_pretest_run_hint()}
+								disabled={running() || offReason() !== null}
+								onClick={() => void runPretests()}
 							>
-								<Show when={sending()}>
+								<Show when={running()}>
 									<span class="loading loading-spinner loading-xs" />
 								</Show>
-								{sending() ? m.code_submit_sending() : m.code_submit()}
+								{running() ? m.code_pretest_running() : m.code_pretest_run()}
 							</button>
-						</Show>
-					</div>
-				</div>
-				{/* daisyUI's code mockup, as in the course snippets: dots on top, none of its gap before each `pre`. */}
-				<div
-					class={`${EDITOR_FOCUS_RING} mockup-code code-surface overflow-hidden pt-3 pb-1 before:mb-2 before:ml-1 [&_pre]:before:hidden`}
-				>
-					<div
-						class={`${EDITOR_SURFACE} max-h-96 [font-variant-ligatures:none]`}
-					>
-						<Show when={!ready()}>
-							<ExampleCode
-								text={code()}
-								firstLine={1}
-								html={undefined}
-								attributes={{ "data-editor-static": "" }}
-							/>
-						</Show>
-						<div
-							ref={editorParent}
-							class={ready() ? "" : "hidden"}
-							data-editor
-						/>
-					</div>
-				</div>
-				<div
-					class="px-1 py-1.5 text-xs text-muted"
-					data-pretest-hint={offReason() ?? "on"}
-				>
-					{offReason() === "no-runner"
-						? m.code_pretest_no_runner()
-						: offReason() === "no-pretests"
-							? m.code_pretest_none()
-							: m.code_pretest_hint()}
-				</div>
-			</div>
-
-			<Show when={onSubmit()}>
-				<div
-					class="flex flex-wrap items-baseline gap-x-3 text-sm"
-					role="status"
-					aria-live="polite"
-					data-submit-status={notice()?.kind ?? "idle"}
-				>
-					<span class="text-muted" data-submit-count>
-						{props.sends?.limit == null
-							? m.code_submit_used({ used: String(props.sends?.used ?? 0) })
-							: m.code_submit_used_of({
-									used: String(props.sends.used),
-									limit: String(props.sends.limit),
-								})}
-					</span>
-					<Show when={nextWorth() !== null}>
-						<span class="text-muted" data-submit-worth>
-							{m.code_submit_worth({ worth: String(nextWorth()) })}
-						</span>
-					</Show>
-					<Show when={notice()}>
-						{(current) => (
-							<span
-								class={
-									current().kind === "sent" ? "text-success" : "text-error"
-								}
+							<Show when={onSubmit()}>
+								<button
+									type="button"
+									class="btn btn-outline btn-xs"
+									data-action="submit"
+									disabled={sending() || exhausted()}
+									onClick={() => void submit()}
+								>
+									<Show when={sending()}>
+										<span class="loading loading-spinner loading-xs" />
+									</Show>
+									{sending() ? m.code_submit_sending() : m.code_submit()}
+								</button>
+							</Show>
+						</>
+					}
+					below={
+						<div class="flex min-h-0 flex-col gap-2 overflow-auto border-t border-(--code-border) px-3 py-2">
+							<div
+								class="text-xs text-(--code-muted)"
+								data-pretest-hint={offReason() ?? "on"}
 							>
-								{current().text}
-							</span>
-						)}
-					</Show>
-				</div>
-			</Show>
+								{offReason() === "no-runner"
+									? m.code_pretest_no_runner()
+									: offReason() === "no-pretests"
+										? m.code_pretest_none()
+										: m.code_pretest_hint()}
+							</div>
+							<div role="status" aria-live="polite" data-pretest-result>
+								<Show when={state()} keyed>
+									{(current) => (
+										<Switch>
+											<Match when={current.kind === "done" && current}>
+												{(done) => (
+													<PretestResult
+														report={done().report}
+														stale={stale()}
+													/>
+												)}
+											</Match>
+											<Match when={current.kind === "unavailable" && current}>
+												{(failed) => (
+													<div
+														class={`alert alert-error alert-soft text-sm ${stale() ? "opacity-60" : ""}`}
+														data-status="unavailable"
+													>
+														{m.code_result_unavailable({
+															message: failed().message,
+														})}
+													</div>
+												)}
+											</Match>
+										</Switch>
+									)}
+								</Show>
+							</div>
+							<Show when={onSubmit()}>
+								<div
+									class="flex flex-wrap items-baseline gap-x-3 text-sm"
+									role="status"
+									aria-live="polite"
+									data-submit-status={notice()?.kind ?? "idle"}
+								>
+									<span class="text-(--code-muted)" data-submit-count>
+										{props.sends?.limit == null
+											? m.code_submit_used({
+													used: String(props.sends?.used ?? 0),
+												})
+											: m.code_submit_used_of({
+													used: String(props.sends.used),
+													limit: String(props.sends.limit),
+												})}
+									</span>
+									<Show when={nextWorth() !== null}>
+										<span class="text-(--code-muted)" data-submit-worth>
+											{m.code_submit_worth({ worth: String(nextWorth()) })}
+										</span>
+									</Show>
+									<Show when={notice()}>
+										{(current) => (
+											<span
+												class={
+													current().kind === "sent"
+														? "text-success"
+														: "text-error"
+												}
+											>
+												{current().text}
+											</span>
+										)}
+									</Show>
+								</div>
+							</Show>
+						</div>
+					}
+				>
+					<div class={EDITOR_FOCUS_RING} data-editor-fill>
+						<div
+							class={`${EDITOR_SURFACE} max-h-96 [font-variant-ligatures:none]`}
+							data-editor-fill
+						>
+							<Show when={!ready()}>
+								<ExampleCode
+									text={code()}
+									firstLine={1}
+									html={undefined}
+									attributes={{ "data-editor-static": "" }}
+								/>
+							</Show>
+							<div
+								ref={editorParent}
+								class={ready() ? "" : "hidden"}
+								data-editor-fill
+								data-editor
+							/>
+						</div>
+					</div>
+				</EditorWindow>
+			</div>
 
 			<Show when={props.sends && props.sends.submissions.length > 0}>
 				<ol class="m-0 flex list-none flex-col gap-2 p-0" data-sends>
@@ -375,30 +440,6 @@ export function CodeAnswer(props: CodeAnswerProps): JSX.Element {
 					</For>
 				</ol>
 			</Show>
-
-			<div role="status" aria-live="polite" data-pretest-result>
-				<Show when={state()} keyed>
-					{(current) => (
-						<Switch>
-							<Match when={current.kind === "done" && current}>
-								{(done) => (
-									<PretestResult report={done().report} stale={stale()} />
-								)}
-							</Match>
-							<Match when={current.kind === "unavailable" && current}>
-								{(failed) => (
-									<div
-										class={`alert alert-error alert-soft text-sm ${stale() ? "opacity-60" : ""}`}
-										data-status="unavailable"
-									>
-										{m.code_result_unavailable({ message: failed().message })}
-									</div>
-								)}
-							</Match>
-						</Switch>
-					)}
-				</Show>
-			</div>
 		</div>
 	);
 }

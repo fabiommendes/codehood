@@ -201,6 +201,24 @@ export function CodeEssayAnswer(props: CodeEssayAnswerProps): JSX.Element {
 		</div>
 	);
 
+	/// The stem, attachments and epilogue, for the panel of the maximized window.
+	const stemPanel = () => (
+		<div class="mdq-question" data-type="essay">
+			<div class="mdq-stem">
+				<Markdown text={props.stem} />
+			</div>
+			<AttachmentList
+				attachments={props.attachments}
+				url={props.attachmentUrl ?? (() => null)}
+			/>
+			<Show when={props.epilogue}>
+				<div class="mdq-epilogue">
+					<Markdown text={props.epilogue} />
+				</div>
+			</Show>
+		</div>
+	);
+
 	return (
 		<div
 			class="mdq-question"
@@ -231,6 +249,7 @@ export function CodeEssayAnswer(props: CodeEssayAnswerProps): JSX.Element {
 								onChange={edited}
 								starterCode={props.starterCode}
 								compact
+								stem={stemPanel}
 								footer={footer()}
 							/>
 						)}

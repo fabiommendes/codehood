@@ -88,9 +88,11 @@ export interface CodeRunnerProps {
 	reviewLabel?: string;
 	/// Shorter editor and terminal hidden until the first run (lists, exams).
 	compact?: boolean;
+	/// Answer mode: renders the question stem, shown in a side panel while the window is maximized.
+	stem?: () => JSX.Element;
 	/// Extra controls at the start of the toolbar (review: submission navigation).
 	toolbar?: JSX.Element;
-	/// Content under the terminal (answer: autosave status, draft conflict).
+	/// Content under the terminal (answer: autosave status, run-off hint); inside the window.
 	footer?: JSX.Element;
 }
 
@@ -196,12 +198,13 @@ export function CodeRunner(props: CodeRunnerProps): JSX.Element {
 	/// Course material: no toolbar, code in an editor window with Run in its
 	/// title bar, and the terminal hidden until the first run.
 	const minimal = props.mode === "snippet";
-	/// The code has a frame: a snippet sits in the editor window and an answer in daisyUI's code mockup. A submission under review stays plain.
-	const framed = minimal || props.mode === "answer";
+	/// The code sits in the editor window (snippet and answer). A submission under review stays plain.
+	const windowed = minimal || props.mode === "answer";
+	const framed = windowed;
 	const [terminalShown, setTerminalShown] = createSignal(
 		!props.compact && !minimal,
 	);
-	/// Snippet mode: the state of the editor window, and whether a run shows the output of a collapsed one.
+	/// The state of the editor window, and whether a run shows the output of a collapsed one.
 	const [windowState, setWindowState] = createSignal<WindowState>("inline");
 	const [peek, setPeek] = createSignal(false);
 	const [terminalReady, setTerminalReady] = createSignal(false);
@@ -615,8 +618,8 @@ export function CodeRunner(props: CodeRunnerProps): JSX.Element {
 		</Show>
 	);
 
-	/// Snippet mode: Run, or Stop while a run is on, in the title bar of the editor window.
-	const playStop = minimal ? (
+	/// Run, or Stop while a run is on, in the title bar of the editor window.
+	const playStop = windowed ? (
 		<Show
 			when={running()}
 			fallback={
@@ -661,20 +664,36 @@ export function CodeRunner(props: CodeRunnerProps): JSX.Element {
 		</Show>
 	) : null;
 
-	/// Snippet mode: the window is maximized, and the terminal fills the room under the editor.
-	const filled = () => minimal && windowState() === "maximized";
-	const frameClass = () =>
-		framed && !minimal
-			? `${terminalShown() ? "rounded-b-none" : ""} mockup-code code-surface overflow-hidden pt-3 pb-1 before:mb-2 before:ml-1 [&_pre]:before:hidden`
-			: "";
+	/// Answer mode: Reset to the starter code, before Run in the title bar.
+	const resetStarter = () =>
+		props.mode === "answer" && props.starterCode !== undefined ? (
+			<button
+				type="button"
+				class="btn btn-ghost btn-sm btn-square text-(--code-muted) hover:bg-(--code-selection) hover:text-(--code-fg)"
+				data-action="reset"
+				aria-label={m.runner_reset()}
+				title={m.runner_reset_starter()}
+				onClick={reset}
+			>
+				<svg
+					viewBox="0 0 24 24"
+					class="size-3.5 fill-none stroke-current stroke-2"
+					aria-hidden="true"
+				>
+					<path d="M3 12a9 9 0 1 0 3-6.7L3 8M3 3v5h5" />
+				</svg>
+			</button>
+		) : null;
+
+	/// The window is maximized, and the terminal fills the room under the editor.
+	const filled = () => windowed && windowState() === "maximized";
 
 	const editorBox = (
 		<>
 			{/* The focus ring is an overlay of this wrapper: an outline on the
 			    scrolling box would be painted under the editor's sticky gutter.
-			    An answer's wrapper is daisyUI's code mockup, with its dots and
-			    without the gap it puts before each `pre`. */}
-			<div class={`${EDITOR_FOCUS_RING} ${frameClass()}`} data-editor-fill>
+			*/}
+			<div class={EDITOR_FOCUS_RING} data-editor-fill>
 				<Show when={minimal}>
 					<div class="absolute top-1.5 right-2 z-10 flex items-center gap-1">
 						<Show when={!editing()}>
@@ -794,7 +813,7 @@ export function CodeRunner(props: CodeRunnerProps): JSX.Element {
 			inert={!terminalShown()}
 		>
 			<div
-				class={`${filled() ? "flex flex-col" : ""} min-h-0 overflow-hidden bg-(--code-bg) font-mono text-(length:--code-font-size) leading-5 text-(--code-fg) ${framed && !minimal ? "rounded-b-box border-x border-b shadow-(--code-shadow)" : ""} border-t border-(--code-border)`}
+				class={`${filled() ? "flex flex-col" : ""} min-h-0 overflow-hidden bg-(--code-bg) font-mono text-(length:--code-font-size) leading-5 text-(--code-fg) border-t border-(--code-border)`}
 			>
 				<div class="flex items-center gap-2 bg-(--code-panel) px-3 py-1 text-[11px] tracking-wide text-(--code-muted) uppercase">
 					<span>{m.runner_terminal()}</span>
@@ -938,21 +957,17 @@ export function CodeRunner(props: CodeRunnerProps): JSX.Element {
 		<div
 			ref={root}
 			class={
-				minimal
+				windowed
 					? "flex flex-col"
-					: framed
-						? "flex flex-col"
-						: "overflow-hidden rounded-box border border-edge bg-base-100"
+					: "overflow-hidden rounded-box border border-edge bg-base-100"
 			}
 			data-code-runner
 			data-submission={props.submission}
 			data-mode={props.mode}
 			data-phase={state().phase}
 		>
-			<Show when={!minimal}>
-				<div
-					class={`flex flex-wrap items-center gap-2 py-1.5 ${framed ? "px-1" : "border-b border-edge bg-base-200/50 px-3"}`}
-				>
+			<Show when={!windowed}>
+				<div class="flex flex-wrap items-center gap-2 border-b border-edge bg-base-200/50 px-3 py-1.5">
 					{props.toolbar}
 					<Show when={position()}>
 						{(at) => (
@@ -1058,19 +1073,6 @@ export function CodeRunner(props: CodeRunnerProps): JSX.Element {
 							</button>
 						</Show>
 						<Show
-							when={props.mode === "answer" && props.starterCode !== undefined}
-						>
-							<button
-								type="button"
-								class="btn btn-ghost btn-sm"
-								data-action="reset"
-								title={m.runner_reset_starter()}
-								onClick={reset}
-							>
-								{m.runner_reset()}
-							</button>
-						</Show>
-						<Show
 							when={running()}
 							fallback={
 								<button
@@ -1131,17 +1133,24 @@ export function CodeRunner(props: CodeRunnerProps): JSX.Element {
 				{blockedNotice()}
 			</Show>
 
-			{minimal ? (
+			{windowed ? (
 				<EditorWindow
 					filename={filename()}
 					language={languageLabel(props.language)}
 					languageTitle={restartNote() ?? undefined}
-					actions={playStop}
+					actions={
+						<>
+							{resetStarter()}
+							{playStop}
+						</>
+					}
+					stem={props.stem}
 					below={
 						<>
 							{progressBar()}
 							{blockedNotice()}
 							{terminalBox}
+							{props.footer}
 						</>
 					}
 					peek={peek()}
@@ -1157,9 +1166,9 @@ export function CodeRunner(props: CodeRunnerProps): JSX.Element {
 				<>
 					{editorBox}
 					{terminalBox}
+					{props.footer}
 				</>
 			)}
-			{props.footer}
 		</div>
 	);
 }

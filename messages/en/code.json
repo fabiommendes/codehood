@@ -2,6 +2,7 @@
 	"code_answer_label": "Your solution",
 	"code_examples_title": "Examples",
 	"code_pretest_run": "Run pretests",
+	"code_pretest_run_hint": "Run pretests (Ctrl+Enter)",
 	"code_pretest_running": "Running pretests…",
 	"code_pretest_hint": "Pretests are the public tests. The grade comes from the submission.",
 	"code_pretest_none": "This question has no pretests.",
