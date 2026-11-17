@@ -332,6 +332,9 @@ Depois da liberação das notas (mesma regra de `feedback.read` da
 
 - G1. Página da tentativa, como no mockup `aluno-bonus` do playground
   `correcao-objetivas`:
+  - o corpo de cada questão usa a renderização padrão do mdq, a mesma da
+    prova aplicada e da revisão (`AnswerView` com a resposta do aluno e o
+    gabarito), não a marcação feita à mão do mockup;
   - as questões aparecem como na prova aplicada (`QuestionFrame`, "Qn" e
     pontos ao lado) e uma barra Q1…QN fixa no topo leva a cada questão, com a
     cor do estado (certa, parcial, errada, em branco, alterada à mão);
