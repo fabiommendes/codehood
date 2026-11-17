@@ -465,7 +465,7 @@ function SplitItem(props: {
 					</For>
 				</ul>
 				<FormAlert error={failure() ?? undefined} />
-				<div class="flex gap-2">
+				<div class="flex justify-end gap-2">
 					<button
 						type="button"
 						class="btn btn-ghost btn-sm"
@@ -544,7 +544,7 @@ function RenameGroup(props: {
 				<Show when={note()}>
 					<p class="text-sm text-muted">{note()}</p>
 				</Show>
-				<button type="submit" class="btn btn-sm self-start">
+				<button type="submit" class="btn btn-sm self-end">
 					{m.grades_grader_rename()}
 				</button>
 			</form>

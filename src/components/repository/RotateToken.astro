@@ -34,8 +34,8 @@ const { discipline, course, slug, confirming, href, error } = Astro.props;
         })}
       />
       <div class="card-actions">
-        <button type="submit" class="btn btn-warning btn-sm">{m.repositories_rotate_confirm()}</button>
         <a href={href} class="btn btn-ghost btn-sm">{m.repositories_rotate_cancel()}</a>
+        <button type="submit" class="btn btn-warning btn-sm">{m.repositories_rotate_confirm()}</button>
       </div>
     </form>
   </section>

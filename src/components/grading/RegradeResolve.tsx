@@ -78,14 +78,7 @@ export default function RegradeResolve(
 				control={{ inputmode: "numeric", autocomplete: "off" }}
 			/>
 			<Field {...form.field("reply")} />
-			<div class="flex gap-2">
-				<button
-					type="submit"
-					class="btn btn-primary"
-					disabled={form.busy() || rejecting()}
-				>
-					{m.grades_regrade_accept()}
-				</button>
+			<div class="flex justify-end gap-2">
 				<button
 					type="button"
 					class="btn btn-outline"
@@ -93,6 +86,13 @@ export default function RegradeResolve(
 					onClick={(event) => reject(event.currentTarget)}
 				>
 					{m.grades_regrade_reject()}
+				</button>
+				<button
+					type="submit"
+					class="btn btn-primary"
+					disabled={form.busy() || rejecting()}
+				>
+					{m.grades_regrade_accept()}
 				</button>
 			</div>
 		</form>

@@ -1,6 +1,7 @@
 ---
 import BrandSquares from "@/components/BrandSquares.astro";
 import PaginatedTableDemo from "@/components/design/PaginatedTableDemo";
+import ToggleGroupDemo from "@/components/design/ToggleGroupDemo";
 import ListRow from "@/components/ListRow.astro";
 import PageKicker from "@/components/PageKicker.astro";
 import Alert from "@/components/ui/Alert";
@@ -106,6 +107,7 @@ const tabItems = [
                 </Alert>
               ))}
             </div>
+            <ToggleGroupDemo client:load />
             <Card title="Card">
               <p class="text-sm text-base-content/70">Surface on base-100, border on base-300.</p>
             </Card>
@@ -304,6 +306,21 @@ const tabItems = [
     <div class="card card-border bg-base-100">
       <div class="card-body">
         <Tabs items={tabItems} active="overview" />
+      </div>
+    </div>
+  </section>
+
+  <section class="mb-14">
+    <h2 class="mb-2 text-xl font-semibold">ToggleGroup</h2>
+    <p class="mb-5 text-sm text-muted">
+      <code class="font-mono">{`<ToggleGroup options={...} value={...} label="..." />`}</code>: joined buttons that
+      pick one value, or several with <code class="font-mono">mode="multiple"</code>. The chosen ones are solid
+      <code class="font-mono">primary</code> and bold. An option with <code class="font-mono">href</code> is a link
+      (filters kept in the query string). The same two groups appear in each theme above.
+    </p>
+    <div class="card card-border bg-base-100">
+      <div class="card-body">
+        <ToggleGroupDemo client:load />
       </div>
     </div>
   </section>

@@ -330,10 +330,7 @@ export default function RubricGrader(props: RubricGraderProps): JSX.Element {
 				fallback={
 					<section class="rounded-box border border-edge p-4">
 						<h3 class="font-semibold">{m.grades_queue_done()}</h3>
-						<div class="mt-3 flex gap-2">
-							<a href={props.queueHref} class="btn btn-primary btn-sm">
-								{m.grades_grader_done_back()}
-							</a>
+						<div class="mt-3 flex justify-end gap-2">
 							<button
 								type="button"
 								class="btn btn-ghost btn-sm"
@@ -341,6 +338,9 @@ export default function RubricGrader(props: RubricGraderProps): JSX.Element {
 							>
 								{m.grades_grader_keep_reviewing()}
 							</button>
+							<a href={props.queueHref} class="btn btn-primary btn-sm">
+								{m.grades_grader_done_back()}
+							</a>
 						</div>
 					</section>
 				}

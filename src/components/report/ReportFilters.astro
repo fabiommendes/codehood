@@ -1,4 +1,5 @@
 ---
+import ToggleGroup from "@/components/ui/ToggleGroup";
 // The filters of a report queue: one button group per filter, each button a link that sets it in the query string.
 import {
 	type ReportKind,
@@ -34,47 +35,43 @@ function hrefWith(
 
 const statusOptions = [
 	...reportStatus.options.map((value) => ({
-		value,
+		value: value as ReportStatus | typeof ALL_REPORTS,
 		label: REPORT_STATUS_LABELS[value](),
+		href: hrefWith(value, filters.kind),
 	})),
-	{ value: null, label: m.report_filter_all() },
+	{
+		value: ALL_REPORTS,
+		label: m.report_filter_all(),
+		href: hrefWith(null, filters.kind),
+	},
 ];
 const kindOptions = [
-	{ value: null, label: m.report_filter_all() },
+	{
+		value: ALL_REPORTS as ReportKind | typeof ALL_REPORTS,
+		label: m.report_filter_all(),
+		href: hrefWith(filters.status, null),
+	},
 	...reportKind.options.map((value) => ({
 		value,
 		label: REPORT_KIND_LABELS[value](),
+		href: hrefWith(filters.status, value),
 	})),
 ];
 ---
 
 <div class="mb-6 flex flex-wrap items-end gap-4">
-  <div role="group" aria-label={m.report_filter_status()} class="join">
-    {
-      statusOptions.map((option) => (
-        <a
-          href={hrefWith(option.value, filters.kind)}
-          class:list={["btn join-item", filters.status === option.value && "btn-active"]}
-          aria-current={filters.status === option.value ? "true" : undefined}
-        >
-          {option.label}
-        </a>
-      ))
-    }
-  </div>
+  <ToggleGroup
+    label={m.report_filter_status()}
+    options={statusOptions}
+    value={filters.status ?? ALL_REPORTS}
+  />
   {
     !hideKind && (
-      <div role="group" aria-label={m.report_filter_type()} class="join">
-        {kindOptions.map((option) => (
-          <a
-            href={hrefWith(filters.status, option.value)}
-            class:list={["btn join-item", filters.kind === option.value && "btn-active"]}
-            aria-current={filters.kind === option.value ? "true" : undefined}
-          >
-            {option.label}
-          </a>
-        ))}
-      </div>
+      <ToggleGroup
+        label={m.report_filter_type()}
+        options={kindOptions}
+        value={filters.kind ?? ALL_REPORTS}
+      />
     )
   }
 </div>

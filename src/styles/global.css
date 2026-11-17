@@ -756,3 +756,10 @@ h6 {
 		animation: none;
 	}
 }
+
+/* Action buttons sit on the right of their card, as in a dialog's footer. */
+@layer utilities {
+	.card-actions {
+		justify-content: flex-end;
+	}
+}

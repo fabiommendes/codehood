@@ -136,10 +136,7 @@ export default function BlankGradeForm(
 					setComment((event.target as HTMLTextAreaElement).value)
 				}
 			/>
-			<div class="flex gap-2">
-				<button type="submit" class="btn btn-primary" disabled={busy()}>
-					{m.grades_form_save()}
-				</button>
+			<div class="flex justify-end gap-2">
 				<Show when={props.onCancel}>
 					{(cancel) => (
 						<button type="button" class="btn btn-ghost" onClick={cancel()}>
@@ -147,6 +144,9 @@ export default function BlankGradeForm(
 						</button>
 					)}
 				</Show>
+				<button type="submit" class="btn btn-primary" disabled={busy()}>
+					{m.grades_form_save()}
+				</button>
 			</div>
 		</form>
 	);

@@ -248,7 +248,9 @@ const RENEW_ICON =
           </div>
           <form method="POST" action={Astro.url.pathname} id="invite-form">
             <Field {...inviteForm.field("maxUses")} />
-            <button type="submit" class="btn btn-primary btn-sm mt-2">{m.courses_roster_generate()}</button>
+            <div class="mt-2 flex justify-end">
+              <button type="submit" class="btn btn-primary btn-sm">{m.courses_roster_generate()}</button>
+            </div>
           </form>
         </div>
       </div>

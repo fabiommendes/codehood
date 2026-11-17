@@ -239,7 +239,7 @@ function ReportCard(props: {
 							{props.row.note ?? ""}
 						</textarea>
 					</fieldset>
-					<div>
+					<div class="flex justify-end">
 						<button
 							type="submit"
 							class="btn btn-primary btn-sm"

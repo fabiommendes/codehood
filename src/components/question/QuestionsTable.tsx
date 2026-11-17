@@ -13,6 +13,7 @@ import Badge from "@/components/ui/Badge";
 import PaginatedTable from "@/components/ui/PaginatedTable";
 import type { CursorPage } from "@/components/ui/Pagination";
 import type { ColumnConfig } from "@/components/ui/Table";
+import ToggleGroup from "@/components/ui/ToggleGroup";
 import { toggleSortState } from "@/components/ui/table-sort";
 import type { Question } from "@/db/services/question.service";
 import { errorMessage } from "@/forms/field-errors";
@@ -292,22 +293,16 @@ export default function QuestionsTable(props: Props): JSX.Element {
 		<div class="mt-4 flex flex-col gap-4">
 			<FormAlert error={failure() ?? undefined} />
 			<div class="flex flex-wrap items-center gap-3">
-				<div class="join">
-					<For each={QUESTION_STATUSES}>
-						{(option) => (
-							<button
-								type="button"
-								aria-pressed={props.query.statuses.includes(option)}
-								class={`btn btn-sm join-item ${props.query.statuses.includes(option) ? "btn-active" : ""}`}
-								onClick={() =>
-									show({ statuses: toggled(props.query.statuses, option) })
-								}
-							>
-								{STATUS_LABELS[option]}
-							</button>
-						)}
-					</For>
-				</div>
+				<ToggleGroup<QuestionListQuery["statuses"][number]>
+					mode="multiple"
+					label={m.questions_table_col_status()}
+					options={QUESTION_STATUSES.map((value) => ({
+						value,
+						label: STATUS_LABELS[value],
+					}))}
+					value={props.query.statuses}
+					onChange={(statuses) => show({ statuses })}
+				/>
 
 				<div
 					ref={typeMenuRoot}

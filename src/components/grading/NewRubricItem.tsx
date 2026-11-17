@@ -101,7 +101,11 @@ export default function NewRubricItem(props: NewRubricItemProps): JSX.Element {
 					/>
 				</label>
 				<FormAlert error={failure() ?? undefined} />
-				<button type="submit" class="btn btn-primary btn-sm" disabled={busy()}>
+				<button
+					type="submit"
+					class="btn btn-primary btn-sm self-end"
+					disabled={busy()}
+				>
 					{m.grades_grader_add_item()}
 				</button>
 			</fieldset>

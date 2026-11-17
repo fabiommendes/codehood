@@ -54,10 +54,7 @@ export default function GradeForm(props: GradeFormProps): JSX.Element {
 				}}
 			/>
 			<Field {...form.field("comment")} />
-			<div class="flex gap-2">
-				<button type="submit" class="btn btn-primary" disabled={form.busy()}>
-					{m.grades_form_save()}
-				</button>
+			<div class="flex justify-end gap-2">
 				<Show when={props.onCancel}>
 					{(cancel) => (
 						<button type="button" class="btn btn-ghost" onClick={cancel()}>
@@ -65,6 +62,9 @@ export default function GradeForm(props: GradeFormProps): JSX.Element {
 						</button>
 					)}
 				</Show>
+				<button type="submit" class="btn btn-primary" disabled={form.busy()}>
+					{m.grades_form_save()}
+				</button>
 			</div>
 		</form>
 	);
