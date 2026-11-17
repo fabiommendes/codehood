@@ -1,3 +1,9 @@
+import os
+
+# Typer colors the help when it sees GITHUB_ACTIONS, which puts escape codes
+# inside the option names the tests look for. Read when typer is imported.
+os.environ["_TYPER_FORCE_DISABLE_TERMINAL"] = "1"
+
 import shutil
 from pathlib import Path
 
