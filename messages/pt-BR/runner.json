@@ -46,5 +46,12 @@
 	"runner_review_previous": "Resposta anterior com código",
 	"runner_review_next": "Próxima resposta com código",
 	"runner_review_position": "{n} de {total}",
-	"runner_review_hint": "Sandbox novo a cada submissão. Executar nunca mexe na nota."
+	"runner_review_hint": "Sandbox novo a cada submissão. Executar nunca mexe na nota.",
+	"runner_window_label": "Janela do editor",
+	"runner_window_inline": "Tamanho normal",
+	"runner_window_collapse": "Recolher editor",
+	"runner_window_maximize": "Maximizar",
+	"runner_window_stem_show": "Enunciado",
+	"runner_window_stem_hide": "Esconder enunciado",
+	"runner_run_hint": "Executar (Ctrl+Enter)"
 }

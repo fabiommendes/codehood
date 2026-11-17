@@ -80,15 +80,44 @@ A implementação parte de `_EditorWindow.tsx`. O protótipo é removido no fim
   escuro. A barra de ferramentas que hoje fica acima da moldura no modo
   `answer` e no `CodeAnswer` passa para dentro dela.
 - R3. Ações da barra de título:
-  - Rodar: ícone de play (`btn btn-ghost btn-sm btn-square text-success`),
-    `aria-label` "Rodar" e `title` "Rodar (Ctrl+Enter)". Nos três lugares.
-  - Na prova (`CodeAnswer`): "Executar pré-testes" (`btn btn-ghost btn-xs`) e
-    Enviar (`btn btn-outline btn-xs`), nessa ordem, depois do play.
+  - Executar: ícone de play (`btn btn-ghost btn-sm btn-square text-success`),
+    `data-action="run"`, `aria-label` "Executar" (`runner_run`) e `title`
+    "Executar (Ctrl+Enter)". No `CodeRunner` (`snippet` e `answer`).
+    Substitui o botão redondo que hoje fica pendurado embaixo do código no
+    `snippet` (e o `pb-5` que reserva espaço para ele) e o botão com texto
+    do modo `answer`.
+  - Durante a execução o play vira Parar: ícone de quadrado
+    (`text-error`), `data-action="stop"`, `aria-label` "Parar"; enquanto
+    prepara, spinner e `aria-label` "Cancelar". O foco volta ao play quando
+    a execução parada termina, como hoje.
+  - A nota de reinício da linguagem (`restartNote`, hoje tooltip do botão
+    redondo e texto na barra do `answer`) vira `title` da linguagem na barra
+    de título.
+  - A barra de progresso do download e o aviso de execução bloqueada
+    (`disabled`, `unsupported`, `unconfigured`) ficam dentro da janela, entre
+    o editor e o terminal, como hoje no `snippet`.
+  - No `answer`, Restaurar ao código inicial (`data-action="reset"`, só com
+    `starterCode`) vai para a barra de título, antes do play.
+  - Na prova (`CodeAnswer`): "Rodar pré-testes" (`btn btn-ghost btn-xs`,
+    `data-action="run-pretests"`) e "Enviar para correção"
+    (`btn btn-outline btn-xs`, `data-action="submit"`), nessa ordem, à
+    direita. Sem play no `CodeAnswer` (D1): "Rodar pré-testes" é a ação
+    principal e ganha `title` "Rodar pré-testes (Ctrl+Enter)"
+    (`code_pretest_run_hint`). Enviar só aparece quando a questão tem
+    corretor (`onSubmit`, como hoje), fica desabilitado durante o envio e
+    com os envios esgotados, e mostra spinner enquanto envia. A contagem
+    ("Envios: 1 de 3"), o valor do próximo envio e o resultado ("Enviado",
+    recusa) ficam numa linha de status no rodapé da janela, logo abaixo do
+    relatório dos pré-testes.
   - No `snippet`, os botões Editar e Restaurar que hoje flutuam no canto do
-    código continuam como estão.
+    código continuam no canto do código, abaixo da barra de título.
+  - Os `data-action` existentes (`run`, `stop`, `reset`, `edit`,
+    `run-pretests`, `submit`, `hide-terminal`, `retry`) não mudam: os specs
+    atuais dependem deles.
 - R4. As bolinhas são três `<button>` dentro de um `role="toolbar"` com
   `aria-label` "Janela do editor", na ordem cinza, vermelha, verde. Cada uma
-  tem `aria-label` e `title` ("Restaurar", "Recolher editor", "Maximizar") e
+  tem `aria-label` e `title` ("Tamanho normal", "Recolher editor",
+  "Maximizar"; não "Restaurar", que já é o botão de restaurar o código) e
   `data-action` (`window-inline`, `window-collapsed`, `window-maximized`).
   Vermelha e verde têm `aria-pressed`. A área de clique é 24×24 px
   (`size-6`), com a bolinha desenhada em 12 px (`size-3`). Cores:
@@ -133,7 +162,10 @@ A implementação parte de `_EditorWindow.tsx`. O protótipo é removido no fim
 - R12. A janela maximizada leva tudo o que o componente desenha: barra de
   título, editor, saída (terminal no `CodeRunner`, relatório de pré-testes no
   `CodeAnswer`), status de envio e contagem ("Envios: 0 de 3...") e o rodapé
-  "Salvo às HH:MM". O editor cresce para a altura livre
+  do `CodeEssayAnswer` ("Salvo às HH:MM", aviso de execução desligada). No
+  `CodeAnswer` entram também a dica dos pré-testes (`data-pretest-hint`); a
+  lista de envios já corrigidos (`data-sends`) fica fora da janela, abaixo
+  dela. O editor cresce para a altura livre
   (`[&_.cm-editor]:h-full`); o limite `max-h-96` / `max-h-56` não vale nesse
   estado. A saída fica com no máximo 30% da altura, com rolagem.
 - R13. Enunciado. Nos dois lugares de prova, a janela maximizada mostra o
@@ -141,7 +173,12 @@ A implementação parte de `_EditorWindow.tsx`. O protótipo é removido no fim
   (`max-h-[40%]`) em tela estreita, com rolagem própria e fundo
   `bg-base-100`. Um botão na barra de título ("Esconder enunciado" /
   "Enunciado", `aria-expanded`) recolhe o painel. O painel começa aberto. O
-  enunciado vem do mesmo HTML que a página já desenha acima do editor.
+  enunciado é desenhado pelos mesmos componentes que a página usa acima do
+  editor (`Markdown` do mdq-js, `AttachmentList`), passados ao
+  `EditorWindow` como função de render (`stem?: () => JSX.Element`), não
+  como HTML: no `CodeAnswer`, enunciado, anexos e testes de exemplo; no
+  `CodeEssayAnswer`, enunciado, anexos e epílogo. O painel só é montado
+  enquanto a janela está maximizada.
 - R14. No lugar da janela, a página guarda um espaço vazio com a altura que
   ela tinha antes de maximizar, `aria-hidden`, sem texto nem botão, para o
   texto em volta não pular.
@@ -196,17 +233,17 @@ A implementação parte de `_EditorWindow.tsx`. O protótipo é removido no fim
   | Chave                          | pt-BR                 | en                 |
   | :----------------------------- | :-------------------- | :----------------- |
   | `runner_window_label`          | Janela do editor      | Editor window      |
-  | `runner_window_restore`        | Restaurar             | Restore            |
+  | `runner_window_inline`         | Tamanho normal        | Normal size        |
   | `runner_window_collapse`       | Recolher editor       | Collapse editor    |
   | `runner_window_maximize`       | Maximizar             | Maximize           |
   | `runner_window_stem_show`      | Enunciado             | Question           |
   | `runner_window_stem_hide`      | Esconder enunciado    | Hide question      |
-  | `runner_run_icon`              | Rodar                 | Run                |
-  | `runner_run_icon_hint`         | Rodar (Ctrl+Enter)    | Run (Ctrl+Enter)   |
-  | `code_pretest_run`             | Executar pré-testes   | Run pretests       |
+  | `runner_run_hint`              | Executar (Ctrl+Enter) | Run (Ctrl+Enter)   |
+  | `code_pretest_run_hint`        | Rodar pré-testes (Ctrl+Enter) | Run pretests (Ctrl+Enter) |
 
-  Antes de criar, procurar chaves com o mesmo texto (`runner_run`,
-  `code_pretest_*`) e reaproveitar as que existem.
+  Reaproveitadas sem mudar o texto: `runner_run` ("Executar"),
+  `runner_stop`, `runner_cancel`, `runner_reset`, `code_pretest_run`
+  ("Rodar pré-testes"), `code_submit` ("Enviar para correção").
 
 ### Catálogo e dados de dev
 
@@ -224,6 +261,9 @@ A implementação parte de `_EditorWindow.tsx`. O protótipo é removido no fim
   dentro do app shell, com a navegação à mostra.
 - Lembrar o estado entre páginas ou visitas.
 - Redimensionar a janela arrastando, ou janelas lado a lado.
+- O painel de conflito de rascunho do `CodeEssayAnswer`: enquanto ele está
+  na tela não há editor nem janela. Escolhida a versão, o `CodeRunner` é
+  remontado e a janela começa em `inline` (R7).
 
 ## Decisões
 
@@ -237,6 +277,11 @@ A implementação parte de `_EditorWindow.tsx`. O protótipo é removido no fim
 - As barras do shell se declaram (`data-shell-bar`) em vez de a janela
   receber seletores: a janela não depende da prova nem do layout.
 - Medir em JS, e não com variáveis CSS do `AppLayout`: ver R10.
+- Textos: o produto já diz "Executar" para o runner e "Rodar pré-testes";
+  o protótipo invertia os dois verbos. Mantidos os textos existentes.
+- D1. O `CodeAnswer` não tem execução livre: Ctrl+Enter roda os
+  pré-testes. O protótipo mostrava um play falso ali; ficou sem play, com
+  "Rodar pré-testes" e Enviar na barra de título (R3).
 
 ## Revisão de UX
 
@@ -292,8 +337,9 @@ Rodada do revisor de UX do r2 em 2026-11-17 (relatório em
   Esc com cursores extras os cancela e não sai; Esc com o foco numa bolinha
   sai.
 - A7. Numa prova maximizada, o cronômetro e a navegação entre questões
-  continuam visíveis, o enunciado aparece no painel, e o resultado de
-  Enviar e o "Salvo às" aparecem dentro da janela.
+  continuam visíveis, o enunciado aparece no painel, o resultado de Enviar
+  (`CodeAnswer`) e o "Salvo às" (`CodeEssayAnswer`) aparecem dentro da
+  janela.
 - A8. Com `prefers-reduced-motion: reduce`, nenhum `startViewTransition` é
   chamado.
 - A9. Recolher ou maximizar uma resposta de prova não dispara salvamento nem

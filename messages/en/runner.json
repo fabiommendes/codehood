@@ -46,5 +46,12 @@
 	"runner_review_previous": "Previous answer with code",
 	"runner_review_next": "Next answer with code",
 	"runner_review_position": "{n} of {total}",
-	"runner_review_hint": "New sandbox for each submission. Running never changes the grade."
+	"runner_review_hint": "New sandbox for each submission. Running never changes the grade.",
+	"runner_window_label": "Editor window",
+	"runner_window_inline": "Normal size",
+	"runner_window_collapse": "Collapse editor",
+	"runner_window_maximize": "Maximize",
+	"runner_window_stem_show": "Question",
+	"runner_window_stem_hide": "Hide question",
+	"runner_run_hint": "Run (Ctrl+Enter)"
 }
