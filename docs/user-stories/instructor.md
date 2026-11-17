@@ -439,6 +439,74 @@ and the notes of an active one, or revoke it after a confirmation. A revoked
 sanction stays listed as revoked and the student gets the original total back.
 
 
+### Review an automatically graded question
+
+    status: todo
+    url: /<discipline>/<course>/exams/<exam>/grading/<question>
+
+Instructor checks that a question the server graded by itself was keyed right.
+The question's grading page has no answer-by-answer list: it counts the answers
+and the share that got it right, and groups identical responses, each group
+with how many students gave it, the score it got and how those students did on
+the rest of the exam. A wrong response chosen by students who do well elsewhere
+is marked for review, which is how a wrong answer key shows up. Every objective
+type has its own grouping: per choice, per statement, per blank, per value, per
+order.
+
+"Needs attention" appears only when an answer has no grade or a regrade request
+is open, and lets them grade the first and open the second. From a group they
+open its students, by name, and change the grade of one. Answers changed by hand
+are listed apart with the automatic grade struck through, and Undo gives it
+back. There is no action on a whole group, and the page says that pinning a new
+version of the question does not grade the existing answers again.
+
+
+### Change the grade of one question
+
+    status: todo
+    url: /<discipline>/<course>/exams/<exam>/attempts/<username>
+
+Instructor decides that one student deserves another grade on a question: the
+answer key was wrong for their answer, or they solved the in-class challenge
+that turns a wrong question into a right one. On the student's attempt each
+question has Change grade: mark it as correct or type a grade from 0 to 100,
+with a comment the student reads. The grade is for the whole question, even
+when it has blanks or statements. A question the student left blank can be
+graded the same way and still reads as unanswered. While the exam is still
+open for that student a blank question cannot be graded, and the page says so.
+A grade given to a blank question does not count as an answer in the
+question's statistics; a changed grade on a real answer does.
+
+
+### Grade a student who did not take the exam
+
+    status: todo
+    url: /<discipline>/<course>/exams/<exam>/results
+
+Instructor gives a grade to a student with no attempt at an exam: the project
+replaces the exam, or the student sat a makeup on paper. In the exam's results
+they select the student, alone or with others, and replace the grade, with a
+reason. The student then has a total and an attempt with no answers, and
+further adjustments land on that same attempt. It is refused while the exam is
+still open or yet to open for that student, extra time and makeup dates
+included, for someone who is not enrolled, and on a practice exam; nothing is
+saved then. A grade given this way does not hold back the release of the
+class's grades.
+
+
+### Find a student in a large class
+
+    status: todo
+    url: /<discipline>/<course>/exams/<exam>/attempts/<username>
+
+Instructor has a student in mind and a class of eighty. From any attempt of the
+exam they open the list of students, type a name, a username or the school id
+the student remembers, and sort by total or by situation: pending, no attempt,
+adjusted, delivered. A row opens that student's attempt; arrows step to the
+previous and the next one. Inside an attempt a bar with Q1 to QN stays in view,
+each question coloured by how it went, and leads to the question.
+
+
 ### Give a student extra time or a makeup exam
 
     status: implemented

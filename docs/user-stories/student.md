@@ -345,6 +345,30 @@ contested with a regrade request, while a classmate's unsanctioned one still
 can.
 
 
+### See a grade for an exam I did not take
+
+    status: todo
+    url: /<discipline>/<course>/exams/<exam>
+
+Student missed an exam and the instructor gave them a grade for it anyway, such
+as the project's grade or a makeup's. Once the grades are released, the exam
+page says that they did not take the exam, shows the grade it was replaced by
+with the instructor's reason, and the total. It shows no answers, and before
+the release it shows nothing of the grade.
+
+
+### See a question grade my instructor changed
+
+    status: todo
+    url: /<discipline>/<course>/exams/<exam>
+
+Student's grade on one question was changed by the instructor after the
+grading. Once the grades are released they see their own answer as they gave
+it, the new grade and the instructor's comment, and the total counts the new
+grade. A question they left blank still reads as unanswered, with the grade and
+the comment beside it.
+
+
 ### See my course grades
 
     status: implemented
