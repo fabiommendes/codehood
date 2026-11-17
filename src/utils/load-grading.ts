@@ -208,7 +208,7 @@ export async function loadGrades(
 		loadStudents(course, actor),
 		db.response.findMany({ course, practice: false }, { actor }),
 		db.feedback.findMany({ course }, { actor }),
-		db.examSanction.findMany({ course }, { actor }),
+		db.examAdjustment.findMany({ course }, { actor }),
 		db.gradeColumn.findMany({ course }, { actor }),
 		loadCourseExceptions(course),
 		loadResultPolicy(course),
@@ -269,7 +269,7 @@ export async function gradingExamNav(
 		exam.type === "PRACTICE"
 			? []
 			: (sanctions ??
-				db.examSanction.findMany(
+				db.examAdjustment.findMany(
 					{ course: course.id, exam: exam.slug },
 					{ actor },
 				)),

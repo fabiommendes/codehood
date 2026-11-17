@@ -59,7 +59,7 @@ export async function loadStudentHome(
 					{ course: course.id, author: actor.username },
 					{ actor },
 				),
-				db.examSanction.findMany(
+				db.examAdjustment.findMany(
 					{ course: course.id, author: actor.username },
 					{ actor },
 				),

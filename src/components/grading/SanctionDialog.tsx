@@ -3,7 +3,7 @@ import { createSignal, For, type JSX, Show } from "solid-js";
 import { createSchemaForm } from "@/components/form/create-schema-form";
 import Field from "@/components/form/Field";
 import FormAlert from "@/components/form/FormAlert";
-import { examSanctionCreateForm } from "@/core/schemas/exam-sanction";
+import { examAdjustmentCreateForm } from "@/core/schemas/exam-adjustment";
 import { m } from "@/i18n";
 import SanctionModal from "./SanctionModal";
 import { withInitialValues } from "./sanction-fields";
@@ -46,17 +46,18 @@ export default function SanctionDialog(
 	const [open, setOpen] = createSignal(false);
 	/// The question picked in the target field; empty is the whole exam.
 	const [target, setTarget] = createSignal("");
-	const form = createSchemaForm(examSanctionCreateForm, {
+	const form = createSchemaForm(examAdjustmentCreateForm, {
 		id,
-		action: actions.examSanction.create,
+		action: actions.examAdjustment.create,
 		hidden: {
 			discipline: props.discipline,
 			course: props.course,
 			exam: props.exam,
+			op: "FACTOR",
 		},
 		fields: {
 			question: { label: m.grades_sanction_target() },
-			factor: {
+			value: {
 				label: m.grades_sanction_factor(),
 				hint: m.grades_sanction_factor_hint(),
 			},
@@ -72,7 +73,7 @@ export default function SanctionDialog(
 		},
 		onSuccess: () => window.location.reload(),
 	});
-	const field = withInitialValues(form, { factor: "0" });
+	const field = withInitialValues(form, { value: "0" });
 
 	return (
 		<>
@@ -111,7 +112,10 @@ export default function SanctionDialog(
 					<Show
 						when={props.question === undefined}
 						fallback={
-							<input type="hidden" name="question" value={props.question} />
+							<>
+								<input type="hidden" name="question" value={props.question} />
+								<input type="hidden" name="value" value="0" />
+							</>
 						}
 					>
 						<fieldset class="fieldset">
@@ -144,7 +148,7 @@ export default function SanctionDialog(
 						</fieldset>
 						<Show when={target() === ""}>
 							<Field
-								{...field("factor")}
+								{...field("value")}
 								control={{ inputmode: "decimal", autocomplete: "off" }}
 							/>
 						</Show>

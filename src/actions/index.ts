@@ -5,7 +5,7 @@ import { auth } from "./auth";
 import { checkIn } from "./check-in";
 import { course } from "./course";
 import { exam } from "./exam";
-import { examSanction } from "./exam-sanction";
+import { examAdjustment } from "./exam-adjustment";
 import { gradeColumn } from "./grade-column";
 import { grading } from "./grading";
 import { gradingJob } from "./grading-job";
@@ -26,7 +26,7 @@ export const server = {
 	answerHistory,
 	course,
 	exam,
-	examSanction,
+	examAdjustment,
 	gradeColumn,
 	grading,
 	gradingJob,

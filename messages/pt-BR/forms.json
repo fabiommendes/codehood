@@ -85,7 +85,12 @@
 	"forms_schema_git_sha_invalid": "Não é um nome de objeto git: esperados 40 dígitos hexadecimais minúsculos.",
 	"forms_schema_rubric_group": "Caminho do grupo: segmentos separados por '/', nenhum vazio e nenhum com ':'.",
 	"forms_schema_rubric_base": "A base deve ser um número entre 0 e 1.",
-	"forms_schema_sanction_factor_invalid": "O fator deve ser um decimal de 0 até menos de 1, como 0 ou 0.5.",
-	"forms_schema_sanction_text_max": "O texto deve ter no máximo {max} caracteres.",
-	"forms_schema_sanction_usernames_required": "Escolha pelo menos um aluno."
+	"forms_schema_adjustment_value_invalid": "Informe um número, como 0, 0.5 ou -0.1.",
+	"forms_schema_adjustment_set_range": "A nota substituta fica entre 0 e 1 do total da prova.",
+	"forms_schema_adjustment_factor_range": "O multiplicador fica entre 0 e 2.",
+	"forms_schema_adjustment_offset_range": "Um bônus ou penalidade fica entre -1 e 1 do total da prova, e não é 0.",
+	"forms_schema_adjustment_question_op": "Uma questão só aceita multiplicador.",
+	"forms_schema_adjustment_question_factor": "Uma questão só pode ser reduzida: o multiplicador deve ficar abaixo de 1.",
+	"forms_schema_adjustment_text_max": "O texto deve ter no máximo {max} caracteres.",
+	"forms_schema_adjustment_usernames_required": "Escolha pelo menos um aluno."
 }

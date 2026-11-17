@@ -116,14 +116,14 @@ const openRegrades = new Map(
 );
 const regradesHref = `${href}/exams/${exam.slug}/regrades`;
 // The sanctions of the exam, and the factor of each student's on this question.
-const sanctions = await db.examSanction.findMany(
+const sanctions = await db.examAdjustment.findMany(
 	{ course: course.id, exam: exam.slug },
 	{ actor },
 );
 const sanctioned = new Map(
 	sanctions
 		.filter((sanction) => sanction.question === questionSlug)
-		.map((sanction) => [sanction.author, Number(sanction.factor)]),
+		.map((sanction) => [sanction.author, Number(sanction.value)]),
 );
 /// The badge text for a sanctioned answer, or undefined when it is not.
 const sanctionLabel = (author: string) => {

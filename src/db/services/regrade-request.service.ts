@@ -167,10 +167,10 @@ const contestedSelect = {
 			authorId: true,
 			createdAt: true,
 			acceptingSubmissions: true,
-			sanctions: {
-				where: { revokedAt: null },
+			adjustments: {
+				where: { revokedAt: null, op: "FACTOR" },
 				select: {
-					factor: true,
+					value: true,
 					reason: true,
 					questionRef: { select: { slug: true } },
 				},
@@ -363,9 +363,9 @@ export const makeRegradeRequestService = defineService<RegradeRequestT>()(
 							submission: entry.publicId,
 						})),
 					),
-					response.sanctions.map((sanction) => ({
+					response.adjustments.map((sanction) => ({
 						question: sanction.questionRef?.slug ?? null,
-						factor: sanction.factor,
+						factor: sanction.value,
 						reason: sanction.reason,
 					})),
 					resultPolicy(response.exam.type, {
@@ -384,7 +384,7 @@ export const makeRegradeRequestService = defineService<RegradeRequestT>()(
 						author: response.authorId,
 						attempt: response,
 						outcome,
-						examSanctioned: response.sanctions.some(
+						examSanctioned: response.adjustments.some(
 							(sanction) => sanction.questionRef === null,
 						),
 						submission: input.submission,

@@ -285,11 +285,13 @@ test("releaseGrades: a student zeroed on the exam with an answer pending does no
 		{ essay: true },
 	);
 	await prisma.feedback.delete({ where: { id: feedback.id } });
-	await db.examSanction.create(
+	await db.examAdjustment.create(
 		{
 			course: pk.course,
 			exam: exam.slug,
 			usernames: [student.username],
+			op: "FACTOR",
+			value: "0",
 		},
 		{ actor: instructor },
 	);

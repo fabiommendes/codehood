@@ -604,21 +604,25 @@ test("student: ask for a regrade", async ({ page }) => {
 test("student: see that my grade was sanctioned", async ({ page }) => {
 	const world = await gradedExam("honour-stu");
 	const { ana, bia } = world;
-	await db.examSanction.create(
+	await db.examAdjustment.create(
 		{
 			course: world.course.id,
 			exam: world.exam.slug,
 			usernames: [ana.username],
+			op: "FACTOR",
+			value: "0",
 			reason: REASON,
 			notes: NOTES,
 		},
 		{ actor: world.teacher },
 	);
-	await db.examSanction.create(
+	await db.examAdjustment.create(
 		{
 			course: world.course.id,
 			exam: world.exam.slug,
 			usernames: [ana.username],
+			op: "FACTOR",
+			value: "0",
 			question: "q-first",
 			reason: REASON,
 			notes: NOTES,

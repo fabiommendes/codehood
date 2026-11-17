@@ -1271,8 +1271,7 @@ test("instructor: sanction a student's grade", async ({ page }) => {
 	const world = await gradedExam("honour-ins");
 	const { ana, caio } = world;
 	const NEW_NOTES = "Confirmed by the neighbour, who admitted it";
-	const FACTOR_ERROR =
-		"The factor must be a decimal from 0 up to, but not including, 1, such as 0 or 0.5.";
+	const FACTOR_ERROR = "A multiplier is between 0 and 2.";
 	await world.release();
 	await logInAs(page, world.teacher);
 
@@ -1285,7 +1284,7 @@ test("instructor: sanction a student's grade", async ({ page }) => {
 	const sanctionRow = (name: string) =>
 		sanctions().getByRole("row").filter({ hasText: name });
 	const active = () =>
-		db.examSanction.findMany(
+		db.examAdjustment.findMany(
 			{ course: world.course.id, exam: world.exam.slug },
 			{ actor: world.teacher },
 		);
@@ -1302,7 +1301,7 @@ test("instructor: sanction a student's grade", async ({ page }) => {
 		).toBeDisabled();
 	});
 
-	await test.step("a factor outside [0, 1) is refused and nothing is saved", async () => {
+	await test.step("a factor outside [0, 200%] is refused and nothing is saved", async () => {
 		await resultRow("Ana Prado")
 			.getByRole("checkbox", { name: "Select Ana Prado" })
 			.check();
@@ -1318,7 +1317,7 @@ test("instructor: sanction a student's grade", async ({ page }) => {
 			"First question",
 			"Second question",
 		]);
-		await dialog.getByLabel("Factor").fill("1");
+		await dialog.getByLabel("Factor").fill("250");
 		await dialog.getByRole("button", { name: "Sanction", exact: true }).click();
 
 		await expect(dialog.getByText(FACTOR_ERROR)).toBeVisible();
@@ -1347,7 +1346,7 @@ test("instructor: sanction a student's grade", async ({ page }) => {
 		).toBeDisabled();
 	});
 
-	await test.step("sanctioning the same student on the same target again shows the error in the dialog", async () => {
+	await test.step("sanctioning the same student on the whole exam again is accepted: factors compose", async () => {
 		await resultRow("Ana Prado")
 			.getByRole("checkbox", { name: "Select Ana Prado" })
 			.check();
@@ -1355,12 +1354,14 @@ test("instructor: sanction a student's grade", async ({ page }) => {
 		const dialog = page.getByRole("dialog");
 		await dialog.getByRole("button", { name: "Sanction", exact: true }).click();
 
-		await expect(dialog.getByRole("alert")).toBeVisible();
-		await expect(dialog.getByRole("alert")).toContainText(ana.username);
-		expect(await active()).toHaveLength(2);
-
-		await dialog.getByRole("button", { name: "Cancel" }).click();
 		await expect(dialog).toBeHidden();
+		expect(await active()).toHaveLength(3);
+		// Back to the state the next steps read: the extra row goes away.
+		const extra = (await active()).at(-1);
+		await prisma.examAdjustment.delete({
+			where: { publicId: extra?.publicId ?? "" },
+		});
+		await page.reload();
 		await resultRow("Ana Prado")
 			.getByRole("checkbox", { name: "Select Ana Prado" })
 			.uncheck();
@@ -1400,7 +1401,7 @@ test("instructor: sanction a student's grade", async ({ page }) => {
 		);
 		await expect(dialog.getByLabel("Private notes")).toHaveValue(NOTES);
 
-		await dialog.getByLabel("Factor").fill("1");
+		await dialog.getByLabel("Factor").fill("250");
 		await dialog.getByRole("button", { name: "Save" }).click();
 		await expect(dialog.getByText(FACTOR_ERROR)).toBeVisible();
 

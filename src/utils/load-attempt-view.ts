@@ -78,7 +78,7 @@ export async function loadAttemptView(
 	const sanctions =
 		state.kind === "results" && attempt && !preview
 			? sanctionsByResponse(
-					await db.examSanction.findMany(
+					await db.examAdjustment.findMany(
 						{ course, exam: exam.slug, author },
 						{ actor },
 					),

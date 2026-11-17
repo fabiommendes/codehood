@@ -37,24 +37,26 @@ export interface ResultSanction {
 }
 
 /**
- * Groups sanctions by the `publicId` of the attempt they hit.
+ * Groups the `FACTOR` adjustments by the `publicId` of the attempt they hit; `SET` and `OFFSET` are not part of the result yet.
  *
  * @example
- * sanctionsByResponse([{ response: "r1", question: null, factor: "0", reason: null }]).get("r1")
+ * sanctionsByResponse([{ response: "r1", question: null, op: "FACTOR", value: "0", reason: null }]).get("r1")
  * // [{ question: null, factor: "0", reason: null }]
  */
 export function sanctionsByResponse(
 	views: readonly {
 		response: string;
 		question: string | null;
-		factor: string;
+		op: "SET" | "FACTOR" | "OFFSET";
+		value: string;
 		reason: string | null;
 	}[],
 ): ReadonlyMap<string, ResultSanction[]> {
 	const byResponse = new Map<string, ResultSanction[]>();
-	for (const { response, question, factor, reason } of views) {
+	for (const { response, question, op, value, reason } of views) {
+		if (op !== "FACTOR") continue;
 		// Copied field by field: a staff view also carries the private notes, which must not ride along.
-		const sanction = { question, factor, reason };
+		const sanction = { question, factor: value, reason };
 		const list = byResponse.get(response);
 		if (list) list.push(sanction);
 		else byResponse.set(response, [sanction]);

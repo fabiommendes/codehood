@@ -856,11 +856,13 @@ function sanctionScenario(
 	{ course, instructor, student, open }: Scenario,
 	question?: string,
 ) {
-	return db.examSanction.create(
+	return db.examAdjustment.create(
 		{
 			course: course.id,
 			exam: open.exam.slug,
 			usernames: [student.username],
+			op: "FACTOR",
+			value: "0",
 			reason: "copied",
 			...(question ? { question } : {}),
 		},
@@ -875,7 +877,7 @@ async function sanctionedOutcomeOf(scenario: Scenario) {
 		{ course: course.id, submission: { publicId: submission.publicId } },
 		{ actor: student },
 	);
-	const sanctions = await db.examSanction.findMany(
+	const sanctions = await db.examAdjustment.findMany(
 		{ course: course.id, exam: open.exam.slug },
 		{ actor: instructor },
 	);
@@ -894,9 +896,9 @@ async function sanctionedOutcomeOf(scenario: Scenario) {
 			feedback: pass.feedback,
 			updatedAt: pass.updatedAt,
 		})),
-		sanctions.map(({ question, factor, reason }) => ({
+		sanctions.map(({ question, value, reason }) => ({
 			question,
-			factor,
+			factor: value,
 			reason,
 		})),
 	);
@@ -920,7 +922,7 @@ test("create: an exam sanction blocks the request with sanctioned", async () => 
 test("create: a revoked exam sanction does not block", async () => {
 	const scenario = await makeScenario("0");
 	const [sanction] = await sanctionScenario(scenario);
-	await db.examSanction.revoke(
+	await db.examAdjustment.revoke(
 		{
 			course: scenario.course.id,
 			exam: scenario.open.exam.slug,

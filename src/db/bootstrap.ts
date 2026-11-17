@@ -2082,13 +2082,14 @@ async function seedReleasedQuiz(
 	);
 
 	// A correct answer zeroed by the instructor: the sanction applies on top of the grade.
-	await db.examSanction.create(
+	await db.examAdjustment.create(
 		{
 			course,
 			exam,
 			usernames: [students.hopper.username],
 			question: "factorial-of-five",
-			factor: "0",
+			op: "FACTOR",
+			value: "0",
 		},
 		{ actor: instructor },
 	);
@@ -3145,23 +3146,25 @@ async function seedGradingShowcase(
 	);
 
 	// Exam-level halving of hamilton's total, and a zeroed blank of hopper's that is still waiting for grading.
-	await db.examSanction.create(
+	await db.examAdjustment.create(
 		{
 			course,
 			exam,
 			usernames: [hamilton.username],
-			factor: "0.5",
+			op: "FACTOR",
+			value: "0.5",
 			reason: "Penalidade aplicada pelo professor.",
 		},
 		{ actor: instructor },
 	);
-	await db.examSanction.create(
+	await db.examAdjustment.create(
 		{
 			course,
 			exam,
 			usernames: [hopper.username],
 			question: blanks,
-			factor: "0",
+			op: "FACTOR",
+			value: "0",
 		},
 		{ actor: instructor },
 	);
@@ -3796,38 +3799,41 @@ async function seedReleasedExam(
 		FULL_ACCESS,
 	);
 	// Sanctions go before the release, so the students see them with their grades.
-	await db.examSanction.create(
+	await db.examAdjustment.create(
 		{
 			course,
 			exam,
 			usernames: [students[2]?.username ?? "", students[3]?.username ?? ""],
-			factor: "0",
+			op: "FACTOR",
+			value: "0",
 			reason: "Respostas idênticas às de outro aluno.",
 			notes: "Mesma sequência de respostas nas questões de ordenação.",
 		},
 		{ actor: instructor },
 	);
-	await db.examSanction.create(
+	await db.examAdjustment.create(
 		{
 			course,
 			exam,
 			usernames: [students[4]?.username ?? ""],
 			question: "fastest-sort",
-			factor: "0",
+			op: "FACTOR",
+			value: "0",
 		},
 		{ actor: instructor },
 	);
-	const [withdrawn] = await db.examSanction.create(
+	const [withdrawn] = await db.examAdjustment.create(
 		{
 			course,
 			exam,
 			usernames: [students[5]?.username ?? ""],
 			question: "n-log-n",
-			factor: "0",
+			op: "FACTOR",
+			value: "0",
 		},
 		{ actor: instructor },
 	);
-	await db.examSanction.revoke(
+	await db.examAdjustment.revoke(
 		{ course, exam, publicId: withdrawn?.publicId ?? "" },
 		{ actor: instructor },
 	);

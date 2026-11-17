@@ -3,7 +3,7 @@ import { hasPerm } from "@/auth/permissions";
 import { NotAllowed, NotFound } from "@/core/error";
 import type { CourseRef } from "@/core/schemas/course";
 import { db } from "@/db";
-import { activeSanctionsOf } from "@/db/active-sanctions";
+import { activeAdjustmentsOf } from "@/db/active-adjustments";
 import { loadResultPolicy } from "@/db/result-policy";
 import { attendancePercent } from "@/services/attendance-table";
 import { sanctionsByResponse } from "@/services/exam-result";
@@ -52,7 +52,7 @@ export async function loadCourseGrades(
 		db.enrollment.findMany({ course: found.id, status: "DROPPED" }, opts),
 		db.response.findMany({ course: found.id, practice: false }, opts),
 		db.feedback.findMany({ course: found.id }, opts),
-		activeSanctionsOf(found.id),
+		activeAdjustmentsOf(found.id),
 		loadCourseExceptions(found.id),
 		loadResultPolicy(found.id),
 	]);

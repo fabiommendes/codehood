@@ -114,7 +114,7 @@ async function sanction(
 ) {
 	const res = await request.post(url, {
 		headers,
-		data: { usernames, ...extra },
+		data: { usernames, op: "FACTOR", value: "0", ...extra },
 	});
 	expect(res.status()).toBe(200);
 	return (await res.json()) as Array<{ publicId: string }>;
@@ -149,7 +149,8 @@ test("POST creates two sanctions with a CLI key, GET lists and reads them with n
 	expect(page.items[0]).toMatchObject({
 		exam: ctx.exam.slug,
 		question: null,
-		factor: "0",
+		op: "FACTOR",
+		value: "0",
 		reason: "plagiarism",
 		notes: "same code as a classmate",
 		createdBy: ctx.instructor.username,
@@ -179,7 +180,11 @@ test("a batch with a student without an attempt is a 400 on usernames and the li
 
 	const res = await request.post(ctx.url, {
 		headers,
-		data: { usernames: [withAttempt.username, without.username] },
+		data: {
+			usernames: [withAttempt.username, without.username],
+			op: "FACTOR",
+			value: "0",
+		},
 	});
 
 	expect(res.status()).toBe(400);
@@ -213,14 +218,14 @@ test("PATCH with a stale If-Match is a 412 and changes nothing; with the current
 
 	const fresh = await request.patch(item, {
 		headers: { ...headers, "If-Match": etag },
-		data: { reason: "second", factor: "0.5", notes: "checked" },
+		data: { reason: "second", value: "0.5", notes: "checked" },
 	});
 	expect(fresh.status()).toBe(200);
 	expect(fresh.headers().etag).toBeTruthy();
 	expect(fresh.headers().etag).not.toBe(etag);
 	expect(await fresh.json()).toMatchObject({
 		reason: "second",
-		factor: "0.5",
+		value: "0.5",
 		notes: "checked",
 	});
 });
@@ -326,7 +331,8 @@ test("a student sees an empty list and a 404 before the release, and after it re
 	expect(after.items[0]).toMatchObject({
 		author: ana.username,
 		reason: "copied",
-		factor: "0",
+		op: "FACTOR",
+		value: "0",
 	});
 	expect(JSON.stringify(after)).not.toContain("private evidence");
 	const read = await request.get(item, { headers });
@@ -348,7 +354,7 @@ test("a student sees an empty list and a 404 before the release, and after it re
 		(
 			await request.post(ctx.url, {
 				headers,
-				data: { usernames: [ana.username] },
+				data: { usernames: [ana.username], op: "FACTOR", value: "0" },
 			})
 		).status(),
 	).toBe(403);
@@ -374,7 +380,7 @@ test("the instructor's BOT key and an instructor of another course are refused",
 	const bot = await keyHeaders(ctx.instructor, "BOT", "runner");
 	const refused = await request.post(ctx.url, {
 		headers: bot,
-		data: { usernames: [ana.username] },
+		data: { usernames: [ana.username], op: "FACTOR", value: "0" },
 	});
 	expect(refused.status()).toBe(403);
 

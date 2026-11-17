@@ -485,11 +485,17 @@ const HONORED: Record<string, Record<string, Case>> = {
 			},
 		};
 	})(),
-	examSanction: (() => {
+	examAdjustment: (() => {
 		const row = async () => {
 			const { course, instructor, student, exam } = await makeResponse();
-			const [sanction] = await db.examSanction.create(
-				{ course: course.id, exam: exam.slug, usernames: [student.username] },
+			const [sanction] = await db.examAdjustment.create(
+				{
+					course: course.id,
+					exam: exam.slug,
+					usernames: [student.username],
+					op: "FACTOR",
+					value: "0",
+				},
 				actorOf(instructor),
 			);
 			if (!sanction) throw new Error("no sanction created");
@@ -510,11 +516,11 @@ const HONORED: Record<string, Record<string, Case>> = {
 		return {
 			update: async (v) => {
 				const made = await row();
-				return db.examSanction.update(made.key, { reason: "x" }, as(made, v));
+				return db.examAdjustment.update(made.key, { reason: "x" }, as(made, v));
 			},
 			revoke: async (v) => {
 				const made = await row();
-				return db.examSanction.revoke(made.key, as(made, v));
+				return db.examAdjustment.revoke(made.key, as(made, v));
 			},
 		};
 	})(),
@@ -789,7 +795,7 @@ const UNGUARDED: Record<string, string> = {
 			"rollCall",
 			"exam",
 			"examException",
-			"examSanction",
+			"examAdjustment",
 			"report",
 			"feedback",
 			"regradeRequest",

@@ -19,7 +19,7 @@ const { course, href, tabs, exam, data } = result;
 // biome-ignore lint/style/noNonNullAssertion: loadExamStaff already redirected an anonymous visitor.
 const actor = Astro.locals.actor!;
 const [sanctions, stored] = await Promise.all([
-	db.examSanction.findMany(
+	db.examAdjustment.findMany(
 		{ course: course.id, exam: exam.slug, revoked: true },
 		{ actor },
 	),
@@ -95,7 +95,7 @@ const rows = sanctions.map((sanction) => ({
                       {active ? m.grades_sanction_active() : m.grades_sanction_revoked()}
                     </span>
                   </div>
-                  <div class="text-xs text-muted tabular-nums">{m.grades_sanction_factor_line({ factor: sanction.factor })}</div>
+                  <div class="text-xs text-muted tabular-nums">{m.grades_sanction_factor_line({ factor: sanction.value })}</div>
                 </td>
                 <td>
                   <div class="whitespace-pre-wrap">{sanction.reason}</div>
@@ -114,10 +114,10 @@ const rows = sanctions.map((sanction) => ({
                       discipline={discipline!}
                       course={courseSegment!}
                       exam={exam.slug}
-                      sanction={sanction.publicId}
+                      adjustment={sanction.publicId}
                       updatedAt={sanction.updatedAt.toISOString()}
                       wholeExam={sanction.question === null}
-                      factor={sanction.factor}
+                      value={sanction.value}
                       reason={sanction.reason}
                       notes={notes}
                     />

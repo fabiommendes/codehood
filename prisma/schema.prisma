@@ -79,8 +79,8 @@ model User {
   regradesResolved RegradeRequest[]
   reports          Report[]           @relation("ReportAuthor")
   reportsTriaged   Report[]           @relation("ReportTriagedBy")
-  sanctionsCreated ExamSanction[]     @relation("SanctionCreatedBy")
-  sanctionsRevoked ExamSanction[]     @relation("SanctionRevokedBy")
+  adjustmentsCreated ExamAdjustment[]     @relation("AdjustmentCreatedBy")
+  adjustmentsRevoked ExamAdjustment[]     @relation("AdjustmentRevokedBy")
 
   @@index([role])
 }
@@ -789,7 +789,7 @@ model QuestionRef {
   groupId            Int?
   submissions        Submission[]
   answerEditFields   AnswerEditField[]
-  sanctions          ExamSanction[]
+  adjustments        ExamAdjustment[]
 
   @@unique([slug, courseId])
   @@index([courseId])
@@ -906,35 +906,50 @@ model Response {
 
   submissions Submission[]
   editHistory AnswerEditHistory?
-  sanctions   ExamSanction[]
+  adjustments ExamAdjustment[]
 
   @@unique([authorId, examId, slotKey])
   @@index([examId])
   @@map("ResponseRef")
 }
 
-/// An instructor's decision to cancel or reduce one student's score on an
-/// exam, or on one question of it, for misconduct or another problem. Applied
+/// What an adjustment does to a score.
+enum ExamAdjustmentOp {
+  /// Replaces the exam total.
+  SET
+  /// Multiplies the exam total, or the score of one question.
+  FACTOR
+  /// Adds to the exam total.
+  OFFSET
+}
+
+/// An instructor's decision to replace, multiply or add to one student's
+/// score on an exam, or to multiply the score of one question of it. Applied
 /// on top of every grading pass, so regrading never undoes it.
 ///
-/// At most one active sanction per attempt and target (question or exam
-/// total). The service enforces it: revoked rows stay as a record, and SQLite
-/// would let duplicates with a null `questionRefId` through a unique index.
-model ExamSanction {
+/// The service enforces the uniqueness: at most one active SET per attempt and
+/// one active adjustment per question; any number of FACTOR and OFFSET on the
+/// total. Revoked rows stay as a record, and SQLite would let duplicates with a
+/// null `questionRefId` through a unique index.
+model ExamAdjustment {
   id       Int    @id @default(autoincrement())
   publicId String @unique
 
-  /// The sanctioned attempt.
+  /// The adjusted attempt.
   responseId Int
   response   Response @relation(fields: [responseId], references: [id], onDelete: Cascade)
 
   /// The question whose score is affected. Null affects the exam total. A
-  /// sanction on a question the exam no longer has is ignored.
+  /// adjustment on a question the exam no longer has is ignored.
   questionRefId Int?
   questionRef   QuestionRef? @relation(fields: [questionRefId], references: [id], onDelete: Cascade)
 
-  /// Multiplier on the score, a decimal string in [0, 1). "0" zeroes it.
-  factor String @default("0")
+  op ExamAdjustmentOp
+
+  /// A decimal string. SET and FACTOR read it as a fraction of the exam total
+  /// (SET in [0, 1], FACTOR in [0, 2]), OFFSET in [-1, 1] and not 0. A question
+  /// target only takes a FACTOR below 1.
+  value String
 
   /// Shown to the student. Optional.
   reason String?
@@ -943,19 +958,19 @@ model ExamSanction {
   notes String?
 
   createdById String
-  createdBy   User   @relation("SanctionCreatedBy", fields: [createdById], references: [username])
+  createdBy   User   @relation("AdjustmentCreatedBy", fields: [createdById], references: [username])
 
-  /// Set when the sanction was lifted. The row stays as a record.
+  /// Set when the adjustment was lifted. The row stays as a record.
   revokedAt   DateTime?
   revokedById String?
-  revokedBy   User?     @relation("SanctionRevokedBy", fields: [revokedById], references: [username])
+  revokedBy   User?     @relation("AdjustmentRevokedBy", fields: [revokedById], references: [username])
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  /// Every grade read loads the active sanctions of a set of attempts.
+  /// Every grade read loads the active adjustments of a set of attempts.
   @@index([responseId])
-  /// Deleting a question looks for the sanctions that target it.
+  /// Deleting a question looks for the adjustments that target it.
   @@index([questionRefId])
 }
 

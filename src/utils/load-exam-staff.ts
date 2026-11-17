@@ -90,7 +90,7 @@ export async function loadExamStaffData(
 			{ actor },
 		),
 		db.feedback.findMany({ course, exam: exam.slug }, { actor }),
-		db.examSanction.findMany({ course, exam: exam.slug }, { actor }),
+		db.examAdjustment.findMany({ course, exam: exam.slug }, { actor }),
 		loadStudents(course, actor),
 		db.examException.findMany({ course, exam: exam.slug }, { actor }),
 		db.regradeRequest.findMany(

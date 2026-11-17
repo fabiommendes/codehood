@@ -68,7 +68,7 @@ export async function loadInstructorHome(
 				db.exam.findMany({ course: course.id }, { actor }),
 				db.response.findMany({ course: course.id, practice: false }, { actor }),
 				db.feedback.findMany({ course: course.id }, { actor }),
-				db.examSanction.findMany({ course: course.id }, { actor }),
+				db.examAdjustment.findMany({ course: course.id }, { actor }),
 				db.question.findMany({ course: course.id, public: false }, { actor }),
 				loadCourseExceptions(course.id),
 				db.regradeRequest.findMany(

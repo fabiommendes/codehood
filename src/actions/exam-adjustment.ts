@@ -2,25 +2,25 @@ import { defineAction } from "astro:actions";
 import { requireUser } from "@/auth/require-user";
 import { FieldError, InvalidData } from "@/core/error";
 import {
-	examSanctionCreateForm,
-	examSanctionRevokeForm,
-	examSanctionUpdateForm,
-} from "@/core/schemas/exam-sanction";
+	examAdjustmentCreateForm,
+	examAdjustmentRevokeForm,
+	examAdjustmentUpdateForm,
+} from "@/core/schemas/exam-adjustment";
 import { db } from "@/db";
 import { parseCourseParams } from "@/urls";
 import { withServiceErrors } from "./helpers";
 
-export const examSanction = {
+export const examAdjustment = {
 	/**
 	 * Sanctions each of `usernames` on the exam, or on one of its questions (instructor only).
 	 */
 	create: defineAction({
-		input: examSanctionCreateForm,
+		input: examAdjustmentCreateForm,
 		handler: withServiceErrors(async (input, context) => {
 			const actor = requireUser(context);
 			const { discipline, course, ...rest } = input;
 			try {
-				await db.examSanction.create(
+				await db.examAdjustment.create(
 					{ ...rest, course: parseCourseParams({ discipline, course }) },
 					{ actor },
 				);
@@ -36,19 +36,19 @@ export const examSanction = {
 	}),
 
 	/**
-	 * Changes the factor, reason or notes of an active sanction (instructor only).
+	 * Changes the value, reason or notes of an active sanction (instructor only).
 	 */
 	update: defineAction({
-		input: examSanctionUpdateForm,
+		input: examAdjustmentUpdateForm,
 		handler: withServiceErrors(async (input, context) => {
 			const actor = requireUser(context);
-			const { discipline, course, exam, sanction, updatedAt, ...fields } =
+			const { discipline, course, exam, adjustment, updatedAt, ...fields } =
 				input;
-			await db.examSanction.update(
+			await db.examAdjustment.update(
 				{
 					course: parseCourseParams({ discipline, course }),
 					exam,
-					publicId: sanction,
+					publicId: adjustment,
 				},
 				fields,
 				{ actor, expectedUpdatedAt: updatedAt },
@@ -60,15 +60,15 @@ export const examSanction = {
 	 * Lifts an active sanction (instructor only).
 	 */
 	revoke: defineAction({
-		input: examSanctionRevokeForm,
+		input: examAdjustmentRevokeForm,
 		handler: withServiceErrors(async (input, context) => {
 			const actor = requireUser(context);
-			const { discipline, course, exam, sanction, updatedAt } = input;
-			await db.examSanction.revoke(
+			const { discipline, course, exam, adjustment, updatedAt } = input;
+			await db.examAdjustment.revoke(
 				{
 					course: parseCourseParams({ discipline, course }),
 					exam,
-					publicId: sanction,
+					publicId: adjustment,
 				},
 				{ actor, expectedUpdatedAt: updatedAt },
 			);

@@ -1199,7 +1199,16 @@
             "pattern": "^[a-z0-9][a-z0-9._\\-]*$",
             "example": "intro-to-recursion"
           },
-          "factor": {
+          "op": {
+            "type": "string",
+            "enum": [
+              "SET",
+              "FACTOR",
+              "OFFSET"
+            ],
+            "example": "FACTOR"
+          },
+          "value": {
             "type": "string"
           },
           "reason": {
@@ -1241,7 +1250,8 @@
           "exam",
           "author",
           "question",
-          "factor",
+          "op",
+          "value",
           "reason",
           "createdAt",
           "updatedAt",
@@ -14517,7 +14527,16 @@
                       "pattern": "^[a-z0-9][a-z0-9._\\-]*$",
                       "example": "intro-to-recursion"
                     },
-                    "factor": {
+                    "op": {
+                      "type": "string",
+                      "enum": [
+                        "SET",
+                        "FACTOR",
+                        "OFFSET"
+                      ],
+                      "example": "FACTOR"
+                    },
+                    "value": {
                       "type": "string"
                     },
                     "reason": {
@@ -14559,7 +14578,8 @@
                     "exam",
                     "author",
                     "question",
-                    "factor",
+                    "op",
+                    "value",
                     "reason",
                     "createdAt",
                     "updatedAt",
@@ -14627,10 +14647,19 @@
               "schema": {
                 "type": "object",
                 "properties": {
-                  "factor": {
+                  "op": {
                     "type": "string",
-                    "pattern": "^0(\\.\\d+)?$",
-                    "example": "0"
+                    "enum": [
+                      "SET",
+                      "FACTOR",
+                      "OFFSET"
+                    ],
+                    "example": "FACTOR"
+                  },
+                  "value": {
+                    "type": "string",
+                    "pattern": "^-?\\d+(\\.\\d+)?$",
+                    "example": "0.5"
                   },
                   "reason": {
                     "type": "string",
@@ -14695,7 +14724,16 @@
                       "pattern": "^[a-z0-9][a-z0-9._\\-]*$",
                       "example": "intro-to-recursion"
                     },
-                    "factor": {
+                    "op": {
+                      "type": "string",
+                      "enum": [
+                        "SET",
+                        "FACTOR",
+                        "OFFSET"
+                      ],
+                      "example": "FACTOR"
+                    },
+                    "value": {
                       "type": "string"
                     },
                     "reason": {
@@ -14737,7 +14775,8 @@
                     "exam",
                     "author",
                     "question",
-                    "factor",
+                    "op",
+                    "value",
                     "reason",
                     "createdAt",
                     "updatedAt",
@@ -14855,7 +14894,16 @@
                             "pattern": "^[a-z0-9][a-z0-9._\\-]*$",
                             "example": "intro-to-recursion"
                           },
-                          "factor": {
+                          "op": {
+                            "type": "string",
+                            "enum": [
+                              "SET",
+                              "FACTOR",
+                              "OFFSET"
+                            ],
+                            "example": "FACTOR"
+                          },
+                          "value": {
                             "type": "string"
                           },
                           "reason": {
@@ -14897,7 +14945,8 @@
                           "exam",
                           "author",
                           "question",
-                          "factor",
+                          "op",
+                          "value",
                           "reason",
                           "createdAt",
                           "updatedAt",
@@ -14926,9 +14975,9 @@
         }
       },
       "post": {
-        "operationId": "examSanctionCreate",
-        "summary": "Sanction one or more students on an exam.",
-        "description": "Creates one sanction per student of `usernames`, all or none, and answers them in that order. `question` narrows the sanction to one question of the exam; without it the sanction hits the exam total. Only the course's instructor, by session or CLI key; a BOT key gets 403. A student without a real attempt, or already sanctioned on the same target, is a 400 keyed on `usernames`.",
+        "operationId": "examAdjustmentCreate",
+        "summary": "Adjust the score of one or more students on an exam.",
+        "description": "Creates one adjustment per student of `usernames`, all or none, and answers them in that order. `op` is `SET` (replaces the exam total), `FACTOR` (multiplies it, or one question) or `OFFSET` (adds to it), and `value` is a decimal string: `SET` in [0, 1], `FACTOR` in [0, 2], `OFFSET` in [-1, 1] and not 0. `question` narrows the adjustment to one question of the exam, which only takes a `FACTOR` below 1; without it the adjustment hits the exam total. Only the course's instructor, by session or CLI key; a BOT key gets 403. A student without a real attempt, or that already has an active `SET`, or an active adjustment on the same question, is a 400 keyed on `usernames`. A `value` the operation refuses is a 400 keyed on `value`.",
         "tags": [
           "Exams"
         ],
@@ -14979,11 +15028,19 @@
                     "pattern": "^[a-z0-9][a-z0-9._\\-]*$",
                     "example": "intro-to-recursion"
                   },
-                  "factor": {
+                  "op": {
                     "type": "string",
-                    "pattern": "^0(\\.\\d+)?$",
-                    "default": "0",
-                    "example": "0"
+                    "enum": [
+                      "SET",
+                      "FACTOR",
+                      "OFFSET"
+                    ],
+                    "example": "FACTOR"
+                  },
+                  "value": {
+                    "type": "string",
+                    "pattern": "^-?\\d+(\\.\\d+)?$",
+                    "example": "0.5"
                   },
                   "reason": {
                     "type": "string",
@@ -14997,7 +15054,9 @@
                   }
                 },
                 "required": [
-                  "usernames"
+                  "usernames",
+                  "op",
+                  "value"
                 ]
               }
             }
@@ -15022,8 +15081,8 @@
     },
     "/api/course/{discipline}/{course}/exam/{slug}/sanction/{publicId}/revoke": {
       "post": {
-        "operationId": "examSanctionRevoke",
-        "summary": "Revoke a sanction of an exam.",
+        "operationId": "examAdjustmentRevoke",
+        "summary": "Revoke an adjustment of an exam.",
         "description": "Lifts an active sanction and answers it with `revokedAt` and `revokedBy` set. The row stays as a record. Revoking a revoked sanction is a 409. Only the course's instructor, by session or CLI key; a BOT key gets 403.",
         "tags": [
           "Exams"

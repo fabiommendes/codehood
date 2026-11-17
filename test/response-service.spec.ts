@@ -654,8 +654,14 @@ async function sanctionedAttempt() {
 		exam: exam.slug,
 		author: student.username,
 	});
-	const [sanction] = await db.examSanction.create(
-		{ course: course.id, exam: exam.slug, usernames: [student.username] },
+	const [sanction] = await db.examAdjustment.create(
+		{
+			course: course.id,
+			exam: exam.slug,
+			usernames: [student.username],
+			op: "FACTOR",
+			value: "0",
+		},
 		{ actor: instructor },
 	);
 	if (!sanction) throw new Error("no sanction created");
@@ -679,14 +685,14 @@ test("delete: an attempt with an active sanction is refused 409 and kept", async
 		await prisma.response.findUnique({ where: { id: response.id } }),
 	).not.toBeNull();
 	expect(
-		await prisma.examSanction.count({ where: { responseId: response.id } }),
+		await prisma.examAdjustment.count({ where: { responseId: response.id } }),
 	).toBe(1);
 });
 
 test("delete: an attempt whose sanction was revoked is removed with the sanction", async () => {
 	const { course, instructor, exam, response, sanction } =
 		await sanctionedAttempt();
-	await db.examSanction.revoke(
+	await db.examAdjustment.revoke(
 		{ course: course.id, exam: exam.slug, publicId: sanction.publicId },
 		{ actor: instructor },
 	);
@@ -700,6 +706,6 @@ test("delete: an attempt whose sanction was revoked is removed with the sanction
 		await prisma.response.findUnique({ where: { id: response.id } }),
 	).toBeNull();
 	expect(
-		await prisma.examSanction.count({ where: { responseId: response.id } }),
+		await prisma.examAdjustment.count({ where: { responseId: response.id } }),
 	).toBe(0);
 });

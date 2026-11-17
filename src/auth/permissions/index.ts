@@ -38,7 +38,7 @@ export type RoleEntity =
 	| "response"
 	| "submission"
 	| "feedback"
-	| "exam-sanction"
+	| "exam-adjustment"
 	| "regrade"
 	| "report"
 	| "api-key"
@@ -58,7 +58,7 @@ type ExtraPerms =
 	| "roll-call.manage"
 	| "exam.manage-exceptions"
 	| "exam.release-grades"
-	| "exam-sanction.revoke"
+	| "exam-adjustment.revoke"
 	| "rubric.read"
 	| "rubric.write"
 	| "grading-job.work"
@@ -395,7 +395,7 @@ const PERMISSIONS = {
 	// line with `feedback.create`: a bot grades, it never punishes. The
 	// sanctioned student reads their own active, released sanction without the
 	// private fields, which the service decides from the row, not from here.
-	"exam-sanction.create | exam-sanction.update | exam-sanction.revoke | exam-sanction.read":
+	"exam-adjustment.create | exam-adjustment.update | exam-adjustment.revoke | exam-adjustment.read":
 		{
 			system: false,
 			other: (actor, target) => isCourseOwner(actor, target) && !actor.bot,

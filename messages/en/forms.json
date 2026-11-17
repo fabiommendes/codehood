@@ -85,7 +85,12 @@
 	"forms_schema_git_sha_invalid": "Not a git object name: expected 40 lowercase hex digits.",
 	"forms_schema_rubric_group": "Group path: segments separated by '/', none empty and none containing ':'.",
 	"forms_schema_rubric_base": "The base must be a number between 0 and 1.",
-	"forms_schema_sanction_factor_invalid": "The factor must be a decimal from 0 up to, but not including, 1, such as 0 or 0.5.",
-	"forms_schema_sanction_text_max": "The text must have at most {max} characters.",
-	"forms_schema_sanction_usernames_required": "Choose at least one student."
+	"forms_schema_adjustment_value_invalid": "Enter a number, such as 0, 0.5 or -0.1.",
+	"forms_schema_adjustment_set_range": "A replacement grade is between 0 and 1 of the exam total.",
+	"forms_schema_adjustment_factor_range": "A multiplier is between 0 and 2.",
+	"forms_schema_adjustment_offset_range": "A bonus or penalty is between -1 and 1 of the exam total, and not 0.",
+	"forms_schema_adjustment_question_op": "A question only takes a multiplier.",
+	"forms_schema_adjustment_question_factor": "A question can only be reduced: the multiplier must be below 1.",
+	"forms_schema_adjustment_text_max": "The text must have at most {max} characters.",
+	"forms_schema_adjustment_usernames_required": "Choose at least one student."
 }

@@ -241,39 +241,39 @@ export const examExceptionApi = CRUD(
 	},
 );
 
-/// A sanction as the API answers it: no row id, and the instructor-only fields are absent for the sanctioned student.
-const examSanctionEntity = schema.examSanctionSchema
+/// An adjustment as the API answers it: no row id, and the instructor-only fields are absent for the adjusted student.
+const examAdjustmentEntity = schema.examAdjustmentSchema
 	.omit({ id: true, notes: true, createdBy: true, revokedBy: true })
 	.extend({
 		notes: z.string().nullable().optional(),
-		createdBy: schema.examSanctionSchema.shape.createdBy.optional(),
-		revokedBy: schema.examSanctionSchema.shape.revokedBy.optional(),
+		createdBy: schema.examAdjustmentSchema.shape.createdBy.optional(),
+		revokedBy: schema.examAdjustmentSchema.shape.revokedBy.optional(),
 	});
 
-export const examSanctionApi = CRUD(
+export const examAdjustmentApi = CRUD(
 	"/api/course/[discipline]/[course]/exam/[slug]/sanction",
 	{
 		name: "Exam Sanction",
 		plural: "Exam Sanctions",
 		keySegment: "/[publicId]",
 
-		entity: examSanctionEntity,
+		entity: examAdjustmentEntity,
 		create: null,
 		upsert: false,
-		update: schema.examSanctionUpdate,
-		filter: schema.examSanctionFilter.omit({
+		update: schema.examAdjustmentUpdate,
+		filter: schema.examAdjustmentFilter.omit({
 			course: true,
 			exam: true,
 		}),
 		scope: z.object({
 			course: schema.courseRef,
-			exam: schema.examSanctionPK.shape.exam,
+			exam: schema.examAdjustmentPK.shape.exam,
 		}),
-		key: schema.examSanctionPK,
+		key: schema.examAdjustmentPK,
 		skipDelete: true,
 
 		tags: ["Exams"],
-		service: db.examSanction,
+		service: db.examAdjustment,
 
 		parseKeyParams(params) {
 			return {
@@ -291,18 +291,18 @@ export const examSanctionApi = CRUD(
 	},
 );
 
-export const examSanctionCreateApi = POST(
+export const examAdjustmentCreateApi = POST(
 	"/api/course/[discipline]/[course]/exam/[slug]/sanction",
 	{
-		in: schema.examSanctionCreate.omit({ course: true, exam: true }),
-		out: z.array(examSanctionEntity.openapi("Exam Sanction")),
-		summary: "Sanction one or more students on an exam.",
+		in: schema.examAdjustmentCreateBody,
+		out: z.array(examAdjustmentEntity.openapi("Exam Sanction")),
+		summary: "Adjust the score of one or more students on an exam.",
 		description:
-			"Creates one sanction per student of `usernames`, all or none, and answers them in that order. `question` narrows the sanction to one question of the exam; without it the sanction hits the exam total. Only the course's instructor, by session or CLI key; a BOT key gets 403. A student without a real attempt, or already sanctioned on the same target, is a 400 keyed on `usernames`.",
-		operationId: "examSanctionCreate",
+			"Creates one adjustment per student of `usernames`, all or none, and answers them in that order. `op` is `SET` (replaces the exam total), `FACTOR` (multiplies it, or one question) or `OFFSET` (adds to it), and `value` is a decimal string: `SET` in [0, 1], `FACTOR` in [0, 2], `OFFSET` in [-1, 1] and not 0. `question` narrows the adjustment to one question of the exam, which only takes a `FACTOR` below 1; without it the adjustment hits the exam total. Only the course's instructor, by session or CLI key; a BOT key gets 403. A student without a real attempt, or that already has an active `SET`, or an active adjustment on the same question, is a 400 keyed on `usernames`. A `value` the operation refuses is a 400 keyed on `value`.",
+		operationId: "examAdjustmentCreate",
 		tags: ["Exams"],
 		handler: async ({ actor, body, params }) =>
-			db.examSanction.create(
+			db.examAdjustment.create(
 				{
 					...body,
 					course: parseCourseParams(params),
@@ -313,18 +313,18 @@ export const examSanctionCreateApi = POST(
 	},
 );
 
-export const examSanctionRevokeApi = POST(
+export const examAdjustmentRevokeApi = POST(
 	"/api/course/[discipline]/[course]/exam/[slug]/sanction/[publicId]/revoke",
 	{
-		out: examSanctionEntity.openapi("Exam Sanction"),
-		summary: "Revoke a sanction of an exam.",
+		out: examAdjustmentEntity.openapi("Exam Sanction"),
+		summary: "Revoke an adjustment of an exam.",
 		description:
 			"Lifts an active sanction and answers it with `revokedAt` and `revokedBy` set. The row stays as a record. Revoking a revoked sanction is a 409. Only the course's instructor, by session or CLI key; a BOT key gets 403.",
-		operationId: "examSanctionRevoke",
+		operationId: "examAdjustmentRevoke",
 		tags: ["Exams"],
 		versioned: true,
 		handler: async ({ actor, params, precondition }) =>
-			db.examSanction.revoke(
+			db.examAdjustment.revoke(
 				{
 					course: parseCourseParams(params),
 					exam: params.slug as string,

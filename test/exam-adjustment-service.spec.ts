@@ -6,7 +6,7 @@ import {
 	NotFound,
 	PreconditionFailed,
 } from "@/core/error";
-import { db, schema } from "@/db";
+import { db } from "@/db";
 import { prisma } from "@/db/client";
 import { persistedResponseFactory } from "@/fixtures/response.factory";
 import { persistedUserFactory } from "@/fixtures/user.factory";
@@ -48,14 +48,21 @@ async function attempt(ctx: Ctx) {
 	return { student, response };
 }
 
-/// Sanctions `usernames` on the setup's exam, as its instructor.
+/// Adjusts `usernames` on the setup's exam, as its instructor: a sanction (`FACTOR` 0) unless `extra` says otherwise.
 function sanction(
 	ctx: Ctx,
 	usernames: string[],
-	extra: Partial<Parameters<typeof db.examSanction.create>[0]> = {},
+	extra: Partial<Parameters<typeof db.examAdjustment.create>[0]> = {},
 ) {
-	return db.examSanction.create(
-		{ course: ctx.course.id, exam: ctx.exam.slug, usernames, ...extra },
+	return db.examAdjustment.create(
+		{
+			course: ctx.course.id,
+			exam: ctx.exam.slug,
+			usernames,
+			op: "FACTOR",
+			value: "0",
+			...extra,
+		},
 		ctx.as,
 	);
 }
@@ -71,7 +78,7 @@ function pkOf(ctx: Ctx, view: { publicId: string }) {
 
 /// Rows stored for the exam, revoked or not, which is what "nothing written" is measured on.
 function stored(ctx: Ctx) {
-	return prisma.examSanction.count({
+	return prisma.examAdjustment.count({
 		where: { response: { examId: ctx.exam.id } },
 	});
 }
@@ -125,7 +132,8 @@ test("create: sanctions two students at once, readable back with createdBy and a
 		expect(row).toMatchObject({
 			exam: ctx.exam.slug,
 			question: null,
-			factor: "0",
+			op: "FACTOR",
+			value: "0",
 			reason: "plagiarism",
 			notes: "same code as a classmate",
 			createdBy: ctx.instructor.username,
@@ -134,7 +142,7 @@ test("create: sanctions two students at once, readable back with createdBy and a
 		});
 		expect(row.createdAt).toBeInstanceOf(Date);
 	}
-	const found = await db.examSanction.findOne(
+	const found = await db.examAdjustment.findOne(
 		pkOf(
 			ctx,
 			created[0] ?? {
@@ -143,9 +151,13 @@ test("create: sanctions two students at once, readable back with createdBy and a
 		),
 		ctx.as,
 	);
-	expect(found).toMatchObject({ author: ana.student.username, factor: "0" });
+	expect(found).toMatchObject({
+		author: ana.student.username,
+		op: "FACTOR",
+		value: "0",
+	});
 	expect(
-		await db.examSanction.findMany(
+		await db.examAdjustment.findMany(
 			{ course: ctx.course.id, exam: ctx.exam.slug },
 			ctx.as,
 		),
@@ -201,48 +213,98 @@ test("create: a question outside the exam is refused", async () => {
 	expect(await stored(ctx)).toBe(0);
 });
 
-test("create: a second active sanction on the same target is refused, not-unique", async () => {
+test("create: a second active adjustment on the same question is refused, not-unique", async () => {
 	const ctx = await setup();
 	const ana = await attempt(ctx);
 	const bia = await attempt(ctx);
-	await sanction(ctx, [ana.student.username]);
+	await sanction(ctx, [ana.student.username], {
+		question: ctx.q1.slug,
+		value: "0.5",
+	});
 
-	// The whole exam: refused, and the batch's other student is not written.
+	// The batch is refused whole: the other student is not written either.
 	const again = await invalid(
-		sanction(ctx, [bia.student.username, ana.student.username]),
+		sanction(ctx, [bia.student.username, ana.student.username], {
+			question: ctx.q1.slug,
+			value: "0.5",
+		}),
 	);
 	expect(again.errors.usernames?.[0]?.code).toBe("not-unique");
 	expect(await stored(ctx)).toBe(1);
 
-	// A sanction on the exam does not block one on a question.
-	const onQuestion = await sanction(ctx, [ana.student.username], {
-		question: ctx.q1.slug,
-	});
-	expect(onQuestion[0]?.question).toBe(ctx.q1.slug);
-
-	// The same question twice: refused. Another question is another target.
-	const sameQuestion = await invalid(
-		sanction(ctx, [ana.student.username], { question: ctx.q1.slug }),
-	);
-	expect(sameQuestion.errors.usernames?.[0]?.code).toBe("not-unique");
+	// Another question is another target, and so is the exam total.
 	await sanction(ctx, [ana.student.username], { question: ctx.q2.slug });
+	await sanction(ctx, [ana.student.username]);
 	expect(await stored(ctx)).toBe(3);
+});
+
+test("create: any number of FACTOR and OFFSET on the exam total, next to one SET", async () => {
+	const ctx = await setup();
+	const ana = await attempt(ctx);
+
+	await sanction(ctx, [ana.student.username], { value: "0.5" });
+	await sanction(ctx, [ana.student.username], { value: "0.8" });
+	await sanction(ctx, [ana.student.username], { op: "FACTOR", value: "1.1" });
+	await sanction(ctx, [ana.student.username], { op: "OFFSET", value: "0.1" });
+	await sanction(ctx, [ana.student.username], { op: "OFFSET", value: "-0.1" });
+	await sanction(ctx, [ana.student.username], { op: "SET", value: "0.8" });
+
+	expect(await stored(ctx)).toBe(6);
+});
+
+test("create: a second active SET on the attempt is refused with not-unique, and writes nothing", async () => {
+	const ctx = await setup();
+	const ana = await attempt(ctx);
+	const bia = await attempt(ctx);
+	await sanction(ctx, [ana.student.username], { op: "SET", value: "0.8" });
+
+	const error = await invalid(
+		sanction(ctx, [bia.student.username, ana.student.username], {
+			op: "SET",
+			value: "0.5",
+		}),
+	);
+
+	expect(error.errors.usernames?.[0]).toMatchObject({ code: "not-unique" });
+	expect(error.errors.usernames?.[0]?.message).toContain(ana.student.username);
+	expect(await stored(ctx)).toBe(1);
+});
+
+test("create: a revoked SET frees the attempt for another one", async () => {
+	const ctx = await setup();
+	const ana = await attempt(ctx);
+	const [first] = await sanction(ctx, [ana.student.username], {
+		op: "SET",
+		value: "0.8",
+	});
+	await db.examAdjustment.revoke(pkOf(ctx, first ?? { publicId: "" }), ctx.as);
+
+	const [second] = await sanction(ctx, [ana.student.username], {
+		op: "SET",
+		value: "0.5",
+	});
+
+	expect(second).toMatchObject({ op: "SET", value: "0.5" });
 });
 
 test("create: after revoking, the same target can be sanctioned again", async () => {
 	const ctx = await setup();
 	const ana = await attempt(ctx);
-	const [first] = await sanction(ctx, [ana.student.username]);
-	await db.examSanction.revoke(pkOf(ctx, first ?? { publicId: "" }), ctx.as);
+	const [first] = await sanction(ctx, [ana.student.username], {
+		question: ctx.q1.slug,
+	});
+	await db.examAdjustment.revoke(pkOf(ctx, first ?? { publicId: "" }), ctx.as);
 
-	const [second] = await sanction(ctx, [ana.student.username]);
+	const [second] = await sanction(ctx, [ana.student.username], {
+		question: ctx.q1.slug,
+	});
 
 	expect(second?.publicId).not.toBe(first?.publicId);
 	expect(await stored(ctx)).toBe(2);
 	const filter = { course: ctx.course.id, exam: ctx.exam.slug };
-	const active = await db.examSanction.findMany(filter, ctx.as);
+	const active = await db.examAdjustment.findMany(filter, ctx.as);
 	expect(active.map((row) => row.publicId)).toEqual([second?.publicId]);
-	const all = await db.examSanction.findMany(
+	const all = await db.examAdjustment.findMany(
 		{ ...filter, revoked: true },
 		ctx.as,
 	);
@@ -270,7 +332,7 @@ test("create: reason and notes are trimmed and an empty one is stored as null", 
 		reason: "x",
 		notes: "y",
 	});
-	const cleared = await db.examSanction.update(
+	const cleared = await db.examAdjustment.update(
 		pkOf(ctx, updated ?? { publicId: "" }),
 		{ reason: "", notes: "  " },
 		ctx.as,
@@ -297,7 +359,7 @@ test("create: a reason over 2000 characters is refused", async () => {
 // update, revoke
 //
 
-test("update: changes factor, reason and notes of an active sanction; a revoked one is 409", async () => {
+test("update: changes value, reason and notes of an active adjustment; a revoked one is 409", async () => {
 	const ctx = await setup();
 	const ana = await attempt(ctx);
 	const [created] = await sanction(ctx, [ana.student.username], {
@@ -305,48 +367,117 @@ test("update: changes factor, reason and notes of an active sanction; a revoked 
 	});
 	const pk = pkOf(ctx, created ?? { publicId: "" });
 
-	const updated = await db.examSanction.update(
+	const updated = await db.examAdjustment.update(
 		pk,
-		{ factor: "0.5", reason: "second", notes: "private" },
+		{ value: "0.5", reason: "second", notes: "private" },
 		ctx.as,
 	);
 	expect(updated).toMatchObject({
-		factor: "0.5",
+		op: "FACTOR",
+		value: "0.5",
 		reason: "second",
 		notes: "private",
 		revokedAt: null,
 	});
-	const partial = await db.examSanction.update(pk, { reason: "third" }, ctx.as);
+	const partial = await db.examAdjustment.update(
+		pk,
+		{ reason: "third" },
+		ctx.as,
+	);
 	expect(partial).toMatchObject({
-		factor: "0.5",
+		value: "0.5",
 		reason: "third",
 		notes: "private",
 	});
 
-	await db.examSanction.revoke(pk, ctx.as);
-	const refused = db.examSanction.update(pk, { factor: "0.1" }, ctx.as);
+	await db.examAdjustment.revoke(pk, ctx.as);
+	const refused = db.examAdjustment.update(pk, { value: "0.1" }, ctx.as);
 	await expect(refused).rejects.toBeInstanceOf(NotAllowed);
 	await expect(refused).rejects.toMatchObject({
 		status: 409,
-		action: "exam-sanction.update",
+		action: "exam-adjustment.update",
 	});
-	expect((await db.examSanction.findOne(pk, ctx.as))?.factor).toBe("0.5");
+	expect((await db.examAdjustment.findOne(pk, ctx.as))?.value).toBe("0.5");
 });
 
-test("update: a factor of 1 or more is refused", async () => {
+test("update: the new value is checked against the operation of the row", async () => {
 	const ctx = await setup();
 	const ana = await attempt(ctx);
-	const [created] = await sanction(ctx, [ana.student.username]);
+	const [onQuestion] = await sanction(ctx, [ana.student.username], {
+		question: ctx.q1.slug,
+	});
+	const [offset] = await sanction(ctx, [ana.student.username], {
+		op: "OFFSET",
+		value: "0.1",
+	});
+	const [set] = await sanction(ctx, [ana.student.username], {
+		op: "SET",
+		value: "0.5",
+	});
+	const [factor] = await sanction(ctx, [ana.student.username]);
 
-	const error = await invalid(
-		db.examSanction.update(
-			pkOf(ctx, created ?? { publicId: "" }),
-			{ factor: "1" },
+	// A question only gets reduced.
+	const bonus = await invalid(
+		db.examAdjustment.update(
+			pkOf(ctx, onQuestion ?? { publicId: "" }),
+			{ value: "1" },
 			ctx.as,
 		),
 	);
+	expect(bonus.errors).toHaveProperty("value");
+	const zero = await invalid(
+		db.examAdjustment.update(
+			pkOf(ctx, offset ?? { publicId: "" }),
+			{ value: "0" },
+			ctx.as,
+		),
+	);
+	expect(zero.errors).toHaveProperty("value");
+	const high = await invalid(
+		db.examAdjustment.update(
+			pkOf(ctx, set ?? { publicId: "" }),
+			{ value: "1.5" },
+			ctx.as,
+		),
+	);
+	expect(high.errors).toHaveProperty("value");
+	// A multiplier of the exam total may rise above 1.
+	const raised = await db.examAdjustment.update(
+		pkOf(ctx, factor ?? { publicId: "" }),
+		{ value: "1.5" },
+		ctx.as,
+	);
+	expect(raised.value).toBe("1.5");
+});
 
-	expect(error.errors).toHaveProperty("factor");
+test("update: turning a row into a second active SET is refused", async () => {
+	const ctx = await setup();
+	const ana = await attempt(ctx);
+	const [set] = await sanction(ctx, [ana.student.username], {
+		op: "SET",
+		value: "0.5",
+	});
+	const [offset] = await sanction(ctx, [ana.student.username], {
+		op: "OFFSET",
+		value: "0.1",
+	});
+
+	const error = await invalid(
+		db.examAdjustment.update(
+			pkOf(ctx, offset ?? { publicId: "" }),
+			{ op: "SET", value: "0.9" },
+			ctx.as,
+		),
+	);
+	expect(error.errors).toHaveProperty("op");
+
+	// The SET itself can change.
+	const edited = await db.examAdjustment.update(
+		pkOf(ctx, set ?? { publicId: "" }),
+		{ op: "SET", value: "0.9" },
+		ctx.as,
+	);
+	expect(edited.value).toBe("0.9");
 });
 
 test("update and revoke: an unknown sanction is NotFound", async () => {
@@ -354,12 +485,12 @@ test("update and revoke: an unknown sanction is NotFound", async () => {
 	const pk = { course: ctx.course.id, exam: ctx.exam.slug, publicId: "nope" };
 
 	await expect(
-		db.examSanction.update(pk, { factor: "0.5" }, ctx.as),
+		db.examAdjustment.update(pk, { value: "0.5" }, ctx.as),
 	).rejects.toBeInstanceOf(NotFound);
-	await expect(db.examSanction.revoke(pk, ctx.as)).rejects.toBeInstanceOf(
+	await expect(db.examAdjustment.revoke(pk, ctx.as)).rejects.toBeInstanceOf(
 		NotFound,
 	);
-	expect(await db.examSanction.findOne(pk, ctx.as)).toBeNull();
+	expect(await db.examAdjustment.findOne(pk, ctx.as)).toBeNull();
 });
 
 test("revoke: records revokedBy and revokedAt and keeps the row; revoking again is 409", async () => {
@@ -369,22 +500,22 @@ test("revoke: records revokedBy and revokedAt and keeps the row; revoking again 
 	const pk = pkOf(ctx, created ?? { publicId: "" });
 	const before = Date.now();
 
-	const revoked = await db.examSanction.revoke(pk, ctx.as);
+	const revoked = await db.examAdjustment.revoke(pk, ctx.as);
 
 	expect(revoked.revokedBy).toBe(ctx.instructor.username);
 	expect(revoked.revokedAt?.getTime()).toBeGreaterThanOrEqual(before - 5000);
 	expect(await stored(ctx)).toBe(1);
-	const row = await prisma.examSanction.findFirstOrThrow({
+	const row = await prisma.examAdjustment.findFirstOrThrow({
 		where: { publicId: pk.publicId },
 	});
 	expect(row.revokedById).toBe(ctx.instructor.username);
 	expect(row.revokedAt).not.toBeNull();
 
-	const again = db.examSanction.revoke(pk, ctx.as);
+	const again = db.examAdjustment.revoke(pk, ctx.as);
 	await expect(again).rejects.toBeInstanceOf(NotAllowed);
 	await expect(again).rejects.toMatchObject({
 		status: 409,
-		action: "exam-sanction.revoke",
+		action: "exam-adjustment.revoke",
 	});
 });
 
@@ -399,19 +530,19 @@ test("update/revoke: a stale expectedUpdatedAt is PreconditionFailed and changes
 	const stale = { ...ctx.as, expectedUpdatedAt: new Date(0) };
 
 	await expect(
-		db.examSanction.update(pk, { reason: "lost" }, stale),
+		db.examAdjustment.update(pk, { reason: "lost" }, stale),
 	).rejects.toBeInstanceOf(PreconditionFailed);
-	await expect(db.examSanction.revoke(pk, stale)).rejects.toBeInstanceOf(
+	await expect(db.examAdjustment.revoke(pk, stale)).rejects.toBeInstanceOf(
 		PreconditionFailed,
 	);
 
-	const after = await db.examSanction.findOne(pk, ctx.as);
+	const after = await db.examAdjustment.findOne(pk, ctx.as);
 	expect(after).toMatchObject({ reason: "kept", revokedAt: null });
 	expect(after?.updatedAt).toEqual(created.updatedAt);
 
 	const current = { ...ctx.as, expectedUpdatedAt: created.updatedAt };
-	const updated = await db.examSanction.update(pk, { reason: "ok" }, current);
-	await db.examSanction.revoke(pk, {
+	const updated = await db.examAdjustment.update(pk, { reason: "ok" }, current);
+	await db.examAdjustment.revoke(pk, {
 		...ctx.as,
 		expectedUpdatedAt: updated.updatedAt,
 	});
@@ -443,11 +574,13 @@ test("permissions: only the course's instructor writes", async () => {
 
 	for (const [label, opts] of Object.entries(actors)) {
 		await expect(
-			db.examSanction.create(
+			db.examAdjustment.create(
 				{
 					course: ctx.course.id,
 					exam: ctx.exam.slug,
 					usernames: [ana.student.username],
+					op: "FACTOR",
+					value: "0",
 					question: ctx.q1.slug,
 				},
 				opts,
@@ -456,8 +589,8 @@ test("permissions: only the course's instructor writes", async () => {
 		).rejects.toBeInstanceOf(NotAllowed);
 		// An actor who cannot read the sanction may be told it is missing instead.
 		for (const write of [
-			db.examSanction.update(pk, { reason: "lost" }, opts),
-			db.examSanction.revoke(pk, opts),
+			db.examAdjustment.update(pk, { reason: "lost" }, opts),
+			db.examAdjustment.revoke(pk, opts),
 		]) {
 			const error = await write.then(
 				() => null,
@@ -471,7 +604,7 @@ test("permissions: only the course's instructor writes", async () => {
 	}
 
 	expect(await stored(ctx)).toBe(1);
-	expect(await db.examSanction.findOne(pk, ctx.as)).toMatchObject({
+	expect(await db.examAdjustment.findOne(pk, ctx.as)).toMatchObject({
 		reason: "kept",
 		revokedAt: null,
 	});
@@ -489,19 +622,19 @@ test("findMany: staff gets notes and, with revoked: true, the revoked ones", asy
 	const [gone] = await sanction(ctx, [bia.student.username], {
 		notes: "bia evidence",
 	});
-	await db.examSanction.revoke(pkOf(ctx, gone ?? { publicId: "" }), ctx.as);
+	await db.examAdjustment.revoke(pkOf(ctx, gone ?? { publicId: "" }), ctx.as);
 	const filter = { course: ctx.course.id, exam: ctx.exam.slug };
 
-	const active = await db.examSanction.findMany(filter, ctx.as);
-	const everything = await db.examSanction.findMany(
+	const active = await db.examAdjustment.findMany(filter, ctx.as);
+	const everything = await db.examAdjustment.findMany(
 		{ ...filter, revoked: true },
 		ctx.as,
 	);
-	const ofBia = await db.examSanction.findMany(
+	const ofBia = await db.examAdjustment.findMany(
 		{ ...filter, revoked: true, author: bia.student.username },
 		ctx.as,
 	);
-	const courseWide = await db.examSanction.findMany(
+	const courseWide = await db.examAdjustment.findMany(
 		{ course: ctx.course.id },
 		ctx.as,
 	);
@@ -531,13 +664,13 @@ test("admin: reads no sanction of a course they do not teach", async () => {
 	});
 	const admin = actorOf(await persistedUserFactory.create({ role: "ADMIN" }));
 
-	const listed = await db.examSanction
+	const listed = await db.examAdjustment
 		.findMany({ course: ctx.course.id, exam: ctx.exam.slug }, admin)
 		.catch((e: unknown) => e);
 	if (Array.isArray(listed)) expect(listed).toEqual([]);
 	else expect(listed).toBeInstanceOf(NotAllowed);
 
-	const found = await db.examSanction
+	const found = await db.examAdjustment
 		.findOne(pkOf(ctx, created ?? { publicId: "" }), admin)
 		.catch((e: unknown) => e);
 	if (found instanceof Error) expect(found).toBeInstanceOf(NotAllowed);
@@ -553,14 +686,15 @@ const STUDENT_KEYS = [
 	"author",
 	"createdAt",
 	"exam",
-	"factor",
 	"id",
+	"op",
 	"publicId",
 	"question",
 	"reason",
 	"response",
 	"revokedAt",
 	"updatedAt",
+	"value",
 ];
 
 test("student: sees nothing before an EXAM's release and their own active sanction after, without notes, createdBy or revokedBy", async () => {
@@ -574,22 +708,23 @@ test("student: sees nothing before an EXAM's release and their own active sancti
 	const filter = { course: ctx.course.id, exam: ctx.exam.slug };
 	const asAna = actorOf(ana.student);
 
-	expect(await db.examSanction.findMany(filter, asAna)).toEqual([]);
-	expect(await db.examSanction.findOne(pk, asAna)).toBeNull();
+	expect(await db.examAdjustment.findMany(filter, asAna)).toEqual([]);
+	expect(await db.examAdjustment.findOne(pk, asAna)).toBeNull();
 
 	await release(ctx);
 
-	const rows = await db.examSanction.findMany(filter, asAna);
+	const rows = await db.examAdjustment.findMany(filter, asAna);
 	expect(rows).toHaveLength(1);
 	expect(rows[0]).toMatchObject({
 		author: ana.student.username,
 		question: null,
-		factor: "0",
+		op: "FACTOR",
+		value: "0",
 		reason: "copied",
 		revokedAt: null,
 	});
 	expect(Object.keys(rows[0] ?? {}).sort()).toEqual(STUDENT_KEYS);
-	const one = await db.examSanction.findOne(pk, asAna);
+	const one = await db.examAdjustment.findOne(pk, asAna);
 	expect(Object.keys(one ?? {}).sort()).toEqual(STUDENT_KEYS);
 });
 
@@ -600,14 +735,14 @@ test("student: a closed QUIZ shows its sanction; an open one does not", async ()
 	const filter = { course: ctx.course.id, exam: ctx.exam.slug };
 	const asAna = actorOf(ana.student);
 
-	expect(await db.examSanction.findMany(filter, asAna)).toEqual([]);
+	expect(await db.examAdjustment.findMany(filter, asAna)).toEqual([]);
 
 	await prisma.exam.update({
 		where: { id: ctx.exam.id },
 		data: { status: "COMPLETED" },
 	});
 
-	const rows = await db.examSanction.findMany(filter, asAna);
+	const rows = await db.examAdjustment.findMany(filter, asAna);
 	expect(rows.map((row) => row.reason)).toEqual(["copied"]);
 	expect(Object.keys(rows[0] ?? {})).not.toContain("notes");
 });
@@ -617,7 +752,7 @@ test("student: a revoked sanction and a classmate's are invisible, and findOne o
 	const ana = await attempt(ctx);
 	const bia = await attempt(ctx);
 	const [first] = await sanction(ctx, [ana.student.username]);
-	const revoked = await db.examSanction.revoke(
+	const revoked = await db.examAdjustment.revoke(
 		pkOf(ctx, first ?? { publicId: "" }),
 		ctx.as,
 	);
@@ -629,24 +764,24 @@ test("student: a revoked sanction and a classmate's are invisible, and findOne o
 	const asAna = actorOf(ana.student);
 	const filter = { course: ctx.course.id, exam: ctx.exam.slug };
 
-	const rows = await db.examSanction.findMany(
+	const rows = await db.examAdjustment.findMany(
 		{ ...filter, revoked: true },
 		asAna,
 	);
 
 	expect(rows.map((row) => row.publicId)).toEqual([own?.publicId]);
-	expect(await db.examSanction.findOne(pkOf(ctx, revoked), asAna)).toBeNull();
+	expect(await db.examAdjustment.findOne(pkOf(ctx, revoked), asAna)).toBeNull();
 	expect(
-		await db.examSanction.findOne(
+		await db.examAdjustment.findOne(
 			pkOf(ctx, classmates ?? { publicId: "" }),
 			asAna,
 		),
 	).toBeNull();
 	expect(
-		await db.examSanction.findOne(pkOf(ctx, own ?? { publicId: "" }), asAna),
+		await db.examAdjustment.findOne(pkOf(ctx, own ?? { publicId: "" }), asAna),
 	).not.toBeNull();
 	// Asking for a classmate's sanctions does not leak them either.
-	const aimed = await db.examSanction
+	const aimed = await db.examAdjustment
 		.findMany({ ...filter, author: bia.student.username }, asAna)
 		.catch((e: unknown) => e);
 	if (Array.isArray(aimed)) expect(aimed).toEqual([]);
@@ -654,40 +789,80 @@ test("student: a revoked sanction and a classmate's are invisible, and findOne o
 });
 
 //
-// the factor
+// the value
 //
 
-const factors: Array<[string, boolean]> = [
-	["0", true],
-	["0.5", true],
-	["0.25", true],
-	["0.999", true],
-	["1", false],
-	["1.0", false],
-	["-0.1", false],
-	[".5", false],
-	["0.", false],
-	["0,5", false],
-	["00.5", false],
-	["", false],
-	[" 0.5", false],
+/// `[op, on a question, value, accepted]`.
+const values: Array<[string, boolean, string, boolean]> = [
+	["SET", false, "0", true],
+	["SET", false, "1", true],
+	["SET", false, "0.8", true],
+	["SET", false, "1.01", false],
+	["SET", false, "-0.1", false],
+	["FACTOR", false, "0", true],
+	["FACTOR", false, "1", true],
+	["FACTOR", false, "2", true],
+	["FACTOR", false, "2.01", false],
+	["FACTOR", false, "-0.5", false],
+	["OFFSET", false, "-1", true],
+	["OFFSET", false, "1", true],
+	["OFFSET", false, "0.1", true],
+	["OFFSET", false, "0", false],
+	["OFFSET", false, "0.0", false],
+	["OFFSET", false, "1.01", false],
+	["OFFSET", false, "-1.01", false],
+	["FACTOR", true, "0", true],
+	["FACTOR", true, "0.999", true],
+	["FACTOR", true, "1", false],
+	["FACTOR", true, "1.5", false],
+	["SET", true, "0.5", false],
+	["OFFSET", true, "0.1", false],
+	["FACTOR", false, "", false],
+	["FACTOR", false, "0,5", false],
+	["FACTOR", false, ".5", false],
+	["FACTOR", false, "0.", false],
+	["FACTOR", false, " 0.5", false],
+	["FACTOR", false, "1e0", false],
 ];
 
-for (const [value, ok] of factors) {
-	test(`sanctionFactor: ${JSON.stringify(value)} is ${ok ? "accepted" : "refused"}`, () => {
-		expect(schema.sanctionFactor.safeParse(value).success).toBe(ok);
+for (const [op, onQuestion, value, ok] of values) {
+	const where = onQuestion ? "on a question" : "on the exam";
+	test(`create: ${op} ${JSON.stringify(value)} ${where} is ${ok ? "accepted" : "refused"}`, async () => {
+		const ctx = await setup();
+		const ana = await attempt(ctx);
+		const attempted = sanction(ctx, [ana.student.username], {
+			op: op as "SET" | "FACTOR" | "OFFSET",
+			value,
+			...(onQuestion ? { question: ctx.q1.slug } : {}),
+		});
+
+		if (ok) {
+			await attempted;
+			expect(await stored(ctx)).toBe(1);
+		} else {
+			const error = await invalid(attempted);
+			expect(Object.keys(error.errors).length).toBeGreaterThan(0);
+			expect(await stored(ctx)).toBe(0);
+		}
 	});
 }
 
-test("create: a factor of 1 is refused and writes nothing", async () => {
+test("create: an unknown or missing operation, or a missing value, is refused", async () => {
 	const ctx = await setup();
 	const ana = await attempt(ctx);
 
-	const error = await invalid(
-		sanction(ctx, [ana.student.username], { factor: "1" }),
+	const unknown = await invalid(
+		sanction(ctx, [ana.student.username], { op: "ADD" as "SET" }),
 	);
-
-	expect(error.errors).toHaveProperty("factor");
+	expect(unknown.errors).toHaveProperty("op");
+	const missing = await invalid(
+		sanction(ctx, [ana.student.username], { op: undefined }),
+	);
+	expect(missing.errors).toHaveProperty("op");
+	const noValue = await invalid(
+		sanction(ctx, [ana.student.username], { value: undefined }),
+	);
+	expect(noValue.errors).toHaveProperty("value");
 	expect(await stored(ctx)).toBe(0);
 });
 

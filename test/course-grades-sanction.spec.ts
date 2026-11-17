@@ -62,11 +62,13 @@ async function setup() {
 type Ctx = Awaited<ReturnType<typeof setup>>;
 
 function sanction(ctx: Ctx, username: string) {
-	return db.examSanction.create(
+	return db.examAdjustment.create(
 		{
 			course: ctx.course.id,
 			exam: ctx.exam.slug,
 			usernames: [username],
+			op: "FACTOR",
+			value: "0",
 			reason: "copied",
 		},
 		actorOf(ctx.instructor),
@@ -96,7 +98,7 @@ test("the cell of a zeroed student is a total of 0 carrying the sanction, and a 
 	});
 	await sanction(ctx, ctx.pending.username);
 	const [revoked] = await sanction(ctx, ctx.graded.username);
-	await db.examSanction.revoke(
+	await db.examAdjustment.revoke(
 		{
 			course: ctx.course.id,
 			exam: ctx.exam.slug,

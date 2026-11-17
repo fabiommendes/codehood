@@ -672,11 +672,12 @@ export async function fillDatabase(
 			"createdAt",
 			"updatedAt",
 		]);
-		const insertSanction = insert("ExamSanction", [
+		const insertSanction = insert("ExamAdjustment", [
 			"publicId",
 			"responseId",
 			"questionRefId",
-			"factor",
+			"op",
+			"value",
 			"reason",
 			"notes",
 			"createdById",
@@ -1666,6 +1667,7 @@ export async function fillDatabase(
 							publicId(),
 							responseId,
 							null,
+							"FACTOR",
 							"0",
 							"copied",
 							"same code as a classmate",

@@ -80,7 +80,7 @@ import {
 	releaseBlocker,
 	viewerTiming,
 } from "@/services/exam-state";
-import { activeSanctionsOf } from "../active-sanctions";
+import { activeAdjustmentsOf } from "../active-adjustments";
 import {
 	DbNull,
 	type Prisma,
@@ -922,7 +922,7 @@ async function attemptResults(
 	}));
 	const policy = (await loadResultPolicy(exam.courseId, tx))(exam);
 	const sanctions = sanctionsByResponse(
-		await activeSanctionsOf(exam.courseId, [exam.id], tx),
+		await activeAdjustmentsOf(exam.courseId, [exam.id], tx),
 	);
 	return attempts.map(({ publicId, submissions }) =>
 		examResult(

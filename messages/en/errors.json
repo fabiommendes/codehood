@@ -173,9 +173,10 @@
 	"errors_code_send_waiting": "Wait for the previous send to be graded before sending again",
 	"errors_code_sends_spent": "You have no sends left for this question",
 	"errors_code_not_sendable": "This question is not sent to a worker: it only takes autosaves",
-	"errors_exam_sanction_no_attempt": "\"{username}\" has no attempt at this exam",
-	"errors_exam_sanction_duplicate": "\"{username}\" is listed more than once",
-	"errors_exam_sanction_exists": "\"{username}\" already has an active sanction on this target",
-	"errors_exam_sanction_practice": "Practice exams take no sanctions",
-	"errors_exam_sanction_question": "\"{question}\" is not a question of this exam"
+	"errors_exam_adjustment_no_attempt": "\"{username}\" has no attempt at this exam",
+	"errors_exam_adjustment_duplicate": "\"{username}\" is listed more than once",
+	"errors_exam_adjustment_exists": "\"{username}\" already has an active adjustment on this question",
+	"errors_exam_adjustment_set_exists": "\"{username}\" already has an active replacement grade: edit the existing one",
+	"errors_exam_adjustment_practice": "Practice exams take no adjustments",
+	"errors_exam_adjustment_question": "\"{question}\" is not a question of this exam"
 }

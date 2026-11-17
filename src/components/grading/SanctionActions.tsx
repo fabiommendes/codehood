@@ -4,9 +4,10 @@ import { createSchemaForm } from "@/components/form/create-schema-form";
 import Field from "@/components/form/Field";
 import FormAlert from "@/components/form/FormAlert";
 import {
-	examSanctionRevokeForm,
-	examSanctionUpdateForm,
-} from "@/core/schemas/exam-sanction";
+	examAdjustmentRevokeForm,
+	examAdjustmentUpdateForm,
+	fractionToPercent,
+} from "@/core/schemas/exam-adjustment";
 import { m } from "@/i18n";
 import SanctionModal from "./SanctionModal";
 import { withInitialValues } from "./sanction-fields";
@@ -16,13 +17,14 @@ export interface SanctionActionsProps {
 	discipline: string;
 	course: string;
 	exam: string;
-	/// The `publicId` of the active sanction.
-	sanction: string;
+	/// The `publicId` of the active adjustment.
+	adjustment: string;
 	/// The sanction's `updatedAt` as ISO text, the version the page loaded.
 	updatedAt: string;
 	/// Whether the sanction hits the whole exam, the only target whose factor can change.
 	wholeExam: boolean;
-	factor: string;
+	/// The adjustment's value, a fraction as stored.
+	value: string;
 	reason: string | null;
 	notes: string | null;
 }
@@ -35,22 +37,22 @@ export interface SanctionActionsProps {
 export default function SanctionActions(
 	props: SanctionActionsProps,
 ): JSX.Element {
-	const id = props.sanction;
+	const id = props.adjustment;
 	const [editing, setEditing] = createSignal(false);
 	const [revoking, setRevoking] = createSignal(false);
 	const target = {
 		discipline: props.discipline,
 		course: props.course,
 		exam: props.exam,
-		sanction: props.sanction,
+		adjustment: props.adjustment,
 		updatedAt: props.updatedAt,
 	};
-	const edit = createSchemaForm(examSanctionUpdateForm, {
+	const edit = createSchemaForm(examAdjustmentUpdateForm, {
 		id: `edit-${id}`,
-		action: actions.examSanction.update,
+		action: actions.examAdjustment.update,
 		hidden: target,
 		fields: {
-			factor: {
+			value: {
 				label: m.grades_sanction_factor(),
 				hint: m.grades_sanction_factor_hint(),
 			},
@@ -67,13 +69,13 @@ export default function SanctionActions(
 		onSuccess: () => window.location.reload(),
 	});
 	const field = withInitialValues(edit, {
-		factor: props.factor,
+		value: fractionToPercent(props.value),
 		reason: props.reason ?? "",
 		notes: props.notes ?? "",
 	});
-	const revoke = createSchemaForm(examSanctionRevokeForm, {
+	const revoke = createSchemaForm(examAdjustmentRevokeForm, {
 		id: `revoke-${id}`,
-		action: actions.examSanction.revoke,
+		action: actions.examAdjustment.revoke,
 		hidden: target,
 		onSuccess: () => window.location.reload(),
 	});
@@ -141,7 +143,7 @@ export default function SanctionActions(
 					<FormAlert error={edit.error()} />
 					<Show when={props.wholeExam}>
 						<Field
-							{...field("factor")}
+							{...field("value")}
 							control={{ inputmode: "decimal", autocomplete: "off" }}
 						/>
 					</Show>

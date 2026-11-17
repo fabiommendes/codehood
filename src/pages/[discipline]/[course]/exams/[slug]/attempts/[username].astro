@@ -63,7 +63,7 @@ const [students, stored, sanctions] = await Promise.all([
 		{ course: course.id, public: false, slugs: questions },
 		{ actor },
 	),
-	db.examSanction.findMany(
+	db.examAdjustment.findMany(
 		{ course: course.id, exam: exam.slug, author: attempt.author },
 		{ actor },
 	),
@@ -135,13 +135,16 @@ const outcomes = examResult(
 );
 
 // The sanction on the whole exam, and whether this attempt can take one at all.
-const examSanction = sanctions
+const examAdjustment = sanctions
 	.filter(
-		(entry) => entry.response === attempt.publicId && entry.question === null,
+		(entry) =>
+			entry.response === attempt.publicId &&
+			entry.question === null &&
+			entry.op === "FACTOR",
 	)
-	.sort((a, b) => Number(a.factor) - Number(b.factor))[0];
-const examSanctionNotes =
-	examSanction && "notes" in examSanction ? examSanction.notes : null;
+	.sort((a, b) => Number(a.value) - Number(b.value))[0];
+const examAdjustmentNotes =
+	examAdjustment && "notes" in examAdjustment ? examAdjustment.notes : null;
 const sanctionable = exam.type !== "PRACTICE";
 
 const points = pointsByPosition(exam.questions);
@@ -233,13 +236,13 @@ const stateLabel = (status: string, score: number | null): string => {
   }
 
   {
-    examSanction && (
+    examAdjustment && (
       <div role="status" class="alert alert-error alert-soft mt-4 block text-sm">
         <p class="font-semibold">{m.grades_sanction_banner_title()}</p>
-        <p>{Number(examSanction.factor) === 0 ? m.grades_sanction_banner_zeroed() : m.grades_sanction_banner_factor({ percent: Math.round(Number(examSanction.factor) * 100) })}</p>
-        {examSanction.reason && <p class="whitespace-pre-wrap">{m.grades_sanction_banner_reason({ reason: examSanction.reason })}</p>}
-        {examSanctionNotes && (
-          <p class="whitespace-pre-wrap">{m.grades_sanction_banner_notes({ notes: examSanctionNotes })}</p>
+        <p>{Number(examAdjustment.value) === 0 ? m.grades_sanction_banner_zeroed() : m.grades_sanction_banner_factor({ percent: Math.round(Number(examAdjustment.value) * 100) })}</p>
+        {examAdjustment.reason && <p class="whitespace-pre-wrap">{m.grades_sanction_banner_reason({ reason: examAdjustment.reason })}</p>}
+        {examAdjustmentNotes && (
+          <p class="whitespace-pre-wrap">{m.grades_sanction_banner_notes({ notes: examAdjustmentNotes })}</p>
         )}
         <p class="mt-1"><a class="link" href={`${href}/exams/${exam.slug}/sanctions`}>{m.grades_sanction_manage()}</a></p>
       </div>
@@ -247,7 +250,7 @@ const stateLabel = (status: string, score: number | null): string => {
   }
 
   {
-    sanctionable && !examSanction && (
+    sanctionable && !examAdjustment && (
       <div class="mt-4">
         <SanctionDialog
           client:load

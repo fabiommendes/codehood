@@ -473,7 +473,7 @@ export const makeResponseService = defineService<ResponseT>()(() => {
 					// Before anything is measured or deleted: a stale caller loses nothing.
 					await checkVersion(inner, "response", { id: response.id }, opts);
 					// A sanction is a record of a decision: only a revoked one goes with the attempt.
-					const sanctioned = await inner.examSanction.count({
+					const sanctioned = await inner.examAdjustment.count({
 						where: { responseId: response.id, revokedAt: null },
 					});
 					if (sanctioned > 0) {
