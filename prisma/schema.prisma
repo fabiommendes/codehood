@@ -81,6 +81,8 @@ model User {
   reportsTriaged     Report[]           @relation("ReportTriagedBy")
   adjustmentsCreated ExamAdjustment[]   @relation("AdjustmentCreatedBy")
   adjustmentsRevoked ExamAdjustment[]   @relation("AdjustmentRevokedBy")
+  submissionsCreated Submission[]       @relation("SubmissionCreatedBy")
+  responsesCreated   Response[]         @relation("ResponseCreatedBy")
 
   @@index([role])
 }
@@ -901,6 +903,11 @@ model Response {
   /// Only the service writes it, once, at creation.
   preview Boolean @default(false)
 
+  /// The instructor who created this attempt for a student who did not take
+  /// the exam, to hold an adjustment. Null on the student's own attempts.
+  createdById String?
+  createdBy   User?   @relation("ResponseCreatedBy", fields: [createdById], references: [username], onDelete: Restrict)
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
@@ -994,6 +1001,11 @@ model Submission {
   question   QuestionRef @relation(fields: [questionId], references: [id])
 
   payload Json
+
+  /// The instructor who created this submission to hold a grade for a question
+  /// the student left unanswered. Null on the student's own submissions.
+  createdById String?
+  createdBy   User?   @relation("SubmissionCreatedBy", fields: [createdById], references: [username], onDelete: Restrict)
 
   /// The worker's runner report (mdq runner-report schema).
   runnerReport Json?

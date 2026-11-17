@@ -63,6 +63,27 @@ export interface GradingPass {
 /// The prefix of the `ref` of a pass that marks an answer will-not-grade.
 export const WILL_NOT_GRADE_REF = "wng-";
 
+/// The prefix of the `ref` of a pass that undoes a change by hand.
+export const REVERT_REF_PREFIX = "revert-";
+
+/** The score of the newest pass with no grader (the automatic one), or `null` when there is none. */
+export function autoScoreOf(
+	_passes: readonly Pick<GradingPass, "grader" | "score" | "updatedAt">[],
+): number | null {
+	throw new Error("not implemented");
+}
+
+/**
+ * Whether an answer's current verdict was changed by hand: its newest pass has a grader, its `ref` does not start
+ * with `REVERT_REF_PREFIX`, and either an earlier pass exists or the instructor created the submission.
+ */
+export function isManualChange(
+	_passes: readonly GradingPass[],
+	_createdBy: string | null | undefined,
+): boolean {
+	throw new Error("not implemented");
+}
+
 /// The answer a student gave to one question within a closed attempt: its newest submission, or for a `code` question the sent one that counts.
 export interface CountingAnswer {
 	/// The submission's `publicId`.
@@ -80,6 +101,8 @@ export interface CountingAnswer {
 	blanks?: Feedback["blanks"];
 	/// Set when the newest pass applies a retired rubric item, so the answer should be graded again.
 	review?: true;
+	/// Set when the instructor created the submission.
+	createdBy?: string;
 	/// Every pass on this submission, newest first (by `updatedAt`).
 	passes: GradingPass[];
 	/// The graded submissions of a `code` question with how each weighs in the verdict. Absent for other answers.
@@ -101,7 +124,8 @@ export interface QueueEntry {
 export type GradingAttempt = Pick<
 	Response,
 	"publicId" | "author" | "createdAt" | "acceptingSubmissions" | "submissions"
->;
+> &
+	Partial<Pick<Response, "createdBy">>;
 
 /// The part of a grading pass the grading rules read.
 export type GradingFeedback = Pick<

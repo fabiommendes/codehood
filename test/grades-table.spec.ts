@@ -86,6 +86,7 @@ function submission(
 		kind: "AUTOSAVE",
 		automaticallyTriggered: false,
 		payload: {},
+		createdBy: null,
 		startedAt: null,
 		createdAt: at(5),
 		...overrides,

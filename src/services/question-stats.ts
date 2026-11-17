@@ -138,6 +138,13 @@ export function questionStats(
 	});
 }
 
+/** The attempts as statistics read them: instructor-created attempts dropped, and instructor-created submissions dropped from the rest. */
+export function measuredAttempts<T extends GradingAttempt>(
+	_attempts: readonly T[],
+): T[] {
+	throw new Error("not implemented");
+}
+
 /// The closed attempts of the exam: the ones `countingAnswers` reads, found by their authors' personal timing.
 function closedAttemptCount(
 	exam: ExamTiming,
@@ -354,7 +361,7 @@ export type AnswerDistribution =
  */
 export function answerDistribution(
 	question: QuestionDocument,
-	answers: readonly Pick<CountingAnswer, "payload">[],
+	answers: readonly Pick<CountingAnswer, "payload" | "createdBy">[],
 ): AnswerDistribution | null {
 	switch (question.type) {
 		case "multiple-choice":

@@ -1285,6 +1285,7 @@ function fromDb(row: DbResponse): Response {
 		acceptingSubmissions: row.acceptingSubmissions,
 		closedAt: row.closedAt,
 		preview: row.preview,
+		createdBy: row.createdById,
 		submissions: row.submissions.map(submissionFromDb),
 		createdAt: row.createdAt,
 		updatedAt: row.updatedAt,

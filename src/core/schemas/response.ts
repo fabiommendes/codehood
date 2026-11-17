@@ -42,6 +42,9 @@ export const responseSchema = z.object({
 	/// Whether this is the course instructor's simulation of the exam. Server state: never written by a client.
 	preview: z.boolean(),
 
+	/// The instructor who created this attempt for a student who did not take the exam, or `null` for the student's own. Server state: never written by a client.
+	createdBy: username.nullable(),
+
 	/// When the attempt was closed, or `null` while it is open or when it was closed before the server recorded it. Server state: never written by a client.
 	closedAt: z.date().nullable(),
 
@@ -64,6 +67,7 @@ export const responseCreate = responseSchema
 		submissions: true,
 		closedAt: true,
 		preview: true,
+		createdBy: true,
 		createdAt: true,
 		updatedAt: true,
 	})

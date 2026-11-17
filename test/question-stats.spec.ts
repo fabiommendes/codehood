@@ -75,6 +75,7 @@ function submission(
 		kind: "AUTOSAVE",
 		automaticallyTriggered: false,
 		payload: { answer: publicId },
+		createdBy: null,
 		startedAt: null,
 		createdAt: at(minutes),
 		...overrides,

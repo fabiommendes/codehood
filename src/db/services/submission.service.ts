@@ -703,6 +703,7 @@ export function fromDb(row: SubmissionFromDbRow): Submission {
 		kind: row.kind,
 		automaticallyTriggered: row.automaticallyTriggered,
 		payload: row.payload as Submission["payload"],
+		createdBy: row.createdById,
 		startedAt: row.startedAt,
 		createdAt: row.createdAt,
 	};

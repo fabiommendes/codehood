@@ -68,6 +68,9 @@ export const submissionSchema = z.object({
 	automaticallyTriggered: z.boolean(),
 	payload: submissionPayload,
 
+	/// Server state: the instructor who created the submission; `null` for the student's own.
+	createdBy: username.nullable(),
+
 	startedAt: z.date().nullable(),
 	createdAt: z.date(),
 });
@@ -82,6 +85,7 @@ export const submissionCreate = submissionSchema
 		question: true,
 		createdAt: true,
 		kind: true,
+		createdBy: true,
 	})
 	.extend({
 		response: responseRef,
