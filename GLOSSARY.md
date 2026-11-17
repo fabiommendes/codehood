@@ -221,6 +221,14 @@ start date, or both. Every "may this student answer now?" check uses the
 student's personal window, the exam's window with the exception applied. Grades
 of an exam are not released while a personal window is still open or upcoming.
 
+## Exam grant
+
+Type: domain
+
+Proof, issued by the server from a student's attempt, that the student may read
+the questions of one [Exam](#exam) at their frozen versions. Short-lived; every
+student read of a question goes through one.
+
 ## Grade column
 
 Type: domain
@@ -309,6 +317,14 @@ Type: platform
 A script for operator tasks that have no UI, such as creating users and
 resetting passwords. Commands go through the [Service](#service) layer like
 everything else, never straight to the database.
+
+## Missed
+
+Type: domain
+
+The state of a [Student](#student) whose [Exam](#exam) has closed for them with
+no attempt of their own. Once grades are released they read the questions'
+statements, without a review.
 
 ## OpenRPC
 
@@ -597,6 +613,14 @@ An account, holding a [Role](#role), a unique username, and external handles
 (github id, school id) collected at invite acceptance. The username is immutable
 because it is the foreign key courses reference for the instructor and a path
 segment of every [Course URL](#course-url) that instructor owns.
+
+## Version freeze
+
+Type: domain
+
+Pinning the latest version on every unpinned question of an [Exam](#exam), at
+its first attempt, its closing or its grade release. From then on a push keeps
+the pins. A PRACTICE exam never freezes.
 
 ## Worker
 
