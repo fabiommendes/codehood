@@ -1,6 +1,7 @@
 import {
 	brasiliaFillIn,
 	fibonacciOrdering,
+	fillIn,
 	idempotenceEssay,
 	multipleChoice,
 	multipleSelection,
@@ -969,4 +970,291 @@ test("restMeans is null for everyone when the exam has no other question", () =>
 		feedbackOf("ana1", "1"),
 	]);
 	expect(means.get("ana")).toBeNull();
+});
+
+//
+// fill-in: scores and review follow each blank's own mark
+//
+
+const PARTIAL_BLANKS = fillIn({
+	id: "partial-blanks",
+	stem: "Pick [^x] and type [^y].",
+	blanks: [
+		{
+			id: "x",
+			type: "multiple-choice",
+			choices: [
+				{ id: "good", text: "Good", score: 1 },
+				{ id: "half", text: "Half", score: 0.5 },
+				{ id: "bad", text: "Bad", score: 0 },
+			],
+		},
+		{ id: "y", type: "short-answer", accept: ["yes"] },
+	],
+});
+
+function blankRows(sections: ReviewSection[], index: number): AnswerGroup[] {
+	const blanks = sections.filter(
+		(section): section is GroupsSection =>
+			section.kind === "groups" && section.block === "blank",
+	);
+	const found = blanks[index];
+	if (!found) throw new Error(`no blank section ${index}`);
+	return found.rows;
+}
+
+test("a fill-in row scores by its blank's mark, whatever the verdict of the whole answer", () => {
+	const answers = [
+		answer("u1", { x: "good", y: "yes" }, 1),
+		answer("u2", { x: "half", y: "no" }, 0.25),
+		answer("u3", { x: "bad", y: "no" }, 0),
+		answer("u4", { x: "bad", y: "yes" }, 0.5),
+		answer("u5", { x: "good", y: "no" }, 0.5),
+	];
+	const sections = answerSections(PARTIAL_BLANKS, answers);
+	const x = blankRows(sections, 0);
+	expect(rowWithText(x, "Good").score).toBe(1);
+	expect(rowWithText(x, "Half").score).toBe(0.5);
+	expect(rowWithText(x, "Bad").score).toBe(0);
+	const y = blankRows(sections, 1);
+	expect(rowWithText(y, "yes").score).toBe(1);
+	expect(rowWithText(y, "no").score).toBe(0);
+});
+
+test("a fill-in blank asks for review against the mean of those who got that blank right", () => {
+	const answers = [
+		...many("g", 3, { x: "good", y: "yes" }, 1, { restMean: 0.6 }),
+		...many("b", 3, { x: "bad", y: "yes" }, 0.5, { restMean: 0.8 }),
+		...many("h", 3, { x: "half", y: "no" }, 0.25, { restMean: 0.4 }),
+	];
+	const sections = answerSections(PARTIAL_BLANKS, answers);
+	const x = blankRows(sections, 0);
+	expect(rowWithText(x, "Good").review).toBe(false);
+	expect(rowWithText(x, "Bad").review).toBe(true);
+	expect(rowWithText(x, "Half").review).toBe(false);
+	// y: "yes" is right for g and b (mean 0.7); "no" has the mean 0.4 of h.
+	const y = blankRows(sections, 1);
+	expect(rowWithText(y, "yes").review).toBe(false);
+	expect(rowWithText(y, "no").review).toBe(false);
+});
+
+//
+// overrides: sanction factors
+//
+
+test("a factor of zero leaves a negative score negative and zeroes a positive one", () => {
+	const model = objectiveReview({
+		question: FOUR,
+		slug: "four",
+		answers: [answer("caio", "b", -0.5), answer("dani", "a", 1)],
+		stats: { correct: 0.5, discrimination: null },
+		regrades: new Map(),
+		sanctions: new Map([
+			["caio", { publicId: "adj-1", value: 0, reason: null, updatedAt: at(2) }],
+			["dani", { publicId: "adj-2", value: 0, reason: null, updatedAt: at(1) }],
+		]),
+	});
+	expect(
+		model.overrides.map((row) => [row.author, row.auto, row.final]),
+	).toEqual([
+		["caio", -0.5, -0.5],
+		["dani", 1, 0],
+	]);
+});
+
+test("a sanction on a student who did not answer has no submission", () => {
+	const model = objectiveReview({
+		question: FOUR,
+		slug: "four",
+		answers: [answer("ana", "a", 1)],
+		stats: { correct: 1, discrimination: null },
+		regrades: new Map(),
+		sanctions: new Map([
+			[
+				"eli",
+				{ publicId: "adj-9", value: 0.5, reason: "late", updatedAt: at(3) },
+			],
+		]),
+	});
+	const [row] = model.overrides;
+	expect(model.overrides).toHaveLength(1);
+	expect(row).toMatchObject({
+		author: "eli",
+		kind: "sanction",
+		auto: null,
+		comment: "late",
+		adjustment: { publicId: "adj-9", updatedAt: at(3) },
+	});
+	expect(row?.submission).toBeUndefined();
+});
+
+//
+// right follows the automatic score
+//
+
+/// Two answers at full score and one lowered to 0 by hand, all in the same row.
+function loweredRow(payload: unknown): ReviewAnswer[] {
+	return [
+		answer("k1", payload, 1, { restMean: 0.3 }),
+		answer("k2", payload, 1, { restMean: 0.3 }),
+		answer("k3", payload, 0, {
+			restMean: 0.9,
+			passes: [
+				pass(0, { grader: "teacher", updatedAt: at(2) }),
+				pass(1, { updatedAt: at(1) }),
+			],
+		}),
+	];
+}
+
+test("a text row stays right, with no review, when a member was lowered by hand", () => {
+	const answers = [
+		...loweredRow("Paris"),
+		...many("w", 3, "Roma", 0, { restMean: 0.1 }),
+	];
+	const rows = groupsOf(answerSections(FRANCE, answers), "texts").rows;
+	const paris = rowWithText(rows, "Paris");
+	expect(paris).toMatchObject({ score: "varies", changed: 1, review: false });
+	expect(paris.mean).toBeCloseTo(0.5, 10);
+});
+
+test("a value row stays right, with no review, when a member was lowered by hand", () => {
+	const answers = [
+		...loweredRow(2.02),
+		...many("w", 3, 9, 0, { restMean: 0.1 }),
+	];
+	const rows = groupsOf(answerSections(BAND, answers), "values").rows;
+	const key = rowWithText(rows, "2.02");
+	expect(key).toMatchObject({ score: "varies", changed: 1, review: false });
+	expect(key.mean).toBeCloseTo(0.5, 10);
+});
+
+//
+// rows with no key to check never ask for review
+//
+
+test("blank and removed multiple choice rows never ask for review", () => {
+	const answers = [
+		...many("a", 3, "a", 1, { restMean: 0.2 }),
+		...many("b", 3, "b", 0, { restMean: 0.9 }),
+		...many("g", 3, "gone", 0, { restMean: 0.9 }),
+		...many("n", 3, null, 0, { restMean: 0.9 }),
+	];
+	const rows = groupsOf(answerSections(FOUR, answers), "choices").rows;
+	expect(rows.map((row) => row.count)).toEqual([3, 3, 0, 0, 3, 3]);
+	expect(rows.map((row) => row.review)).toEqual([
+		false,
+		true,
+		false,
+		false,
+		false,
+		false,
+	]);
+});
+
+test("the others row of multiple selection never asks for review", () => {
+	const sets: [string, string[], number, number][] = [
+		["A", ["two", "three", "five"], 9, 1],
+		["B", ["two", "three"], 8, 0],
+		["C", ["two"], 7, 0],
+		["D", ["two", "five"], 6, 0],
+		["E", ["three", "five"], 5, 0],
+		["F", ["four"], 2, 0],
+		["G", ["two", "four"], 2, 0],
+	];
+	const answers = sets.flatMap(([id, ticked, count, verdict]) =>
+		many(id, count, ticked, verdict, { restMean: id === "A" ? 0.2 : 0.9 }),
+	);
+	const rows = groupsOf(
+		answerSections(primesSelection, answers),
+		"combinations",
+	).rows;
+	expect(rows.map((row) => row.count)).toEqual([9, 8, 7, 6, 5, 4]);
+	expect(rows.map((row) => row.review)).toEqual([
+		false,
+		true,
+		true,
+		true,
+		true,
+		false,
+	]);
+});
+
+test("the blank row of ordering never asks for review", () => {
+	const answers = [
+		...many("k", 3, fibonacciOrdering.lines, 1, { restMean: 0.2 }),
+		...many("n", 3, null, 0, { restMean: 0.9 }),
+	];
+	const orders = groupsOf(
+		answerSections(fibonacciOrdering, answers),
+		"orders",
+	).rows;
+	const blank = orders.find((row) => authorsOf(row).includes("n1"));
+	expect(blank?.count).toBe(3);
+	expect(blank?.review).toBe(false);
+});
+
+//
+// member detail
+//
+
+test("a short answer member with another spelling carries it as detail", () => {
+	const answers = [
+		answer("p1", "Paris", 1),
+		answer("p2", "Paris", 1),
+		answer("p3", "  París ", 1),
+	];
+	const paris = rowWithText(
+		groupsOf(answerSections(FRANCE, answers), "texts").rows,
+		"Paris",
+	);
+	const detail = Object.fromEntries(
+		paris.members.map((member) => [member.author, member.detail]),
+	);
+	expect(detail).toEqual({ p1: undefined, p2: undefined, p3: "París" });
+});
+
+test("a true-false member carries what the student answered as detail", () => {
+	const answers = [
+		answer("w1", { "tcp-order": false, "udp-guarantee": false }, 0.5),
+		answer("w2", { "udp-guarantee": false }, 0.5),
+	];
+	const [tcp] = groupsOf(
+		answerSections(protocolsTrueFalse, answers),
+		"statements",
+	).rows;
+	const detail = Object.fromEntries(
+		tcp?.members.map((member) => [member.author, member.detail]) ?? [],
+	);
+	expect(detail).toEqual({ w1: "F F", w2: "– F" });
+});
+
+//
+// ordering with an item outside the key
+//
+
+test("an ordering extra item stays out of the matrix", () => {
+	const [a, b, c, d] = fibonacciOrdering.lines;
+	const extra = fibonacciOrdering.extra?.[0];
+	const sections = answerSections(fibonacciOrdering, [
+		answer("x1", [a, b, c, d, extra], 0),
+		answer("k1", [a, b, c, d], 1),
+	]);
+	const matrix = sections[0];
+	if (matrix?.kind !== "matrix") throw new Error("no matrix");
+	expect(matrix.matrix.steps).toHaveLength(4);
+	expect(matrix.matrix.answers).toBe(2);
+	expect(matrix.matrix.cells).toEqual([
+		[2, 0, 0, 0],
+		[0, 2, 0, 0],
+		[0, 0, 2, 0],
+		[0, 0, 0, 2],
+	]);
+	const orders = groupsOf(sections, "orders");
+	const withExtra = orders.rows.find((row) => authorsOf(row).includes("x1"));
+	expect(
+		withExtra?.cell.kind === "chips"
+			? withExtra.cell.chips.map((chip) => chip.ok)
+			: null,
+	).toEqual([true, true, true, true, false]);
 });

@@ -148,7 +148,8 @@ export type AttentionRow =
 /** A student whose result on the question the instructor changed. */
 export interface OverrideRow {
 	author: string;
-	submission: string;
+	/// Absent when the student did not answer (a sanction on an empty attempt).
+	submission?: string;
 	kind: "grade" | "sanction";
 	/// The automatic score (grade) or the score before the factor (sanction); `null` when the student did not answer.
 	auto: number | null;
