@@ -347,5 +347,8 @@
 	"grades_adjustment_penalty_factor": "Penalidade ×{factor}",
 	"grades_adjustment_bonus_factor": "Bônus ×{factor}",
 	"grades_adjustment_bonus_offset": "Bônus +{points}",
-	"grades_adjustment_penalty_offset": "Penalidade −{points}"
+	"grades_adjustment_penalty_offset": "Penalidade −{points}",
+	"grades_objective_blank": "Lacuna {number}",
+	"grades_objective_others": "Outras",
+	"grades_objective_spellings": "{count} grafias"
 }
