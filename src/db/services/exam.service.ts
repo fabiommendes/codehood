@@ -1373,6 +1373,7 @@ function fromDb(
 		extraTime: fromMs(row.extraTimeMs),
 		author: row.authorId,
 		gradesReleasedAt: row.gradesReleasedAt,
+		questionsFrozenAt: row.questionsFrozenAt,
 		rev: row.rev,
 		tags: row.examTags.map((t) => t.tag),
 		questions:

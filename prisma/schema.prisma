@@ -1326,6 +1326,13 @@ model Exam {
   /// score as soon as it is written and a `QUIZ` once it is closed.
   gradesReleasedAt DateTime?
 
+  /// When the versions of the exam's questions were frozen: the creation of
+  /// its first attempt that is not a simulation, its closing or the release
+  /// of its grades, whichever came first. Null before that, and always null
+  /// for a PRACTICE exam. Server-side state the course repository must not
+  /// set (dev/adr/0011-contrato-de-sync-entre-cli-e-servidor.md).
+  questionsFrozenAt DateTime?
+
   authorId String
   author   User   @relation(fields: [authorId], references: [username])
 

@@ -5,7 +5,16 @@
  * Nothing here checks permissions and nothing here imports a service: the
  * callers do their own checks before reaching for these.
  */
-import type { ExamId } from "@/core/schemas/base";
+import type { Actor } from "@/auth/actor";
+import type {
+	CourseId,
+	ExamId,
+	QuestionDataId,
+	QuestionRefId,
+	ResponseId,
+} from "@/core/schemas/base";
+import type { CourseRef } from "@/core/schemas/course";
+import type { PublicQuestion, QuestionDocument } from "@/mdq";
 import type { ExamTiming, ExceptionTiming } from "@/services/exam-state";
 import type { Prisma, PrismaTx } from "../client";
 import { fromMs } from "../utils";
@@ -117,4 +126,93 @@ export async function unsafePinnedDocuments<
 				? byHash.get(`${q.id}:${q.version}`)
 				: byId.get(q.latestId ?? -1)) ?? null,
 	) as (Prisma.QuestionDataGetPayload<{ select: S }> | null)[];
+}
+
+declare const grantBrand: unique symbol;
+
+/// `answer`: the public half. `review`: the public half plus what the review derives from the key.
+export type GrantView = "answer" | "review";
+
+/** Proof that `username` may read the questions of one exam, through one attempt or after its release. */
+export interface ExamGrant {
+	readonly [grantBrand]: true;
+	readonly username: string;
+	readonly courseId: CourseId;
+	readonly examId: ExamId;
+	/// `null` only for a student who missed the exam.
+	readonly responseId: ResponseId | null;
+	readonly view: GrantView;
+	/// Whether the attempt still takes answers; pretest sources leave only then.
+	readonly answering: boolean;
+	/// Each question at the version resolved when the grant was issued, in exam order.
+	readonly questions: readonly {
+		refId: QuestionRefId;
+		slug: string;
+		dataId: QuestionDataId;
+		version: string;
+	}[];
+	readonly expiresAt: Date;
+}
+
+/// A question of a grant as `grantedQuestions` reads it: the public half of the version the grant resolved.
+export interface GrantedQuestion {
+	slug: string;
+	version: string;
+	question: PublicQuestion;
+}
+
+/** Issues the grant of `actor` for their attempt at the exam, or `null` when they have none to read through. */
+export async function issueExamGrant(
+	_tx: PrismaTx,
+	_target: { course: CourseRef; exam: string } | { response: string },
+	_actor: Actor,
+	_now?: Date,
+): Promise<ExamGrant | null> {
+	throw new Error("not implemented");
+}
+
+/** What `actor` would be granted on each exam, by exam id, without resolving versions or writing anything. */
+export async function grantViews(
+	_tx: PrismaTx,
+	_examIds: readonly ExamId[],
+	_actor: Actor,
+	_now?: Date,
+): Promise<Map<ExamId, GrantView | null>> {
+	throw new Error("not implemented");
+}
+
+/** @throws {@link ImproperBehavior} Not issued here, issued to someone else, or expired. */
+export function assertExamGrant(
+	_grant: ExamGrant,
+	_actor: Actor,
+	_now?: Date,
+): void {
+	throw new Error("not implemented");
+}
+
+/** The public half of every question of the grant, in exam order, in one query. */
+export async function grantedQuestions(
+	_tx: PrismaTx,
+	_grant: ExamGrant,
+	_actor: Actor,
+): Promise<GrantedQuestion[]> {
+	throw new Error("not implemented");
+}
+
+/// The private document of one question of the grant, for a sibling service that derives a student view from it.
+export async function grantedDocument(
+	_tx: PrismaTx,
+	_grant: ExamGrant,
+	_actor: Actor,
+	_slug: string,
+): Promise<QuestionDocument> {
+	throw new Error("not implemented");
+}
+
+/** Stamps the latest version on every unpinned question of the exam and sets `questionsFrozenAt`. */
+export async function freezeQuestionVersions(
+	_tx: PrismaTx,
+	_examId: number,
+): Promise<void> {
+	throw new Error("not implemented");
 }
