@@ -51,7 +51,7 @@ export interface RegradeContext {
 	outcome: QuestionOutcome;
 	/// The `publicId` of the contested submission.
 	submission: string;
-	/// Whether the attempt has an active sanction on the whole exam.
+	/// Whether the attempt has an active adjustment on the whole exam that lowers the grade (FACTOR < 1).
 	examReduced: boolean;
 	/// Whether a request (open or resolved) already exists for `submission`.
 	requested: boolean;
@@ -65,8 +65,8 @@ export interface RegradeContext {
  * - `practice`: the exam is a `PRACTICE` exam.
  * - `not-released`: `attemptOf(schedule, author, attempt, now)` is not
  *   `results`.
- * - `sanctioned`: `ctx.examReduced` is `true`, or the outcome carries a
- *   sanction.
+ * - `sanctioned`: `ctx.examReduced` is `true`, or the outcome carries an active
+ *   adjustment that lowers the grade (FACTOR < 1).
  * - `not-counting`: `ctx.submission` is not `ctx.outcome.submission`, the
  *   answer that counts for its question.
  * - `not-gradable`: the outcome is `pending` or `unanswered`.

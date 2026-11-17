@@ -11,8 +11,8 @@ import type { AttemptRow } from "@/services/grading";
 import { attemptTotalLabel } from "./attempt-total";
 import SanctionDialog from "./SanctionDialog";
 
-/// An attempt's row with, once sanctioned, the total it would have without the sanctions.
-export type ResultRow = AttemptRow & { unsanctioned?: number | null };
+/// An attempt's row with `unadjusted`, its total before every adjustment, question-level ones included.
+export type ResultRow = AttemptRow & { unadjusted?: number | null };
 
 interface Props {
 	/// The exam page's URL.
@@ -136,16 +136,16 @@ export default function ExamResults(props: Props): JSX.Element {
 			headerClass: NUMERIC,
 			render: (row) => (
 				<Show
-					when={row.unsanctioned !== undefined && row.state === "submitted"}
+					when={row.unadjusted !== undefined && row.state === "submitted"}
 					fallback={attemptTotalLabel(row.total, row.state)}
 				>
 					<ins class="font-semibold text-error no-underline">
 						{attemptTotalLabel(row.total, row.state)}
 					</ins>
-					<Show when={row.unsanctioned != null}>
+					<Show when={row.unadjusted != null}>
 						{" "}
 						<del class="text-error">
-							{attemptTotalLabel(row.unsanctioned ?? null, row.state)}
+							{attemptTotalLabel(row.unadjusted ?? null, row.state)}
 						</del>
 					</Show>
 				</Show>
