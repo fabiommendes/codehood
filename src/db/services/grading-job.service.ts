@@ -63,6 +63,7 @@ import {
 import { parseCourseParams } from "@/urls";
 import type { Prisma, PrismaTx } from "../client";
 import { courseRefWhere, valueOrNotFound } from "../utils";
+import { unsafePinnedDocument } from "./exam-questions";
 import {
 	examReleaseSelect,
 	makeFeedbackService,
@@ -854,12 +855,15 @@ export async function privateDocument(
 	});
 	const data = valueOrNotFound(
 		"question-version",
-		await tx.questionData.findFirst({
-			where: inExam?.version
-				? { refId: question.id, versionHash: inExam.version }
-				: { id: question.latestId ?? -1 },
-			select: { privatePayload: true },
-		}),
+		await unsafePinnedDocument(
+			tx,
+			{
+				id: question.id,
+				latestId: question.latestId,
+				version: inExam?.version ?? null,
+			},
+			{ privatePayload: true },
+		),
 	);
 	return data.privatePayload as unknown as QuestionDocument;
 }

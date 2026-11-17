@@ -74,10 +74,13 @@ import type { Prisma, PrismaClient, PrismaTx } from "../client";
 import { realAttempt, realAttemptSql } from "../preview-filter";
 import { courseRefMatch } from "../utils";
 import {
-	assertAcceptingSubmissions,
-	attemptTiming,
 	examTimingSelect,
 	loadExceptionTiming,
+	unsafePinnedDocument,
+} from "./exam-questions";
+import {
+	assertAcceptingSubmissions,
+	attemptTiming,
 } from "./submission.service";
 
 export type {
@@ -831,12 +834,11 @@ async function questionTypeOf(
 	},
 ): Promise<string | undefined> {
 	const { id, latestId } = row.questionRef;
-	const version = await tx.questionData.findFirst({
-		where: row.version
-			? { refId: id, versionHash: row.version }
-			: { id: latestId ?? -1 },
-		select: { publicPayload: true },
-	});
+	const version = await unsafePinnedDocument(
+		tx,
+		{ id, latestId, version: row.version },
+		{ publicPayload: true },
+	);
 	const payload = version?.publicPayload as { type?: unknown } | null;
 	return typeof payload?.type === "string" ? payload.type : undefined;
 }

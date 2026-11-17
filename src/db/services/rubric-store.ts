@@ -16,6 +16,7 @@ import {
 import type { PrismaTx } from "../client";
 import { guardedUpdate } from "../conditional-write";
 import { feedbackOfRealAttempts, realAttempt } from "../preview-filter";
+import { unsafePinnedDocument } from "./exam-questions";
 
 /// A rubric item as a stored row.
 export interface StoredItem {
@@ -79,21 +80,21 @@ export async function readInitialRubric(
 		where: { examId_questionRefId: { examId, questionRefId } },
 		select: { version: true },
 	});
-	const data = pinned?.version
-		? await tx.questionData.findUnique({
-				where: {
-					refId_versionHash: {
-						refId: questionRefId,
-						versionHash: pinned.version,
-					},
-				},
-			})
-		: (
-				await tx.questionRef.findUnique({
-					where: { id: questionRefId as QuestionRefId },
-					select: { latest: true },
-				})
-			)?.latest;
+	const latest = pinned?.version
+		? null
+		: await tx.questionRef.findUnique({
+				where: { id: questionRefId as QuestionRefId },
+				select: { latestId: true },
+			});
+	const data = await unsafePinnedDocument(
+		tx,
+		{
+			id: questionRefId,
+			latestId: latest?.latestId ?? null,
+			version: pinned?.version ?? null,
+		},
+		{ privatePayload: true, versionHash: true },
+	);
 
 	const payload = (data?.privatePayload ?? {}) as Record<string, unknown>;
 	const { items, warnings } = parseInitialRubric(payload.rubric);

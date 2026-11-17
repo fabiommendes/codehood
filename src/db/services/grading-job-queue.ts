@@ -14,11 +14,8 @@ import { m } from "@/i18n";
 import { DEFAULT_CODE_ATTEMPTS, spentAttempts } from "@/services/code-grading";
 import type { Prisma, PrismaTx } from "../client";
 import { realAttemptSql } from "../preview-filter";
-import {
-	attemptTimedOut,
-	examTimingSelect,
-	loadExceptionTiming,
-} from "./submission.service";
+import { examTimingSelect, loadExceptionTiming } from "./exam-questions";
+import { attemptTimedOut } from "./submission.service";
 
 /// The (attempt, question) pair a send belongs to, with the question's send policy.
 export interface SendTarget {

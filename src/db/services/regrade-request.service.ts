@@ -52,8 +52,8 @@ import {
 	invalidIfExists,
 	valueOrNotFound,
 } from "../utils";
+import { examTimingFromDb, examTimingSelect } from "./exam-questions";
 import { makeFeedbackService } from "./feedback.service";
-import { examTimingFromDb, examTimingSelect } from "./submission.service";
 
 export type { RegradeRequestId };
 

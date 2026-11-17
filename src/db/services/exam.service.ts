@@ -17,7 +17,7 @@ import {
 	NotAllowed,
 	NotFound,
 } from "@/core/error";
-import type { CourseId, ExamId, QuestionRefId } from "@/core/schemas/base";
+import type { CourseId, ExamId } from "@/core/schemas/base";
 import { slug } from "@/core/schemas/base";
 import {
 	courseExamSchema,
@@ -42,16 +42,18 @@ import { loadResultPolicy } from "@/db/result-policy";
 import type { AttachmentService } from "@/db/services/attachment.service";
 import type { BlobService } from "@/db/services/blob.service";
 import { courseContentsWhere } from "@/db/services/course.service";
+import {
+	examTimingFromDb,
+	examTimingSelect,
+	loadExceptionTiming,
+	unsafePinnedDocument,
+	unsafePinnedDocuments,
+} from "@/db/services/exam-questions";
 import { promoteFinalSends } from "@/db/services/grading-job-queue";
 import {
 	gradeExpiredObjectives,
 	gradeObjectives,
 } from "@/db/services/objective-grading";
-import {
-	examTimingFromDb,
-	examTimingSelect,
-	loadExceptionTiming,
-} from "@/db/services/submission.service";
 import { m } from "@/i18n";
 import { attachmentProblems } from "@/mdq";
 import {
@@ -793,13 +795,15 @@ const buildExamService = (deps: Deps) =>
 				);
 				if (!pinned) throw new NotFound("attachment");
 
-				const refId = pinned.questionRef.id as QuestionRefId;
-				const version = await tx.questionData.findFirst({
-					where: pinned.version
-						? { refId, versionHash: pinned.version }
-						: { id: (await latestId(tx, refId)) ?? -1 },
-					select: { privatePayload: true, files: true },
-				});
+				const version = await unsafePinnedDocument(
+					tx,
+					{
+						id: pinned.questionRef.id,
+						latestId: pinned.questionRef.latestId,
+						version: pinned.version,
+					},
+					{ privatePayload: true, files: true },
+				);
 				if (!version) throw new NotFound("attachment");
 				const document = version.privatePayload as unknown as
 					| WithAttachments
@@ -1245,57 +1249,26 @@ async function loadWeights(
 	rows: readonly DbExam[],
 ): Promise<Map<number, number[]>> {
 	const questions = rows.flatMap((row) => row.questionsForExams);
-	const latestIds = questions.flatMap((q) =>
-		!q.version && q.questionRef.latestId !== null
-			? [q.questionRef.latestId]
-			: [],
-	);
-	const pinned = questions.flatMap((q) =>
-		q.version ? [{ refId: q.questionRef.id, versionHash: q.version }] : [],
-	);
-	if (latestIds.length === 0 && pinned.length === 0) return new Map();
+	if (questions.length === 0) return new Map();
 
-	const versions = await tx.questionData.findMany({
-		// An empty `in` renders as `1=0 OR …`, which SQLite answers with a scan.
-		where: {
-			OR: [...(latestIds.length ? [{ id: { in: latestIds } }] : []), ...pinned],
-		},
-		select: {
-			id: true,
-			refId: true,
-			versionHash: true,
-			publicPayload: true,
-		},
-	});
-	const byId = new Map<number, (typeof versions)[number]>(
-		versions.map((v) => [v.id, v]),
+	const versions = await unsafePinnedDocuments(
+		tx,
+		questions.map((q) => ({
+			id: q.questionRef.id,
+			latestId: q.questionRef.latestId,
+			version: q.version,
+		})),
+		{ publicPayload: true },
 	);
-	const byHash = new Map(
-		versions.map((v) => [`${v.refId}:${v.versionHash}`, v]),
-	);
+	let next = 0;
 	return new Map(
 		rows.map((row) => [
 			row.id,
-			row.questionsForExams.map((q) => {
-				const version = q.version
-					? byHash.get(`${q.questionRef.id}:${q.version}`)
-					: byId.get(q.questionRef.latestId ?? -1);
-				return payloadWeight(version?.publicPayload);
-			}),
+			row.questionsForExams.map(() =>
+				payloadWeight(versions[next++]?.publicPayload),
+			),
 		]),
 	);
-}
-
-/// The id of the latest version of a question, `null` when it has none.
-async function latestId(
-	tx: PrismaTx,
-	refId: QuestionRefId,
-): Promise<number | null> {
-	const ref = await tx.questionRef.findUnique({
-		where: { id: refId },
-		select: { latestId: true },
-	});
-	return ref?.latestId ?? null;
 }
 
 /**

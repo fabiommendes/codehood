@@ -10,12 +10,9 @@ import { touch } from "@/db/conditional-write";
 import { NotAutoGradable, ResponseError, scoreResponse } from "@/mdq";
 import type { PrismaTx } from "../client";
 import { realAttempt } from "../preview-filter";
+import { examTimingSelect, loadExceptionTiming } from "./exam-questions";
 import { privateDocument, scoreText } from "./grading-job.service";
-import {
-	attemptTimedOut,
-	examTimingSelect,
-	loadExceptionTiming,
-} from "./submission.service";
+import { attemptTimedOut } from "./submission.service";
 
 /// The `ref` of the pass an automatic grade is stored under.
 const AUTOMATIC_REF = "auto";

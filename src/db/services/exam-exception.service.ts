@@ -40,7 +40,7 @@ import {
 	toMs,
 	valueOrNotFound,
 } from "../utils";
-import { examTimingFromDb, examTimingSelect } from "./submission.service";
+import { examTimingFromDb, examTimingSelect } from "./exam-questions";
 
 export type { ExamExceptionId };
 

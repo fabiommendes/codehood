@@ -63,6 +63,11 @@ import {
 	valueOrNotFound,
 } from "../utils";
 import { loggingAnswerHistoryRemoval } from "./answer-edit.service";
+import {
+	examTimingFromDb,
+	examTimingSelect,
+	loadExceptionTiming,
+} from "./exam-questions";
 import { enqueueGradingJob, promoteFinalSends } from "./grading-job-queue";
 import {
 	gradeObjectives as gradeAttempt,
@@ -71,9 +76,6 @@ import {
 import {
 	assertAcceptingSubmissions,
 	assertExamOpen,
-	examTimingFromDb,
-	examTimingSelect,
-	loadExceptionTiming,
 	resolveExamQuestion,
 	fromDb as submissionFromDb,
 } from "./submission.service";

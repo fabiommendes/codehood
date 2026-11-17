@@ -16,7 +16,7 @@ import {
 import { generateToken } from "@/auth/token";
 import { EXAM_ANSWER_GRACE_MS } from "@/core/constants";
 import { InvalidData, NotAllowed, NotFound } from "@/core/error";
-import type { ExamId, SubmissionId } from "@/core/schemas/base";
+import type { SubmissionId } from "@/core/schemas/base";
 import type { CourseRef } from "@/core/schemas/course";
 import {
 	submissionCreate,
@@ -33,7 +33,6 @@ import { m } from "@/i18n";
 import { assertResponse, type QuestionDocument, ResponseError } from "@/mdq";
 import {
 	attemptDeadline,
-	type ExamTiming,
 	type ExceptionTiming,
 	examPhase,
 	type PersonalTiming,
@@ -45,10 +44,15 @@ import { realAttempt } from "../preview-filter";
 import {
 	courseRefMatch,
 	courseRefWhere,
-	fromMs,
 	invalidIfExists,
 	valueOrNotFound,
 } from "../utils";
+import {
+	examTimingFromDb,
+	examTimingSelect,
+	loadExceptionTiming,
+	unsafePinnedDocument,
+} from "./exam-questions";
 
 export { submissionStatus } from "@/core/schemas/submission";
 export type { SubmissionId };
@@ -80,45 +84,6 @@ export function attemptTiming(
 ): PersonalTiming {
 	const exam = examTimingFromDb(attempt.exam);
 	return attempt.preview ? previewTiming(exam) : viewerTiming(exam, exception);
-}
-
-/// The exam columns {@link examTimingFromDb} reads.
-export const examTimingSelect = {
-	status: true,
-	type: true,
-	scheduledAt: true,
-	durationMs: true,
-	extraTimeMs: true,
-} satisfies Prisma.ExamSelect;
-
-/** The {@link ExamTiming} of an exam row selected with {@link examTimingSelect}. */
-export function examTimingFromDb(
-	exam: Prisma.ExamGetPayload<{ select: typeof examTimingSelect }>,
-): ExamTiming {
-	return {
-		type: exam.type,
-		status: exam.status,
-		scheduledAt: exam.scheduledAt,
-		duration: fromMs(exam.durationMs),
-		extraTime: fromMs(exam.extraTimeMs),
-	};
-}
-
-/** The exception of `username` on the exam `examId` as far as timing goes, or `null` when there is none. */
-export async function loadExceptionTiming(
-	tx: PrismaTx,
-	examId: number,
-	username: string,
-): Promise<ExceptionTiming | null> {
-	const row = await tx.examException.findUnique({
-		where: { examId_username: { examId: examId as ExamId, username } },
-		select: { extraTimeMs: true, scheduledAt: true },
-	});
-	if (!row) return null;
-	return {
-		extraTime: fromMs(row.extraTimeMs),
-		scheduledAt: row.scheduledAt,
-	};
 }
 
 /// The relations needed to build a permission target from a response row.
@@ -654,12 +619,11 @@ export async function resolveExamQuestion(
 
 	const version = valueOrNotFound(
 		"question-version",
-		await tx.questionData.findFirst({
-			where: inExam.version
-				? { refId: question.id, versionHash: inExam.version }
-				: { id: question.latestId ?? -1 },
-			select: { privatePayload: true },
-		}),
+		await unsafePinnedDocument(
+			tx,
+			{ id: question.id, latestId: question.latestId, version: inExam.version },
+			{ privatePayload: true },
+		),
 	);
 	try {
 		assertResponse(

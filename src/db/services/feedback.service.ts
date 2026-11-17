@@ -48,8 +48,8 @@ import {
 	invalidIfExists,
 	valueOrNotFound,
 } from "../utils";
+import { examTimingFromDb, examTimingSelect } from "./exam-questions";
 import { gradeWithRubric } from "./rubric-store";
-import { examTimingFromDb, examTimingSelect } from "./submission.service";
 
 export type { FeedbackId };
 

@@ -16,7 +16,7 @@ import {
 	examTimingFromDb,
 	examTimingSelect,
 	loadExceptionTiming,
-} from "./services/submission.service";
+} from "./services/exam-questions";
 import { valueOrNotFound } from "./utils";
 
 /**
