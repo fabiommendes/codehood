@@ -1,8 +1,15 @@
+import { PrismaClientKnownRequestError } from "@prisma/client/runtime/client";
 import { generateToken } from "@/auth/token";
 import { InvalidData } from "@/core/error";
 import type { ExamId, ResponseId } from "@/core/schemas/base";
 import { m } from "@/i18n";
-import { examPhase, viewerTiming } from "@/services/exam-state";
+import {
+	attemptOf,
+	examPhase,
+	examSchedule,
+	isFinished,
+	viewerTiming,
+} from "@/services/exam-state";
 import type { PrismaTx } from "./client";
 import { realAttempt } from "./preview-filter";
 import {
@@ -47,63 +54,90 @@ export async function attemptOrEmpty(
 		throw refuse(m.errors_empty_attempt_practice());
 	}
 
-	const existing = await tx.response.findFirst({
-		where: {
-			examId: input.examId,
-			authorId: input.author,
-			slotKey: 0,
-			...realAttempt,
-		},
-		select: { id: true, publicId: true },
-	});
-	if (existing && !input.requireFinished) {
-		return { ...existing, created: false };
-	}
-
-	if (!existing) {
-		const enrollment = await tx.enrollment.findFirst({
+	const findExisting = () =>
+		tx.response.findFirst({
 			where: {
-				courseId: exam.courseId,
-				username: input.author,
-				status: "ACTIVE",
+				examId: input.examId,
+				authorId: input.author,
+				slotKey: 0,
+				...realAttempt,
 			},
-			select: { id: true },
+			select: {
+				id: true,
+				publicId: true,
+				createdAt: true,
+				acceptingSubmissions: true,
+			},
 		});
-		if (!enrollment) {
+	const reuse = (row: { id: ResponseId; publicId: string }) => ({
+		id: row.id,
+		publicId: row.publicId,
+		created: false,
+	});
+
+	const existing = await findExisting();
+	if (existing && !input.requireFinished) return reuse(existing);
+
+	const timing = examTimingFromDb(exam);
+	const exception = await loadExceptionTiming(tx, input.examId, input.author);
+	const personal = viewerTiming(timing, exception);
+	const phase = examPhase(personal, input.now);
+
+	if (existing) {
+		// An archived exam is closed for the student, whatever the state of the attempt.
+		const schedule = examSchedule(
+			timing,
+			exception ? new Map([[input.author, exception]]) : new Map(),
+		);
+		const finished =
+			phase === "archived" ||
+			isFinished(attemptOf(schedule, input.author, existing, input.now));
+		if (!finished) {
 			throw refuse(
-				m.errors_empty_attempt_not_enrolled({ username: input.author }),
+				m.errors_empty_attempt_in_progress({ username: input.author }),
 			);
 		}
+		return reuse(existing);
 	}
 
-	const phase = examPhase(
-		viewerTiming(
-			examTimingFromDb(exam),
-			await loadExceptionTiming(tx, input.examId, input.author),
-		),
-		input.now,
-	);
-	if (phase === "draft" || phase === "upcoming" || phase === "open") {
+	const enrollment = await tx.enrollment.findFirst({
+		where: {
+			courseId: exam.courseId,
+			username: input.author,
+			status: "ACTIVE",
+		},
+		select: { id: true },
+	});
+	if (!enrollment) {
 		throw refuse(
-			existing
-				? m.errors_empty_attempt_in_progress({ username: input.author })
-				: m.errors_empty_attempt_exam_open({ username: input.author }),
+			m.errors_empty_attempt_not_enrolled({ username: input.author }),
 		);
 	}
-	if (existing) return { ...existing, created: false };
+	if (phase === "draft" || phase === "upcoming" || phase === "open") {
+		throw refuse(m.errors_empty_attempt_exam_open({ username: input.author }));
+	}
 
-	const created = await tx.response.create({
-		data: {
-			publicId: generateToken(9),
-			authorId: input.author,
-			examId: input.examId,
-			slotKey: 0,
-			preview: false,
-			acceptingSubmissions: false,
-			closedAt: input.now,
-			createdById: input.createdBy,
-		},
-		select: { id: true, publicId: true },
-	});
-	return { ...created, created: true };
+	try {
+		const created = await tx.response.create({
+			data: {
+				publicId: generateToken(9),
+				authorId: input.author,
+				examId: input.examId,
+				slotKey: 0,
+				preview: false,
+				acceptingSubmissions: false,
+				closedAt: input.now,
+				createdById: input.createdBy,
+			},
+			select: { id: true, publicId: true },
+		});
+		return { ...created, created: true };
+	} catch (error) {
+		// A concurrent create won the unique `(author, exam, slotKey)`: use its attempt.
+		if (!(error instanceof PrismaClientKnownRequestError)) throw error;
+		if (error.code !== "P2002") throw error;
+		const winner = await findExisting();
+		if (!winner) throw error;
+		return reuse(winner);
+	}
 }

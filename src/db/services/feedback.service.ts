@@ -669,7 +669,7 @@ async function resolveGradableSubmission(
 }
 
 /// Sets a submission's status to reflect who graded it last: a user or a bot, moving the version of the response that shows it, and closes its open grading job when a user graded.
-async function markGraded(
+export async function markGraded(
 	tx: PrismaTx,
 	submission: Pick<DbSubmission, "id" | "responseId" | "status">,
 	graderId: string | null,

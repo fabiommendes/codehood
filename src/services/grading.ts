@@ -66,7 +66,11 @@ export const WILL_NOT_GRADE_REF = "wng-";
 /// The prefix of the `ref` of a pass that undoes a change by hand.
 export const REVERT_REF_PREFIX = "revert-";
 
-/** The score of the newest pass with no grader (the automatic one), or `null` when there is none. */
+/**
+ * The score of the newest pass with no grader (the automatic one), or `null` when there is none.
+ *
+ * `passes` run oldest first: of two passes with the same `updatedAt`, the later one in the list is the newer.
+ */
 export function autoScoreOf(
 	passes: readonly Pick<GradingPass, "grader" | "score" | "updatedAt">[],
 ): number | null {
@@ -79,6 +83,9 @@ export function autoScoreOf(
 /**
  * Whether an answer's current verdict was changed by hand: its newest pass has a grader, its `ref` does not start
  * with `REVERT_REF_PREFIX`, and either an earlier pass exists or the instructor created the submission.
+ *
+ * `passes` run oldest first, as stored: of two passes with the same `updatedAt`, the later one in the list is the newer.
+ * `CountingAnswer.passes` run newest first, so reverse a copy before passing it here.
  */
 export function isManualChange(
 	passes: readonly GradingPass[],

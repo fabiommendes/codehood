@@ -17,6 +17,7 @@ import { touch } from "@/db/conditional-write";
 import { defineService, op } from "@/db/define-service";
 import { m } from "@/i18n";
 import {
+	autoScoreOf,
 	type GradingPass,
 	isManualChange,
 	REVERT_REF_PREFIX,
@@ -24,6 +25,8 @@ import {
 import { JsonNull, type Prisma, type PrismaTx } from "../client";
 import { attemptOrEmpty } from "../empty-attempt";
 import { courseRefWhere, valueOrNotFound } from "../utils";
+import { markGraded } from "./feedback.service";
+import { scoreText } from "./grading-job.service";
 import { fromDb, type Submission } from "./submission.service";
 
 /// The input of a schema with a course, whose id is branded.
@@ -200,10 +203,10 @@ export const makeManualGradeService = defineService()(() => {
 				}),
 			);
 
-			const newestFirst = [...row.feedbacks].sort(
-				(a, b) => b.updatedAt.getTime() - a.updatedAt.getTime() || b.id - a.id,
+			const oldestFirst = [...row.feedbacks].sort(
+				(a, b) => a.updatedAt.getTime() - b.updatedAt.getTime() || a.id - b.id,
 			);
-			const passes: GradingPass[] = newestFirst.map((pass) => ({
+			const passes: GradingPass[] = oldestFirst.map((pass) => ({
 				score: scoreValue(pass.score),
 				comment: pass.feedback,
 				grader: pass.graderId,
@@ -223,21 +226,22 @@ export const makeManualGradeService = defineService()(() => {
 				});
 			}
 
-			const automatic = newestFirst.find((pass) => pass.graderId === null);
+			const grader = (opts.actor as UserActor).username;
+			const automatic = autoScoreOf(passes);
 			await tx.feedback.create({
 				data: {
 					submissionId: row.id,
 					ref: `${REVERT_REF_PREFIX}${randomUUID()}`,
-					score: automatic?.score ?? "0",
-					graderId: (opts.actor as UserActor).username,
+					score: automatic === null ? "0" : scoreText(automatic),
+					graderId: grader,
 				},
 			});
-			const updated = await tx.submission.update({
+			await markGraded(tx, row, grader);
+			await touch(tx, "response", { id: row.responseId }, {});
+			const updated = await tx.submission.findUniqueOrThrow({
 				where: { id: row.id },
-				data: { status: "GRADED_MANUALLY" },
 				include: submissionInclude,
 			});
-			await touch(tx, "response", { id: row.responseId }, {});
 			return fromDb(updated);
 		},
 	});
