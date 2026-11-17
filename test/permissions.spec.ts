@@ -3,7 +3,7 @@ import type { Actor } from "@/auth/actor";
 import { hasMinimumRole, SYSTEM } from "@/auth/actor";
 import { ensurePerm, hasPerm, simplifyTarget } from "@/auth/permissions";
 import { NotAllowed } from "@/core/error";
-import type { UserId } from "@/core/schemas";
+import type { UserId } from "@/core/schemas/base";
 
 const admin = {
 	role: "ADMIN" as const,

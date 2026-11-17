@@ -39,7 +39,7 @@ import { loadCourseExceptions } from "@/utils/load-exam-exceptions";
 import { loadExamQuestions } from "@/utils/load-exam-questions";
 import { type ExamStaffData, loadExamStaffData } from "@/utils/load-exam-staff";
 import { highlightCodeBlocks, renderMarkdown } from "@/utils/markdown";
-import { questionTypeLabels } from "@/utils/question-display";
+import { automationLabel, questionTypeLabels } from "@/utils/question-display";
 import {
 	durationToMinutes,
 	formatDateTime,
@@ -135,6 +135,7 @@ const questionRows: {
 	slug: string;
 	title: string;
 	type: string;
+	grading: string;
 	weight: number;
 }[] = [];
 let questionStats: Map<string, QuestionStats> | undefined;
@@ -150,6 +151,7 @@ if (staff) {
 			slug,
 			title: document?.title || slug,
 			type: document ? questionTypeLabels[document.type] : "",
+			grading: document ? automationLabel(document) : "",
 			weight,
 		});
 	}

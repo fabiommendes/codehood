@@ -2,7 +2,7 @@ import type { UserActor } from "@/auth/actor";
 import type { AnswerPayload } from "@/components/exam/answer-payload";
 import { type CodeSends, sendsOf } from "@/components/exam/code-sends";
 import type { QuestionRegrade } from "@/components/exam/RegradeControls";
-import type { CourseId } from "@/core/schemas";
+import type { CourseId } from "@/core/schemas/base";
 import { db, type Exam, type QuestionPublic, type Response } from "@/db";
 import { loadResultPolicy } from "@/db/result-policy";
 import { shufflePool } from "@/mdq/shuffle";

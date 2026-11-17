@@ -1,5 +1,5 @@
 import { expect, test } from "@playwright/test";
-import { answerWillNotGrade } from "@/core/schemas";
+import { answerWillNotGrade } from "@/core/schemas/answer";
 
 const ref = {
 	discipline: "cs",

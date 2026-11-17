@@ -1,5 +1,6 @@
 import { FULL_ACCESS } from "@/auth/actor";
-import type { CourseId, QuestionSort } from "@/core/schemas";
+import type { CourseId } from "@/core/schemas/base";
+import type { QuestionSort } from "@/core/schemas/question";
 import { db } from "@/db";
 import type { QuestionPageFilter } from "@/db/services/question.service";
 import { persistedCourseFactory } from "@/fixtures/course.factory";

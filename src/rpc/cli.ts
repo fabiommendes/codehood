@@ -4,7 +4,7 @@
 
 import { z } from "zod";
 import { NotFound } from "@/core/error";
-import * as schemas from "@/core/schemas";
+import * as schemas from "@/core/schemas/all";
 import { db } from "@/db";
 import { METHOD } from "./registry";
 

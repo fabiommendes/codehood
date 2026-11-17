@@ -1,5 +1,5 @@
 import type { z } from "zod";
-import type { studentReportViewSchema } from "@/core/schemas";
+import type { studentReportViewSchema } from "@/core/schemas/grading-job";
 
 /// What a student may see of a worker's report, as the server sends it.
 export type StudentReport = z.infer<typeof studentReportViewSchema>;

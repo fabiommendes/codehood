@@ -5,7 +5,7 @@
  * Shared by the closing of an attempt, `response.gradeObjectives` and `response.settleExpired`.
  */
 
-import type { ExamId, ResponseId } from "@/core/schemas";
+import type { ExamId, ResponseId } from "@/core/schemas/base";
 import { touch } from "@/db/conditional-write";
 import { NotAutoGradable, ResponseError, scoreResponse } from "@/mdq";
 import type { PrismaTx } from "../client";

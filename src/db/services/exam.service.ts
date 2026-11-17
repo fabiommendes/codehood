@@ -17,7 +17,8 @@ import {
 	NotAllowed,
 	NotFound,
 } from "@/core/error";
-import type { CourseId, ExamId, QuestionRefId } from "@/core/schemas";
+import type { CourseId, ExamId, QuestionRefId } from "@/core/schemas/base";
+import { slug } from "@/core/schemas/base";
 import {
 	courseExamSchema,
 	type examCreate,
@@ -28,8 +29,7 @@ import {
 	type examUpdate,
 	examWriteCreate,
 	examWriteUpdate,
-} from "@/core/schemas";
-import { slug } from "@/core/schemas/base";
+} from "@/core/schemas/exam";
 import type { ServiceOpts, ServiceOptsWithoutTx } from "@/db/base-service";
 import {
 	checkExpectedUpdatedAt,
@@ -98,7 +98,7 @@ import {
 	valueOrNotFound,
 } from "../utils";
 
-export { examStatus, examType, textFormat } from "@/core/schemas";
+export { examStatus, examType, textFormat } from "@/core/schemas/exam";
 export type { ExamId };
 
 //

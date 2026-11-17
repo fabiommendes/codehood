@@ -14,15 +14,14 @@ import {
 	NotAllowed,
 	NotFound,
 } from "@/core/error";
+import type { CourseId, GradeColumnId } from "@/core/schemas/base";
 import {
-	type CourseId,
-	type GradeColumnId,
 	gradeColumnCreate,
 	gradeColumnFilter,
 	gradeColumnPK,
 	gradeColumnSchema,
 	gradeColumnUpdate,
-} from "@/core/schemas";
+} from "@/core/schemas/grade-column";
 import type { ServiceOptsWithoutTx } from "@/db/base-service";
 import {
 	checkExpectedUpdatedAt,
@@ -35,7 +34,7 @@ import { m } from "@/i18n";
 import type { Prisma, PrismaTx } from "../client";
 import { courseRefWhere, invalidIfExists, valueOrNotFound } from "../utils";
 
-export type { GradeColumnId } from "@/core/schemas";
+export type { GradeColumnId } from "@/core/schemas/base";
 
 //
 // Type definitions

@@ -1,5 +1,5 @@
 import type { CursorPage } from "@/components/ui/Pagination";
-import type { Page } from "@/core/schemas";
+import type { Page } from "@/core/schemas/page";
 
 /**
  * The links a cursor pager follows from `url` to the pages around `page`.

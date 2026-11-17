@@ -1,4 +1,4 @@
-import type { ReportKind, ReportStatus } from "@/core/schemas";
+import type { ReportKind, ReportStatus } from "@/core/schemas/report";
 import type { Report } from "@/db";
 import { m } from "@/i18n";
 

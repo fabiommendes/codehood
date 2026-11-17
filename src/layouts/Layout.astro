@@ -1,6 +1,8 @@
 ---
 import "../styles/fonts.css";
 import "../styles/global.css";
+import atkinson400 from "@fontsource/atkinson-hyperlegible/files/atkinson-hyperlegible-latin-400-normal.woff2?url";
+import fraunces from "@fontsource-variable/fraunces/files/fraunces-latin-full-normal.woff2?url";
 import DraftSession from "@/components/exam/DraftSession.astro";
 import { locale } from "@/i18n";
 import { CODE_THEME_CSS } from "@/utils/code-themes";
@@ -43,6 +45,8 @@ const { title = "Codehood" } = Astro.props;
 		<meta name="viewport" content="width=device-width" />
 		<link rel="icon" type="image/svg+xml" href="/favicon.svg" />
 		<link rel="icon" href="/favicon.ico" />
+		<link rel="preload" as="font" type="font/woff2" href={fraunces} crossorigin />
+		<link rel="preload" as="font" type="font/woff2" href={atkinson400} crossorigin />
 		<meta name="generator" content={Astro.generator} />
 		<title>{title}</title>
 		<style is:inline set:html={CODE_THEME_CSS}></style>

@@ -2,7 +2,7 @@ import { expect, test } from "@playwright/test";
 import { FULL_ACCESS } from "@/auth/actor";
 import { hasPerm } from "@/auth/permissions";
 import { NotFound } from "@/core/error";
-import { isoDate } from "@/core/schemas";
+import { isoDate } from "@/core/schemas/base";
 import { db } from "@/db";
 
 function tag(prefix: string): string {

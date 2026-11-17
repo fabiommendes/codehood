@@ -1,4 +1,4 @@
-import type { CourseId } from "@/core/schemas";
+import type { CourseId } from "@/core/schemas/base";
 import type { Question, QuestionPublic } from "@/db";
 import { db } from "@/db";
 

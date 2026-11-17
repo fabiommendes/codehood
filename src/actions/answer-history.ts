@@ -1,6 +1,7 @@
 import { defineAction } from "astro:actions";
 import { requireUser } from "@/auth/require-user";
-import { answerEditAppendRequest, examParams } from "@/core/schemas";
+import { answerEditAppendRequest } from "@/core/schemas/answer-edit";
+import { examParams } from "@/core/schemas/exam";
 import { db } from "@/db";
 import type { AnswerEditFieldInput } from "@/db/services/answer-edit.service";
 import { parseCourseParams } from "@/urls";

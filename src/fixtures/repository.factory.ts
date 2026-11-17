@@ -1,5 +1,8 @@
 import { Factory } from "fishery";
-import type { RepositoryEntry, RepositoryFileMode } from "@/core/schemas";
+import type {
+	RepositoryEntry,
+	RepositoryFileMode,
+} from "@/core/schemas/repository";
 import {
 	db,
 	type Repository,

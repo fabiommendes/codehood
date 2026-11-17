@@ -1,8 +1,9 @@
 import { expect, test } from "@playwright/test";
 import { FULL_ACCESS } from "@/auth/actor";
 import { InvalidData } from "@/core/error";
-import type { CourseId, QuestionRefId } from "@/core/schemas";
-import { codeQuestionMeta, isoDate, questionCreate } from "@/core/schemas";
+import type { CourseId, QuestionRefId } from "@/core/schemas/base";
+import { isoDate } from "@/core/schemas/base";
+import { codeQuestionMeta, questionCreate } from "@/core/schemas/question";
 import { db } from "@/db";
 import { prisma } from "@/db/client";
 import {

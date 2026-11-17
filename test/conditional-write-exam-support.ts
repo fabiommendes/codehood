@@ -1,5 +1,5 @@
 import { type Actor, FULL_ACCESS, type UserActor } from "@/auth/actor";
-import { isoDate } from "@/core/schemas";
+import { isoDate } from "@/core/schemas/base";
 import { db, type schema, type User } from "@/db";
 import { persistedCourseFactory } from "@/fixtures/course.factory";
 import { persistedExamFactory } from "@/fixtures/exam.factory";

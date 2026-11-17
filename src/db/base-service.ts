@@ -1,5 +1,5 @@
 import type { Actor } from "@/auth/actor";
-import type { Page, PageParams } from "@/core/schemas";
+import type { Page, PageParams } from "@/core/schemas/page";
 import type { PrismaTx } from "./client";
 
 /**

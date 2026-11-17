@@ -12,7 +12,7 @@
 import { parseArgs } from "node:util";
 import { FULL_ACCESS } from "@/auth/actor";
 import { hashToken } from "@/auth/token";
-import type { CourseId } from "@/core/schemas";
+import type { CourseId } from "@/core/schemas/base";
 import { db } from "@/db";
 import { prisma } from "@/db/client";
 import { localDateOf } from "@/utils/schedule-time";

@@ -1,7 +1,7 @@
 import { expect, test } from "@playwright/test";
 import { SYSTEM } from "@/auth/actor";
 import { InvalidData } from "@/core/error";
-import type { Page, PageParams } from "@/core/schemas";
+import type { Page, PageParams } from "@/core/schemas/page";
 import { db, isEditionOpen } from "@/db";
 import { persistedDisciplineFactory } from "@/fixtures/discipline.factory";
 import { persistedEditionFactory } from "@/fixtures/edition.factory";

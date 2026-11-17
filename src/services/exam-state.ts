@@ -8,7 +8,7 @@
  * remembering to update a column.
  */
 
-import type { Duration } from "@/core/schemas";
+import type { Duration } from "@/core/schemas/base";
 import type { Exam } from "@/db/services/exam.service";
 import { m } from "@/i18n";
 import type { Marked, Unmarked } from "@/typing/branding";

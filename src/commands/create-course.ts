@@ -1,7 +1,7 @@
 import { input } from "@inquirer/prompts";
 import { Command } from "commander";
 import { FULL_ACCESS } from "@/auth/actor";
-import { isoDate } from "@/core/schemas";
+import { isoDate } from "@/core/schemas/base";
 import { db } from "@/db";
 
 export const createCourseCommand = new Command("create-course")

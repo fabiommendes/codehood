@@ -1,6 +1,6 @@
 ---
 /**
- * The questions of an exam for its instructor: number, title, type, weight and, once attempts closed, how they went.
+ * The questions of an exam for its instructor: number, title, grading, type, weight and, once attempts closed, how they went.
  *
  * Average and discrimination show only when `stats` is given; the full table
  * lives in the results page.
@@ -18,6 +18,8 @@ interface Row {
 	title: string;
 	/// The label of the question's type, empty when unknown.
 	type: string;
+	/// How the question is graded (`automationLabel`), empty when unknown.
+	grading: string;
 	weight: number;
 }
 
@@ -36,7 +38,11 @@ const twoDecimals = new Intl.NumberFormat(locale, {
 	minimumFractionDigits: 2,
 	maximumFractionDigits: 2,
 });
-const numberFormat = new Intl.NumberFormat(locale);
+/// A weight shows at least two decimals, so the weights of a column line up.
+const weightFormat = new Intl.NumberFormat(locale, {
+	minimumFractionDigits: 2,
+	maximumFractionDigits: 4,
+});
 const gapReasons: Record<DiscriminationGap, string> = {
 	"few-attempts": m.grades_stats_gap_few_attempts(),
 	"single-question": m.grades_stats_gap_single_question(),
@@ -56,9 +62,9 @@ const gapReasons: Record<DiscriminationGap, string> = {
             <tr>
               <th scope="col">{m.grades_stats_col_question()}</th>
               <th scope="col">{m.exams_detail_questions_col_type()}</th>
-              <th scope="col" class="text-right">{m.exams_detail_questions_col_weight()}</th>
+              <th scope="col" class="text-center">{m.exams_detail_questions_col_weight()}</th>
               {stats && <th scope="col" class="text-right">{m.grades_stats_col_average()}</th>}
-              {stats && <th scope="col" class="text-right">{m.grades_stats_col_discrimination()}</th>}
+              {stats && <th scope="col" class="text-center">{m.grades_stats_col_discrimination()}</th>}
             </tr>
           </thead>
           <tbody>
@@ -68,18 +74,23 @@ const gapReasons: Record<DiscriminationGap, string> = {
               return (
                 <tr data-question={row.slug}>
                   <td>
-                    <span class="text-muted tabular-nums">{m.exams_attempt_question_short({ number: index + 1 })}</span>{" "}
-                    <a href={`${href}/questions/${row.slug}`} class="link">{row.title}</a>
+                    <div class="flex items-center gap-3">
+                      <span class="min-w-8 font-display text-lg font-bold tabular-nums">{m.exams_attempt_question_short({ number: index + 1 })}</span>
+                      <div class="min-w-0">
+                        <a href={`${href}/questions/${row.slug}`} class="link">{row.title}</a>
+                        {row.grading && <p class="text-sm text-muted">{row.grading}</p>}
+                      </div>
+                    </div>
                   </td>
                   <td class="text-sm text-muted">{row.type}</td>
-                  <td class="text-right tabular-nums">{numberFormat.format(row.weight)}</td>
+                  <td class="text-center tabular-nums">{weightFormat.format(row.weight)}</td>
                   {stats && (
                     <td class="text-right tabular-nums">
                       {entry?.average != null ? formatScore(entry.average) : ""}
                     </td>
                   )}
                   {stats && (
-                    <td class="text-right tabular-nums">
+                    <td class="text-center tabular-nums">
                       {entry?.discrimination != null ? (
                         twoDecimals.format(entry.discrimination)
                       ) : (

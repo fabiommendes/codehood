@@ -1,12 +1,12 @@
 import { z } from "zod";
 import { type CourseTarget, ensurePerm } from "@/auth/permissions";
+import type { CourseId } from "@/core/schemas/base";
 import {
-	type CourseId,
 	enrollmentCreate,
 	enrollmentFilter,
 	enrollmentPK,
 	enrollmentSchema,
-} from "@/core/schemas";
+} from "@/core/schemas/enrollment";
 import type { ServiceOptsWithoutTx } from "@/db/base-service";
 import { defineService, op } from "@/db/define-service";
 import type { Prisma, PrismaTx } from "../client";

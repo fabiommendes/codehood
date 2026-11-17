@@ -2,8 +2,8 @@ import { expect, test } from "@playwright/test";
 import type { Actor } from "@/auth/actor";
 import { FULL_ACCESS } from "@/auth/actor";
 import { hasPerm } from "@/auth/permissions";
-import type { CourseId, UserId } from "@/core/schemas";
-import { isoDate } from "@/core/schemas";
+import type { CourseId, UserId } from "@/core/schemas/base";
+import { isoDate } from "@/core/schemas/base";
 import { db } from "@/db";
 
 function actorOf(

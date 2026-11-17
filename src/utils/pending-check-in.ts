@@ -1,6 +1,6 @@
 import { createHmac, timingSafeEqual } from "node:crypto";
 import { z } from "zod";
-import type { RollCallId } from "@/core/schemas";
+import type { RollCallId } from "@/core/schemas/base";
 import { rollCallId } from "@/core/schemas/base";
 
 /// How long a signed check-in claim stays valid after it is made.

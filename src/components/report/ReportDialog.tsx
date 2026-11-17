@@ -13,7 +13,7 @@ import {
 	type ReportKind,
 	reportKind,
 	reportMessage,
-} from "@/core/schemas";
+} from "@/core/schemas/report";
 import { fieldErrors } from "@/forms/field-errors";
 import { m } from "@/i18n";
 import { REPORT_KIND_LABELS } from "@/utils/report-row";

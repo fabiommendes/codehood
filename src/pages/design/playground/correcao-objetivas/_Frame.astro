@@ -1,0 +1,105 @@
+---
+/// The frame every type shares: header, summary line, needs attention, [type body], changed by hand, statement and key.
+import QuestionNumber from "@/components/exam/QuestionNumber.astro";
+import { type Fixture, fmt, studentLabel } from "./_data";
+import Shell from "./_Shell.astro";
+
+interface Props {
+	q: Fixture;
+}
+
+const { q } = Astro.props;
+const names = Astro.url.searchParams.get("names") === "1";
+const toggle = names ? Astro.url.pathname : `${Astro.url.pathname}?names=1`;
+const back = "/design/playground/correcao-objetivas";
+const regrades = "/cs101/ada_2026-2/exams/quiz-01/regrades";
+---
+
+<Shell title={q.title}>
+  <a href={back} class="text-sm text-muted hover:text-primary">← Mockups da correção</a>
+  <p class="mt-2 text-sm"><QuestionNumber number={q.position} points={q.points} /> <span class="badge badge-ghost badge-sm ml-1">{q.typeLabel}</span></p>
+  <h2 class="page-subheader">{q.title}</h2>
+
+  <nav class="mt-3 flex gap-4 text-sm">
+    <a href="#" class="link">← Anterior</a>
+    <a href="#" class="link">Próxima →</a>
+    <a href={toggle} role="switch" aria-checked={names ? "true" : "false"} class="link ml-auto">{names ? "Ocultar nomes" : "Mostrar nomes"}</a>
+  </nav>
+
+  <p class="mt-6 flex flex-wrap items-center gap-x-3 gap-y-1 text-lg" data-testid="summary">
+    <span><strong>{q.answers}</strong> respostas</span>
+    <span class="text-muted">·</span>
+    <span><strong>{q.correctPct}%</strong> corretas</span>
+    {q.discrimination !== null && <span class="badge badge-warning badge-soft" title="Quem vai bem na prova erra tanto quanto quem vai mal. Vale conferir o gabarito.">discriminação baixa ({fmt(q.discrimination, 2)})</span>}
+    {q.pending > 0 && <a href="#atencao" class="badge badge-warning">{q.pending} sem nota</a>}
+  </p>
+
+  {(q.attention.length > 0 || q.showEmptyAttention) && (
+    <section id="atencao" class="mt-6">
+      <h3 class="page-subsubheader">Requer atenção{q.attention.length > 0 && ` (${q.attention.length})`}</h3>
+      {q.attention.length === 0 ? (
+        <p class="mt-2 text-sm text-muted">Nada requer atenção: todas as respostas têm nota e não há pedidos de revisão.</p>
+      ) : (
+        <ul class="mt-3 overflow-hidden rounded-box border border-warning/40 bg-base-100">
+          {q.attention.map((row) => (
+            <li class="flex flex-wrap items-center gap-x-4 gap-y-2 border-t border-edge px-4 py-2 text-sm first:border-t-0">
+              <span class="w-44 shrink-0 font-medium">{studentLabel(row.student, names)}</span>
+              <span class="badge badge-warning badge-soft badge-sm">{row.kind === "pending" ? "Sem nota" : row.kind === "regrade" ? "Revisão pedida" : "Suspeita"}</span>
+              <span class="min-w-48 flex-1 text-muted">{row.detail}</span>
+              {row.kind === "pending" && (
+                <form class="flex items-center gap-2">
+                  <input type="number" min="0" max="100" placeholder="0 a 100" class="input input-sm w-24" aria-label="Nota" />
+                  <button type="button" class="btn btn-success btn-soft btn-sm">Marcar como certa</button>
+                  <button type="button" class="btn btn-primary btn-sm">Dar nota</button>
+                </form>
+              )}
+              {row.kind === "regrade" && <a href={regrades} class="btn btn-outline btn-sm">Ver pedido</a>}
+              {row.kind === "suspicious" && (
+                <span class="flex gap-2">
+                  <button type="button" class="btn btn-ghost btn-sm">Ignorar</button>
+                  <button type="button" class="btn btn-outline btn-error btn-sm">Aplicar sanção</button>
+                </span>
+              )}
+            </li>
+          ))}
+        </ul>
+      )}
+    </section>
+  )}
+
+  <slot />
+
+  {q.overrides.length > 0 && (
+    <details class="mt-8 rounded-box border border-edge bg-base-100">
+      <summary class="cursor-pointer px-4 py-2 text-sm font-medium">Alteradas à mão ({q.overrides.length})</summary>
+      <ul class="border-t border-edge">
+        {q.overrides.map((o) => (
+          <li class="flex flex-wrap items-center gap-x-4 gap-y-1 border-t border-edge px-4 py-2 text-sm first:border-t-0">
+            <span class="w-44 shrink-0 font-medium">{studentLabel(o.student, names)}</span>
+            <span class={`badge badge-sm ${o.kind === "Sanção" ? "badge-error badge-soft" : "badge-info badge-soft"}`}>{o.kind}</span>
+            <span class="tabular-nums"><span class="text-muted line-through">{o.auto}%</span> → {o.final}%</span>
+            <span class="min-w-40 flex-1 text-muted">{o.comment} <span class="text-xs">({o.when})</span></span>
+            <button type="button" class="btn btn-ghost btn-xs">Alterar</button>
+            <button type="button" class="btn btn-ghost btn-xs text-error">Desfazer</button>
+          </li>
+        ))}
+      </ul>
+    </details>
+  )}
+
+  <details class="mt-4 rounded-box border border-edge bg-base-100">
+    <summary class="cursor-pointer px-4 py-2 text-sm font-medium">Enunciado e gabarito</summary>
+    <div class="border-t border-edge p-4">
+      <p>{q.statement}</p>
+      <ul class="mt-3 flex flex-col gap-1 text-sm">
+        {q.key.map((k) => (
+          <li class={k.ok ? "font-medium text-success" : "text-base-content/70"}>{k.ok ? "✓ " : ""}<span class="whitespace-pre font-mono-none">{k.text}</span></li>
+        ))}
+      </ul>
+    </div>
+  </details>
+  <div class="mt-3 flex flex-wrap items-center gap-4">
+    <a href="#" class="btn btn-outline btn-sm">Editar questão</a>
+    <p role="note" class="alert alert-info alert-soft grow py-2 text-sm">Fixar uma nova versão da questão na prova não corrige de novo as respostas que já existem. Por enquanto, use "Alterar nota".</p>
+  </div>
+</Shell>

@@ -5,15 +5,14 @@ import { requireUser } from "@/auth/require-user";
 import { clearSessionCookie } from "@/auth/session-cookie";
 import { SESSION_COOKIE, SESSION_COOKIE_OPTIONS } from "@/core/constants";
 import { FieldError } from "@/core/error";
+import { apiKeyForm, apiKeyRevoke } from "@/core/schemas/api-key";
 import {
-	apiKeyForm,
-	apiKeyRevoke,
 	inviteAccept,
 	inviteClassroom,
 	inviteJoin,
 	invitePersonal,
-	sessionLogin,
-} from "@/core/schemas";
+} from "@/core/schemas/invite";
+import { sessionLogin } from "@/core/schemas/session";
 import { db, InviteError, type User } from "@/db";
 import { prisma } from "@/db/client";
 import { m } from "@/i18n";

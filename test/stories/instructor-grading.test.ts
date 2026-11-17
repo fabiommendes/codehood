@@ -839,13 +839,16 @@ test("instructor: find the questions that need rework", async ({ page }) => {
 		await expect(rows.nth(1).getByText("Correct answer: False")).toBeVisible();
 	});
 
-	await test.step("a question without a distribution shows none", async () => {
+	await test.step("a typed question groups identical responses instead of choices", async () => {
 		await page.goto(`${href}/exams/final/grading/trick?view=list`);
 
 		await expect(
 			page.getByRole("heading", { level: 2, name: "Trick question" }),
 		).toBeVisible();
-		await expect(distribution()).toHaveCount(0);
+		await expect(distribution().getByRole("listitem")).toHaveCount(8);
+		await expect(distribution().getByRole("listitem").first()).toContainText(
+			"1 · 13%",
+		);
 	});
 
 	await test.step("after the question gets a new version the exam still grades against the pinned one", async () => {
@@ -869,6 +872,7 @@ test("instructor: find the questions that need rework", async ({ page }) => {
 
 		await page.goto(`${href}/exams/final/grading/fruit?view=list`);
 
+		await page.getByText("Statement and answer key").click();
 		await expect(page.getByText("Pick the best fruit.").first()).toBeVisible();
 		await expect(
 			page.getByText("Pick the fruit that grows on trees."),
@@ -896,6 +900,7 @@ test("instructor: find the questions that need rework", async ({ page }) => {
 		await expect(page.getByRole("alert")).toContainText(
 			'This exam pins version "ghost", which this question does not have. Showing the latest version instead.',
 		);
+		await page.getByText("Statement and answer key").click();
 		await expect(
 			page.getByText("Pick the fruit that grows on trees.").first(),
 		).toBeVisible();

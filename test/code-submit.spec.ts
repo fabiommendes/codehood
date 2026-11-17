@@ -2,7 +2,7 @@ import { expect, test } from "@playwright/test";
 import { PrismaBetterSqlite3 } from "@prisma/adapter-better-sqlite3";
 import { FULL_ACCESS } from "@/auth/actor";
 import { InvalidData, NotAllowed } from "@/core/error";
-import { isoDate } from "@/core/schemas";
+import { isoDate } from "@/core/schemas/base";
 import { db, type schema } from "@/db";
 import { PrismaClient, prisma } from "@/db/client";
 import { makeResponseService } from "@/db/services/response.service";

@@ -459,13 +459,24 @@ test("question page: a correct answer is shown under a Correct answer heading, f
 			`${href}/exams/midterm/grading/${slug}?view=list`,
 		);
 		await expect(titleHeading(page, title)).toBeVisible();
-		await expect(
-			page.getByRole("heading", {
-				level: 3,
-				name: "Correct answer",
-				exact: true,
-			}),
-		).toBeVisible();
+		if (slug === "q-short") {
+			await expect(
+				page.getByRole("heading", {
+					level: 3,
+					name: "Correct answer",
+					exact: true,
+				}),
+			).toBeVisible();
+		} else {
+			// Graded automatically: the key sits in a closed disclosure, not under a heading.
+			await page.getByText("Statement and answer key").click();
+			await expect(
+				page
+					.locator("details", { hasText: "Statement and answer key" })
+					.getByText("Brasília")
+					.first(),
+			).toBeVisible();
+		}
 		// The key tab's score badge says only that the key is right.
 		await expect(page.getByText(/^Score \d/)).toHaveCount(0);
 	}

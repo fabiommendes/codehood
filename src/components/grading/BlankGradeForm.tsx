@@ -2,7 +2,7 @@ import { actions } from "astro:actions";
 import { createSignal, For, type JSX, Show } from "solid-js";
 import Field from "@/components/form/Field";
 import FormAlert from "@/components/form/FormAlert";
-import type { BlankGrade } from "@/core/schemas";
+import type { BlankGrade } from "@/core/schemas/feedback";
 import { isPercentScore, SCORE_ERROR } from "@/core/score";
 import { errorMessage } from "@/forms/field-errors";
 import { m } from "@/i18n";

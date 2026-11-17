@@ -5,8 +5,8 @@ import { readMultipart } from "@/api/registry/multipart";
 import { buildOpenApiDocument } from "@/api/registry/openapi-document";
 import { openApiRequest, POST, registry } from "@/api/registry/route";
 import { InvalidData } from "@/core/error";
-import { MAX_UPLOAD_BYTES } from "@/core/schemas";
 import { buffer } from "@/core/schemas/base";
+import { MAX_UPLOAD_BYTES } from "@/core/schemas/blob";
 
 /// Multipart upload: the endpoint reads file and text parts, the OpenAPI
 /// document describes them, and an oversized request is refused unread.

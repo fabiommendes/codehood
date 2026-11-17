@@ -1,6 +1,6 @@
 import { expect, test } from "@playwright/test";
 import { FULL_ACCESS } from "@/auth/actor";
-import { isoDate } from "@/core/schemas";
+import { isoDate } from "@/core/schemas/base";
 import { db } from "@/db";
 import { prisma } from "@/db/client";
 import { loadResultPolicy } from "@/db/result-policy";

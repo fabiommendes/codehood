@@ -1,6 +1,6 @@
 import { expect, test } from "@playwright/test";
 import { ImproperBehavior } from "@/core/error";
-import { courseGradesSchema } from "@/core/schemas";
+import { courseGradesSchema } from "@/core/schemas/grade-column";
 import type { Enrollment } from "@/db/services/enrollment.service";
 import type { GradeColumn } from "@/db/services/grade-column.service";
 import {

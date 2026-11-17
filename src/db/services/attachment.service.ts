@@ -2,12 +2,6 @@ import type { z } from "zod";
 import { SYSTEM, type UserActor } from "@/auth/actor";
 import { BLOB_QUOTA_BY_ROLE } from "@/core/constants";
 import { NotAllowed, NotFound } from "@/core/error";
-import type {
-	ExamId,
-	QuestionRefId,
-	ReportId,
-	RepositoryId,
-} from "@/core/schemas";
 import {
 	attachmentAttach,
 	attachmentCreate,
@@ -16,7 +10,13 @@ import {
 	attachmentSchema,
 	type attachmentToType,
 	attachmentUpdate,
-} from "@/core/schemas";
+} from "@/core/schemas/attachment";
+import type {
+	ExamId,
+	QuestionRefId,
+	ReportId,
+	RepositoryId,
+} from "@/core/schemas/base";
 import type { ServiceOptsWithoutTx } from "@/db/base-service";
 import { rejectExpectedUpdatedAt, touch } from "@/db/conditional-write";
 import { defineService, op } from "@/db/define-service";
@@ -33,7 +33,7 @@ import {
 import type { BlobService } from "./blob.service";
 import type { ResourceId } from "./resource.service";
 
-export type { AttachmentId } from "@/core/schemas";
+export type { AttachmentId } from "@/core/schemas/base";
 
 //
 // Type definitions

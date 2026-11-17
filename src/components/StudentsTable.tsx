@@ -2,7 +2,7 @@ import { actions } from "astro:actions";
 import type { JSX } from "solid-js";
 import type { z } from "zod";
 import Table, { type ColumnConfig } from "@/components/ui/Table";
-import type { enrollmentSchema } from "@/core/schemas";
+import type { enrollmentSchema } from "@/core/schemas/enrollment";
 import { locale, m } from "@/i18n";
 
 /// The columns this table renders — the full `enrollmentSchema` row minus the

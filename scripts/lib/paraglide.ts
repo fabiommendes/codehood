@@ -28,13 +28,10 @@ export function paraglideOptions(root: string): CompilerOptions {
 		outdir: path.join(root, "src", "generated", "paraglide"),
 		strategy: ["baseLocale"],
 		emitTsDeclarations: true,
-		// The Vite plugin's default. Stating it here makes `pnpm run generate`
-		// write the same files, so the plugin's cache stays valid and the dev
-		// server does not compile the messages a second time.
-		outputStructure:
-			process.env.NODE_ENV === "production"
-				? "message-modules"
-				: "locale-modules",
+		// One layout for dev, `astro sync` and build. A per-message layout under
+		// NODE_ENV=production would rewrite the directory a running dev server
+		// reads and make it serve thousands of modules per page.
+		outputStructure: "locale-modules",
 		experimentalStaticLocale: `typeof ${LOCALE_GLOBAL} === 'undefined' ? ${JSON.stringify(baseLocale)} : ${LOCALE_GLOBAL}`,
 	};
 }

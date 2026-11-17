@@ -6,7 +6,10 @@ import { expect, test } from "@playwright/test";
 import type { UserActor } from "@/auth/actor";
 import { FULL_ACCESS, SYSTEM } from "@/auth/actor";
 import { InvalidData, NotAllowed } from "@/core/error";
-import { MAX_REPOSITORY_FILES, type RepositoryEntry } from "@/core/schemas";
+import {
+	MAX_REPOSITORY_FILES,
+	type RepositoryEntry,
+} from "@/core/schemas/repository";
 import type { Repository, RepositoryPK } from "@/db";
 import { db } from "@/db";
 import { persistedCalendarEventFactory } from "@/fixtures/calendar-event.factory";

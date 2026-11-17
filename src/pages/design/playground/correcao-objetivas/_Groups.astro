@@ -1,0 +1,89 @@
+---
+import { type Block, fmt, meanOf } from "./_data";
+/// Distinct responses with count, score and the mean of who chose them; each group expands to its students.
+import Member from "./_Member.astro";
+
+interface Props {
+	block: Block;
+	names: boolean;
+	note?: string;
+}
+
+const { block, names, note } = Astro.props;
+const showMean = block.showMean !== false;
+const total = block.groups.reduce((n, g) => n + g.members.length, 0);
+const cols = showMean
+	? "minmax(0,1fr) 3.5rem 3rem 6.5rem 7rem"
+	: "minmax(0,1fr) 3.5rem 3rem 6.5rem";
+const barClass = (score: number | null) =>
+	score === 100
+		? "bg-success"
+		: score === 0
+			? "bg-base-content/30"
+			: score === null
+				? "bg-base-content/30"
+				: "bg-warning";
+---
+
+<section class="mt-8">
+  {block.title && <h3 class="page-subsubheader">{block.title}</h3>}
+  <div class="mt-3 overflow-hidden rounded-box border border-edge bg-base-100">
+    <div class="grid items-end gap-3 border-b border-edge px-4 py-2 text-xs text-muted" style={`grid-template-columns:${cols}`}>
+      <span>{block.responseHeader ?? "Resposta"}</span>
+      <span class="text-right">Alunos</span>
+      <span class="text-right">%</span>
+      <span class="text-right">{block.mode === "accepted" ? "Aceita?" : "Nota dada"}</span>
+      {showMean && <span class="text-right" title="Nota média na prova, nas outras questões. Só para grupos de 3 ou mais.">Média nas outras</span>}
+    </div>
+    <ul>
+      {block.groups.map((g) => {
+        const count = g.members.length;
+        const pct = Math.round((count / total) * 100);
+        const changed = g.members.filter((m) => m.manual !== undefined).length;
+        const mean = meanOf(g);
+        return (
+          <li class="border-t border-edge first:border-t-0">
+            <details>
+              <summary class="grid cursor-pointer list-none items-center gap-3 px-4 py-2 hover:bg-base-200/60" style={`grid-template-columns:${cols}`}>
+                <span class="min-w-0">
+                  {g.chips ? (
+                    <span class="flex flex-wrap gap-1">
+                      {g.chips.map((c) => <span class={`badge badge-sm ${c.ok ? "badge-success badge-soft" : "badge-error badge-soft"}`}>{c.text}</span>)}
+                    </span>
+                  ) : (
+                    <span class="font-medium">{g.label}</span>
+                  )}
+                  {g.tag && <span class="badge badge-warning badge-soft badge-sm ml-2">{g.tag}</span>}
+                  {g.sub && <span class="block text-xs text-muted">{g.sub}</span>}
+                  <span class="mt-1 block h-1.5 overflow-hidden rounded-full bg-base-200"><span class={`block h-full ${barClass(g.score)}`} style={`width:${pct * 2.5}%`}></span></span>
+                </span>
+                <span class="text-right tabular-nums">{count}</span>
+                <span class="text-right tabular-nums text-muted">{pct}%</span>
+                <span class="text-right">
+                  {block.mode === "accepted" ? (
+                    g.score === 100 ? <span class="badge badge-success badge-soft badge-sm">sim</span> : g.score === 0 ? <span class="badge badge-ghost badge-sm">não</span> : <span class="badge badge-warning badge-soft badge-sm">parcial</span>
+                  ) : (
+                    <span class={`tabular-nums ${g.score === 100 ? "text-success" : "text-muted"}`}>{g.score === null ? "varia" : `${g.score}%`}</span>
+                  )}
+                  {changed > 0 && <span class="block text-xs text-info">{changed} {changed === 1 ? "alterada" : "alteradas"}</span>}
+                </span>
+                {showMean && (
+                  <span class="text-right tabular-nums">
+                    {mean === null ? <span class="text-muted">–</span> : fmt(mean)}
+                    {g.flag && <span class="badge badge-warning badge-xs mt-0.5 block whitespace-normal text-right" title={g.flag}>acima do gabarito</span>}
+                  </span>
+                )}
+              </summary>
+              <div class="border-t border-edge bg-base-200/30">
+                {g.flag && <p class="px-4 py-2 text-xs text-warning">{g.flag}: a média de quem escolheu esta resposta é maior que a de quem acertou.</p>}
+                <ul class="max-h-96 overflow-y-auto">
+                  {g.members.map((m) => <Member member={m} names={names} note={note} />)}
+                </ul>
+              </div>
+            </details>
+          </li>
+        );
+      })}
+    </ul>
+  </div>
+</section>

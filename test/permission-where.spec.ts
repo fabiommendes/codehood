@@ -5,7 +5,7 @@ import {
 	hasPerm,
 	type QuestionWithCourse,
 } from "@/auth/permissions";
-import { isoDate } from "@/core/schemas";
+import { isoDate } from "@/core/schemas/base";
 import { db, type User } from "@/db";
 import { prisma } from "@/db/client";
 import { courseContentsWhere, courseWhere } from "@/db/services/course.service";

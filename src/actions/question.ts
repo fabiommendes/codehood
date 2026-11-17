@@ -1,6 +1,6 @@
 import { ActionError, defineAction } from "astro:actions";
 import { requireUser } from "@/auth/require-user";
-import { questionStatusUpdate } from "@/core/schemas";
+import { questionStatusUpdate } from "@/core/schemas/question";
 import { db } from "@/db";
 import { m } from "@/i18n";
 import { writable } from "@/services/question-status";

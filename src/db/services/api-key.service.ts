@@ -3,12 +3,12 @@ import { hasPerm } from "@/auth/permissions";
 import { generateToken, hashToken } from "@/auth/token";
 import { NotAllowed, NotFound } from "@/core/error";
 import {
-	type ApiKeyId,
 	apiKeyCreate,
 	apiKeyFilter,
 	apiKeyPK,
 	apiKeySchema,
-} from "@/core/schemas";
+} from "@/core/schemas/api-key";
+import type { ApiKeyId } from "@/core/schemas/base";
 import type { ServiceOptsWithoutTx } from "@/db/base-service";
 import { defineService, op } from "@/db/define-service";
 import {
@@ -24,7 +24,7 @@ const apiKeyInclude = {
 
 type DbApiKey = Prisma.ApiKeyGetPayload<{ include: typeof apiKeyInclude }>;
 
-export type { ApiKeyId } from "@/core/schemas";
+export type { ApiKeyId } from "@/core/schemas/base";
 
 //
 // Type definitions

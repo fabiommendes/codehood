@@ -8,7 +8,7 @@
 
 import type { z } from "zod";
 import { ImproperBehavior } from "@/core/error";
-import type { courseGradesSchema } from "@/core/schemas";
+import type { courseGradesSchema } from "@/core/schemas/grade-column";
 import type { Enrollment } from "@/db/services/enrollment.service";
 import type { Exam } from "@/db/services/exam.service";
 import type { GradeColumn } from "@/db/services/grade-column.service";

@@ -9,7 +9,7 @@ import {
 	invitePK,
 	inviteSchema,
 	inviteUpdate,
-} from "@/core/schemas";
+} from "@/core/schemas/invite";
 import type { ServiceOptsWithoutTx } from "@/db/base-service";
 import { defineService, op } from "@/db/define-service";
 import { m } from "@/i18n";
@@ -17,7 +17,7 @@ import type { FillUndefineds } from "@/typing";
 import type { Prisma, PrismaTx } from "../client";
 import { courseRefWhere, valueOrNotFound } from "../utils";
 
-export type { InviteId } from "@/core/schemas";
+export type { InviteId } from "@/core/schemas/base";
 
 const DEFAULT_EXPIRY_MS = 7 * 24 * 60 * 60 * 1000; // 7 days
 

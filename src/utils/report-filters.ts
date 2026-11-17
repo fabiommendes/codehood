@@ -3,7 +3,7 @@ import {
 	type ReportStatus,
 	reportKind,
 	reportStatus,
-} from "@/core/schemas";
+} from "@/core/schemas/report";
 
 /// The value the filter selects take for "no filter".
 export const ALL_REPORTS = "ALL";

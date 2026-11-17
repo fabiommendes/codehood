@@ -1,6 +1,6 @@
 import { type Actor, SYSTEM } from "@/auth/actor";
 import { ensurePerm } from "@/auth/permissions";
-import type { CourseId } from "@/core/schemas";
+import type { CourseId } from "@/core/schemas/base";
 import type { CourseNaturalKey } from "@/urls";
 import type { ServiceOptsWithoutTx } from "./base-service";
 import type { Prisma, PrismaTx } from "./client";

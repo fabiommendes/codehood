@@ -1,0 +1,13 @@
+---
+import { multipleChoice } from "./_data";
+import Frame from "./_Frame.astro";
+import Groups from "./_Groups.astro";
+
+export const prerender = false;
+const q = multipleChoice({ quiet: true });
+const names = Astro.url.searchParams.get("names") === "1";
+---
+
+<Frame q={q}>
+  {q.blocks.map((block) => <Groups block={{ ...block, title: block.title ?? "Respostas agrupadas" }} names={names} />)}
+</Frame>

@@ -1,7 +1,7 @@
 import { expect, test } from "@playwright/test";
 import { FULL_ACCESS } from "@/auth/actor";
 import { NotFound, PreconditionFailed } from "@/core/error";
-import type { ExamExceptionId } from "@/core/schemas";
+import type { ExamExceptionId } from "@/core/schemas/base";
 import { db } from "@/db";
 import { prisma } from "@/db/client";
 import { persistedQuestionFactory } from "@/fixtures/question.factory";

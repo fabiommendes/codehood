@@ -16,6 +16,7 @@ import {
 	NotAllowed,
 	NotFound,
 } from "@/core/error";
+import { publicId } from "@/core/schemas/base";
 import {
 	DEFAULT_CLAIM_LIMIT,
 	DEFAULT_LEASE_MS,
@@ -38,8 +39,7 @@ import {
 	gradingJobSummary,
 	gradingJobTotals,
 	MAX_JOB_ATTEMPTS,
-	publicId,
-} from "@/core/schemas";
+} from "@/core/schemas/grading-job";
 import { scoreValue } from "@/core/score";
 import type { ServiceOptsWithoutTx } from "@/db/base-service";
 import { touch } from "@/db/conditional-write";

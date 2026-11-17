@@ -1,0 +1,42 @@
+---
+/// One student of an expanded group: the score and a single "Alterar nota" action with its form.
+import { type Member, studentLabel } from "./_data";
+
+interface Props {
+	member: Member;
+	names: boolean;
+	/// What the student wrote, when the group label does not say it.
+	detail?: string;
+	note?: string;
+}
+
+const { member, names, note } = Astro.props;
+const detail = Astro.props.detail ?? member.detail;
+const final = member.manual ?? member.auto;
+---
+
+<li class="border-t border-edge first:border-t-0">
+  <details class="group/member">
+    <summary class="flex cursor-pointer list-none items-center gap-3 px-4 py-1.5 text-sm hover:bg-base-200/60">
+      <span class="w-44 shrink-0 font-medium">{studentLabel(member.student, names)}</span>
+      <span class="min-w-0 flex-1 truncate text-muted">{detail ?? ""}</span>
+      {member.manual !== undefined ? (
+        <span class="tabular-nums"><span class="text-muted line-through">{member.auto}%</span> {member.manual}% <span class="badge badge-info badge-soft badge-xs">alterada</span></span>
+      ) : (
+        <span class="tabular-nums text-muted">{member.auto}%</span>
+      )}
+      <span class="link link-hover text-xs">Alterar nota</span>
+    </summary>
+    <form class="flex flex-wrap items-end gap-3 bg-base-200/40 px-4 py-3">
+      <label class="flex flex-col gap-1 text-xs text-muted">Nota (0 a 100)
+        <input type="number" min="0" max="100" value={final} class="input input-sm w-24 text-base-content" />
+      </label>
+      <button type="button" class="btn btn-success btn-soft btn-sm">Marcar como certa</button>
+      <label class="flex min-w-48 grow flex-col gap-1 text-xs text-muted">Comentário (opcional)
+        <input type="text" class="input input-sm w-full text-base-content" />
+      </label>
+      <button type="button" class="btn btn-primary btn-sm">Salvar</button>
+      {note && <p class="w-full text-xs text-muted">{note}</p>}
+    </form>
+  </details>
+</li>

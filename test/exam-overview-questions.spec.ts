@@ -57,7 +57,7 @@ async function setup() {
 	return { student, course, weighted, href };
 }
 
-test("the overview lists the questions with Qn, title, type and weight", async ({
+test("the overview lists the questions with Qn, title, type, grading and weight", async ({
 	page,
 }) => {
 	const { course, href } = await setup();
@@ -69,7 +69,13 @@ test("the overview lists the questions with Qn, title, type and weight", async (
 	await expect(rows).toHaveCount(2);
 	await expect(rows.nth(0)).toContainText("Q1");
 	await expect(rows.nth(0)).toContainText("T heavy");
-	await expect(rows.nth(0)).toContainText("3");
+	await expect(rows.nth(0).locator("td").nth(0)).toContainText(
+		/^Q1\s*T heavy\s*(Automatic grading|Correção automática)$/,
+	);
+	await expect(rows.nth(0).locator("td").nth(1)).toHaveText(
+		/^(Multiple choice|Múltipla escolha)$/,
+	);
+	await expect(rows.nth(0).locator("td").nth(2)).toHaveText(/^3[.,]00$/);
 	await expect(rows.nth(1)).toContainText("Q2");
 	await expect(rows.nth(1)).toContainText("T light");
 	await expect(rows.nth(0).getByRole("link")).toHaveAttribute(
@@ -94,7 +100,7 @@ test("an exam whose questions all weigh 1 still shows the weight column", async 
 	await expect(
 		page.getByRole("columnheader", { name: /^(Peso|Weight)$/ }),
 	).toBeVisible();
-	await expect(rows.nth(0).locator("td").nth(2)).toHaveText("1");
+	await expect(rows.nth(0).locator("td").nth(2)).toHaveText(/^1[.,]00$/);
 });
 
 test("the table reads title and weight from the version the exam pins, not the latest", async ({
@@ -143,7 +149,7 @@ test("the table reads title and weight from the version the exam pins, not the l
 	const row = page.locator("[data-testid=exam-questions] tbody tr").nth(0);
 	await expect(row).toContainText("Old title");
 	await expect(row).not.toContainText("New title");
-	await expect(row.locator("td").nth(2)).toHaveText("2");
+	await expect(row.locator("td").nth(2)).toHaveText(/^2[.,]00$/);
 });
 
 test("average and discrimination appear only once an attempt is closed", async ({

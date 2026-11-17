@@ -1,5 +1,9 @@
-@import "tailwindcss";
+/* Scan only the app code: the repo also holds docs, specs and skills full of
+   class names that are not ours, and DaisyUI would emit CSS for all of them. */
+@import "tailwindcss" source(none);
 @import "./mdq.css";
+@source "../";
+@source "../../packages";
 
 @plugin "@tailwindcss/typography";
 

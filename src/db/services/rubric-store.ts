@@ -5,7 +5,7 @@
  * Nothing here checks permissions: the callers do, before reaching for these.
  */
 import { InvalidData } from "@/core/error";
-import type { FeedbackId, QuestionRefId } from "@/core/schemas";
+import type { FeedbackId, QuestionRefId } from "@/core/schemas/base";
 import { m } from "@/i18n";
 import { isNewerSubmission, newestPassesFirst } from "@/services/exam-result";
 import {

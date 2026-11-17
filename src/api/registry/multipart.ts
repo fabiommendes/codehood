@@ -1,7 +1,7 @@
 import type { ZodType } from "zod";
 import { InvalidData } from "@/core/error";
 import type { InvalidDataCode } from "@/core/error-response";
-import { MAX_UPLOAD_BYTES } from "@/core/schemas";
+import { MAX_UPLOAD_BYTES } from "@/core/schemas/blob";
 import { hashBytes } from "@/utils/content-hash";
 import { coerceForSchema } from "@/utils/query-coerce";
 

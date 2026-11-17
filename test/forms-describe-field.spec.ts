@@ -3,8 +3,8 @@ import { z } from "zod";
 import { describeField, describeFields } from "@/forms/describe-field";
 import "@/forms/meta";
 import { buildOpenApiDocument } from "@/api/registry/openapi-document";
-import { userSignUp } from "@/core/schemas";
 import { publicId, slug } from "@/core/schemas/base";
+import { userSignUp } from "@/core/schemas/user";
 import {
 	buildOpenRpcDocument,
 	jsonSchemaOf,

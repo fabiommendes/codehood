@@ -4,7 +4,7 @@ import { createSchemaForm } from "@/components/form/create-schema-form";
 import Field from "@/components/form/Field";
 import FormAlert from "@/components/form/FormAlert";
 import Table, { type ColumnConfig } from "@/components/ui/Table";
-import { examExceptionSave } from "@/core/schemas";
+import { examExceptionSave } from "@/core/schemas/exam-exception";
 import { errorMessage } from "@/forms/field-errors";
 import { m } from "@/i18n";
 

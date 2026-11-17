@@ -1,7 +1,8 @@
 import { expect, test } from "@playwright/test";
 import { FULL_ACCESS } from "@/auth/actor";
 import { InvalidData } from "@/core/error";
-import { isoDate, REGRADE_WINDOW_DAYS } from "@/core/schemas";
+import { isoDate } from "@/core/schemas/base";
+import { REGRADE_WINDOW_DAYS } from "@/core/schemas/regrade-request";
 import { db, type schema } from "@/db";
 import { prisma } from "@/db/client";
 import { persistedCourseFactory } from "@/fixtures/course.factory";

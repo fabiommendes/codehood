@@ -1,5 +1,5 @@
 import { expect, test } from "@playwright/test";
-import { isoDate } from "@/core/schemas";
+import { isoDate } from "@/core/schemas/base";
 import type { Weekday } from "@/db";
 import {
 	addDays,

@@ -4,7 +4,7 @@ import type {
 	FeedbackId,
 	RegradeRequestId,
 	SubmissionId,
-} from "@/core/schemas";
+} from "@/core/schemas/base";
 import { db } from "@/db";
 import { prisma } from "@/db/client";
 import {

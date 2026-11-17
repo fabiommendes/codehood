@@ -1,5 +1,5 @@
 import { expect, test } from "@playwright/test";
-import { isoDate } from "@/core/schemas";
+import { isoDate } from "@/core/schemas/base";
 
 test("isoDate accepts a valid calendar date", () => {
 	expect(isoDate.parse("2026-02-28")).toBe("2026-02-28");

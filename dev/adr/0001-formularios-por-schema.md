@@ -124,8 +124,11 @@ primeiro erro, revalida a cada digitação só os campos que têm erro.
   `accept: "form"`.
 - `busy()` fica `true` após o sucesso: `onSuccess` deve navegar.
 - `control` em `<Field>` passa atributos ao elemento (`inputmode`, `data-*`).
-- Uma ilha pode importar `@/core/schemas`; `test/schemas-browser-safe.spec.ts`
-  garante que o barrel carrega sem `process` nem `Buffer`.
+- Uma ilha importa o submódulo que define o schema (`@/core/schemas/<módulo>`),
+  nunca um barrel: os módulos rodam `.openapi(...)` ao carregar e nada sofre
+  tree-shaking. `@/core/schemas/all` é só para o servidor;
+  `test/schemas-browser-safe.spec.ts` garante que carrega sem `process` nem
+  `Buffer`.
 
 ### 5. Erro que só o servidor detecta
 

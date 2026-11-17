@@ -3,7 +3,10 @@ import { createSignal, type JSX } from "solid-js";
 import { createSchemaForm } from "@/components/form/create-schema-form";
 import Field from "@/components/form/Field";
 import FormAlert from "@/components/form/FormAlert";
-import { regradeAcceptForm, regradeReject } from "@/core/schemas";
+import {
+	regradeAcceptForm,
+	regradeReject,
+} from "@/core/schemas/regrade-request";
 import { errorMessage } from "@/forms/field-errors";
 import { m } from "@/i18n";
 

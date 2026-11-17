@@ -1,5 +1,5 @@
 import { expect, test } from "@playwright/test";
-import type { RollCallId } from "@/core/schemas";
+import type { RollCallId } from "@/core/schemas/base";
 import { readClaim, signClaim } from "@/utils/pending-check-in";
 
 const KEY = "test-signing-key";

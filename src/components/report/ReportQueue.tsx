@@ -5,7 +5,7 @@ import {
 	type ReportStatus,
 	reportKind,
 	reportStatus,
-} from "@/core/schemas";
+} from "@/core/schemas/report";
 import { errorMessage } from "@/forms/field-errors";
 import { m } from "@/i18n";
 import {

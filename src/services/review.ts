@@ -6,7 +6,7 @@
  * and the current grade.
  */
 
-import type { BlankGrade } from "@/core/schemas";
+import type { BlankGrade } from "@/core/schemas/feedback";
 import {
 	type BlankScore,
 	combineBlanks,

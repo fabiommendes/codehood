@@ -18,14 +18,15 @@ import {
 	NotAllowed,
 	NotFound,
 } from "@/core/error";
-import type { CourseRef, FeedbackId } from "@/core/schemas";
+import type { FeedbackId } from "@/core/schemas/base";
+import type { CourseRef } from "@/core/schemas/course";
 import {
 	feedbackCreate,
 	feedbackFilter,
 	feedbackPK,
 	feedbackSchema,
 	feedbackUpdate,
-} from "@/core/schemas";
+} from "@/core/schemas/feedback";
 import type { ServiceOptsWithoutTx } from "@/db/base-service";
 import {
 	checkExpectedUpdatedAt,

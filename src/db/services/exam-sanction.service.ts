@@ -12,16 +12,16 @@ import type { z } from "zod";
 import type { Actor, UserActor } from "@/auth/actor";
 import { ensurePerm, hasPerm } from "@/auth/permissions";
 import { InvalidData, NotAllowed } from "@/core/error";
+import type { CourseId } from "@/core/schemas/base";
+import type { CourseRef } from "@/core/schemas/course";
 import {
-	type CourseId,
-	type CourseRef,
 	examSanctionCreate,
 	examSanctionFilter,
 	examSanctionPK,
 	examSanctionPublicSchema,
 	examSanctionSchema,
 	examSanctionUpdate,
-} from "@/core/schemas";
+} from "@/core/schemas/exam-sanction";
 import type { ServiceOptsWithoutTx } from "@/db/base-service";
 import {
 	checkExpectedUpdatedAt,

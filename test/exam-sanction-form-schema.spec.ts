@@ -1,6 +1,9 @@
 import { expect, test } from "@playwright/test";
 import * as core from "zod/v4/core";
-import { examSanctionCreateForm, examSanctionUpdateForm } from "@/core/schemas";
+import {
+	examSanctionCreateForm,
+	examSanctionUpdateForm,
+} from "@/core/schemas/exam-sanction";
 import { formToInput } from "@/forms/form-to-input";
 
 /// The sanction forms as the dialogs submit them: `FormData` read the way an Astro action reads it, then parsed.

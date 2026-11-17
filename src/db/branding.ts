@@ -125,7 +125,10 @@ export function brandSource(args: { model: string; source: string }): string {
 	for (const item of indexes) {
 		const { field, from: srcType, to: destType } = item;
 		const regex = new RegExp(`(\\b${field}[?]?:\\s*)(${srcType})`, "g");
-		source = source.replaceAll(regex, `$1import("@/core/schemas").${destType}`);
+		source = source.replaceAll(
+			regex,
+			`$1import("@/core/schemas/base").${destType}`,
+		);
 	}
 
 	return `// BRANDED TYPES\n\n${source}\n\n// BRANDED TYPES`;

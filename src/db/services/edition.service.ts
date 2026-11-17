@@ -7,11 +7,13 @@ import {
 	editionPK,
 	editionSchema,
 	editionUpdate,
+} from "@/core/schemas/edition";
+import {
 	type Page,
 	type PageParams,
 	pageOf,
 	pageParams,
-} from "@/core/schemas";
+} from "@/core/schemas/page";
 import type { ServiceOptsWithoutTx } from "@/db/base-service";
 import { rejectExpectedUpdatedAt } from "@/db/conditional-write";
 import { defineService, op } from "@/db/define-service";

@@ -1,5 +1,5 @@
 import { FULL_ACCESS } from "@/auth/actor";
-import { isoDate } from "@/core/schemas";
+import { isoDate } from "@/core/schemas/base";
 import { db, type Weekday } from "@/db";
 import { type APIRequestContext, expect, test } from "./fixtures";
 

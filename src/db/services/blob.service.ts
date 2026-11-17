@@ -28,11 +28,10 @@ import {
 	blobCreate,
 	blobFilter,
 	blobHash,
-	blobMissingInput,
-	blobMissingResult,
 	blobPK,
 	blobSchema,
-} from "@/core/schemas";
+} from "@/core/schemas/blob";
+import { blobMissingInput, blobMissingResult } from "@/core/schemas/repository";
 import type { ServiceOpts, ServiceOptsWithoutTx } from "@/db/base-service";
 import { defineService, op } from "@/db/define-service";
 import { m } from "@/i18n";

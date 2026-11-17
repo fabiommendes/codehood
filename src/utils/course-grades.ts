@@ -1,7 +1,7 @@
 import type { Actor } from "@/auth/actor";
 import { hasPerm } from "@/auth/permissions";
 import { NotAllowed, NotFound } from "@/core/error";
-import type { CourseRef } from "@/core/schemas";
+import type { CourseRef } from "@/core/schemas/course";
 import { db } from "@/db";
 import { activeSanctionsOf } from "@/db/active-sanctions";
 import { loadResultPolicy } from "@/db/result-policy";

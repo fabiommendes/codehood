@@ -1,5 +1,5 @@
 import { expect, test } from "@playwright/test";
-import type { CalendarEventId } from "@/core/schemas";
+import type { CalendarEventId } from "@/core/schemas/base";
 import type { Resource } from "@/db";
 import { splitByEvent } from "@/services/event-resources";
 

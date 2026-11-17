@@ -1,5 +1,5 @@
 import { Factory } from "fishery";
-import type { Duration } from "@/core/schemas";
+import type { Duration } from "@/core/schemas/base";
 import {
 	db,
 	type ExamCreate,

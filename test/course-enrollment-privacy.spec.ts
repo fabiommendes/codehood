@@ -1,5 +1,5 @@
 import { FULL_ACCESS } from "@/auth/actor";
-import { isoDate } from "@/core/schemas";
+import { isoDate } from "@/core/schemas/base";
 import { db } from "@/db";
 import { expect, test } from "./fixtures";
 

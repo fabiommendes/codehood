@@ -1,11 +1,11 @@
 import { defineAction } from "astro:actions";
 import { requireUser } from "@/auth/require-user";
+import { gradingQuestion } from "@/core/schemas/answer";
 import {
 	gradingJobInstructorQuery,
 	gradingJobStudentBatchQuery,
 	gradingJobStudentQuery,
-	gradingQuestion,
-} from "@/core/schemas";
+} from "@/core/schemas/grading-job";
 import { db } from "@/db";
 import { parseCourseParams } from "@/urls";
 import { withServiceErrors } from "./helpers";

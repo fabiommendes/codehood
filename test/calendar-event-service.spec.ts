@@ -1,8 +1,8 @@
 import { expect, test } from "@playwright/test";
 import { FULL_ACCESS, SYSTEM } from "@/auth/actor";
 import { hasPerm } from "@/auth/permissions";
-import type { CourseId } from "@/core/schemas";
-import { isoDate } from "@/core/schemas";
+import type { CourseId } from "@/core/schemas/base";
+import { isoDate } from "@/core/schemas/base";
 import { db, type ServiceOpts } from "@/db";
 import { prisma } from "@/db/client";
 import { localDateOf, toInstant, weekdayOf } from "@/utils/schedule-time";

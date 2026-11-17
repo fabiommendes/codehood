@@ -1,11 +1,11 @@
 import { expect, test } from "@playwright/test";
 import { FULL_ACCESS, type UserActor } from "@/auth/actor";
 import { InvalidData, TooManyRequests } from "@/core/error";
+import { isoDate } from "@/core/schemas/base";
 import {
-	isoDate,
 	REPORT_DAILY_LIMIT,
 	REPORT_MAX_ATTACHMENT_BYTES,
-} from "@/core/schemas";
+} from "@/core/schemas/report";
 import { db, type Report, type ReportCreate, type User } from "@/db";
 import { prisma } from "@/db/client";
 import { persistedCourseFactory } from "@/fixtures/course.factory";

@@ -7,7 +7,7 @@
  */
 
 import { z } from "zod";
-import * as schema from "@/core/schemas";
+import * as schema from "@/core/schemas/all";
 import { db } from "@/db";
 import { POST } from "./registry";
 

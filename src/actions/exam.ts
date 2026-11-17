@@ -3,12 +3,14 @@ import { requireUser } from "@/auth/require-user";
 import { FieldError, InvalidData, NotFound } from "@/core/error";
 import {
 	examAnswer,
-	examExceptionRemove,
-	examExceptionSave,
 	examParams,
 	examReopenAttempt,
 	examSetAnswerHistory,
-} from "@/core/schemas";
+} from "@/core/schemas/exam";
+import {
+	examExceptionRemove,
+	examExceptionSave,
+} from "@/core/schemas/exam-exception";
 import { db } from "@/db";
 import { effectiveAnswerHistory } from "@/services/answer-history";
 import { parseCourseParams } from "@/urls";

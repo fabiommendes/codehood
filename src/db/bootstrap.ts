@@ -2062,11 +2062,22 @@ async function seedReleasedQuiz(
 		FULL_ACCESS,
 	);
 
-	await answerExam(course, exam, students.hamilton, {
+	const hamilton = await answerExam(course, exam, students.hamilton, {
 		"recursion-basics": "base-case",
 		"factorial-of-five": 25,
 		"base-case-blanks": { stop: "recursive", smaller: "smaller" },
 	});
+	// The library gives 25 no credit: the instructor overrode it by hand.
+	await db.feedback.create(
+		{
+			submission: { publicId: hamilton["factorial-of-five"] ?? "" },
+			ref: "manual-1",
+			score: "0.5",
+			grader: "ada",
+			feedback: "25 is 5 squared, but the recursion you set up was right.",
+		},
+		FULL_ACCESS,
+	);
 
 	// A correct answer zeroed by the instructor: the sanction applies on top of the grade.
 	await db.examSanction.create(

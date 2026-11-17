@@ -12,10 +12,12 @@ import { type Actor, SYSTEM } from "@/auth/actor";
 import { ensurePerm, hasPerm } from "@/auth/permissions";
 import { generateToken } from "@/auth/token";
 import { InvalidData, NotAllowed, NotFound } from "@/core/error";
-import type { Page, QuestionRefId, QuestionSortField } from "@/core/schemas";
+import type { QuestionRefId } from "@/core/schemas/base";
+import type { Page } from "@/core/schemas/page";
+import { pageOf } from "@/core/schemas/page";
+import type { QuestionSortField } from "@/core/schemas/question";
 import {
 	codeQuestionMeta,
-	pageOf,
 	questionAttachmentPK,
 	questionFilter,
 	questionFindOneFilter,
@@ -25,7 +27,7 @@ import {
 	questionPublicSchema,
 	questionWriteCreate,
 	questionWriteUpdate,
-} from "@/core/schemas";
+} from "@/core/schemas/question";
 import type { ServiceOpts, ServiceOptsWithoutTx } from "@/db/base-service";
 import {
 	checkExpectedUpdatedAt,
@@ -81,7 +83,7 @@ import type { AttachmentService } from "./attachment.service";
 import type { BlobService } from "./blob.service";
 import { courseContentsWhere } from "./course.service";
 
-export { questionStatus, questionType } from "@/core/schemas";
+export { questionStatus, questionType } from "@/core/schemas/question";
 export type { QuestionRefId };
 
 //

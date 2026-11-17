@@ -7,16 +7,15 @@
 import type { z } from "zod";
 import { hasPerm } from "@/auth/permissions";
 import { InvalidData, NotAllowed } from "@/core/error";
+import type { CourseId, TimeSlotId } from "@/core/schemas/base";
+import type { courseNaturalKey } from "@/core/schemas/course";
 import {
-	type CourseId,
-	type courseNaturalKey,
-	type TimeSlotId,
 	timeSlotCreate,
 	timeSlotFilter,
 	timeSlotPK,
 	timeSlotSchema,
 	timeSlotUpdate,
-} from "@/core/schemas";
+} from "@/core/schemas/time-slot";
 import type { ServiceOptsWithoutTx } from "@/db/base-service";
 import {
 	checkExpectedUpdatedAt,
@@ -36,8 +35,8 @@ import type { Prisma, PrismaTx } from "../client";
 import { recomputeEventTimes } from "../event-times";
 import { courseRefWhere, valueOrNotAllowed, valueOrNotFound } from "../utils";
 
-export type { TimeSlotId } from "@/core/schemas";
-export { weekdaySchema } from "@/core/schemas";
+export type { TimeSlotId } from "@/core/schemas/base";
+export { weekdaySchema } from "@/core/schemas/time-slot";
 
 //
 // Type definitions

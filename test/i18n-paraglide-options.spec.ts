@@ -29,6 +29,20 @@ test.describe("AC8 paraglideOptions", () => {
 		expect(options.outdir).toBe(path.join(ROOT, "src/generated/paraglide"));
 	});
 
+	for (const env of ["production", "development", "test", undefined]) {
+		test(`emits locale-modules when NODE_ENV is ${env}`, () => {
+			const previous = process.env.NODE_ENV;
+			if (env === undefined) delete process.env.NODE_ENV;
+			else process.env.NODE_ENV = env;
+			try {
+				expect(paraglideOptions(ROOT).outputStructure).toBe("locale-modules");
+			} finally {
+				if (previous === undefined) delete process.env.NODE_ENV;
+				else process.env.NODE_ENV = previous;
+			}
+		});
+	}
+
 	test.describe("static locale expression", () => {
 		const evaluate = () => {
 			const expression = paraglideOptions(ROOT).experimentalStaticLocale;

@@ -1,8 +1,8 @@
 import { expect, test } from "@playwright/test";
 import { FULL_ACCESS, SYSTEM } from "@/auth/actor";
 import { type CourseWithEnrollment, hasPerm } from "@/auth/permissions";
-import type { CourseId } from "@/core/schemas";
-import { isoDate } from "@/core/schemas";
+import type { CourseId } from "@/core/schemas/base";
+import { isoDate } from "@/core/schemas/base";
 import { db } from "@/db";
 import { todayIn } from "@/utils/schedule-time";
 

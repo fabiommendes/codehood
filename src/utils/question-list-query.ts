@@ -15,7 +15,7 @@ import type {
 	QuestionSortField,
 	QuestionType,
 	questionStatus,
-} from "@/core/schemas";
+} from "@/core/schemas/question";
 import type { AssertEqual } from "./types";
 
 type QuestionStatus = z.infer<typeof questionStatus>;

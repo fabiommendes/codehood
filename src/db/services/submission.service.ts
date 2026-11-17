@@ -16,14 +16,15 @@ import {
 import { generateToken } from "@/auth/token";
 import { EXAM_ANSWER_GRACE_MS } from "@/core/constants";
 import { InvalidData, NotAllowed, NotFound } from "@/core/error";
-import type { CourseRef, ExamId, SubmissionId } from "@/core/schemas";
+import type { ExamId, SubmissionId } from "@/core/schemas/base";
+import type { CourseRef } from "@/core/schemas/course";
 import {
 	submissionCreate,
 	submissionFilter,
 	submissionPK,
 	submissionSchema,
 	submissionUpdate,
-} from "@/core/schemas";
+} from "@/core/schemas/submission";
 import type { ServiceOptsWithoutTx } from "@/db/base-service";
 import { rejectExpectedUpdatedAt, touch } from "@/db/conditional-write";
 import { enrollmentsOf } from "@/db/course-access";
@@ -49,7 +50,7 @@ import {
 	valueOrNotFound,
 } from "../utils";
 
-export { submissionStatus } from "@/core/schemas";
+export { submissionStatus } from "@/core/schemas/submission";
 export type { SubmissionId };
 
 //

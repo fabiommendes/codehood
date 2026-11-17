@@ -2,19 +2,19 @@ import type { z } from "zod";
 import { hasPerm } from "@/auth/permissions";
 import { generateToken, hashToken } from "@/auth/token";
 import { NotAllowed } from "@/core/error";
+import type { SessionId } from "@/core/schemas/base";
 import {
-	type SessionId,
 	sessionCreate,
 	sessionCreateResult,
 	sessionDeletePK,
 	type sessionSchema,
-} from "@/core/schemas";
+} from "@/core/schemas/session";
 import type { ServiceOptsWithoutTx } from "@/db/base-service";
 import { defineService, op } from "@/db/define-service";
 import type { FillUndefineds } from "@/typing";
 import { type PrismaTx, prisma, type Role } from "../client";
 
-export type { SessionId } from "@/core/schemas";
+export type { SessionId } from "@/core/schemas/base";
 
 const SESSION_TTL_MS = 30 * 24 * 60 * 60 * 1000; // 30 days
 const REFRESH_THRESHOLD_MS = SESSION_TTL_MS / 2;

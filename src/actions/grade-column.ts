@@ -1,6 +1,6 @@
 import { defineAction } from "astro:actions";
 import { requireUser } from "@/auth/require-user";
-import { gradeColumnRelease } from "@/core/schemas";
+import { gradeColumnRelease } from "@/core/schemas/grade-column";
 import { db } from "@/db";
 import { parseCourseParams } from "@/urls";
 import { withServiceErrors } from "./helpers";

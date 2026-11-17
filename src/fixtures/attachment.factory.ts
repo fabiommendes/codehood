@@ -1,6 +1,6 @@
 import { faker } from "@faker-js/faker";
 import { type DeepPartial, Factory } from "fishery";
-import type { ResourceId } from "@/core/schemas";
+import type { ResourceId } from "@/core/schemas/base";
 import { type Attachment, type AttachmentCreate, db } from "@/db";
 import { type PersistParams, serviceOpts } from "./support";
 

@@ -5,7 +5,7 @@
  * it whether to show the "ask for a regrade" button, so both always agree.
  */
 
-import { REGRADE_WINDOW_DAYS } from "@/core/schemas";
+import { REGRADE_WINDOW_DAYS } from "@/core/schemas/regrade-request";
 import { m } from "@/i18n";
 import type { QuestionOutcome } from "./exam-result";
 import {

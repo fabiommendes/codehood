@@ -1,5 +1,9 @@
 import { InvalidData } from "@/core/error";
-import { PAGE_LIMIT_MAX, type Page, type PageParams } from "@/core/schemas";
+import {
+	PAGE_LIMIT_MAX,
+	type Page,
+	type PageParams,
+} from "@/core/schemas/page";
 import { cursorParams } from "./page-links";
 
 /// Rows a list page shows when its URL names no `limit`.

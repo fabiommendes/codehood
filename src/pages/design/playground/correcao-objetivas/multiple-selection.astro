@@ -1,0 +1,49 @@
+---
+import { multipleSelection } from "./_data";
+import Frame from "./_Frame.astro";
+import Groups from "./_Groups.astro";
+
+export const prerender = false;
+const q = multipleSelection();
+const names = Astro.url.searchParams.get("names") === "1";
+const options = q.key.map((k, i) => ({
+	letter: "ABCDE"[i] as string,
+	text: k.text.slice(3),
+	key: k.ok === true,
+}));
+const members = q.blocks.flatMap((b) =>
+	b.groups.flatMap((g) => g.members.map((m) => m.detail ?? g.label)),
+);
+const total = members.length;
+const rows = options.map((o) => {
+	const count = members.filter((c) =>
+		(c.match(/\b[A-E]\b/g) ?? ([] as string[])).includes(o.letter),
+	).length;
+	const pct = Math.round((count / total) * 100);
+	// A key option few marked, or a wrong one many marked, is worth a look at the key.
+	const review = o.key ? pct < 70 : pct > 25;
+	return { ...o, count, pct, review };
+});
+---
+
+<Frame q={q}>
+  <section class="mt-8">
+    <h3 class="page-subsubheader">Por alternativa</h3>
+    <p class="mt-1 text-sm text-muted">Quantos marcaram cada alternativa. A barra verde é do gabarito, a cinza é de alternativa que não deveria ser marcada.</p>
+    <ul class="mt-3 overflow-hidden rounded-box border border-edge bg-base-100">
+      {rows.map((r) => (
+        <li class="grid items-center gap-3 border-t border-edge px-4 py-2 text-sm first:border-t-0" style="grid-template-columns:2rem minmax(0,1fr) minmax(8rem,14rem) 4.5rem 6rem">
+          <span class="font-semibold">{r.letter}</span>
+          <span>{r.text}</span>
+          <span class="h-2 overflow-hidden rounded-full bg-base-200"><span class={`block h-full ${r.key ? "bg-success" : "bg-base-content/30"}`} style={`width:${r.pct}%`}></span></span>
+          <span class="text-right tabular-nums">{r.count} <span class="text-muted">({r.pct}%)</span></span>
+          <span class="text-right text-xs">
+            {r.key ? <span class="text-success">✓ no gabarito</span> : <span class="text-muted">fora</span>}
+            {r.review && <span class="badge badge-warning badge-soft badge-xs ml-1">revisar</span>}
+          </span>
+        </li>
+      ))}
+    </ul>
+  </section>
+  {q.blocks.map((block) => <Groups block={{ ...block, title: block.title ?? "Respostas agrupadas" }} names={names} />)}
+</Frame>

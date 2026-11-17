@@ -10,18 +10,16 @@ import type { z } from "zod";
 import { SYSTEM } from "@/auth/actor";
 import { ensurePerm, hasPerm } from "@/auth/permissions";
 import { InvalidData, NotAllowed } from "@/core/error";
+import type { Duration, ExamExceptionId, ExamId } from "@/core/schemas/base";
+import type { CourseRef } from "@/core/schemas/course";
 import {
-	type CourseRef,
-	type Duration,
-	type ExamExceptionId,
-	type ExamId,
 	examExceptionCreate,
 	examExceptionFilter,
 	examExceptionPK,
 	examExceptionPublicSchema,
 	examExceptionSchema,
 	examExceptionUpdate,
-} from "@/core/schemas";
+} from "@/core/schemas/exam-exception";
 import type { ServiceOpts, ServiceOptsWithoutTx } from "@/db/base-service";
 import {
 	checkExpectedUpdatedAt,

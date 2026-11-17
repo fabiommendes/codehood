@@ -11,9 +11,9 @@
 import type { z } from "zod";
 import { ensurePerm } from "@/auth/permissions";
 import { InvalidData } from "@/core/error";
+import type { FeedbackId } from "@/core/schemas/base";
+import type { CourseRef } from "@/core/schemas/course";
 import {
-	type CourseRef,
-	type FeedbackId,
 	rubricChange,
 	rubricItemCreate,
 	rubricItemPK,
@@ -27,7 +27,7 @@ import {
 	rubricSchema,
 	rubricSplit,
 	rubricUpdate,
-} from "@/core/schemas";
+} from "@/core/schemas/rubric";
 import type { ServiceOptsWithoutTx } from "@/db/base-service";
 import {
 	checkExpectedUpdatedAt,

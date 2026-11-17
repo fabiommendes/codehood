@@ -1,8 +1,12 @@
 import { expect, test } from "@playwright/test";
 import { FULL_ACCESS } from "@/auth/actor";
 import { InvalidData, NotAllowed } from "@/core/error";
-import type { CalendarEventId, CourseId, RollCallId } from "@/core/schemas";
-import { isoDate } from "@/core/schemas";
+import type {
+	CalendarEventId,
+	CourseId,
+	RollCallId,
+} from "@/core/schemas/base";
+import { isoDate } from "@/core/schemas/base";
 import { db } from "@/db";
 import { prisma } from "@/db/client";
 import { codeAt } from "@/services/roll-call-code";

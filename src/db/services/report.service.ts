@@ -14,22 +14,23 @@ import {
 	NotFound,
 	TooManyRequests,
 } from "@/core/error";
+import type { CourseId, ReportId } from "@/core/schemas/base";
+import type { CourseRef } from "@/core/schemas/course";
 import {
-	type CourseId,
-	type CourseRef,
 	type Page,
 	type PageParams,
 	pageOf,
 	pageParams,
+} from "@/core/schemas/page";
+import {
 	REPORT_DAILY_LIMIT,
 	REPORT_MAX_ATTACHMENT_BYTES,
-	type ReportId,
 	reportCreate,
 	reportFilter,
 	reportPK,
 	reportSchema,
 	reportUpdate,
-} from "@/core/schemas";
+} from "@/core/schemas/report";
 import type { ServiceOptsWithoutTx } from "@/db/base-service";
 import {
 	checkExpectedUpdatedAt,
@@ -52,7 +53,7 @@ import { courseRefMatch } from "../utils";
 import type { AttachmentService } from "./attachment.service";
 import type { BlobService } from "./blob.service";
 
-export type { ReportId } from "@/core/schemas";
+export type { ReportId } from "@/core/schemas/base";
 
 //
 // Type definitions

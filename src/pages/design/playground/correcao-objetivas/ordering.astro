@@ -1,0 +1,49 @@
+---
+import { ordering } from "./_data";
+import Frame from "./_Frame.astro";
+import Groups from "./_Groups.astro";
+
+export const prerender = false;
+const q = ordering();
+const names = Astro.url.searchParams.get("names") === "1";
+const steps = q.key.map((k) => k.text.replace(/^\d+\. /, ""));
+const groups = q.blocks.flatMap((b) => b.groups);
+const total = groups.reduce((n, g) => n + g.members.length, 0);
+// How many students put each step at each position.
+const cell = (step: string, position: number): number =>
+	groups
+		.filter((g) => g.chips?.[position]?.text === step)
+		.reduce((n, g) => n + g.members.length, 0);
+---
+
+<Frame q={q}>
+  <section class="mt-8">
+    <h3 class="page-subsubheader">Onde cada etapa foi colocada</h3>
+    <p class="mt-1 text-sm text-muted">Linhas: etapas na ordem do gabarito. Colunas: posição escolhida. A diagonal é o gabarito. Fora dela, quanto mais forte a cor, mais alunos se enganaram assim.</p>
+    <div class="mt-3 overflow-x-auto rounded-box border border-edge bg-base-100 p-4">
+      <table class="table table-sm w-auto">
+        <thead>
+          <tr><th>Etapa</th>{steps.map((_, p) => <th class="text-center">{p + 1}º</th>)}</tr>
+        </thead>
+        <tbody>
+          {steps.map((step, i) => (
+            <tr>
+              <th class="font-medium">{i + 1}. {step}</th>
+              {steps.map((_, p) => {
+                const n = cell(step, p);
+                const pct = Math.round((n / total) * 100);
+                const color = i === p ? "--color-success" : "--color-error";
+                return (
+                  <td class="text-center tabular-nums" style={`background: color-mix(in oklab, var(${color}) ${n === 0 ? 0 : 12 + pct * 0.7}%, transparent); ${i === p ? "outline: 2px solid var(--color-success); outline-offset: -2px;" : ""}`}>
+                    {n === 0 ? <span class="text-muted">·</span> : <>{n} <span class="text-xs text-muted">{pct}%</span></>}
+                  </td>
+                );
+              })}
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  </section>
+  {q.blocks.map((block) => <Groups block={{ ...block, title: "Ordens inteiras" }} names={names} />)}
+</Frame>

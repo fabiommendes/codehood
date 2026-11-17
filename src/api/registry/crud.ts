@@ -7,7 +7,7 @@ import {
 	type JSONValue,
 	NotFound,
 } from "@/core/error";
-import { type Page, pageOf, pageParams } from "@/core/schemas";
+import { type Page, pageOf, pageParams } from "@/core/schemas/page";
 import type {
 	Create,
 	Delete,

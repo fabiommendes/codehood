@@ -1,6 +1,6 @@
 import { FULL_ACCESS } from "@/auth/actor";
-import type { CourseId } from "@/core/schemas";
-import { isoDate } from "@/core/schemas";
+import type { CourseId } from "@/core/schemas/base";
+import { isoDate } from "@/core/schemas/base";
 import { db } from "@/db";
 import { prisma } from "@/db/client";
 import { type APIRequestContext, expect, test } from "./fixtures";

@@ -9,7 +9,7 @@ import { gradingQueue } from "@/services/grading";
 import { breadcrumbs } from "@/utils/breadcrumbs";
 import { gradingHref, wantsNames } from "@/utils/grading-urls";
 import { gradingExamNav, loadGrading } from "@/utils/load-grading";
-import { questionTypeLabels } from "@/utils/question-display";
+import { questionKindLabel } from "@/utils/question-display";
 
 export const prerender = false;
 
@@ -77,7 +77,7 @@ const rows = queue.map((entry, index) => {
 		points: points[index] ?? "0",
 		slug: entry.question,
 		title: doc?.title ?? entry.question,
-		type: doc ? questionTypeLabels[doc.type] : null,
+		kind: doc ? questionKindLabel(doc) : null,
 		counts:
 			counts.length > 0
 				? counts.join(" · ")
@@ -113,7 +113,7 @@ const nothingLeft =
             <div class="min-w-0 flex-1">
               <p class="text-sm"><QuestionNumber number={row.number} points={row.points} /></p>
               <span id={`queue-${row.slug}`} class="font-medium group-hover:text-primary">{row.title}</span>
-              {row.type && <p class="text-sm text-muted">{row.type}</p>}
+              {row.kind && <p class="text-sm text-muted">{row.kind}</p>}
             </div>
             <span class="text-sm">{row.counts}</span>
           </a>

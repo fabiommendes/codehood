@@ -8,7 +8,7 @@
 
 import { generateToken } from "@/auth/token";
 import { NotAllowed } from "@/core/error";
-import type { QuestionRefId, ResponseId } from "@/core/schemas";
+import type { QuestionRefId, ResponseId } from "@/core/schemas/base";
 import { guardedUpdate } from "@/db/conditional-write";
 import { m } from "@/i18n";
 import { DEFAULT_CODE_ATTEMPTS, spentAttempts } from "@/services/code-grading";

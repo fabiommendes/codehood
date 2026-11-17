@@ -1,6 +1,6 @@
 import { FULL_ACCESS } from "@/auth/actor";
 import { dummyPasswordHash, verifyPassword } from "@/auth/password";
-import { inviteCreate, inviteUpdate } from "@/core/schemas";
+import { inviteCreate, inviteUpdate } from "@/core/schemas/invite";
 import { db } from "@/db";
 import { persistedCourseFactory } from "@/fixtures/course.factory";
 import { userFactory } from "@/fixtures/user.factory";

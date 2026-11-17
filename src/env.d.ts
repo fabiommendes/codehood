@@ -2,7 +2,7 @@ declare namespace App {
 	interface Locals {
 		actor?: import("@/auth/actor").UserActor;
 		apiKey?: {
-			id: import("@/core/schemas").ApiKeyId;
+			id: import("@/core/schemas/base").ApiKeyId;
 			kind: import("@/db/client").ApiKeyKind;
 		};
 	}

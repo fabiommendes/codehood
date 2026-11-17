@@ -1,6 +1,6 @@
 import { defineAction } from "astro:actions";
 import { requireUser } from "@/auth/require-user";
-import { repositoryRotate } from "@/core/schemas";
+import { repositoryRotate } from "@/core/schemas/repository";
 import { db } from "@/db";
 import { parseCourseParams } from "@/urls";
 import { withServiceErrors } from "./helpers";

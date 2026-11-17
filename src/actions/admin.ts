@@ -6,13 +6,14 @@ import {
 	disciplineCreate,
 	disciplineEdit,
 	disciplinePK,
-	editionForm,
-	editionPK,
-	inviteRevoke,
+} from "@/core/schemas/discipline";
+import { editionForm, editionPK } from "@/core/schemas/edition";
+import { inviteRevoke } from "@/core/schemas/invite";
+import {
 	passwordReset,
 	userByUsername,
 	userCreateForm,
-} from "@/core/schemas";
+} from "@/core/schemas/user";
 import { db } from "@/db";
 import { m } from "@/i18n";
 import { publicUser } from "./auth";

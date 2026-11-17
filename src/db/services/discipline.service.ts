@@ -8,11 +8,13 @@ import {
 	disciplinePK,
 	disciplineSchema,
 	disciplineUpdate,
+} from "@/core/schemas/discipline";
+import {
 	type Page,
 	type PageParams,
 	pageOf,
 	pageParams,
-} from "@/core/schemas";
+} from "@/core/schemas/page";
 import type { ServiceOptsWithoutTx } from "@/db/base-service";
 import {
 	checkExpectedUpdatedAt,

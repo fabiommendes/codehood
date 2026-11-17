@@ -5,7 +5,7 @@ import {
 	rollCallAttendances,
 	rollCallOpen,
 	rollCallTarget,
-} from "@/core/schemas";
+} from "@/core/schemas/roll-call";
 import { db } from "@/db";
 import type { RollCall, RollCallPK } from "@/db/services/roll-call.service";
 import { m } from "@/i18n";

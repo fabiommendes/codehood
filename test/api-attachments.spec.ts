@@ -1,8 +1,8 @@
 import { createHash } from "node:crypto";
 import type { z } from "zod";
 import { FULL_ACCESS } from "@/auth/actor";
-import type { questionSchema } from "@/core/schemas";
-import { isoDate } from "@/core/schemas";
+import { isoDate } from "@/core/schemas/base";
+import type { questionSchema } from "@/core/schemas/question";
 import { db, type User } from "@/db";
 import { prisma } from "@/db/client";
 import { type APIRequestContext, expect, test } from "./fixtures";

@@ -1,5 +1,8 @@
-// Import schemas from here, not from the sub-modules. Order does not matter:
-// every sub-module imports `./base`, which patches zod with `.openapi(...)`.
+// Every schema in one namespace, for server code that registers or looks up
+// schemas by name (`db.schema`, the REST and RPC registries). Client code must
+// import the sub-module that defines what it needs: the schema modules run
+// `.openapi(...)` at load, so nothing here tree-shakes.
+// Order does not matter: every sub-module imports `./base`, which patches zod.
 
 export * from "./answer";
 export * from "./answer-edit";

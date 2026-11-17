@@ -13,7 +13,7 @@
  * `weekdayOf` are for readers. Never mix the two.
  */
 import { timeZone } from "codehood:build";
-import type { ClockTime, Duration } from "@/core/schemas";
+import type { ClockTime, Duration } from "@/core/schemas/base";
 import type { Weekday } from "@/db/";
 import { locale } from "@/i18n";
 import type { IsoDate } from "@/typing/iso-date";

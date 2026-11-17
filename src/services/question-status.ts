@@ -1,7 +1,7 @@
 // The lifecycle of a question's status, in one place. Pure, so the browser
 // imports it too: no Prisma, no node modules.
 import type { z } from "zod";
-import type { questionStatus } from "@/core/schemas";
+import type { questionStatus } from "@/core/schemas/question";
 
 export type QuestionStatus = z.infer<typeof questionStatus>;
 

@@ -4,7 +4,7 @@ import { createSchemaForm } from "@/components/form/create-schema-form";
 import Field from "@/components/form/Field";
 import FormAlert from "@/components/form/FormAlert";
 import Alert from "@/components/ui/Alert";
-import { rollCallOpen } from "@/core/schemas";
+import { rollCallOpen } from "@/core/schemas/roll-call";
 import { m } from "@/i18n";
 
 export interface OpenRollCallDialogProps {

@@ -19,7 +19,7 @@ import {
 	type ResponseWithCourse,
 } from "@/auth/permissions";
 import { InvalidData, NotAllowed, NotFound } from "@/core/error";
-import type { RegradeRequestId, SubmissionId } from "@/core/schemas";
+import type { RegradeRequestId, SubmissionId } from "@/core/schemas/base";
 import {
 	regradeAccept,
 	regradeReject,
@@ -27,7 +27,7 @@ import {
 	regradeRequestFilter,
 	regradeRequestPK,
 	regradeRequestSchema,
-} from "@/core/schemas";
+} from "@/core/schemas/regrade-request";
 import type { ServiceOptsWithoutTx } from "@/db/base-service";
 import {
 	checkExpectedUpdatedAt,

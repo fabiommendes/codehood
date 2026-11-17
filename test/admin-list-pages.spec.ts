@@ -1,5 +1,5 @@
 import { FULL_ACCESS } from "@/auth/actor";
-import type { Page as ListPage, PageParams } from "@/core/schemas";
+import type { Page as ListPage, PageParams } from "@/core/schemas/page";
 import { db } from "@/db";
 import { persistedCourseFactory } from "@/fixtures/course.factory";
 import { persistedDisciplineFactory } from "@/fixtures/discipline.factory";

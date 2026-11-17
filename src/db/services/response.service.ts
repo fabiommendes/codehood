@@ -21,7 +21,7 @@ import {
 	PRACTICE_SESSION_WINDOW_MS,
 } from "@/core/constants";
 import { InvalidData, NotAllowed, NotFound } from "@/core/error";
-import type { ResponseId } from "@/core/schemas";
+import type { ResponseId } from "@/core/schemas/base";
 import {
 	responseAnswered,
 	responseCreate,
@@ -35,7 +35,7 @@ import {
 	responseSubmit,
 	responseSubmitted,
 	responseUpdate,
-} from "@/core/schemas";
+} from "@/core/schemas/response";
 import type { ServiceOptsWithoutTx } from "@/db/base-service";
 import {
 	checkExpectedUpdatedAt,

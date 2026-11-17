@@ -20,14 +20,6 @@ import {
 	MAX_ANSWER_HISTORY_TEXT_BYTES,
 } from "@/core/constants";
 import { InvalidData, NotAllowed, NotFound } from "@/core/error";
-import type {
-	AnswerEditFieldId,
-	AnswerEditHistoryId,
-	CourseRef,
-	ExamId,
-	QuestionRefId,
-	ResponseId,
-} from "@/core/schemas";
 import {
 	type AnswerEditAppendInput,
 	type AnswerEditAppendResult,
@@ -53,6 +45,14 @@ import {
 	INT32_MAX,
 	MAX_ANSWER_EDIT_GAP_REASON,
 } from "@/core/schemas/answer-edit";
+import type {
+	AnswerEditFieldId,
+	AnswerEditHistoryId,
+	ExamId,
+	QuestionRefId,
+	ResponseId,
+} from "@/core/schemas/base";
+import type { CourseRef } from "@/core/schemas/course";
 import type { ServiceOptsWithoutTx } from "@/db/base-service";
 import { enrollmentsOf } from "@/db/course-access";
 import { defineService, op } from "@/db/define-service";

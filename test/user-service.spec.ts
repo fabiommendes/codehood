@@ -4,7 +4,7 @@ import { FULL_ACCESS } from "@/auth/actor";
 import { verifyPassword } from "@/auth/password";
 import { hasPerm } from "@/auth/permissions";
 import { NotAllowed, WeakPassword } from "@/core/error";
-import type { UserId } from "@/core/schemas";
+import type { UserId } from "@/core/schemas/base";
 import { db } from "@/db";
 
 function actorOf(

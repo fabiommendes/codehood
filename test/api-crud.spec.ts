@@ -1,6 +1,6 @@
 import { APIS } from "@/api/registry/hook";
 import { buildOpenApiDocument } from "@/api/registry/openapi-document";
-import { isoDate } from "@/core/schemas";
+import { isoDate } from "@/core/schemas/base";
 import { persistedCourseFactory } from "@/fixtures/course.factory";
 import { persistedDisciplineFactory } from "@/fixtures/discipline.factory";
 import { persistedEditionFactory } from "@/fixtures/edition.factory";

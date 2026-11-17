@@ -8,7 +8,8 @@ import {
 	NotFound,
 } from "@/core/error";
 import type { InvalidDataCode } from "@/core/error-response";
-import type { CourseRef, Duration } from "@/core/schemas";
+import type { Duration } from "@/core/schemas/base";
+import type { CourseRef } from "@/core/schemas/course";
 import { m } from "@/i18n";
 import {
 	type BaseTiming,

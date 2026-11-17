@@ -8,19 +8,21 @@ import {
 	NotAllowed,
 	raise,
 } from "@/core/error";
+import type { CourseId } from "@/core/schemas/base";
 import {
-	type CourseId,
 	courseCreate,
 	courseFilter,
 	type courseNaturalKey,
 	coursePK,
 	courseSchema,
 	courseUpdate,
+} from "@/core/schemas/course";
+import {
 	type Page,
 	type PageParams,
 	pageOf,
 	pageParams,
-} from "@/core/schemas";
+} from "@/core/schemas/page";
 import type { ServiceOptsWithoutTx } from "@/db/base-service";
 import {
 	checkExpectedUpdatedAt,
@@ -36,7 +38,7 @@ import { recomputeEventTimes } from "../event-times";
 import { invalidIfExists, valueOrNotFound } from "../utils";
 import { isEditionOpen } from "./edition.service";
 
-export type { CourseId } from "@/core/schemas";
+export type { CourseId } from "@/core/schemas/base";
 
 //
 // Type definitions

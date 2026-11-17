@@ -4,7 +4,7 @@ import { dummyPasswordHash, verifyPassword } from "@/auth/password";
 import { clearSessionCookie } from "@/auth/session-cookie";
 import { SESSION_COOKIE, SESSION_COOKIE_OPTIONS } from "@/core/constants";
 import { NotAllowed } from "@/core/error";
-import { usernameOrEmail } from "@/core/schemas";
+import { usernameOrEmail } from "@/core/schemas/user";
 import { db } from "@/db";
 import { m } from "@/i18n";
 import { POST } from "./registry";

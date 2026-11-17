@@ -1,6 +1,6 @@
 import { FULL_ACCESS } from "@/auth/actor";
 import { InvalidData } from "@/core/error";
-import { isoDate } from "@/core/schemas";
+import { isoDate } from "@/core/schemas/base";
 import { db, type schema } from "@/db";
 import { prisma } from "@/db/client";
 import { persistedCourseFactory } from "@/fixtures/course.factory";

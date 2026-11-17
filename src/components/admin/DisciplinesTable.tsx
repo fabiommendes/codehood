@@ -5,7 +5,7 @@ import FormAlert from "@/components/form/FormAlert";
 import PaginatedTable from "@/components/ui/PaginatedTable";
 import type { CursorPage } from "@/components/ui/Pagination";
 import type { ColumnConfig } from "@/components/ui/Table";
-import type { disciplineEdit } from "@/core/schemas";
+import type { disciplineEdit } from "@/core/schemas/discipline";
 import type { FormState } from "@/forms/form-state";
 import { m, SLOT, splitAtSlot } from "@/i18n";
 import { actionHref } from "@/utils/list-page";

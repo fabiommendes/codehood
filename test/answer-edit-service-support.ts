@@ -6,7 +6,7 @@
 import { expect } from "@playwright/test";
 import { FULL_ACCESS } from "@/auth/actor";
 import { EXAM_ANSWER_GRACE_MS } from "@/core/constants";
-import { isoDate } from "@/core/schemas";
+import { isoDate } from "@/core/schemas/base";
 import { db, type schema } from "@/db";
 import { prisma } from "@/db/client";
 import type {

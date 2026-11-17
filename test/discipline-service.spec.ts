@@ -1,7 +1,7 @@
 import { expect, test } from "@playwright/test";
 import type { Actor } from "@/auth/actor";
 import { FULL_ACCESS } from "@/auth/actor";
-import type { UserId } from "@/core/schemas";
+import type { UserId } from "@/core/schemas/base";
 import { db } from "@/db";
 import { disciplineFactory } from "@/fixtures/discipline.factory";
 import { addDays, todayIn } from "@/utils/schedule-time";

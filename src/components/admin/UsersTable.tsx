@@ -6,7 +6,7 @@ import Badge from "@/components/ui/Badge";
 import PaginatedTable from "@/components/ui/PaginatedTable";
 import type { CursorPage } from "@/components/ui/Pagination";
 import type { ColumnConfig } from "@/components/ui/Table";
-import type { passwordReset } from "@/core/schemas";
+import type { passwordReset } from "@/core/schemas/user";
 import type { User } from "@/db";
 import type { FormState } from "@/forms/form-state";
 import { locale, m } from "@/i18n";

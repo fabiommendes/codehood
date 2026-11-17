@@ -1,8 +1,8 @@
 import { expect, test } from "@playwright/test";
 import { FULL_ACCESS } from "@/auth/actor";
 import { NotFound } from "@/core/error";
-import type { TimeSlotId } from "@/core/schemas";
-import { isoDate } from "@/core/schemas";
+import type { TimeSlotId } from "@/core/schemas/base";
+import { isoDate } from "@/core/schemas/base";
 import { db } from "@/db";
 import { prisma } from "@/db/client";
 

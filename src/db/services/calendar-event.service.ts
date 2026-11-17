@@ -8,16 +8,18 @@
 import type { z } from "zod";
 import { ensurePerm, hasPerm } from "@/auth/permissions";
 import { InvalidData, NotAllowed } from "@/core/error";
+import type {
+	CalendarEventId,
+	CourseId,
+	TimeSlotId,
+} from "@/core/schemas/base";
 import {
-	type CalendarEventId,
-	type CourseId,
 	calendarEventCreate,
 	calendarEventFilter,
 	calendarEventPK,
 	calendarEventSchema,
 	calendarEventUpdate,
-	type TimeSlotId,
-} from "@/core/schemas";
+} from "@/core/schemas/calendar-event";
 import type { ServiceOptsWithoutTx } from "@/db/base-service";
 import {
 	checkExpectedUpdatedAt,
@@ -39,7 +41,7 @@ import { recomputeEventTimes } from "../event-times";
 import { courseRefWhere, valueOrNotAllowed, valueOrNotFound } from "../utils";
 import { courseContentsWhere } from "./course.service";
 
-export type { CalendarEventId } from "@/core/schemas";
+export type { CalendarEventId } from "@/core/schemas/base";
 export type { Weekday } from "../client";
 
 //

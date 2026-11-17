@@ -1,0 +1,31 @@
+---
+/// The real course page chrome (layout, sidebar card, course header) around a mockup.
+import CourseHeader from "@/components/CourseHeader.astro";
+import AppLayout from "@/layouts/AppLayout.astro";
+import { breadcrumbs } from "@/utils/breadcrumbs";
+import { gradingExamNav, loadGrading } from "@/utils/load-grading";
+
+interface Props {
+	title: string;
+}
+
+const { title } = Astro.props;
+const result = await loadGrading(
+	Astro as never,
+	"cs101",
+	"ada_2026-2",
+	"quiz-01",
+);
+if ("redirect" in result) return result.redirect;
+// biome-ignore lint/style/noNonNullAssertion: loadGrading redirected an anonymous visitor.
+const actor = Astro.locals.actor!;
+---
+
+<AppLayout
+  title={title}
+  trail={breadcrumbs(Astro.url, { course: result.course, item: "Quiz 1", question: title })}
+  nav={await gradingExamNav(result, actor)}
+>
+  <CourseHeader course={result.course} tabs={result.tabs} active="exams" />
+  <slot />
+</AppLayout>

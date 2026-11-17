@@ -15,21 +15,22 @@ import { ensurePerm, hasPerm } from "@/auth/permissions";
 import { CheckInError, InvalidData, NotAllowed, NotFound } from "@/core/error";
 import {
 	type CourseId,
-	type CourseRef,
-	type calendarEventPK,
+	type RollCallId,
+	rollCallId,
+} from "@/core/schemas/base";
+import type { calendarEventPK } from "@/core/schemas/calendar-event";
+import { type CourseRef, courseRef } from "@/core/schemas/course";
+import {
 	checkInClaimInput,
 	checkInInput,
 	checkInResultSchema,
 	courseAttendanceSchema,
-	courseRef,
-	type RollCallId,
 	rollCallCreate,
 	rollCallFilter,
 	rollCallPK,
 	rollCallSchema,
 	rollCallUpdate,
-} from "@/core/schemas";
-import { rollCallId } from "@/core/schemas/base";
+} from "@/core/schemas/roll-call";
 import type { ServiceOptsWithoutTx } from "@/db/base-service";
 import {
 	checkExpectedUpdatedAt,
@@ -46,7 +47,7 @@ import type { Prisma, PrismaTx } from "../client";
 import { assertNotInstructor } from "../enrollment-guard";
 import { courseRefWhere, invalidIfExists, valueOrNotFound } from "../utils";
 
-export type { RollCallId } from "@/core/schemas";
+export type { RollCallId } from "@/core/schemas/base";
 
 //
 // Type definitions

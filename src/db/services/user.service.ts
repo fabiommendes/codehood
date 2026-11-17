@@ -13,6 +13,8 @@ import {
 	type PageParams,
 	pageOf,
 	pageParams,
+} from "@/core/schemas/page";
+import {
 	passwordChange,
 	passwordReset,
 	userCreate,
@@ -20,7 +22,7 @@ import {
 	userPK,
 	userSchema,
 	userUpdate,
-} from "@/core/schemas";
+} from "@/core/schemas/user";
 import type { ServiceOptsWithoutTx } from "@/db/base-service";
 import { defineService, op } from "@/db/define-service";
 import { m } from "@/i18n";
@@ -29,7 +31,7 @@ import { cutPage, seekOf } from "@/utils/cursor";
 import type { User as DbUser, Prisma, PrismaTx } from "../client";
 import { makeSessionService } from "./session.service";
 
-export type { UserId } from "@/core/schemas";
+export type { UserId } from "@/core/schemas/base";
 
 //
 // Type definitions

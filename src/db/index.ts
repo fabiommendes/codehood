@@ -3,7 +3,7 @@
  *
  * Do not import the service modules directly; use the `db` object instead.
  */
-export * as schema from "@/core/schemas";
+export * as schema from "@/core/schemas/all";
 
 import { nameServices } from "./define-service";
 import { makeAnswerEditService } from "./services/answer-edit.service";

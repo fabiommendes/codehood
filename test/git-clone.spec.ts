@@ -9,7 +9,7 @@ import {
 import path from "node:path";
 import { inflateSync } from "node:zlib";
 import { FULL_ACCESS } from "@/auth/actor";
-import { isoDate } from "@/core/schemas";
+import { isoDate } from "@/core/schemas/base";
 import { db, type Repository } from "@/db";
 import { repositoryTree } from "@/fixtures/repository.factory";
 import { TEST_BASE_URL, TEST_RESOURCE_ROOT } from "./env";

@@ -4,7 +4,7 @@ import { Command } from "commander";
 import { parse as parseYaml } from "yaml";
 import { z } from "zod";
 import { FULL_ACCESS } from "@/auth/actor";
-import type { ClockTime } from "@/core/schemas";
+import type { ClockTime } from "@/core/schemas/base";
 import { db, type TimeSlot } from "@/db";
 import { toDuration } from "@/utils/schedule-time";
 

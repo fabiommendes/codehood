@@ -2,15 +2,15 @@ import type { z } from "zod";
 import { SYSTEM } from "@/auth/actor";
 import { hasPerm } from "@/auth/permissions";
 import { type ActionCode, NotAllowed, NotFound } from "@/core/error";
+import type { CourseId } from "@/core/schemas/base";
+import type { CourseRef } from "@/core/schemas/course";
 import {
-	type CourseId,
-	type CourseRef,
 	resourceCreate,
 	resourceFilter,
 	resourcePK,
 	resourceSchema,
 	resourceUpdate,
-} from "@/core/schemas";
+} from "@/core/schemas/resource";
 import type { ServiceOptsWithoutTx } from "@/db/base-service";
 import {
 	checkExpectedUpdatedAt,
@@ -36,7 +36,7 @@ import {
 import type { AttachmentService } from "./attachment.service";
 import { courseContentsWhere } from "./course.service";
 
-export type { ResourceId } from "@/core/schemas";
+export type { ResourceId } from "@/core/schemas/base";
 
 //
 // Type definitions

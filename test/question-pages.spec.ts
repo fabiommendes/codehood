@@ -1,12 +1,9 @@
 import { expect, test } from "@playwright/test";
 import { FULL_ACCESS } from "@/auth/actor";
 import { InvalidData } from "@/core/error";
-import type {
-	CourseId,
-	Page,
-	QuestionSort,
-	QuestionSortField,
-} from "@/core/schemas";
+import type { CourseId } from "@/core/schemas/base";
+import type { Page } from "@/core/schemas/page";
+import type { QuestionSort, QuestionSortField } from "@/core/schemas/question";
 import { db } from "@/db";
 import { prisma } from "@/db/client";
 import type {

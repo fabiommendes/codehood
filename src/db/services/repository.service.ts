@@ -14,14 +14,15 @@ import { type Actor, SYSTEM } from "@/auth/actor";
 import { hasPerm } from "@/auth/permissions";
 import { PUBLIC_URL } from "@/core/constants";
 import { InvalidData, NotAllowed, NotFound } from "@/core/error";
+import { attachmentSchema } from "@/core/schemas/attachment";
+import type {
+	AttachmentId,
+	CalendarEventId,
+	CourseId,
+	RepositoryId,
+} from "@/core/schemas/base";
+import { blobHash, MAX_UPLOAD_BYTES } from "@/core/schemas/blob";
 import {
-	type AttachmentId,
-	attachmentSchema,
-	blobHash,
-	type CalendarEventId,
-	type CourseId,
-	MAX_UPLOAD_BYTES,
-	type RepositoryId,
 	repositoryCommit,
 	repositoryCreate,
 	repositoryDirEntry,
@@ -32,7 +33,7 @@ import {
 	repositoryPath,
 	repositoryPK,
 	repositorySchema,
-} from "@/core/schemas";
+} from "@/core/schemas/repository";
 import type { ServiceOpts, ServiceOptsWithoutTx } from "@/db/base-service";
 import {
 	checkExpectedUpdatedAt,
@@ -65,7 +66,7 @@ import { courseRefMatch, courseRefWhere, valueOrNotFound } from "../utils";
 import type { Attachment, AttachmentService } from "./attachment.service";
 import type { BlobService } from "./blob.service";
 
-export type { RepositoryId } from "@/core/schemas";
+export type { RepositoryId } from "@/core/schemas/base";
 
 //
 // Type definitions

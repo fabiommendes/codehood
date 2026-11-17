@@ -8,7 +8,7 @@ import {
 	calendarFeedPK,
 	calendarFeedSchema,
 	calendarFeedToken,
-} from "@/core/schemas";
+} from "@/core/schemas/calendar-feed";
 import type { ServiceOptsWithoutTx } from "@/db/base-service";
 import { defineService, op } from "@/db/define-service";
 import { type PrismaClient, type PrismaTx, prisma } from "../client";

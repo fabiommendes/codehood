@@ -1,8 +1,8 @@
 import { expect, test } from "@playwright/test";
 import { FULL_ACCESS } from "@/auth/actor";
 import { NotAllowed, NotFound } from "@/core/error";
-import type { CourseId } from "@/core/schemas";
-import { isoDate } from "@/core/schemas";
+import type { CourseId } from "@/core/schemas/base";
+import { isoDate } from "@/core/schemas/base";
 import { db } from "@/db";
 
 // Random suffix: sibling spec files share one test database in one run.

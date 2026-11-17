@@ -1,5 +1,5 @@
 import { InvalidData } from "@/core/error";
-import type { CourseId } from "@/core/schemas";
+import type { CourseId } from "@/core/schemas/base";
 import { m } from "@/i18n";
 import type { PrismaTx } from "./client";
 

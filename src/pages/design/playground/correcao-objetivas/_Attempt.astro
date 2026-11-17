@@ -1,0 +1,134 @@
+---
+/// The student attempt page with a grade change, either per question or as a bonus on the exam.
+import QuestionNumber from "@/components/exam/QuestionNumber.astro";
+import { ATTEMPT_QUESTIONS, ATTEMPT_STUDENT, fmt } from "./_data";
+import Shell from "./_Shell.astro";
+
+interface Props {
+	variant: "override" | "bonus";
+}
+
+const { variant } = Astro.props;
+const perQuestion = variant === "override";
+const BONUS = 15;
+const points = 20;
+const earned = (auto: number | null, override?: { score: number }): number =>
+	((override?.score ?? auto ?? 0) / 100) * points;
+const autoTotal = ATTEMPT_QUESTIONS.reduce((s, q) => s + earned(q.auto), 0);
+const finalTotal = perQuestion
+	? ATTEMPT_QUESTIONS.reduce((s, q) => s + earned(q.auto, q.override), 0)
+	: Math.min(100, autoTotal + BONUS);
+const back = "/design/playground/correcao-objetivas";
+---
+
+<Shell title={ATTEMPT_STUDENT.name}>
+  <a href={back} class="text-sm text-muted hover:text-primary">← Mockups da correção</a>
+  <h2 class="mt-6 page-subheader">{ATTEMPT_STUDENT.name}</h2>
+
+  <dl class="mt-4 grid grid-cols-1 gap-x-8 gap-y-3 rounded-box border border-edge bg-base-100 p-6 sm:grid-cols-3">
+    <div><dt class="text-sm text-muted">Início</dt><dd class="mt-0.5 font-medium">12/11/2026 14:00</dd></div>
+    <div><dt class="text-sm text-muted">Entrega</dt><dd class="mt-0.5 font-medium">12/11/2026 15:38</dd></div>
+    <div>
+      <dt class="text-sm text-muted">Total</dt>
+      <dd class="mt-0.5 font-medium tabular-nums" data-testid="total">
+        {perQuestion ? (
+          <>{fmt(finalTotal, 1)} <span class="text-sm font-normal text-muted">(automática {fmt(autoTotal, 1)}, 2 questões alteradas)</span></>
+        ) : (
+          <>{fmt(autoTotal, 1)} <span class="text-success">+ {fmt(BONUS, 1)} bônus</span> = {fmt(finalTotal, 1)} <span class="text-sm font-normal text-muted">de 100</span></>
+        )}
+      </dd>
+    </div>
+  </dl>
+
+  {!perQuestion && (
+    <div role="status" class="alert alert-success alert-soft mt-4 block text-sm">
+      <p class="font-semibold">Bônus de +{fmt(BONUS, 1)} pontos na nota da prova</p>
+      <p>Motivo: resolveu o desafio de ordenação em aula.</p>
+      <p class="mt-1 text-muted">O total soma o bônus à nota das questões e é limitado a 100.</p>
+      <p class="mt-1 flex gap-3"><a class="link" href="#">Alterar</a><a class="link text-error" href="#">Remover</a></p>
+    </div>
+  )}
+
+  <div class="mt-4 flex flex-wrap items-start gap-3">
+    <button type="button" class="btn btn-outline btn-error btn-sm">Aplicar sanção à prova</button>
+    {!perQuestion && (
+      <details class="rounded-box border border-edge bg-base-100" open>
+        <summary class="btn btn-outline btn-success btn-sm">Alterar o bônus</summary>
+        <form class="flex flex-wrap items-end gap-3 p-4">
+          <label class="flex flex-col gap-1 text-xs text-muted">Pontos (sobre 100)
+            <input type="number" value={BONUS} step="0.5" class="input input-sm w-28 text-base-content" />
+          </label>
+          <label class="flex min-w-64 grow flex-col gap-1 text-xs text-muted">Motivo
+            <input type="text" value="Resolveu o desafio de ordenação em aula." class="input input-sm w-full text-base-content" />
+          </label>
+          <button type="button" class="btn btn-primary btn-sm">Salvar</button>
+        </form>
+      </details>
+    )}
+  </div>
+
+  <div class="mt-8 flex flex-col gap-6">
+    {ATTEMPT_QUESTIONS.map((q) => {
+      const changed = perQuestion && q.override;
+      return (
+        <article aria-label={`Questão ${q.number}`} class="card card-border bg-base-100">
+          <div class="card-body">
+            <p class="text-sm"><QuestionNumber number={q.number} points={q.points} /></p>
+            <div class="flex flex-wrap items-center justify-between gap-2">
+              <h3 class="text-lg font-semibold">{q.title}</h3>
+              <button type="button" class="btn btn-outline btn-error btn-xs">Zerar</button>
+            </div>
+            <p class="text-sm">{q.stem}</p>
+            {q.auto === null ? (
+              <p class="text-muted">Não respondida.</p>
+            ) : q.choices ? (
+              <ul class="flex flex-col gap-1 text-sm">
+                {q.choices.map((c) => (
+                  <li class={`flex items-center gap-2 rounded-field px-3 py-1.5 ${c.chosen ? (c.key ? "bg-success/15" : "bg-error/15") : c.key ? "outline outline-1 outline-success/60" : ""}`}>
+                    <span class="size-4 rounded-full border border-base-content/40" style={c.chosen ? "background: currentColor; box-shadow: inset 0 0 0 3px var(--color-base-100)" : ""}></span>
+                    {c.text}
+                    {c.key && <span class="ml-auto text-xs text-success">gabarito</span>}
+                  </li>
+                ))}
+              </ul>
+            ) : (
+              <p class="rounded-field bg-error/15 px-3 py-1.5 text-sm">{q.text}</p>
+            )}
+
+            {perQuestion ? (
+              <details class="mt-2 border-t border-edge pt-3" open={q.openForm}>
+                <summary class="flex cursor-pointer list-none flex-wrap items-center gap-x-3 gap-y-2">
+                  <span class="tabular-nums">
+                    {changed ? (
+                      <><span class="text-muted line-through">{q.auto === null ? "sem resposta" : `${q.auto}%`}</span> → <strong class="text-success">{q.override?.score}%</strong> <span class="badge badge-info badge-soft badge-sm">alterada à mão</span></>
+                    ) : (
+                      <span class={q.auto === 100 ? "font-semibold text-success" : "font-semibold"}>{q.auto === null ? "0% (sem resposta)" : `${q.auto}%`}</span>
+                    )}
+                  </span>
+                  {changed && <span class="min-w-40 flex-1 text-sm text-muted">{q.override?.comment}{q.auto === null ? " Nota atribuída sem resposta enviada." : ""}</span>}
+                  {!changed && <span class="flex-1"></span>}
+                  {!changed && q.auto !== 100 && <button type="button" class="btn btn-success btn-soft btn-xs">Marcar como certa</button>}
+                  <span class="btn btn-ghost btn-xs">{changed ? "Alterar" : "Outra nota…"}</span>
+                  {changed && <button type="button" class="btn btn-ghost btn-xs text-error">Desfazer</button>}
+                </summary>
+                <form class="mt-3 flex flex-wrap items-end gap-3 rounded-box bg-base-200/40 p-3">
+                  <label class="flex flex-col gap-1 text-xs text-muted">Nota (0 a 100)
+                    <input type="number" min="0" max="100" value={q.override?.score ?? q.auto ?? 0} class="input input-sm w-24 text-base-content" />
+                  </label>
+                  <button type="button" class="btn btn-success btn-soft btn-sm">Marcar como certa</button>
+                  <label class="flex min-w-48 grow flex-col gap-1 text-xs text-muted">Comentário (opcional)
+                    <input type="text" value={q.override?.comment ?? ""} class="input input-sm w-full text-base-content" />
+                  </label>
+                  <button type="button" class="btn btn-primary btn-sm">Salvar</button>
+                  {q.auto === null && <p class="w-full text-xs text-muted">O aluno não enviou resposta. A nota fica registrada sem resposta associada.</p>}
+                </form>
+              </details>
+            ) : (
+              <p class="mt-2 font-semibold tabular-nums">{q.auto === null ? "Não respondida: 0%" : `${q.auto}%`}</p>
+            )}
+          </div>
+        </article>
+      );
+    })}
+  </div>
+</Shell>

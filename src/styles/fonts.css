@@ -1,16 +1,77 @@
 /* The typefaces of the design system, served from this origin: no page load
-   depends on a third-party host. */
+   depends on a third-party host. Latin subset only: it covers Portuguese and
+   English in full, and the other subsets of @fontsource would add ~20 KB of
+   @font-face rules to every page. Characters outside it fall back to the
+   system font. Keep in sync with the preloads in src/layouts/Layout.astro. */
 
-/* Display. All four axes: opsz, wght, SOFT and WONK. */
-@import "@fontsource-variable/fraunces/full.css";
+@font-face {
+	font-family: "Fraunces Variable";
+	font-style: normal;
+	font-display: swap;
+	font-weight: 100 900;
+	src: url("../../node_modules/@fontsource-variable/fraunces/files/fraunces-latin-full-normal.woff2")
+		format("woff2-variations");
+}
 
-/* Body. */
-@import "@fontsource/atkinson-hyperlegible/400.css";
-@import "@fontsource/atkinson-hyperlegible/400-italic.css";
-@import "@fontsource/atkinson-hyperlegible/700.css";
-@import "@fontsource/atkinson-hyperlegible/700-italic.css";
+@font-face {
+	font-family: "Atkinson Hyperlegible";
+	font-style: normal;
+	font-display: swap;
+	font-weight: 400;
+	src: url("../../node_modules/@fontsource/atkinson-hyperlegible/files/atkinson-hyperlegible-latin-400-normal.woff2")
+		format("woff2");
+}
 
-/* Code. */
-@import "@fontsource/jetbrains-mono/400.css";
-@import "@fontsource/jetbrains-mono/500.css";
-@import "@fontsource/jetbrains-mono/600.css";
+@font-face {
+	font-family: "Atkinson Hyperlegible";
+	font-style: italic;
+	font-display: swap;
+	font-weight: 400;
+	src: url("../../node_modules/@fontsource/atkinson-hyperlegible/files/atkinson-hyperlegible-latin-400-italic.woff2")
+		format("woff2");
+}
+
+@font-face {
+	font-family: "Atkinson Hyperlegible";
+	font-style: normal;
+	font-display: swap;
+	font-weight: 700;
+	src: url("../../node_modules/@fontsource/atkinson-hyperlegible/files/atkinson-hyperlegible-latin-700-normal.woff2")
+		format("woff2");
+}
+
+@font-face {
+	font-family: "Atkinson Hyperlegible";
+	font-style: italic;
+	font-display: swap;
+	font-weight: 700;
+	src: url("../../node_modules/@fontsource/atkinson-hyperlegible/files/atkinson-hyperlegible-latin-700-italic.woff2")
+		format("woff2");
+}
+
+@font-face {
+	font-family: "JetBrains Mono";
+	font-style: normal;
+	font-display: swap;
+	font-weight: 400;
+	src: url("../../node_modules/@fontsource/jetbrains-mono/files/jetbrains-mono-latin-400-normal.woff2")
+		format("woff2");
+}
+
+@font-face {
+	font-family: "JetBrains Mono";
+	font-style: normal;
+	font-display: swap;
+	font-weight: 500;
+	src: url("../../node_modules/@fontsource/jetbrains-mono/files/jetbrains-mono-latin-500-normal.woff2")
+		format("woff2");
+}
+
+@font-face {
+	font-family: "JetBrains Mono";
+	font-style: normal;
+	font-display: swap;
+	font-weight: 600;
+	src: url("../../node_modules/@fontsource/jetbrains-mono/files/jetbrains-mono-latin-600-normal.woff2")
+		format("woff2");
+}

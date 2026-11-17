@@ -4,7 +4,7 @@ import { requireUser } from "@/auth/require-user";
 import { clearSessionCookie } from "@/auth/session-cookie";
 import { SESSION_COOKIE, SESSION_COOKIE_OPTIONS } from "@/core/constants";
 import { FieldError, NotAllowed } from "@/core/error";
-import { profileUpdate } from "@/core/schemas";
+import { profileUpdate } from "@/core/schemas/user";
 import { db, schema } from "@/db";
 import { m } from "@/i18n";
 import { uniqueConstraintError, withActionErrors } from "./helpers";

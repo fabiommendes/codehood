@@ -3,7 +3,7 @@ import { existsSync, readFileSync } from "node:fs";
 import { expect, test } from "@playwright/test";
 import { FULL_ACCESS } from "@/auth/actor";
 import { BLOB_QUOTA_BY_ROLE } from "@/core/constants";
-import type { CourseId } from "@/core/schemas";
+import type { CourseId } from "@/core/schemas/base";
 import { db } from "@/db";
 import { prisma } from "@/db/client";
 import { persistedCourseFactory } from "@/fixtures/course.factory";

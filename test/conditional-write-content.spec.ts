@@ -1,8 +1,8 @@
 import { expect, test } from "@playwright/test";
 import { FULL_ACCESS } from "@/auth/actor";
 import { PreconditionFailed } from "@/core/error";
-import type { CourseId } from "@/core/schemas";
-import { isoDate } from "@/core/schemas";
+import type { CourseId } from "@/core/schemas/base";
+import { isoDate } from "@/core/schemas/base";
 import { db } from "@/db";
 import { repositoryTree } from "@/fixtures/repository.factory";
 

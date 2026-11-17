@@ -3,16 +3,15 @@ import type { z } from "zod";
 import { SYSTEM } from "@/auth/actor";
 import { hasPerm } from "@/auth/permissions";
 import { NotAllowed, NotFound } from "@/core/error";
+import type { CourseId, PassphraseId } from "@/core/schemas/base";
+import type { CourseRef } from "@/core/schemas/course";
 import {
-	type CourseId,
-	type CourseRef,
-	type PassphraseId,
 	passphraseCreate,
 	passphraseFilter,
 	passphrasePK,
 	passphraseSchema,
 	passphraseUpdate,
-} from "@/core/schemas";
+} from "@/core/schemas/passphrase";
 import type { ServiceOptsWithoutTx } from "@/db/base-service";
 import { defineService, op } from "@/db/define-service";
 import { m } from "@/i18n";
@@ -20,7 +19,7 @@ import type { FillUndefineds } from "@/typing";
 import type { Passphrase as DbPassphrase, Prisma, PrismaTx } from "../client";
 import { courseRefWhere } from "../utils";
 
-export type { PassphraseId } from "@/core/schemas";
+export type { PassphraseId } from "@/core/schemas/base";
 
 const EXPIRY_MS = 5 * 60 * 1000; // 5 minutes; the join form shows only while one is live.
 

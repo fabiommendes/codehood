@@ -1,11 +1,8 @@
 import { expect, test } from "@playwright/test";
-import {
-	answerGradeRubric,
-	disciplineEdit,
-	gradingRubricEdit,
-	questionStatusUpdate,
-	rowVersion,
-} from "@/core/schemas";
+import { answerGradeRubric, gradingRubricEdit } from "@/core/schemas/answer";
+import { rowVersion } from "@/core/schemas/base";
+import { disciplineEdit } from "@/core/schemas/discipline";
+import { questionStatusUpdate } from "@/core/schemas/question";
 import type { Rubric, RubricItem } from "@/db";
 import type { CountingAnswer } from "@/services/grading";
 import { graderState, toGraderItem } from "@/utils/grader-state";

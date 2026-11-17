@@ -6,7 +6,7 @@ import {
 	gradingItemAdd,
 	gradingItemSplit,
 	gradingRubricEdit,
-} from "@/core/schemas";
+} from "@/core/schemas/answer";
 import { db } from "@/db";
 import { type PrismaTx, prisma } from "@/db/client";
 import { examSchedule, released } from "@/services/exam-state";

@@ -5,7 +5,7 @@ import {
 	examSanctionCreateForm,
 	examSanctionRevokeForm,
 	examSanctionUpdateForm,
-} from "@/core/schemas";
+} from "@/core/schemas/exam-sanction";
 import { db } from "@/db";
 import { parseCourseParams } from "@/urls";
 import { withServiceErrors } from "./helpers";

@@ -336,5 +336,10 @@
 	"grades_sanction_banner_notes": "Notes: {notes}",
 	"grades_sanction_manage": "Manage sanctions",
 	"grades_sanction_cell_title": "Sanctioned (factor {factor})",
-	"grades_sanction_cell_title_reason": "Sanctioned (factor {factor}): {reason}"
+	"grades_sanction_cell_title_reason": "Sanctioned (factor {factor}): {reason}",
+	"grades_summary_blank": "(blank)",
+	"grades_summary_removed": "(removed)",
+	"grades_summary_none_selected": "(none selected)",
+	"grades_summary_true": "T",
+	"grades_summary_false": "F"
 }

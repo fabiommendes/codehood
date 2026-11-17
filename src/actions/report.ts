@@ -1,7 +1,7 @@
 import { defineAction } from "astro:actions";
 import { requireUser } from "@/auth/require-user";
 import { FieldError } from "@/core/error";
-import { reportForm, reportRef, reportTriageForm } from "@/core/schemas";
+import { reportForm, reportRef, reportTriageForm } from "@/core/schemas/report";
 import { db } from "@/db";
 import { m } from "@/i18n";
 import { parseCourseParams } from "@/urls";

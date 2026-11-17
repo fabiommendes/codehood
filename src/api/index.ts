@@ -8,7 +8,7 @@
 import { z } from "zod";
 import { clearSessionCookie } from "@/auth/session-cookie";
 import { NotFound } from "@/core/error";
-import * as schema from "@/core/schemas";
+import * as schema from "@/core/schemas/all";
 import { db } from "@/db";
 import { parseCourseParams } from "@/urls";
 import { loadCourseGrades } from "@/utils/course-grades";

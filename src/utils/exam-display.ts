@@ -1,7 +1,7 @@
 // Presentation helpers shared by the exam list and detail pages
 // (src/pages/[discipline]/[course]/exams/*).
 
-import type { Duration } from "@/core/schemas";
+import type { Duration } from "@/core/schemas/base";
 import type { Exam } from "@/db";
 import { m } from "@/i18n";
 import {

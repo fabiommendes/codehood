@@ -31,6 +31,16 @@
 		"rules": {
 			"complexity": {
 				"noUselessEscapeInRegex": "off"
+			},
+			"style": {
+				"noRestrictedImports": {
+					"level": "error",
+					"options": {
+						"paths": {
+							"@/core/schemas": "Import the sub-module that defines the schema (@/core/schemas/<module>). Server registries may use @/core/schemas/all."
+						}
+					}
+				}
 			}
 		}
 	},

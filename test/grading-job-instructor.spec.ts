@@ -1,7 +1,7 @@
 import { expect, test } from "@playwright/test";
 import { FULL_ACCESS } from "@/auth/actor";
 import { NotAllowed, NotFound } from "@/core/error";
-import type { CourseId } from "@/core/schemas";
+import type { CourseId } from "@/core/schemas/base";
 import { db } from "@/db";
 import { prisma } from "@/db/client";
 import { persistedResponseFactory } from "@/fixtures/response.factory";

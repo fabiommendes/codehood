@@ -3,10 +3,10 @@ import vm from "node:vm";
 import { expect, test } from "@playwright/test";
 import { build } from "esbuild";
 
-test("the schemas barrel loads in a browser, without process or Buffer", async () => {
+test("the all-schemas module loads in a browser, without process or Buffer", async () => {
 	const result = await build({
 		stdin: {
-			contents: 'export * from "@/core/schemas";',
+			contents: 'export * from "@/core/schemas/all";',
 			resolveDir: path.resolve("src"),
 		},
 		alias: { "@": path.resolve("src") },

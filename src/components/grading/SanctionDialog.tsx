@@ -3,7 +3,7 @@ import { createSignal, For, type JSX, Show } from "solid-js";
 import { createSchemaForm } from "@/components/form/create-schema-form";
 import Field from "@/components/form/Field";
 import FormAlert from "@/components/form/FormAlert";
-import { examSanctionCreateForm } from "@/core/schemas";
+import { examSanctionCreateForm } from "@/core/schemas/exam-sanction";
 import { m } from "@/i18n";
 import SanctionModal from "./SanctionModal";
 import { withInitialValues } from "./sanction-fields";

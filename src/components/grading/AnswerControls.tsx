@@ -3,7 +3,7 @@ import { createSignal, type JSX, Show } from "solid-js";
 import { createSchemaForm } from "@/components/form/create-schema-form";
 import Field from "@/components/form/Field";
 import FormAlert from "@/components/form/FormAlert";
-import { answerWillNotGrade } from "@/core/schemas";
+import { answerWillNotGrade } from "@/core/schemas/answer";
 import { m } from "@/i18n";
 import BlankGradeForm from "./BlankGradeForm";
 import { FOCUS_KEY } from "./focus";

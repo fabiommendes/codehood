@@ -7,7 +7,7 @@
  */
 import { z } from "zod";
 import { InvalidData } from "@/core/error";
-import { PAGE_LIMIT_DEFAULT, type PageParams } from "@/core/schemas";
+import { PAGE_LIMIT_DEFAULT, type PageParams } from "@/core/schemas/page";
 
 const MODULUS = 1n << 64n;
 const MASK = MODULUS - 1n;

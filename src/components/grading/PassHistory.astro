@@ -1,0 +1,38 @@
+---
+import { m } from "@/i18n";
+import { formatScore } from "@/services/exam-result";
+/**
+ * The grading passes on one answer, newest first, each with its score, grader, rubric items and comments.
+ */
+import type { GradingPass } from "@/services/grading";
+import AppliedItems from "./AppliedItems";
+
+interface Props {
+	passes: GradingPass[];
+	/// Who a pass is credited to.
+	graderName: (pass: GradingPass) => string;
+}
+
+const { passes, graderName } = Astro.props;
+---
+
+{passes.length > 0 && (
+  <ul aria-label={m.grades_question_history()} class="mt-2 flex flex-col gap-2">
+    {passes.map((pass) => (
+      <li class="rounded-box bg-base-200/50 px-3 py-2 text-sm">
+        <p>
+          <span class="font-medium">{pass.willNotGrade ? m.grades_question_not_graded() : pass.score === null ? m.grades_question_no_score() : formatScore(pass.score)}</span>
+          <span class="text-muted"> · {graderName(pass)}</span>
+        </p>
+        <AppliedItems items={pass.rubricItems ?? []} />
+        {pass.comment && <p class="mt-1 whitespace-pre-wrap text-base-content/70">{pass.comment}</p>}
+        {pass.notes && (
+          <div role="note" aria-label={m.grades_question_notes()} class="alert alert-warning alert-soft mt-2 block text-sm">
+            <p class="font-semibold">{m.grades_question_notes()}</p>
+            <p class="mt-1 whitespace-pre-wrap">{pass.notes}</p>
+          </div>
+        )}
+      </li>
+    ))}
+  </ul>
+)}

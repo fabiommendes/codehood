@@ -11,7 +11,7 @@ import {
 	type answerRef,
 	answerWillNotGrade,
 	gradingQuestion,
-} from "@/core/schemas";
+} from "@/core/schemas/answer";
 import { SCORE_ERROR } from "@/core/score";
 import { db } from "@/db";
 import { type PrismaTx, prisma } from "@/db/client";

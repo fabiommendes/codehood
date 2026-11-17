@@ -6,7 +6,7 @@ import Badge from "@/components/ui/Badge";
 import PaginatedTable from "@/components/ui/PaginatedTable";
 import type { CursorPage } from "@/components/ui/Pagination";
 import type { ColumnConfig } from "@/components/ui/Table";
-import type { editionForm } from "@/core/schemas";
+import type { editionForm } from "@/core/schemas/edition";
 import type { FormState } from "@/forms/form-state";
 import { m, SLOT, splitAtSlot } from "@/i18n";
 import type { IsoDate } from "@/typing/iso-date";

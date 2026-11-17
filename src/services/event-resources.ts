@@ -1,4 +1,4 @@
-import type { CalendarEventId } from "@/core/schemas";
+import type { CalendarEventId } from "@/core/schemas/base";
 import type { Resource } from "@/db";
 
 /** A course's resources split into the general ones and those of each meeting. */

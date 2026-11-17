@@ -3,12 +3,11 @@ import { z } from "astro/zod";
 import { FULL_ACCESS } from "@/auth/actor";
 import { requireUser } from "@/auth/require-user";
 import { FieldError } from "@/core/error";
+import { enrollmentAdd, enrollmentDrop } from "@/core/schemas/enrollment";
 import {
-	enrollmentAdd,
-	enrollmentDrop,
 	passphraseGenerate,
 	passphraseRedeem,
-} from "@/core/schemas";
+} from "@/core/schemas/passphrase";
 import {
 	db,
 	PassphraseError,

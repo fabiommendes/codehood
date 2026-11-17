@@ -8,7 +8,7 @@ import {
 	regradeRejectForm,
 	regradeRequestForm,
 	regradeRequestRef,
-} from "@/core/schemas";
+} from "@/core/schemas/regrade-request";
 import { SCORE_ERROR } from "@/core/score";
 import { db } from "@/db";
 import { parsePercentScore } from "@/services/grading";
