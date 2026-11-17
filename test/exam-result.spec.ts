@@ -664,6 +664,30 @@ const totalCases: TotalCase[] = [
 		pending: 0,
 	},
 	{
+		name: "FACTOR 0 with an OFFSET over a negative base leaves the base",
+		a: "-0.8",
+		b: "0",
+		adjustments: [onExam("FACTOR", "0"), onExam("OFFSET", "0.2")],
+		total: -0.4,
+		pending: 0,
+	},
+	{
+		name: "FACTOR 0 with a SET gives 0",
+		a: "1",
+		b: "0",
+		adjustments: [onExam("SET", "0.8"), onExam("FACTOR", "0")],
+		total: 0,
+		pending: 0,
+	},
+	{
+		name: "FACTOR 0 alone over a negative base leaves the base",
+		a: "-0.8",
+		b: "0",
+		adjustments: [onExam("FACTOR", "0")],
+		total: -0.4,
+		pending: 0,
+	},
+	{
 		name: "FACTOR 0 is terminal wherever it comes in the list",
 		a: "1",
 		b: "1",
@@ -851,6 +875,20 @@ test("examResult: an adjustment on a question not in the exam is not reported", 
 	expect(withStray.adjustments).toBeUndefined();
 });
 
+test("examResult: a negative total is not multiplied by the exam factor", () => {
+	const result = examResult(
+		unweighted(["q1"]),
+		[submission("s1", "q1", 0)],
+		[feedback("s1", "-0.4", 5)],
+		[onExam("FACTOR", "0")],
+	);
+
+	expect(result.total).toBeCloseTo(-0.4, 10);
+	expect(result.adjustments).toEqual([
+		{ op: "FACTOR", value: 0, reason: null },
+	]);
+});
+
 //
 // examResult: adjustments on a question
 //
@@ -972,6 +1010,30 @@ const adjustTotalCases: Array<
 	["a SET defines a null base", null, [{ op: "SET", value: "0.4" }], 0.4],
 	["a FACTOR 0 defines a null base", null, [{ op: "FACTOR", value: "0" }], 0],
 	["a FACTOR 0 zeroes a base", 0.5, [{ op: "FACTOR", value: "0" }], 0],
+	[
+		"a FACTOR 0 leaves a negative base",
+		-0.4,
+		[{ op: "FACTOR", value: "0" }],
+		-0.4,
+	],
+	[
+		"a FACTOR 0 with an OFFSET leaves a negative base",
+		-0.4,
+		[
+			{ op: "FACTOR", value: "0" },
+			{ op: "OFFSET", value: "0.2" },
+		],
+		-0.4,
+	],
+	[
+		"a FACTOR 0 with a SET gives 0",
+		0.5,
+		[
+			{ op: "SET", value: "0.8" },
+			{ op: "FACTOR", value: "0" },
+		],
+		0,
+	],
 	[
 		"an OFFSET leaves a null base null",
 		null,
