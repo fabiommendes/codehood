@@ -263,6 +263,66 @@ test("Tab indents, and Esc then Tab leaves the editor, as the editor says", asyn
 	).toBe(true);
 });
 
+/// The editor's lines, as typed.
+const lines = (w: Locator) => w.locator(".cm-line").allTextContents();
+
+test("Tab inserts spaces up to the next tab stop, and indents a selection by four", async ({
+	page,
+}) => {
+	await open(page);
+	const w = widget(page, 1);
+	await setCode(w, "ab\ncd");
+	const content = w.locator(".cm-content");
+	await content.press("Control+Home");
+	await content.press("End");
+	await content.press("Tab");
+	expect(await lines(w)).toEqual(["ab  ", "cd"]);
+	await content.press("Control+A");
+	await content.press("Tab");
+	expect(await lines(w)).toEqual(["    ab  ", "    cd"]);
+	await content.press("Shift+Tab");
+	expect(await lines(w)).toEqual(["ab  ", "cd"]);
+});
+
+test("a typed bracket or quote closes itself, and wraps the selection", async ({
+	page,
+}) => {
+	await open(page);
+	const w = widget(page, 1);
+	await setCode(w, "x");
+	const content = w.locator(".cm-content");
+	await content.press("Control+A");
+	await page.keyboard.type("(");
+	expect(await lines(w)).toEqual(["(x)"]);
+	await content.press("End");
+	await page.keyboard.type('["a');
+	expect(await lines(w)).toEqual(['(x)["a"]']);
+});
+
+test("Ctrl+D adds the next occurrence as another cursor", async ({ page }) => {
+	await open(page);
+	const w = widget(page, 1);
+	await setCode(w, "foo + foo");
+	const content = w.locator(".cm-content");
+	await content.press("Control+Home");
+	await content.press("Control+D");
+	await content.press("Control+D");
+	await page.keyboard.type("bar");
+	expect(await lines(w)).toEqual(["bar + bar"]);
+});
+
+test("typing offers completions, and Tab accepts one", async ({ page }) => {
+	await open(page);
+	const w = widget(page, 1);
+	await setCode(w, "const total = 1;\n");
+	await page.keyboard.type("tot");
+	await expect(page.locator(".cm-tooltip-autocomplete")).toContainText("total");
+	// CodeMirror refuses to accept in the first 75 ms after the list opens.
+	await page.waitForTimeout(150);
+	await page.keyboard.press("Tab");
+	expect(await lines(w)).toEqual(["const total = 1;", "total"]);
+});
+
 test("the terminal shows on Run and folds away with its button", async ({
 	page,
 }) => {

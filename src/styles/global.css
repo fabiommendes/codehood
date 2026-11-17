@@ -687,7 +687,8 @@ h6 {
 }
 
 /* Line numbers of the static view of a runner widget, laid out like the
-   editor's gutter (`--digits` is the width of the largest number). */
+   editor's gutters (`--digits` is the width of the largest number; the
+   extra 16px is the fold gutter). */
 [data-line-numbers] {
 	counter-reset: runner-line;
 }
@@ -699,7 +700,7 @@ h6 {
 	box-sizing: content-box;
 	min-width: max(calc(var(--digits, 1) * 1ch), 12px);
 	padding: 0 3px 0 5px;
-	margin-right: 0.75rem;
+	margin-right: calc(16px + 0.75rem);
 	text-align: right;
 	color: var(--code-muted);
 	user-select: none;

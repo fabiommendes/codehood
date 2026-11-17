@@ -54,6 +54,9 @@ export interface CreateEditorOptions {
 	onFocus(): void;
 }
 
+/// Columns of one level of indentation, in every language.
+const INDENT_WIDTH = 4;
+
 /// Gives each editor's hint element its own id.
 let hints = 0;
 
@@ -67,32 +70,68 @@ export async function createEditor(
 	options: CreateEditorOptions,
 ): Promise<RunnerEditor> {
 	const loadSupport = runnerInfo(options.language)?.editor;
-	const [state, view, commands, language, vscode, lint, colors, support] =
-		await Promise.all([
-			import("@codemirror/state"),
-			import("@codemirror/view"),
-			import("@codemirror/commands"),
-			import("@codemirror/language"),
-			import("@replit/codemirror-vscode-keymap"),
-			import("@codemirror/lint"),
-			import("./shiki-highlight").then((shiki) =>
-				shiki.shikiHighlighting(options.language),
-			),
-			// The plugin's language support: indentation, brackets, folding.
-			loadSupport
-				? loadSupport().then(
-						(module) => module.default() as Extension | Promise<Extension>,
-					)
-				: [],
-		]);
+	const [
+		state,
+		view,
+		commands,
+		language,
+		vscode,
+		lint,
+		autocomplete,
+		search,
+		colors,
+		support,
+	] = await Promise.all([
+		import("@codemirror/state"),
+		import("@codemirror/view"),
+		import("@codemirror/commands"),
+		import("@codemirror/language"),
+		import("@replit/codemirror-vscode-keymap"),
+		import("@codemirror/lint"),
+		import("@codemirror/autocomplete"),
+		import("@codemirror/search"),
+		import("./shiki-highlight").then((shiki) =>
+			shiki.shikiHighlighting(options.language),
+		),
+		// The plugin's language support: indentation, brackets, folding.
+		loadSupport
+			? loadSupport().then(
+					(module) => module.default() as Extension | Promise<Extension>,
+				)
+			: [],
+	]);
 	const { Compartment, EditorState, Prec } = state;
 	const {
 		EditorView,
 		keymap,
+		crosshairCursor,
 		drawSelection,
+		dropCursor,
 		highlightActiveLine,
+		highlightSpecialChars,
 		lineNumbers,
+		rectangularSelection,
 	} = view;
+
+	/// Tab without a selection, as in VS Code: spaces up to the next tab stop.
+	const insertSpaces = (target: InstanceType<typeof EditorView>): boolean => {
+		const { state: current } = target;
+		if (current.readOnly) return false;
+		target.dispatch(
+			current.update(
+				current.changeByRange((range) => {
+					const column = range.head - current.doc.lineAt(range.head).from;
+					const spaces = " ".repeat(INDENT_WIDTH - (column % INDENT_WIDTH));
+					return {
+						changes: { from: range.head, insert: spaces },
+						range: state.EditorSelection.cursor(range.head + spaces.length),
+					};
+				}),
+				{ scrollIntoView: true, userEvent: "input.indent" },
+			),
+		);
+		return true;
+	};
 
 	/// Marks changes made by `setCode`, which do not reach `onChange`.
 	const external = state.Annotation.define<boolean>();
@@ -142,6 +181,38 @@ export async function createEditor(
 			border: "1px solid var(--code-border)",
 		},
 		".cm-diagnostic": { fontFamily: "inherit", whiteSpace: "pre-wrap" },
+		".cm-matchingBracket, &.cm-focused .cm-matchingBracket": {
+			backgroundColor: "var(--code-selection)",
+			outline: "1px solid var(--code-muted)",
+		},
+		".cm-selectionMatch": { backgroundColor: "var(--code-active-line)" },
+		// Fixed width: the static view reserves the same space (`[data-line-numbers]`).
+		".cm-foldGutter": { width: "16px" },
+		".cm-foldGutter .cm-gutterElement": {
+			padding: "0",
+			textAlign: "center",
+			cursor: "pointer",
+		},
+		".cm-foldPlaceholder": {
+			backgroundColor: "var(--code-panel)",
+			color: "var(--code-muted)",
+			border: "1px solid var(--code-border)",
+		},
+		".cm-panel.cm-search": { fontFamily: "inherit", padding: "0.25rem 0.5rem" },
+		".cm-panel.cm-search input, .cm-panel.cm-search button": {
+			color: "inherit",
+			backgroundColor: "var(--code-bg)",
+			border: "1px solid var(--code-border)",
+			borderRadius: "0.25rem",
+			backgroundImage: "none",
+		},
+		".cm-searchMatch": { backgroundColor: "var(--code-active-line)" },
+		".cm-searchMatch-selected": { backgroundColor: "var(--code-selection)" },
+		".cm-tooltip-autocomplete > ul": { fontFamily: "inherit" },
+		".cm-tooltip-autocomplete > ul > li[aria-selected]": {
+			backgroundColor: "var(--code-selection)",
+			color: "var(--code-fg)",
+		},
 	});
 
 	const hintId = `runner-editor-hint-${++hints}`;
@@ -167,11 +238,43 @@ export async function createEditor(
 						},
 					]),
 				),
+				keymap.of([
+					{
+						key: "Tab",
+						// With the completion list open, Tab accepts or does nothing: right
+						// after the list opens CodeMirror refuses to accept, and spaces
+						// typed then would be a surprise.
+						run: (target) => {
+							if (autocomplete.completionStatus(target.state) === "active") {
+								autocomplete.acceptCompletion(target);
+								return true;
+							}
+							return target.state.selection.ranges.some((range) => !range.empty)
+								? commands.indentMore(target)
+								: insertSpaces(target);
+						},
+						shift: commands.indentLess,
+						preventDefault: true,
+					},
+				]),
 				keymap.of(vscode.vscodeKeymap),
 				commands.history(),
+				EditorState.allowMultipleSelections.of(true),
+				EditorState.tabSize.of(INDENT_WIDTH),
+				language.indentUnit.of(" ".repeat(INDENT_WIDTH)),
 				drawSelection(),
+				dropCursor(),
+				rectangularSelection(),
+				crosshairCursor(),
 				highlightActiveLine(),
+				highlightSpecialChars(),
+				search.highlightSelectionMatches(),
+				search.search({ top: true }),
 				language.bracketMatching(),
+				language.indentOnInput(),
+				language.foldGutter(),
+				autocomplete.closeBrackets(),
+				autocomplete.autocompletion(),
 				colors,
 				theme,
 				support,

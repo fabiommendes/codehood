@@ -16,6 +16,12 @@
 
 ### Changed
 
+- Editor de código com recursos de IDE: fecha parênteses e aspas e envolve a
+  seleção neles, autocomplete (Python com `lang-python`; Lua, Elm e Prolog
+  completam palavras do próprio código), múltiplos cursores (Ctrl+D,
+  Alt+arrastar), dobra de blocos, busca, destaque das ocorrências da seleção e
+  indentação automática. Tab insere espaços até a próxima parada, ou indenta a
+  seleção; a indentação é de 4 espaços em todas as linguagens.
 - Execução de código ligada por padrão em todo tipo de prova; antes só a
   lista (PRACTICE) rodava código sem `meta.codeRun: true`. A página da prova
   só avisa quando a execução está desligada.

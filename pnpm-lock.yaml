@@ -17,12 +17,18 @@ importers:
       '@astrojs/solid-js':
         specifier: ^7.0.2
         version: 7.0.2(@types/node@26.3.0)(esbuild@0.28.2)(jiti@2.7.0)(solid-js@1.9.15)(supports-color@7.2.0)(terser@5.50.0)(tsx@4.23.12)(yaml@2.9.0)
+      '@codemirror/autocomplete':
+        specifier: 6.20.4
+        version: 6.20.4
       '@codemirror/commands':
         specifier: 6.11.1
         version: 6.11.1
       '@codemirror/lang-javascript':
         specifier: 6.2.5
         version: 6.2.5
+      '@codemirror/lang-python':
+        specifier: 6.2.1
+        version: 6.2.1
       '@codemirror/language':
         specifier: 6.13.1
         version: 6.13.1
@@ -32,6 +38,9 @@ importers:
       '@codemirror/lint':
         specifier: 6.9.7
         version: 6.9.7
+      '@codemirror/search':
+        specifier: 6.7.2
+        version: 6.7.2
       '@codemirror/state':
         specifier: 6.7.6
         version: 6.7.6
@@ -757,6 +766,9 @@ packages:
   '@codemirror/lang-javascript@6.2.5':
     resolution: {integrity: sha512-zD4e5mS+50htS7F+TYjBPsiIFGanfVqg4HyUz6WNFikgOPf2BgKlx+TQedI1w6n/IqRBVBbBWmGFdLB/7uxO4A==}
 
+  '@codemirror/lang-python@6.2.1':
+    resolution: {integrity: sha512-IRjC8RUBhn9mGR9ywecNhB51yePWCGgvHfY1lWN/Mrp3cKuHr0isDKia+9HnvhiWNnMpbGhWrkhuWOc09exRyw==}
+
   '@codemirror/language@6.13.1':
     resolution: {integrity: sha512-zfvU2r3TyylQLMj/te+5CnQ0rSqZi8B1oTCBbQkagcLW4Xc6imab6qN+pEJhsuNOLaJqiRyBXp9UhWA1DhVvDw==}
 
@@ -1349,6 +1361,9 @@ packages:
 
   '@lezer/lr@1.4.12':
     resolution: {integrity: sha512-On9HU4oMMiHPMkQDgoTnGahjgG5n/MkN38CgG77sMraKLL+3JBbeQNi1FcCXV9QRqwF9/BUXP3caHyJC1fBOTQ==}
+
+  '@lezer/python@1.1.19':
+    resolution: {integrity: sha512-MhQIURHRytsNzP/YXnqpYKW6la6voAH3kyplTOOiCdjyFY6cWWGFVmYVdHIPrElqSDf4iCDktQCockB9FxuhzQ==}
 
   '@lix-js/sdk@0.20.1':
     resolution: {integrity: sha512-oscOFP8Cr1My6Wh2KVYC9+aJ1mHs+d7vnD+7PPJaA4L+Y1FR37Sm99SrFGfvUizaj/XtRi2GlDF2IOFt9iXMNQ==}
@@ -5374,6 +5389,14 @@ snapshots:
       '@lezer/common': 1.5.5
       '@lezer/javascript': 1.5.6
 
+  '@codemirror/lang-python@6.2.1':
+    dependencies:
+      '@codemirror/autocomplete': 6.20.4
+      '@codemirror/language': 6.13.1
+      '@codemirror/state': 6.7.6
+      '@lezer/common': 1.5.5
+      '@lezer/python': 1.1.19
+
   '@codemirror/language@6.13.1':
     dependencies:
       '@codemirror/state': 6.7.6
@@ -5853,6 +5876,12 @@ snapshots:
   '@lezer/lr@1.4.12':
     dependencies:
       '@lezer/common': 1.5.5
+
+  '@lezer/python@1.1.19':
+    dependencies:
+      '@lezer/common': 1.5.5
+      '@lezer/highlight': 1.2.5
+      '@lezer/lr': 1.4.12
 
   '@lix-js/sdk@0.20.1':
     dependencies:
