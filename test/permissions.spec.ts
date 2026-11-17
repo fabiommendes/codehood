@@ -266,32 +266,38 @@ test("question.read is exactly course.update-contents on question.course: no adm
 	expect(hasPerm(student, "question.read", question("PUBLISHED"))).toBe(false);
 });
 
-test("question.read-public grants question.read, or a course-contents viewer only once PUBLISHED", () => {
+test("question.read-public grants question.read, or a course-contents viewer once an exam releases it", () => {
 	const course = courseFixture();
-	const draft = { status: "DRAFT" as const, course };
+	const draft = { status: "DRAFT" as const, released: true, course };
 	const published = { status: "PUBLISHED" as const, course };
+	const released = { status: "PUBLISHED" as const, released: true, course };
 
-	// The owning instructor sees both, regardless of status (question.read alone grants it).
-	expect(hasPerm(instructor, "question.read-public", draft)).toBe(true);
-	expect(hasPerm(instructor, "question.read-public", published)).toBe(true);
+	// The owning instructor sees all, regardless of status (question.read alone grants it).
+	for (const question of [draft, published, released]) {
+		expect(hasPerm(instructor, "question.read-public", question)).toBe(true);
+	}
 
-	// An enrolled student is denied a draft, even though enrolled.
+	// An enrolled student is denied a draft, even released, and a question no
+	// open or closed exam holds.
 	expect(hasPerm(enrolledStudent, "question.read-public", draft)).toBe(false);
-	// The same student is granted once the question is published.
 	expect(hasPerm(enrolledStudent, "question.read-public", published)).toBe(
-		true,
-	);
-
-	// An outsider is denied either way: never enrolled, never course.read-contents.
-	expect(hasPerm(outsiderStudent, "question.read-public", draft)).toBe(false);
-	expect(hasPerm(outsiderStudent, "question.read-public", published)).toBe(
 		false,
 	);
+	// The same student is granted once an exam releases it.
+	expect(hasPerm(enrolledStudent, "question.read-public", released)).toBe(true);
 
-	// A non-owning admin has course.read-contents (so PUBLISHED grants it) but
-	// no question.read branch (so DRAFT still denies it).
+	// An outsider is denied either way: never enrolled, never course.read-contents.
+	for (const question of [draft, published, released]) {
+		expect(hasPerm(outsiderStudent, "question.read-public", question)).toBe(
+			false,
+		);
+	}
+
+	// A non-owning admin has course.read-contents (so a release grants it) but
+	// no question.read branch (so a draft still denies it).
 	expect(hasPerm(admin, "question.read-public", draft)).toBe(false);
-	expect(hasPerm(admin, "question.read-public", published)).toBe(true);
+	expect(hasPerm(admin, "question.read-public", published)).toBe(false);
+	expect(hasPerm(admin, "question.read-public", released)).toBe(true);
 });
 
 test("SYSTEM bypasses every rule", () => {

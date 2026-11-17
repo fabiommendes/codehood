@@ -28,28 +28,21 @@ export const webNext: Record<QuestionStatus, QuestionStatus> = {
  *
  * An author gets the whole document. Someone outside the course is refused
  * whatever the status, so a refusal never tells a hidden slug from a published
- * one. A course member gets the public half of a published question, and of a
- * hidden or archived one an exam still pins, since withdrawing a question
- * never pulls it out of an exam. A draft is its author's alone.
+ * one. A course member gets the public half only once the question is
+ * released to them, that is, an exam holding it is open for them or has
+ * closed; before that it is missing, so a scheduled exam does not show its
+ * statements ahead of time. Withdrawing a question never pulls it out of an
+ * exam, so a hidden or archived one is released like a published one. A draft
+ * is its author's alone.
  */
 export function visibility(
 	status: QuestionStatus,
-	rel: { author: boolean; member: boolean; pinned: boolean },
+	rel: { author: boolean; member: boolean; released: boolean },
 ): QuestionVisibility {
 	if (rel.author) return "full";
 	if (!rel.member) return "refused";
-
-	switch (status) {
-		case "PUBLISHED":
-			return "public";
-		case "HIDDEN":
-		case "ARCHIVED":
-			return rel.pinned ? "public" : "absent";
-		case "DRAFT":
-			return "absent";
-		default:
-			return status satisfies never;
-	}
+	if (status === "DRAFT") return "absent";
+	return rel.released ? "public" : "absent";
 }
 
 /// Whether a question in this status takes writes: an archived one comes back only through `create` or `upsert`.

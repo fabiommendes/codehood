@@ -164,8 +164,8 @@ export type InviteTarget = { id?: number; createdBy: UserTarget };
 export interface QuestionWithCourse {
 	id?: number;
 	status: QuestionStatus;
-	/// Whether an exam pins the question; `false` when left out.
-	pinned?: boolean;
+	/// Whether an exam holding the question is open for the actor or has closed; `false` when left out.
+	released?: boolean;
 	course: CourseTarget | CourseWithEnrollment;
 }
 
@@ -412,15 +412,15 @@ const PERMISSIONS = {
 	} satisfies PermDef<QuestionWithCourse>,
 
 	// Rule: the public half goes to whoever `visibility` gives the full
-	// document or the public half: the author, and a course member for a
-	// published question or one an exam pins. Everyone else is refused or
-	// sees nothing. `target.pinned` is whether an exam pins the question.
+	// document or the public half: the author, and a course member once an
+	// exam holding the question has opened for them. Everyone else is refused
+	// or sees nothing. `target.released` says whether such an exam exists.
 	"question.read-public": {
 		other: (actor, target) => {
 			const seen = visibility(target.status, {
 				author: isCourseOwner(actor, target.course),
 				member: courseVisible(actor, target.course),
-				pinned: target.pinned ?? false,
+				released: target.released ?? false,
 			});
 			return seen === "full" || seen === "public";
 		},

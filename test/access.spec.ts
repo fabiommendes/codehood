@@ -95,14 +95,19 @@ test("examAccess: the owner writes, members read published exams, drafts vanish"
 
 // Question ------------------------------------------------------------------
 
-test("questionAccess: the owner writes, a member reads what is published or pinned", () => {
+test("questionAccess: the owner writes, a member reads what an exam released", () => {
 	for (const status of STATUSES) {
-		for (const pinned of [false, true]) {
-			expect(questionAccess(owner, { status, course }, pinned)).toBe("write");
-			expect(questionAccess(outsider, { status, course }, pinned)).toBe("see");
+		for (const released of [false, true]) {
+			expect(questionAccess(owner, { status, course }, released)).toBe("write");
+			expect(questionAccess(outsider, { status, course }, released)).toBe(
+				"see",
+			);
 		}
 	}
 	expect(questionAccess(student, { status: "PUBLISHED", course }, false)).toBe(
+		"none",
+	);
+	expect(questionAccess(student, { status: "PUBLISHED", course }, true)).toBe(
 		"read",
 	);
 	expect(questionAccess(student, { status: "DRAFT", course }, true)).toBe(
@@ -114,7 +119,7 @@ test("questionAccess: the owner writes, a member reads what is published or pinn
 	expect(questionAccess(student, { status: "HIDDEN", course }, true)).toBe(
 		"read",
 	);
-	expect(questionAccess(admin, { status: "PUBLISHED", course }, false)).toBe(
+	expect(questionAccess(admin, { status: "PUBLISHED", course }, true)).toBe(
 		"read",
 	);
 });

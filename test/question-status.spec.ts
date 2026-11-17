@@ -32,23 +32,23 @@ test("only an archived question refuses writes", () => {
 type Row = [
 	status: QuestionStatus,
 	relation: "author" | "member" | "outsider",
-	pinned: boolean,
+	released: boolean,
 	expected: QuestionVisibility,
 ];
 
 const TABLE: Row[] = [
-	// The author sees everything, pinned or not.
+	// The author sees everything, released or not.
 	...STATUSES.flatMap((s): Row[] => [
 		[s, "author", false, "full"],
 		[s, "author", true, "full"],
 	]),
-	// A member sees the public half of a published question only...
-	["PUBLISHED", "member", false, "public"],
-	["PUBLISHED", "member", true, "public"],
+	// A member sees nothing of a question no open or closed exam holds...
+	["PUBLISHED", "member", false, "absent"],
 	["DRAFT", "member", false, "absent"],
 	["HIDDEN", "member", false, "absent"],
 	["ARCHIVED", "member", false, "absent"],
-	// ...plus a hidden or archived one an exam still pins, never a draft.
+	// ...and the public half once such an exam releases it, never of a draft.
+	["PUBLISHED", "member", true, "public"],
 	["HIDDEN", "member", true, "public"],
 	["ARCHIVED", "member", true, "public"],
 	["DRAFT", "member", true, "absent"],
@@ -59,13 +59,13 @@ const TABLE: Row[] = [
 	]),
 ];
 
-for (const [status, relation, pinned, expected] of TABLE) {
-	test(`visibility: ${status} ${relation}${pinned ? " pinned" : ""} is ${expected}`, () => {
+for (const [status, relation, released, expected] of TABLE) {
+	test(`visibility: ${status} ${relation}${released ? " released" : ""} is ${expected}`, () => {
 		expect(
 			visibility(status, {
 				author: relation === "author",
 				member: relation !== "outsider",
-				pinned,
+				released,
 			}),
 		).toBe(expected);
 	});

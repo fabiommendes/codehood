@@ -9,6 +9,7 @@ import { isoDate } from "@/core/schemas/base";
 import type { questionSchema } from "@/core/schemas/question";
 import { db } from "@/db";
 import { prisma } from "@/db/client";
+import { persistedOpenExam } from "@/fixtures/exam.factory";
 import { persistedUserFactory } from "@/fixtures/user.factory";
 
 type Doc = z.infer<typeof questionSchema>["question"];
@@ -573,6 +574,7 @@ test("A15: a student sees no files, no origin and no hash; the author with publi
 		blobs: { [h1.hash]: h1.bytes },
 	});
 	const pk = { course: ctx.course.id, slug: "q1" };
+	await persistedOpenExam(ctx.course.id, ["q1"]);
 
 	const views = [
 		await db.question.findOne({ ...pk, public: true }, { actor: ctx.student }),

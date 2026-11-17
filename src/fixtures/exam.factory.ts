@@ -1,6 +1,7 @@
 import { faker } from "@faker-js/faker";
 import { Factory } from "fishery";
 import { db, type Exam, type ExamCreate, type schema } from "@/db";
+import { prisma } from "@/db/client";
 import { persistedCourseFactory } from "./course.factory";
 import { type PersistParams, serviceOpts } from "./support";
 
@@ -47,3 +48,33 @@ export const persistedExamFactory = Factory.define<
 
 	return buildExam(sequence, params);
 });
+
+/**
+ * Persists an ongoing exam of `course` holding the questions `slugs`, which releases their public half to the course's members.
+ *
+ * The questions are linked straight in the database, so a hidden, archived or
+ * draft question can be held too.
+ */
+export async function persistedOpenExam(
+	course: schema.CourseId,
+	slugs: readonly string[],
+	params: Partial<ExamCreate> = {},
+): Promise<Exam> {
+	const exam = await persistedExamFactory.create({
+		...params,
+		course,
+		status: params.status ?? "ONGOING",
+	});
+	const refs = await prisma.questionRef.findMany({
+		where: { courseId: course, slug: { in: [...slugs] } },
+		select: { id: true },
+	});
+	await prisma.questionsForExam.createMany({
+		data: refs.map((ref, position) => ({
+			examId: exam.id,
+			questionRefId: ref.id,
+			position,
+		})),
+	});
+	return exam;
+}

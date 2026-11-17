@@ -37,6 +37,12 @@
 
 ### Fixed
 
+- Segurança: o aluno lia pela API (e pelos Actions) o enunciado e as
+  alternativas das questões de uma prova agendada antes de ela abrir. Agora o
+  aluno só recebe a metade pública de uma questão quando uma prova que a
+  contém está aberta para ele (com a exceção de segunda chamada aplicada) ou
+  já encerrou. Uma questão publicada fora de qualquer prova deixou de ser
+  visível ao aluno. O gabarito nunca vazou.
 - No tablet e no celular, o breadcrumb ficava por cima da gaveta de
   navegação aberta.
 

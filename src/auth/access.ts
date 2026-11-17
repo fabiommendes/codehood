@@ -87,7 +87,7 @@ export function requireAccess(
 }
 
 /**
- * How much of a question `actor` gets, from its status and whether an exam pins it.
+ * How much of a question `actor` gets, from its status and whether an exam holding it has opened for them.
  *
  * `write` is the whole document and goes to whoever writes the course's
  * contents; `read` is the public half.
@@ -95,13 +95,13 @@ export function requireAccess(
 export function questionAccess(
 	actor: Actor,
 	row: { status: QuestionStatus; course: CourseWithEnrollment },
-	pinned: boolean,
+	released: boolean,
 ): Access {
 	switch (
 		visibility(row.status, {
 			author: hasPerm(actor, "course.update-contents", row.course),
 			member: hasPerm(actor, "course.read-contents", row.course),
-			pinned,
+			released,
 		})
 	) {
 		case "full":

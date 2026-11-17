@@ -9,7 +9,11 @@ import { isDeepStrictEqual } from "node:util";
 import { z } from "zod";
 import { accessError, questionAccess, requireAccess } from "@/auth/access";
 import { type Actor, SYSTEM } from "@/auth/actor";
-import { ensurePerm, hasPerm } from "@/auth/permissions";
+import {
+	type CourseWithEnrollment,
+	ensurePerm,
+	hasPerm,
+} from "@/auth/permissions";
 import { generateToken } from "@/auth/token";
 import { InvalidData, NotAllowed, NotFound } from "@/core/error";
 import type { QuestionRefId } from "@/core/schemas/base";
@@ -59,6 +63,7 @@ import {
 	sameFiles,
 	serveAttachmentFile,
 } from "@/services/attachment-files";
+import { attachmentsOpen, hiddenExamStatuses } from "@/services/exam-state";
 import { type QuestionStatus, writable } from "@/services/question-status";
 import type { JSONValue } from "@/typing/concrete-types";
 import {
@@ -78,7 +83,12 @@ import {
 	type PrismaTx,
 	prisma,
 } from "../client";
-import { courseRefWhere, valueOrNotAllowed, valueOrNotFound } from "../utils";
+import {
+	courseRefWhere,
+	fromMs,
+	valueOrNotAllowed,
+	valueOrNotFound,
+} from "../utils";
 import type { AttachmentService } from "./attachment.service";
 import type { BlobService } from "./blob.service";
 import { courseContentsWhere } from "./course.service";
@@ -278,7 +288,11 @@ const buildQuestionService = (deps: Deps) =>
 				// An outsider is refused whatever the status, so a hidden slug cannot
 				// be told from a published one; a draft, hidden or archived question
 				// is missing for a non-author, unless an exam still pins it.
-				const access = questionAccess(opts.actor, row, await isPinned(tx, row));
+				const access = questionAccess(
+					opts.actor,
+					row,
+					await isReleased(tx, row, opts.actor),
+				);
 				const error = accessError(access, "read", "question.read");
 				if (error instanceof NotFound) return null;
 				if (error) throw error;
@@ -348,7 +362,11 @@ const buildQuestionService = (deps: Deps) =>
 					include: questionInclude(opts.actor),
 				});
 				if (!row) return none;
-				const access = questionAccess(opts.actor, row, await isPinned(tx, row));
+				const access = questionAccess(
+					opts.actor,
+					row,
+					await isReleased(tx, row, opts.actor),
+				);
 				const error = accessError(access, "read", "question.read");
 				if (error instanceof NotFound) return none;
 				if (error) throw error;
@@ -767,7 +785,11 @@ const buildQuestionService = (deps: Deps) =>
 				});
 				if (
 					!ref ||
-					questionAccess(opts.actor, ref, await isPinned(tx, ref)) !== "write"
+					questionAccess(
+						opts.actor,
+						ref,
+						await isReleased(tx, ref, opts.actor),
+					) !== "write"
 				) {
 					throw notFound();
 				}
@@ -890,10 +912,14 @@ export const makeQuestionService = (
 
 /**
  * Prisma `where` fragment implementing the same read rule as the question permissions.
+ *
+ * `released` holds the ids of the questions an exam has released to `actor`
+ * (see `releasedRefIds`), the only ones a member reads the public half of.
  */
 export function questionWhere(
 	actor: Actor,
 	isPublic = false,
+	released: Iterable<number> = [],
 ): Prisma.QuestionRefWhereInput {
 	if (actor === SYSTEM) return {};
 
@@ -901,7 +927,14 @@ export function questionWhere(
 	if (!isPublic) return owned;
 
 	return {
-		OR: [owned, { status: "PUBLISHED", course: courseContentsWhere(actor) }],
+		OR: [
+			owned,
+			{
+				status: { not: "DRAFT" },
+				id: { in: [...released] },
+				course: courseContentsWhere(actor),
+			},
+		],
 	};
 }
 
@@ -1016,11 +1049,17 @@ async function listScope(
 		throw new NotAllowed("question.read");
 	}
 
+	const released =
+		isPublic && !full
+			? await releasedRefIds(tx, actor, {
+					questionRef: { courseId: course.id },
+				})
+			: [];
 	return {
 		isPublic,
 		where: {
 			AND: [
-				questionWhere(actor, isPublic),
+				questionWhere(actor, isPublic, released),
 				{
 					courseId: course.id,
 					...(filter.slugs ? { slug: { in: filter.slugs } } : {}),
@@ -1142,7 +1181,7 @@ async function writableRef(
 	const ref = valueOrNotFound("question", found);
 
 	requireAccess(
-		questionAccess(actor, ref, await isPinned(tx, ref)),
+		questionAccess(actor, ref, await isReleased(tx, ref, actor)),
 		"write",
 		action,
 		opts,
@@ -1150,15 +1189,82 @@ async function writableRef(
 	return ref;
 }
 
-/// Whether an exam pins the question; only a hidden or archived one can be told apart by it.
-async function isPinned(
+/// Whether `actor` reads the public half of the question as a course member: an exam holding it is open for them or has closed.
+async function isReleased(
 	tx: PrismaTx,
-	row: { id: number; status: QuestionStatus },
+	row: {
+		id: number;
+		status: QuestionStatus;
+		course: CourseWithEnrollment;
+	},
+	actor: Actor,
 ): Promise<boolean> {
-	if (row.status !== "HIDDEN" && row.status !== "ARCHIVED") return false;
-	return (
-		(await tx.questionsForExam.count({ where: { questionRefId: row.id } })) > 0
-	);
+	if (row.status === "DRAFT" || actor === SYSTEM) return false;
+	if (hasPerm(actor, "course.update-contents", row.course)) return false;
+	return (await releasedRefIds(tx, actor, { questionRefId: row.id })).size > 0;
+}
+
+/**
+ * The ids of the questions matching `where` that an exam has released to `actor`.
+ *
+ * An exam releases its questions to a member of its course once it is open
+ * for them, after their own exception, and keeps them released after it
+ * closes. A draft or archived exam releases nothing.
+ */
+async function releasedRefIds(
+	tx: PrismaTx,
+	actor: Actor,
+	where: Prisma.QuestionsForExamWhereInput,
+): Promise<Set<number>> {
+	if (actor === SYSTEM) return new Set();
+	const links = await tx.questionsForExam.findMany({
+		where: {
+			...where,
+			exam: {
+				status: { notIn: [...hiddenExamStatuses] },
+				course: courseContentsWhere(actor),
+			},
+		},
+		select: {
+			questionRefId: true,
+			exam: {
+				select: {
+					type: true,
+					status: true,
+					scheduledAt: true,
+					durationMs: true,
+					extraTimeMs: true,
+					exceptions: {
+						where: { username: actor.username },
+						select: { extraTimeMs: true, scheduledAt: true },
+					},
+				},
+			},
+		},
+	});
+	const now = new Date();
+	const released = new Set<number>();
+	for (const { questionRefId, exam } of links) {
+		const [exception] = exam.exceptions;
+		const open = attachmentsOpen(
+			{
+				type: exam.type,
+				status: exam.status,
+				scheduledAt: exam.scheduledAt,
+				duration: fromMs(exam.durationMs),
+				extraTime: fromMs(exam.extraTimeMs),
+			},
+			exception
+				? {
+						extraTime: fromMs(exception.extraTimeMs),
+						scheduledAt: exception.scheduledAt,
+					}
+				: null,
+			now,
+		);
+		if (open) released.add(questionRefId);
+	}
+	return released;
 }
 
 /**

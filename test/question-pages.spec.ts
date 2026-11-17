@@ -11,6 +11,7 @@ import type {
 	QuestionPageFilter,
 } from "@/db/services/question.service";
 import { persistedCourseFactory } from "@/fixtures/course.factory";
+import { persistedOpenExam } from "@/fixtures/exam.factory";
 import { persistedUserFactory } from "@/fixtures/user.factory";
 import {
 	decodeKeyCursor,
@@ -323,6 +324,8 @@ test.describe("pages of questions", () => {
 		const student = await persistedUserFactory.create({ role: "STUDENT" });
 		await db.enrollment.create({ course, username: student.username }, opts);
 		const actor = { actor: student };
+		// Only what an open exam holds reaches a student; q-03 is a draft and stays out.
+		await persistedOpenExam(course, ["q-02", "q-03", "q-06"]);
 
 		const page = await db.question.findPage(
 			{ course, sort: { field: "title", direction: "asc" } },
