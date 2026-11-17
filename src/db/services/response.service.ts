@@ -483,9 +483,10 @@ export const makeResponseService = defineService<ResponseT>()(() => {
 	/**
 	 * Closes the author's attempt at an exam to further answers.
 	 *
-	 * The student's "Submit exam". On a practice exam it is the newest attempt, the current session's; a simulation has its own slot. Calling it on an attempt that is already
-	 * closed returns it unchanged. The author may close their own attempt; the
-	 * course's instructor may close anyone's.
+	 * The student's "Submit exam". On a practice exam it is the newest attempt,
+	 * the current session's; a simulation keeps its own slot. Calling it on an
+	 * attempt that is already closed returns it unchanged. The author may close
+	 * their own attempt; the course's instructor may close anyone's.
 	 *
 	 * @throws {@link NotFound}
 	 * If the author has no attempt at the exam, or it belongs to someone the
