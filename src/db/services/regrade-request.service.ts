@@ -384,7 +384,7 @@ export const makeRegradeRequestService = defineService<RegradeRequestT>()(
 						author: response.authorId,
 						attempt: response,
 						outcome,
-						examSanctioned: response.adjustments.some(
+						examReduced: response.adjustments.some(
 							(sanction) => sanction.questionRef === null,
 						),
 						submission: input.submission,

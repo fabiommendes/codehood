@@ -124,7 +124,7 @@ export async function loadAttemptView(
 						author,
 						attempt,
 						outcome,
-						examSanctioned: result?.sanction !== undefined,
+						examReduced: result?.sanction !== undefined,
 						submission: outcome.submission,
 						requested: request !== null,
 					},

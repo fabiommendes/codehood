@@ -28,6 +28,58 @@ export type QuestionOutcomeStatus =
 	| "not-graded"
 	| "sanctioned";
 
+export type AdjustmentOp = "SET" | "FACTOR" | "OFFSET";
+
+/** An active adjustment of an attempt: on one question by slug, or on the whole exam when `question` is `null`. */
+export interface ResultAdjustment {
+	question: string | null;
+	op: AdjustmentOp;
+	/// A decimal string, as stored.
+	value: string;
+	reason: string | null;
+}
+
+/** Groups the adjustments of every operation by the `publicId` of the attempt they hit, dropping any other field (notes). */
+export function adjustmentsByResponse(
+	_views: readonly {
+		response: string;
+		question: string | null;
+		op: AdjustmentOp;
+		value: string;
+		reason: string | null;
+	}[],
+): ReadonlyMap<string, ResultAdjustment[]> {
+	throw new Error("not implemented");
+}
+
+/** Whether the adjustment lowers a grade: a `FACTOR` below 1. Only these block a regrade request. */
+export function reducesGrade(_adjustment: {
+	op: AdjustmentOp;
+	value: string | number;
+}): boolean {
+	throw new Error("not implemented");
+}
+
+/**
+ * The exam total after the exam-level adjustments, or `null` when `base` is `null` and nothing fixes the total.
+ *
+ * Order: a FACTOR 0 gives 0; else base is the SET value or `base`; each FACTOR multiplies it while it is positive;
+ * every OFFSET is added; the result is clamped to `[min(b, 0), 1]`, `b` being the base before the factors.
+ */
+export function adjustTotal(
+	_base: number | null,
+	_adjustments: readonly { op: AdjustmentOp; value: string | number }[],
+): number | null {
+	throw new Error("not implemented");
+}
+
+/** Whether the adjustments define the total by themselves: a SET, or a FACTOR 0. */
+export function fixesTotal(
+	_adjustments: readonly { op: AdjustmentOp; value: string | number }[],
+): boolean {
+	throw new Error("not implemented");
+}
+
 /// An active sanction on an attempt: on one question by slug, or on the whole exam when `question` is `null`.
 export interface ResultSanction {
 	question: string | null;
@@ -157,6 +209,16 @@ export interface QuestionOutcome {
 	comments: string[];
 	/// The graded submissions of a `code` question, oldest first. Absent for other questions.
 	codeAttempts?: CodeAttemptOutcome[];
+	/// The `FACTOR` adjustment on the question, with what it was before it applied.
+	adjustment?: {
+		op: "FACTOR";
+		value: number;
+		reason: string | null;
+		original: {
+			status: Exclude<QuestionOutcomeStatus, "sanctioned">;
+			score: number | null;
+		};
+	};
 	/// The sanction on the question, with what it was before the factor applied.
 	sanction?: {
 		factor: number;
@@ -192,6 +254,14 @@ export interface ExamResult {
 	total: number | null;
 	/// How many questions are `pending` after the sanctions; 0 when the exam has factor 0.
 	pending: number;
+	/// The adjustments of the whole exam, in order of application: SET, then FACTORs, then OFFSETs.
+	adjustments?: {
+		op: AdjustmentOp;
+		value: number;
+		reason: string | null;
+	}[];
+	/// The total after the question adjustments, before any adjustment of the exam.
+	original?: { total: number | null };
 	/// The sanction on the whole exam; `original.total` is the total before its factor, after the question sanctions.
 	sanction?: {
 		factor: number;
@@ -239,8 +309,27 @@ export function examResult(
 	questions: readonly WeightedQuestion[],
 	submissions: ResultSubmission[],
 	feedback: ResultFeedback[],
-	sanctions: readonly ResultSanction[],
+	sanctions: readonly (ResultSanction | ResultAdjustment)[],
 	policy: ResultPolicy = {},
+): ExamResult {
+	if (sanctions.some((entry) => "op" in entry)) {
+		throw new Error("not implemented");
+	}
+	return legacyExamResult(
+		questions,
+		submissions,
+		feedback,
+		sanctions as readonly ResultSanction[],
+		policy,
+	);
+}
+
+function legacyExamResult(
+	questions: readonly WeightedQuestion[],
+	submissions: ResultSubmission[],
+	feedback: ResultFeedback[],
+	sanctions: readonly ResultSanction[],
+	policy: ResultPolicy,
 ): ExamResult {
 	const outcomes = questions
 		.map(({ slug }) => {

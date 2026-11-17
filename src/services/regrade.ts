@@ -52,7 +52,7 @@ export interface RegradeContext {
 	/// The `publicId` of the contested submission.
 	submission: string;
 	/// Whether the attempt has an active sanction on the whole exam.
-	examSanctioned: boolean;
+	examReduced: boolean;
 	/// Whether a request (open or resolved) already exists for `submission`.
 	requested: boolean;
 }
@@ -65,7 +65,7 @@ export interface RegradeContext {
  * - `practice`: the exam is a `PRACTICE` exam.
  * - `not-released`: `attemptOf(schedule, author, attempt, now)` is not
  *   `results`.
- * - `sanctioned`: `ctx.examSanctioned` is `true`, or the outcome carries a
+ * - `sanctioned`: `ctx.examReduced` is `true`, or the outcome carries a
  *   sanction.
  * - `not-counting`: `ctx.submission` is not `ctx.outcome.submission`, the
  *   answer that counts for its question.
@@ -86,7 +86,8 @@ export function regradeBlocker(
 	const state = attemptOf(schedule, ctx.author, ctx.attempt, now);
 	if (state.kind !== "results") return "not-released";
 
-	if (ctx.examSanctioned || outcome.sanction) return "sanctioned";
+	if (ctx.examReduced || outcome.sanction || outcome.adjustment)
+		return "sanctioned";
 
 	if (outcome.submission !== ctx.submission) return "not-counting";
 	if (outcome.status === "pending" || outcome.status === "unanswered") {
