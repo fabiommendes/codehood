@@ -118,3 +118,11 @@ export async function unsafePinnedDocuments<
 				: byId.get(q.latestId ?? -1)) ?? null,
 	) as (Prisma.QuestionDataGetPayload<{ select: S }> | null)[];
 }
+
+/** Stamps the latest version on every unpinned question of the exam and sets `questionsFrozenAt`. */
+export async function freezeQuestionVersions(
+	_tx: PrismaTx,
+	_examId: number,
+): Promise<void> {
+	throw new Error("not implemented");
+}
