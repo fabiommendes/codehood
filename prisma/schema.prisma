@@ -61,26 +61,26 @@ model User {
   image     String?
   createdAt DateTime @default(now())
 
-  apiKeys          ApiKey[]
-  invitesSent      Invite[]           @relation("InviteCreatedBy")
-  redemptions      InviteRedemption[]
-  sessions         Session[]
-  groupMemberships GroupMembership[]
-  courses          Course[]
-  enrollments      Enrollment[]
-  attachments      Attachment[]
-  responses        Response[]
-  exams            Exam[]
-  feedbacks        Feedback[]
-  gradeValues      GradeValue[]
-  attendances      Attendance[]
-  calendarFeed     CalendarFeed?
-  exceptions       ExamException[]
-  regradesResolved RegradeRequest[]
-  reports          Report[]           @relation("ReportAuthor")
-  reportsTriaged   Report[]           @relation("ReportTriagedBy")
-  adjustmentsCreated ExamAdjustment[]     @relation("AdjustmentCreatedBy")
-  adjustmentsRevoked ExamAdjustment[]     @relation("AdjustmentRevokedBy")
+  apiKeys            ApiKey[]
+  invitesSent        Invite[]           @relation("InviteCreatedBy")
+  redemptions        InviteRedemption[]
+  sessions           Session[]
+  groupMemberships   GroupMembership[]
+  courses            Course[]
+  enrollments        Enrollment[]
+  attachments        Attachment[]
+  responses          Response[]
+  exams              Exam[]
+  feedbacks          Feedback[]
+  gradeValues        GradeValue[]
+  attendances        Attendance[]
+  calendarFeed       CalendarFeed?
+  exceptions         ExamException[]
+  regradesResolved   RegradeRequest[]
+  reports            Report[]           @relation("ReportAuthor")
+  reportsTriaged     Report[]           @relation("ReportTriagedBy")
+  adjustmentsCreated ExamAdjustment[]   @relation("AdjustmentCreatedBy")
+  adjustmentsRevoked ExamAdjustment[]   @relation("AdjustmentRevokedBy")
 
   @@index([role])
 }

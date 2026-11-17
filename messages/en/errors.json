@@ -177,6 +177,7 @@
 	"errors_exam_adjustment_duplicate": "\"{username}\" is listed more than once",
 	"errors_exam_adjustment_exists": "\"{username}\" already has an active adjustment on this question",
 	"errors_exam_adjustment_set_exists": "\"{username}\" already has an active replacement grade: edit the existing one",
+	"errors_exam_adjustment_set_exists_edit": "This attempt already has an active replacement grade: edit the existing one",
 	"errors_exam_adjustment_practice": "Practice exams take no adjustments",
 	"errors_exam_adjustment_question": "\"{question}\" is not a question of this exam"
 }

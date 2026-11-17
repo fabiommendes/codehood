@@ -469,7 +469,8 @@ test("update: turning a row into a second active SET is refused", async () => {
 			ctx.as,
 		),
 	);
-	expect(error.errors).toHaveProperty("op");
+	expect(error.errors.op?.[0]).toMatchObject({ code: "not-unique" });
+	expect(error.errors.op?.[0]?.message).toMatch(/edit/i);
 
 	// The SET itself can change.
 	const edited = await db.examAdjustment.update(
@@ -478,6 +479,51 @@ test("update: turning a row into a second active SET is refused", async () => {
 		ctx.as,
 	);
 	expect(edited.value).toBe("0.9");
+});
+
+test("update: turning a row into SET works once the other SET is revoked", async () => {
+	const ctx = await setup();
+	const ana = await attempt(ctx);
+	const [set] = await sanction(ctx, [ana.student.username], {
+		op: "SET",
+		value: "0.5",
+	});
+	const [offset] = await sanction(ctx, [ana.student.username], {
+		op: "OFFSET",
+		value: "0.1",
+	});
+	await db.examAdjustment.revoke(pkOf(ctx, set ?? { publicId: "" }), ctx.as);
+
+	const turned = await db.examAdjustment.update(
+		pkOf(ctx, offset ?? { publicId: "" }),
+		{ op: "SET", value: "0.9" },
+		ctx.as,
+	);
+
+	expect(turned).toMatchObject({ op: "SET", value: "0.9" });
+});
+
+test("update: switching the operation of a question row is refused", async () => {
+	const ctx = await setup();
+	const ana = await attempt(ctx);
+	const [onQuestion] = await sanction(ctx, [ana.student.username], {
+		question: ctx.q1.slug,
+	});
+
+	const error = await invalid(
+		db.examAdjustment.update(
+			pkOf(ctx, onQuestion ?? { publicId: "" }),
+			{ op: "OFFSET", value: "0.1" },
+			ctx.as,
+		),
+	);
+
+	expect(Object.keys(error.errors)).toEqual(["op"]);
+	const kept = await db.examAdjustment.findOne(
+		pkOf(ctx, onQuestion ?? { publicId: "" }),
+		ctx.as,
+	);
+	expect(kept).toMatchObject({ op: "FACTOR", value: "0" });
 });
 
 test("update and revoke: an unknown sanction is NotFound", async () => {
@@ -823,6 +869,10 @@ const values: Array<[string, boolean, string, boolean]> = [
 	["FACTOR", false, "0.", false],
 	["FACTOR", false, " 0.5", false],
 	["FACTOR", false, "1e0", false],
+	["FACTOR", false, "00.5", false],
+	["FACTOR", false, "0.50", false],
+	["FACTOR", false, "2.0", false],
+	["SET", false, "-0", false],
 ];
 
 for (const [op, onQuestion, value, ok] of values) {
@@ -841,7 +891,9 @@ for (const [op, onQuestion, value, ok] of values) {
 			expect(await stored(ctx)).toBe(1);
 		} else {
 			const error = await invalid(attempted);
-			expect(Object.keys(error.errors).length).toBeGreaterThan(0);
+			// A question only takes FACTOR, so the operation is what is wrong with the others.
+			const field = onQuestion && op !== "FACTOR" ? "op" : "value";
+			expect(Object.keys(error.errors)).toEqual([field]);
 			expect(await stored(ctx)).toBe(0);
 		}
 	});

@@ -1269,7 +1269,7 @@ test("instructor: grade an exam whose questions have different weights", async (
  */
 test("instructor: sanction a student's grade", async ({ page }) => {
 	const world = await gradedExam("honour-ins");
-	const { ana, caio } = world;
+	const { ana, caio, davi } = world;
 	const NEW_NOTES = "Confirmed by the neighbour, who admitted it";
 	const FACTOR_ERROR = "A multiplier is between 0 and 2.";
 	await world.release();
@@ -1317,7 +1317,7 @@ test("instructor: sanction a student's grade", async ({ page }) => {
 			"First question",
 			"Second question",
 		]);
-		await dialog.getByLabel("Factor").fill("250");
+		await dialog.getByLabel("% of the grade kept").fill("250");
 		await dialog.getByRole("button", { name: "Sanction", exact: true }).click();
 
 		await expect(dialog.getByText(FACTOR_ERROR)).toBeVisible();
@@ -1327,7 +1327,7 @@ test("instructor: sanction a student's grade", async ({ page }) => {
 	await test.step("two students are sanctioned on the whole exam at once", async () => {
 		const dialog = page.getByRole("dialog");
 		await dialog.getByLabel("Target").selectOption({ label: "Whole exam" });
-		await dialog.getByLabel("Factor").fill("0");
+		await dialog.getByLabel("% of the grade kept").fill("0");
 		await dialog.getByLabel("Reason", { exact: true }).fill(REASON);
 		await dialog.getByLabel("Private notes").fill(NOTES);
 		await dialog.getByRole("button", { name: "Sanction", exact: true }).click();
@@ -1346,28 +1346,52 @@ test("instructor: sanction a student's grade", async ({ page }) => {
 		).toBeDisabled();
 	});
 
-	await test.step("sanctioning the same student on the whole exam again is accepted: factors compose", async () => {
-		await resultRow("Ana Prado")
-			.getByRole("checkbox", { name: "Select Ana Prado" })
-			.check();
-		await page.getByRole("button", { name: "Sanction selected" }).click();
-		const dialog = page.getByRole("dialog");
-		await dialog.getByRole("button", { name: "Sanction", exact: true }).click();
+	await test.step("zeroing the same question twice shows the error in the dialog, then the extra sanction is revoked", async () => {
+		const pick = async () => {
+			await resultRow("Davi Rocha")
+				.getByRole("checkbox", { name: "Select Davi Rocha" })
+				.check();
+			await page.getByRole("button", { name: "Sanction selected" }).click();
+			const dialog = page.getByRole("dialog");
+			await dialog
+				.getByLabel("Target")
+				.selectOption({ label: "First question" });
+			await dialog
+				.getByRole("button", { name: "Sanction", exact: true })
+				.click();
+			return dialog;
+		};
 
-		await expect(dialog).toBeHidden();
+		const first = await pick();
+		await expect(first).toBeHidden();
 		expect(await active()).toHaveLength(3);
-		// Back to the state the next steps read: the extra row goes away.
-		const extra = (await active()).at(-1);
-		await prisma.examAdjustment.delete({
-			where: { publicId: extra?.publicId ?? "" },
-		});
-		await page.reload();
-		await resultRow("Ana Prado")
-			.getByRole("checkbox", { name: "Select Ana Prado" })
-			.uncheck();
+
+		await resultRow("Davi Rocha")
+			.getByRole("checkbox", { name: "Select Davi Rocha" })
+			.waitFor();
+		const second = await pick();
+		await expect(second.getByRole("alert")).toBeVisible();
+		await expect(second.getByRole("alert")).toContainText(davi.username);
+		expect(await active()).toHaveLength(3);
+		await second.getByRole("button", { name: "Cancel" }).click();
+		await expect(second).toBeHidden();
+
+		// Back to the state the next steps read: the extra sanction is revoked on the sanctions page.
+		await page.goto(`${world.examUrl}/sanctions`);
+		await sanctionRow("Davi Rocha")
+			.getByRole("button", { name: "Revoke" })
+			.click();
+		const dialog = page.getByRole("dialog", { name: "Revoke sanction" });
+		await dialog
+			.getByRole("button", { name: "Revoke sanction", exact: true })
+			.click();
+		await expect(dialog).toBeHidden();
+		await expect(sanctionRow("Davi Rocha")).toContainText("Revoked");
+		expect(await active()).toHaveLength(2);
 	});
 
 	await test.step("the sanctions page lists both with their notes", async () => {
+		await page.goto(`${world.examUrl}/results`);
 		await expect(
 			page.getByRole("link", { name: /^Sanctions\s*2$/ }).first(),
 		).toBeVisible();
@@ -1395,17 +1419,17 @@ test("instructor: sanction a student's grade", async ({ page }) => {
 			.getByRole("button", { name: "Edit" })
 			.click();
 		const dialog = page.getByRole("dialog", { name: "Edit sanction" });
-		await expect(dialog.getByLabel("Factor")).toHaveValue("0");
+		await expect(dialog.getByLabel("% of the grade kept")).toHaveValue("0");
 		await expect(dialog.getByLabel("Reason", { exact: true })).toHaveValue(
 			REASON,
 		);
 		await expect(dialog.getByLabel("Private notes")).toHaveValue(NOTES);
 
-		await dialog.getByLabel("Factor").fill("250");
+		await dialog.getByLabel("% of the grade kept").fill("250");
 		await dialog.getByRole("button", { name: "Save" }).click();
 		await expect(dialog.getByText(FACTOR_ERROR)).toBeVisible();
 
-		await dialog.getByLabel("Factor").fill("0");
+		await dialog.getByLabel("% of the grade kept").fill("0");
 		await dialog.getByLabel("Private notes").fill(NEW_NOTES);
 		await dialog.getByRole("button", { name: "Save" }).click();
 

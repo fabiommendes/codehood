@@ -90,6 +90,7 @@ const conversions: Array<[string, string, string]> = [
 	["OFFSET", "10", "0.1"],
 	["OFFSET", "-10", "-0.1"],
 	["OFFSET", "5", "0.05"],
+	["FACTOR", "33.33", "0.3333"],
 	["OFFSET", "0,5", "0.005"],
 	["OFFSET", "100", "1"],
 	["OFFSET", "-100", "-1"],
@@ -163,4 +164,29 @@ test("create form: an unknown operation is refused", () => {
 			["value", "10"],
 		]).success,
 	).toBe(false);
+});
+
+test("create form: a question and a value of 0 parse as a zeroed question", () => {
+	const parsed = parseCreate([
+		["op", "FACTOR"],
+		["value", "0"],
+		["question", "q1"],
+	]);
+
+	expect(parsed.success).toBe(true);
+	expect(parsed.data).toMatchObject({
+		op: "FACTOR",
+		value: "0",
+		question: "q1",
+	});
+});
+
+test("create form: a question without a value is refused on value", () => {
+	const parsed = parseCreate([
+		["op", "FACTOR"],
+		["question", "q1"],
+	]);
+
+	expect(parsed.success).toBe(false);
+	expect(parsed.error?.issues.map((issue) => issue.path[0])).toContain("value");
 });

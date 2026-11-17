@@ -177,6 +177,7 @@
 	"errors_exam_adjustment_duplicate": "\"{username}\" aparece mais de uma vez",
 	"errors_exam_adjustment_exists": "\"{username}\" já tem um ajuste ativo nesta questão",
 	"errors_exam_adjustment_set_exists": "\"{username}\" já tem uma nota substituta ativa: edite a existente",
+	"errors_exam_adjustment_set_exists_edit": "Esta tentativa já tem uma nota substituta ativa: edite a existente",
 	"errors_exam_adjustment_practice": "Provas de prática não têm ajustes",
 	"errors_exam_adjustment_question": "\"{question}\" não é uma questão desta prova"
 }

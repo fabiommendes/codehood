@@ -585,7 +585,7 @@ async function checkUpdate(
 				op: [
 					{
 						code: "not-unique",
-						message: m.errors_exam_adjustment_set_exists({ username: "" }),
+						message: m.errors_exam_adjustment_set_exists_edit(),
 					},
 				],
 			});

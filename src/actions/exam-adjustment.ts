@@ -12,7 +12,7 @@ import { withServiceErrors } from "./helpers";
 
 export const examAdjustment = {
 	/**
-	 * Sanctions each of `usernames` on the exam, or on one of its questions (instructor only).
+	 * Adjusts the score of each of `usernames` on the exam, or on one of its questions (instructor only).
 	 */
 	create: defineAction({
 		input: examAdjustmentCreateForm,
@@ -36,7 +36,7 @@ export const examAdjustment = {
 	}),
 
 	/**
-	 * Changes the value, reason or notes of an active sanction (instructor only).
+	 * Changes the operation, value, reason or notes of an active adjustment (instructor only).
 	 */
 	update: defineAction({
 		input: examAdjustmentUpdateForm,
@@ -57,7 +57,7 @@ export const examAdjustment = {
 	}),
 
 	/**
-	 * Lifts an active sanction (instructor only).
+	 * Lifts an active adjustment (instructor only).
 	 */
 	revoke: defineAction({
 		input: examAdjustmentRevokeForm,

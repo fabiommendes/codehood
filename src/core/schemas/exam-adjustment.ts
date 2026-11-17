@@ -17,7 +17,10 @@ export type ExamAdjustmentOp = z.infer<typeof examAdjustmentOp>;
 /// A signed decimal string, such as `"0"`, `"0.25"` or `"-0.1"`: no exponent, no comma, no padding.
 export const adjustmentValue = z
 	.string()
-	.regex(/^-?\d+(\.\d+)?$/, m.forms_schema_adjustment_value_invalid())
+	.regex(
+		/^(?:0|-?(?:0\.\d*[1-9]|[1-9]\d*(?:\.\d*[1-9])?))$/,
+		m.forms_schema_adjustment_value_invalid(),
+	)
 	.openapi({ example: "0.5" });
 
 /**
@@ -101,12 +104,16 @@ function shiftDecimal(text: string, places: number): string {
 	return shifted === "0" ? "0" : sign + shifted;
 }
 
-/// A form's percentage as the stored fraction: `"50"` is `"0.5"`, and a decimal comma counts as a point. Text that is not a number passes unchanged.
+/**
+ * A form's percentage as the stored fraction: `"50"` is `"0.5"`, and a decimal comma counts as a point.
+ *
+ * Text that is not a number passes unchanged.
+ */
 export function percentToFraction(text: string): string {
 	return shiftDecimal(text.trim().replace(",", "."), -2);
 }
 
-/// The stored fraction as a form's percentage: `"0.5"` is `"50"`.
+/** The stored fraction as a form's percentage: `"0.5"` is `"50"`. */
 export function fractionToPercent(text: string): string {
 	return shiftDecimal(text, 2);
 }

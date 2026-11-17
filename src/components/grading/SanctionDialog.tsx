@@ -146,7 +146,10 @@ export default function SanctionDialog(
 								)}
 							</For>
 						</fieldset>
-						<Show when={target() === ""}>
+						<Show
+							when={target() === ""}
+							fallback={<input type="hidden" name="value" value="0" />}
+						>
 							<Field
 								{...field("value")}
 								control={{ inputmode: "decimal", autocomplete: "off" }}
