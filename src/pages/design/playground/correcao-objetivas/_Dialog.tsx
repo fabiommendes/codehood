@@ -1,0 +1,68 @@
+import { createEffect, type JSX } from "solid-js";
+import Icon from "./_Icon";
+
+interface Props {
+	/// Unique in the page: names the dialog by its heading.
+	id: string;
+	title: JSX.Element;
+	open: boolean;
+	/// Called when the dialog closes by itself (Escape, backdrop, button).
+	onClose: () => void;
+	children: JSX.Element;
+}
+
+/// A wide DaisyUI modal on a `<dialog>` that follows `open`.
+export default function Dialog(props: Props): JSX.Element {
+	let dialog: HTMLDialogElement | undefined;
+	createEffect(() => {
+		if (!dialog) return;
+		if (props.open && !dialog.open) dialog.showModal();
+		else if (!props.open && dialog.open) dialog.close();
+	});
+	return (
+		<dialog
+			ref={dialog}
+			class="modal"
+			aria-labelledby={`${props.id}-title`}
+			onClose={() => props.onClose()}
+		>
+			<div class="modal-box max-w-4xl whitespace-normal text-left font-normal text-base-content">
+				<h3 id={`${props.id}-title`} class="text-lg font-bold">
+					{props.title}
+				</h3>
+				<div class="mt-4">{props.children}</div>
+				<div class="modal-action">
+					<form method="dialog">
+						<button type="submit" class="btn btn-sm">
+							Fechar
+						</button>
+					</form>
+				</div>
+			</div>
+			<form method="dialog" class="modal-backdrop">
+				<button type="submit">Fechar</button>
+			</form>
+		</dialog>
+	);
+}
+
+/// Icon button that opens the students of a row.
+export function PeopleButton(props: {
+	label: string;
+	active?: boolean;
+	onClick: () => void;
+	disabled?: boolean;
+}): JSX.Element {
+	return (
+		<button
+			type="button"
+			class="btn btn-ghost btn-sm btn-square"
+			aria-label={props.label}
+			title={props.label}
+			disabled={props.disabled}
+			onClick={props.onClick}
+		>
+			<Icon name="people" />
+		</button>
+	);
+}

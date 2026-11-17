@@ -1,7 +1,11 @@
 ---
 /// The frame every type shares: header, summary line, needs attention, [type body], changed by hand, statement and key.
 import QuestionNumber from "@/components/exam/QuestionNumber.astro";
+import AnswerKey from "@/components/grading/AnswerKey";
 import { type Fixture, fmt, studentLabel } from "./_data";
+import { docOf } from "./_docs";
+import Icon from "./_Icon.astro";
+import Overrides from "./_Overrides";
 import Shell from "./_Shell.astro";
 
 interface Props {
@@ -10,7 +14,6 @@ interface Props {
 
 const { q } = Astro.props;
 const names = Astro.url.searchParams.get("names") === "1";
-const toggle = names ? Astro.url.pathname : `${Astro.url.pathname}?names=1`;
 const back = "/design/playground/correcao-objetivas";
 const regrades = "/cs101/ada_2026-2/exams/quiz-01/regrades";
 ---
@@ -18,13 +21,22 @@ const regrades = "/cs101/ada_2026-2/exams/quiz-01/regrades";
 <Shell title={q.title}>
   <a href={back} class="text-sm text-muted hover:text-primary">← Mockups da correção</a>
   <p class="mt-2 text-sm"><QuestionNumber number={q.position} points={q.points} /> <span class="badge badge-ghost badge-sm ml-1">{q.typeLabel}</span></p>
-  <h2 class="page-subheader">{q.title}</h2>
+  <div class="relative flex items-center gap-2">
+    <a href="#" class="btn btn-ghost btn-sm btn-square text-base-content/60 lg:absolute lg:right-full lg:mr-1" aria-label="Questão anterior" title="Questão anterior">
+      <svg viewBox="0 0 24 24" class="size-5" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m15 5-7 7 7 7"></path></svg>
+    </a>
+    <h2 class="page-subheader">{q.title}</h2>
+    <a href="#" class="btn btn-ghost btn-sm btn-square text-base-content/60" aria-label="Próxima questão" title="Próxima questão">
+      <svg viewBox="0 0 24 24" class="size-5" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m9 5 7 7-7 7"></path></svg>
+    </a>
+  </div>
 
-  <nav class="mt-3 flex gap-4 text-sm">
-    <a href="#" class="link">← Anterior</a>
-    <a href="#" class="link">Próxima →</a>
-    <a href={toggle} role="switch" aria-checked={names ? "true" : "false"} class="link ml-auto">{names ? "Ocultar nomes" : "Mostrar nomes"}</a>
-  </nav>
+  <details class="mt-4 overflow-hidden rounded-box border border-edge bg-base-200/25 shadow-sm">
+    <summary class="cursor-pointer bg-base-200/50 px-4 py-2 text-sm font-medium">Enunciado e gabarito</summary>
+    <div class="border-t border-edge p-6">
+      <AnswerKey client:load question={docOf(q)} />
+    </div>
+  </details>
 
   <p class="mt-6 flex flex-wrap items-center gap-x-3 gap-y-1 text-lg" data-testid="summary">
     <span><strong>{q.answers}</strong> respostas</span>
@@ -53,11 +65,11 @@ const regrades = "/cs101/ada_2026-2/exams/quiz-01/regrades";
                   <button type="button" class="btn btn-primary btn-sm">Dar nota</button>
                 </form>
               )}
-              {row.kind === "regrade" && <a href={regrades} class="btn btn-outline btn-sm">Ver pedido</a>}
+              {row.kind === "regrade" && <a href={regrades} class="btn btn-ghost btn-sm btn-square" aria-label="Ver pedido" title="Ver pedido"><Icon name="message" /></a>}
               {row.kind === "suspicious" && (
                 <span class="flex gap-2">
-                  <button type="button" class="btn btn-ghost btn-sm">Ignorar</button>
-                  <button type="button" class="btn btn-outline btn-error btn-sm">Aplicar sanção</button>
+                  <button type="button" class="btn btn-ghost btn-sm btn-square" aria-label="Ignorar" title="Ignorar"><Icon name="eyeOff" /></button>
+                  <button type="button" class="btn btn-ghost btn-sm btn-square text-error" aria-label="Aplicar sanção" title="Aplicar sanção"><Icon name="gavel" /></button>
                 </span>
               )}
             </li>
@@ -70,36 +82,23 @@ const regrades = "/cs101/ada_2026-2/exams/quiz-01/regrades";
   <slot />
 
   {q.overrides.length > 0 && (
-    <details class="mt-8 rounded-box border border-edge bg-base-100">
-      <summary class="cursor-pointer px-4 py-2 text-sm font-medium">Alteradas à mão ({q.overrides.length})</summary>
-      <ul class="border-t border-edge">
-        {q.overrides.map((o) => (
-          <li class="flex flex-wrap items-center gap-x-4 gap-y-1 border-t border-edge px-4 py-2 text-sm first:border-t-0">
-            <span class="w-44 shrink-0 font-medium">{studentLabel(o.student, names)}</span>
-            <span class={`badge badge-sm ${o.kind === "Sanção" ? "badge-error badge-soft" : "badge-info badge-soft"}`}>{o.kind}</span>
-            <span class="tabular-nums"><span class="text-muted line-through">{o.auto}%</span> → {o.final}%</span>
-            <span class="min-w-40 flex-1 text-muted">{o.comment} <span class="text-xs">({o.when})</span></span>
-            <button type="button" class="btn btn-ghost btn-xs">Alterar</button>
-            <button type="button" class="btn btn-ghost btn-xs text-error">Desfazer</button>
-          </li>
-        ))}
-      </ul>
-    </details>
+    <section class="mt-8">
+      <h3 class="page-subsubheader">Alteradas à mão ({q.overrides.length})</h3>
+      <div class="mt-3">
+        <Overrides
+          client:load
+          rows={q.overrides.map((o) => ({ name: studentLabel(o.student, names), kind: o.kind, auto: o.auto, final: o.final, comment: o.comment, when: o.when }))}
+        />
+      </div>
+    </section>
   )}
 
-  <details class="mt-4 rounded-box border border-edge bg-base-100">
-    <summary class="cursor-pointer px-4 py-2 text-sm font-medium">Enunciado e gabarito</summary>
-    <div class="border-t border-edge p-4">
-      <p>{q.statement}</p>
-      <ul class="mt-3 flex flex-col gap-1 text-sm">
-        {q.key.map((k) => (
-          <li class={k.ok ? "font-medium text-success" : "text-base-content/70"}>{k.ok ? "✓ " : ""}<span class="whitespace-pre font-mono-none">{k.text}</span></li>
-        ))}
-      </ul>
-    </div>
-  </details>
-  <div class="mt-3 flex flex-wrap items-center gap-4">
-    <a href="#" class="btn btn-outline btn-sm">Editar questão</a>
-    <p role="note" class="alert alert-info alert-soft grow py-2 text-sm">Fixar uma nova versão da questão na prova não corrige de novo as respostas que já existem. Por enquanto, use "Alterar nota".</p>
+  <p role="note" class="alert alert-info alert-soft mt-8 py-2 text-sm">Fixar uma nova versão da questão na prova não corrige de novo as respostas que já existem. Por enquanto, use "Alterar nota".</p>
+
+  <div class="fab">
+    <a href="#" class="btn btn-lg btn-circle btn-primary" aria-label="Editar questão" title="Editar questão">
+      <Icon name="pencil" />
+    </a>
   </div>
+  <div class="h-20" aria-hidden="true"></div>
 </Shell>

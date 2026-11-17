@@ -784,7 +784,7 @@ export const ATTEMPT_QUESTIONS: AttemptQuestion[] = [
 	},
 ];
 
-/// How a student shows up in the mockups: the name only when the switch is on.
-export function studentLabel(s: Student, names: boolean): string {
-	return names ? s.name : `Aluno ${String(s.id).padStart(2, "0")}`;
+/// How a student shows up in the mockups: always by name.
+export function studentLabel(s: Student, _names?: boolean): string {
+	return s.name;
 }

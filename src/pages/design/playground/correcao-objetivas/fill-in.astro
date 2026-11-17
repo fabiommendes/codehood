@@ -1,7 +1,9 @@
 ---
 import { fillIn, type Member as M } from "./_data";
 import Frame from "./_Frame.astro";
-import Member from "./_Member.astro";
+import GroupedAnswers from "./_GroupedAnswers";
+import Members from "./_Members";
+import { groupRows, memberRow } from "./_rows";
 
 export const prerender = false;
 const q = fillIn();
@@ -18,50 +20,35 @@ q.blocks.forEach((block, i) => {
 	}
 });
 const missed = [...wrongBy.values()]
-	.map((e) => ({
-		...e,
-		member: {
-			...e.member,
-			auto: Math.round(
-				((q.blocks.length - e.misses.length) / q.blocks.length) * 100,
-			),
-		},
-	}))
-	.sort((a, b) => b.misses.length - a.misses.length);
+	.sort((a, b) => b.misses.length - a.misses.length)
+	.map((e) =>
+		memberRow(
+			{
+				...e.member,
+				auto: Math.round(
+					((q.blocks.length - e.misses.length) / q.blocks.length) * 100,
+				),
+			},
+			names,
+			e.misses.join("  ·  "),
+		),
+	);
 ---
 
 <Frame q={q}>
   <section class="mt-8">
     <h3 class="page-subsubheader">Valores por lacuna</h3>
-    <div class="mt-3 grid gap-4 lg:grid-cols-3">
-      {q.blocks.map((block, i) => {
-        const total = block.groups.reduce((n, g) => n + g.members.length, 0);
-        return (
-          <div class="overflow-hidden rounded-box border border-edge bg-base-100">
-            <p class="border-b border-edge px-3 py-2 text-sm font-medium"><span class="font-display font-semibold">L{i + 1}</span> <span class="font-mono text-xs text-muted">{block.title?.split(": ")[1]}</span></p>
-            <table class="table table-sm">
-              <thead><tr><th>Valor</th><th class="text-right">Alunos</th><th class="text-center">Aceita?</th></tr></thead>
-              <tbody>
-                {block.groups.map((g) => (
-                  <tr>
-                    <td class="font-mono">{g.label}</td>
-                    <td class="text-right tabular-nums">{g.members.length} <span class="text-muted">({Math.round((g.members.length / total) * 100)}%)</span></td>
-                    <td class="text-center">{g.score === 100 ? <span class="badge badge-success badge-soft badge-sm">sim</span> : <span class="badge badge-ghost badge-sm">não</span>}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        );
-      })}
-    </div>
+    {q.blocks.map((block) => (
+      <div class="mt-4">
+        <h4 class="mb-2 text-sm font-medium">{block.title}</h4>
+        <GroupedAnswers client:load rows={groupRows(block, names)} responseHeader="Valor" mode="accepted" />
+      </div>
+    ))}
   </section>
 
   <section class="mt-8">
     <h3 class="page-subsubheader">Quem errou alguma lacuna ({missed.length})</h3>
     <p class="mt-1 text-sm text-muted">A nota da questão é a parte de lacunas certas. Alterar a nota vale para a questão inteira.</p>
-    <ul class="mt-3 max-h-96 overflow-y-auto rounded-box border border-edge bg-base-100">
-      {missed.map((e) => <Member member={e.member} names={names} detail={e.misses.join("  ·  ")} />)}
-    </ul>
+    <div class="mt-3"><Members client:load rows={missed} detailTitle="Lacunas erradas" note={q.changeNote} /></div>
   </section>
 </Frame>

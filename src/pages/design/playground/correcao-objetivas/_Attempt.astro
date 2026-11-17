@@ -2,6 +2,7 @@
 /// The student attempt page with a grade change, either per question or as a bonus on the exam.
 import QuestionNumber from "@/components/exam/QuestionNumber.astro";
 import { ATTEMPT_QUESTIONS, ATTEMPT_STUDENT, fmt } from "./_data";
+import Icon from "./_Icon.astro";
 import Shell from "./_Shell.astro";
 
 interface Props {
@@ -23,7 +24,15 @@ const back = "/design/playground/correcao-objetivas";
 
 <Shell title={ATTEMPT_STUDENT.name}>
   <a href={back} class="text-sm text-muted hover:text-primary">← Mockups da correção</a>
-  <h2 class="mt-6 page-subheader">{ATTEMPT_STUDENT.name}</h2>
+  <div class="relative mt-6 flex items-center gap-2">
+    <a href="#" class="btn btn-ghost btn-sm btn-square text-base-content/60 lg:absolute lg:right-full lg:mr-1" aria-label="Aluno anterior" title="Aluno anterior">
+      <svg viewBox="0 0 24 24" class="size-5" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m15 5-7 7 7 7"></path></svg>
+    </a>
+    <h2 class="page-subheader">{ATTEMPT_STUDENT.name}</h2>
+    <a href="#" class="btn btn-ghost btn-sm btn-square text-base-content/60" aria-label="Próximo aluno" title="Próximo aluno">
+      <svg viewBox="0 0 24 24" class="size-5" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m9 5 7 7-7 7"></path></svg>
+    </a>
+  </div>
 
   <dl class="mt-4 grid grid-cols-1 gap-x-8 gap-y-3 rounded-box border border-edge bg-base-100 p-6 sm:grid-cols-3">
     <div><dt class="text-sm text-muted">Início</dt><dd class="mt-0.5 font-medium">12/11/2026 14:00</dd></div>
@@ -45,12 +54,12 @@ const back = "/design/playground/correcao-objetivas";
       <p class="font-semibold">Bônus de +{fmt(BONUS, 1)} pontos na nota da prova</p>
       <p>Motivo: resolveu o desafio de ordenação em aula.</p>
       <p class="mt-1 text-muted">O total soma o bônus à nota das questões e é limitado a 100.</p>
-      <p class="mt-1 flex gap-3"><a class="link" href="#">Alterar</a><a class="link text-error" href="#">Remover</a></p>
+      <p class="mt-2 flex gap-2"><button type="button" class="btn btn-outline btn-sm">Alterar</button><button type="button" class="btn btn-outline btn-error btn-sm">Remover</button></p>
     </div>
   )}
 
   <div class="mt-4 flex flex-wrap items-start gap-3">
-    <button type="button" class="btn btn-outline btn-error btn-sm">Aplicar sanção à prova</button>
+    <button type="button" class="btn btn-ghost btn-sm btn-square text-error" aria-label="Aplicar sanção à prova" title="Aplicar sanção à prova"><Icon name="gavel" /></button>
     {!perQuestion && (
       <details class="rounded-box border border-edge bg-base-100" open>
         <summary class="btn btn-outline btn-success btn-sm">Alterar o bônus</summary>
@@ -108,8 +117,9 @@ const back = "/design/playground/correcao-objetivas";
                   {changed && <span class="min-w-40 flex-1 text-sm text-muted">{q.override?.comment}{q.auto === null ? " Nota atribuída sem resposta enviada." : ""}</span>}
                   {!changed && <span class="flex-1"></span>}
                   {!changed && q.auto !== 100 && <button type="button" class="btn btn-success btn-soft btn-xs">Marcar como certa</button>}
-                  <span class="btn btn-ghost btn-xs">{changed ? "Alterar" : "Outra nota…"}</span>
-                  {changed && <button type="button" class="btn btn-ghost btn-xs text-error">Desfazer</button>}
+                  <span class="btn btn-ghost btn-sm btn-square" role="img" aria-label="Alterar nota" title="Alterar nota"><Icon name="pencil" />
+                  </span>
+                  {changed && <button type="button" class="btn btn-ghost btn-sm btn-square text-error" aria-label="Desfazer" title="Desfazer"><Icon name="undo" /></button>}
                 </summary>
                 <form class="mt-3 flex flex-wrap items-end gap-3 rounded-box bg-base-200/40 p-3">
                   <label class="flex flex-col gap-1 text-xs text-muted">Nota (0 a 100)

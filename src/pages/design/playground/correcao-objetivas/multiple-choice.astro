@@ -9,5 +9,5 @@ const names = Astro.url.searchParams.get("names") === "1";
 ---
 
 <Frame q={q}>
-  {q.blocks.map((block) => <Groups block={{ ...block, title: block.title ?? "Respostas agrupadas" }} names={names} />)}
+  {q.blocks.map((block) => <Groups block={{ ...block, title: block.title ?? "Respostas agrupadas" }} names={names} lead="radio" />)}
 </Frame>
