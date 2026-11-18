@@ -7,10 +7,7 @@ import type { questionSchema } from "@/core/schemas/question";
 import { db } from "@/db";
 import { prisma } from "@/db/client";
 import type { Question, QuestionPublic } from "@/db/services/question.service";
-import {
-	persistedExamFactory,
-	persistedOpenExam,
-} from "@/fixtures/exam.factory";
+import { persistedOpenExam } from "@/fixtures/exam.factory";
 import { persistedUserFactory } from "@/fixtures/user.factory";
 import type { PublicQuestion } from "@/mdq";
 
@@ -318,7 +315,7 @@ test("findMany() gives the instructor the full document, including private field
 	).toHaveProperty("correct");
 });
 
-test("findMany() gives an enrolled student only the public half", async () => {
+test("findMany() gives the author the public half on request and an enrolled student nothing", async () => {
 	const { course, opts } = await makeCourse();
 	const student = await persistedUserFactory.create({ role: "STUDENT" });
 	await db.enrollment.create(
@@ -337,9 +334,13 @@ test("findMany() gives an enrolled student only the public half", async () => {
 	);
 	await persistedOpenExam(course.id, ["q1"]);
 
+	expect(
+		await db.question.findMany({ course: course.id }, { actor: student }),
+	).toEqual([]);
+
 	const questions = await db.question.findMany(
-		{ course: course.id },
-		{ actor: student },
+		{ course: course.id, public: true },
+		opts,
 	);
 
 	expect(questions).toHaveLength(1);
@@ -810,7 +811,7 @@ test("findMany() returns exactly the questions the read permission allows, for e
 		}
 	}
 
-	// An open exam releases the published and the hidden question of each course.
+	// An open exam holds the published and the hidden question of each course; it gives a member no read through the question service.
 	for (const { course } of [a, b]) {
 		await persistedOpenExam(course.id, ["published", "hidden"]);
 	}
@@ -830,10 +831,7 @@ test("findMany() returns exactly the questions the read permission allows, for e
 			},
 		},
 	});
-	const stored = rows.map((row) => ({
-		...row,
-		released: row.slug === "published" || row.slug === "hidden",
-	}));
+	const stored = rows;
 	expect(stored).toHaveLength(8);
 
 	for (const actor of [SYSTEM, a.opts.actor, enrolled, admin] as Actor[]) {
@@ -881,14 +879,9 @@ test("findMany() returns exactly the questions the read permission allows, for e
 			)
 			.map((q) => `${q.courseId === a.course.id ? "a" : "b"}/${q.slug}`)
 			.sort();
-	expect(visible(enrolled, true)).toEqual(["a/hidden", "a/published"]);
+	expect(visible(enrolled, true)).toEqual([]);
 	expect(visible(enrolled, false)).toEqual([]);
-	expect(visible(admin, true)).toEqual([
-		"a/hidden",
-		"a/published",
-		"b/hidden",
-		"b/published",
-	]);
+	expect(visible(admin, true)).toEqual([]);
 	expect(visible(admin, false)).toEqual([]);
 	expect(visible(a.opts.actor, false)).toEqual([
 		"a/archived",
@@ -898,7 +891,7 @@ test("findMany() returns exactly the questions the read permission allows, for e
 	]);
 });
 
-test("an enrolled student sees only the questions an open exam holds, never a draft", async () => {
+test("an enrolled student reads no question through the service, even one an open exam holds", async () => {
 	const { course, opts } = await makeCourse();
 	const student = await persistedUserFactory.create({ role: "STUDENT" });
 	await db.enrollment.create(
@@ -917,36 +910,26 @@ test("an enrolled student sees only the questions an open exam holds, never a dr
 			opts,
 		);
 	}
-	await db.question.create(
-		{
-			course: course.id,
-			slug: "loose",
-			status: "PUBLISHED",
-			version: "v1",
-			question: multipleChoice,
-		},
-		opts,
-	);
 	await persistedOpenExam(course.id, ["draft", "published", "hidden"]);
 
-	const listed = await db.question.findMany(
-		{ course: course.id },
-		{ actor: student },
-	);
-	expect(listed.map((q) => q.slug).sort()).toEqual(["hidden", "published"]);
+	expect(
+		await db.question.findMany({ course: course.id }, { actor: student }),
+	).toEqual([]);
 
 	// Hidden as if they never existed, not refused.
-	for (const slug of ["draft", "archived", "loose"]) {
-		expect(
-			await db.question.findOne(
-				{ course: course.id, slug },
-				{ actor: student },
-			),
-		).toBeNull();
+	for (const slug of ["draft", "published", "hidden", "archived"]) {
+		for (const isPublic of [undefined, true]) {
+			expect(
+				await db.question.findOne(
+					{ course: course.id, slug, public: isPublic },
+					{ actor: student },
+				),
+			).toBeNull();
+		}
 	}
 });
 
-test("a scheduled exam shows its questions to a student only from the moment it opens for them", async () => {
+test("a scheduled exam never shows its questions to a student through the service, open or not", async () => {
 	const { course, opts } = await makeCourse();
 	const [onTime, makeup] = await Promise.all([
 		persistedUserFactory.create({ role: "STUDENT" }),
@@ -999,64 +982,20 @@ test("a scheduled exam shows its questions to a student only from the moment it 
 	expect(await reads(makeup)).toBe(false);
 	expect(await reads(opts.actor)).toBe(true);
 
-	// Open: the class reads it, the makeup student still waits.
+	// Open: still not through the service, a student reads it by grant.
 	await move({ scheduledAt: new Date(Date.now() - 10 * 60_000) });
-	expect(await reads(onTime)).toBe(true);
+	expect(await reads(onTime)).toBe(false);
 	expect(await reads(makeup)).toBe(false);
 
-	// Closed for the class: it stays readable.
+	// Closed for the class.
 	await move({ scheduledAt: new Date(Date.now() - 3 * hour) });
-	expect(await reads(onTime)).toBe(true);
+	expect(await reads(onTime)).toBe(false);
 
-	// An exam taken back to draft releases nothing.
+	// Taken back to draft.
 	await move({ status: "DRAFT" });
 	expect(await reads(onTime)).toBe(false);
+	expect(await reads(opts.actor)).toBe(true);
 });
-
-for (const withdrawn of ["HIDDEN", "ARCHIVED"] as const) {
-	test(`a ${withdrawn.toLowerCase()} question an exam pins stays readable to an enrolled student`, async () => {
-		const { course, opts } = await makeCourse();
-		const student = await persistedUserFactory.create({ role: "STUDENT" });
-		await db.enrollment.create(
-			{ course: course.id, username: student.username },
-			FULL_ACCESS,
-		);
-		for (const slug of ["pinned", "loose"]) {
-			await db.question.create(
-				{
-					course: course.id,
-					slug,
-					status: "PUBLISHED",
-					version: "v1",
-					question: multipleChoice,
-				},
-				opts,
-			);
-		}
-		await persistedExamFactory.create({
-			course: course.id,
-			status: "ONGOING",
-			questions: [{ slug: "pinned", version: "v1" }],
-		});
-		for (const slug of ["pinned", "loose"]) {
-			const pk = { course: course.id, slug };
-			if (withdrawn === "ARCHIVED") await db.question.delete(pk, opts);
-			else await db.question.update(pk, { status: withdrawn }, opts);
-		}
-
-		const pinned = await db.question.findOne(
-			{ course: course.id, slug: "pinned", public: true, version: "v1" },
-			{ actor: student },
-		);
-		expect(pinned?.slug).toBe("pinned");
-		expect(
-			await db.question.findOne(
-				{ course: course.id, slug: "loose", public: true },
-				{ actor: student },
-			),
-		).toBeNull();
-	});
-}
 
 test("a user outside the course is refused a question whatever its status", async () => {
 	const { course, opts } = await makeCourse();
@@ -1082,7 +1021,7 @@ test("a user outside the course is refused a question whatever its status", asyn
 	}
 });
 
-test("an admin who does not teach the course reads only the public half of published questions", async () => {
+test("an admin who does not teach the course reads no question through the service", async () => {
 	const { course, opts } = await makeCourse();
 	const admin = await persistedUserFactory.create({ role: "ADMIN" });
 	for (const status of ["DRAFT", "PUBLISHED"] as const) {
@@ -1099,26 +1038,14 @@ test("an admin who does not teach the course reads only the public half of publi
 	}
 	await persistedOpenExam(course.id, ["draft", "published"]);
 
-	const found = await db.question.findOne(
-		{ course: course.id, slug: "published" },
-		{ actor: admin },
-	);
-	const listed = await db.question.findMany(
-		{ course: course.id },
-		{ actor: admin },
-	);
-
-	expect(listed.map((q) => q.slug)).toEqual(["published"]);
-	for (const q of [found, ...listed]) {
-		const doc = q?.question as PublicQuestion & { type: "true-false" };
-		expect(doc.choices[0]).not.toHaveProperty("correct");
-	}
 	expect(
-		await db.question.findOne(
-			{ course: course.id, slug: "draft" },
-			{ actor: admin },
-		),
-	).toBeNull();
+		await db.question.findMany({ course: course.id }, { actor: admin }),
+	).toEqual([]);
+	for (const slug of ["draft", "published"]) {
+		expect(
+			await db.question.findOne({ course: course.id, slug }, { actor: admin }),
+		).toBeNull();
+	}
 });
 
 test("writes to a draft by a non-author are 404 for a course member and 403 for an outsider, as on reads", async () => {
@@ -1209,12 +1136,13 @@ test("asking for the whole document without the right to it is refused", async (
 
 	await persistedOpenExam(course.id, ["q1"]);
 
-	await expect(
-		db.question.findOne(
+	// The question is missing for them, so the single read does not refuse.
+	expect(
+		await db.question.findOne(
 			{ course: course.id, slug: "q1", public: false },
 			{ actor: student },
 		),
-	).rejects.toMatchObject({ status: 403 });
+	).toBeNull();
 	await expect(
 		db.question.findMany(
 			{ course: course.id, public: false },
@@ -1222,13 +1150,13 @@ test("asking for the whole document without the right to it is refused", async (
 		),
 	).rejects.toMatchObject({ status: 403 });
 
-	// The same reads without the flag succeed with the public half.
+	// The same reads without the flag find nothing.
 	expect(
 		await db.question.findOne(
 			{ course: course.id, slug: "q1" },
 			{ actor: student },
 		),
-	).not.toBeNull();
+	).toBeNull();
 });
 
 /// A second version of `multipleChoice` whose answer key points at the other choice.

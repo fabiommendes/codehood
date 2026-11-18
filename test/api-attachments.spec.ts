@@ -500,6 +500,11 @@ test("C7: the question-of-the-exam route serves the version the exam pins, only 
 	expect(before.status()).toBe(404);
 
 	await openExam(ctx);
+	// A student reads a question of the exam through the grant of an attempt.
+	await db.response.create(
+		{ course: ctx.course.id, exam: "ex1", author: ctx.student.username },
+		{ actor: ctx.student },
+	);
 
 	const after = await request.get(`${url}/q/attachment/data.csv`, {
 		headers: asStudent,
@@ -614,8 +619,8 @@ test("C10: no student page, read model or ETag carries the hash of an attachment
 			["question JSON", `${ctx.questionUrl}/q?public=true`],
 		] as const) {
 			const res = await request.get(url, { headers: asStudent });
-			// The question reaches the student only once the exam opens.
-			const hidden = stage === "before" && label === "question JSON";
+			// The question never reaches a student through its own route: the exam does.
+			const hidden = label === "question JSON";
 			expect(res.status(), `${stage} ${label}`).toBe(hidden ? 404 : 200);
 			bodies.push([`${stage} ${label}`, await res.text()]);
 			bodies.push([`${stage} ${label} etag`, res.headers().etag ?? ""]);

@@ -320,24 +320,20 @@ test.describe("pages of questions", () => {
 		).toEqual(expected);
 	});
 
-	test("a student pages, counts and reads the tags of the published questions only", async () => {
+	test("a student pages, counts and reads the tags of no question, even one an open exam holds", async () => {
 		const student = await persistedUserFactory.create({ role: "STUDENT" });
 		await db.enrollment.create({ course, username: student.username }, opts);
 		const actor = { actor: student };
-		// Only what an open exam holds reaches a student; q-03 is a draft and stays out.
+		// An open exam holds some of them; a student still reads them only by grant.
 		await persistedOpenExam(course, ["q-02", "q-03", "q-06"]);
 
 		const page = await db.question.findPage(
 			{ course, sort: { field: "title", direction: "asc" } },
 			actor,
 		);
-		expect(page.items.map((item) => item.slug)).toEqual(["q-02", "q-06"]);
-		expect(JSON.stringify(page.items[0]?.question)).not.toContain("score");
-		expect(await db.question.count({ course }, actor)).toBe(2);
-		expect(await db.question.tags({ course }, actor)).toEqual([
-			"arrays",
-			"trees",
-		]);
+		expect(page.items).toEqual([]);
+		expect(await db.question.count({ course }, actor)).toBe(0);
+		expect(await db.question.tags({ course }, actor)).toEqual([]);
 		await expect(
 			db.question.findPage({ course, public: false }, actor),
 		).rejects.toThrow();

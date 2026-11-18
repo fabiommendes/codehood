@@ -95,33 +95,13 @@ test("examAccess: the owner writes, members read published exams, drafts vanish"
 
 // Question ------------------------------------------------------------------
 
-test("questionAccess: the owner writes, a member reads what an exam released", () => {
+test("questionAccess: the owner writes, a member who is not the author sees nothing", () => {
 	for (const status of STATUSES) {
-		for (const released of [false, true]) {
-			expect(questionAccess(owner, { status, course }, released)).toBe("write");
-			expect(questionAccess(outsider, { status, course }, released)).toBe(
-				"see",
-			);
-		}
+		expect(questionAccess(owner, { status, course })).toBe("write");
+		expect(questionAccess(outsider, { status, course })).toBe("see");
+		expect(questionAccess(student, { status, course })).toBe("none");
+		expect(questionAccess(admin, { status, course })).toBe("none");
 	}
-	expect(questionAccess(student, { status: "PUBLISHED", course }, false)).toBe(
-		"none",
-	);
-	expect(questionAccess(student, { status: "PUBLISHED", course }, true)).toBe(
-		"read",
-	);
-	expect(questionAccess(student, { status: "DRAFT", course }, true)).toBe(
-		"none",
-	);
-	expect(questionAccess(student, { status: "HIDDEN", course }, false)).toBe(
-		"none",
-	);
-	expect(questionAccess(student, { status: "HIDDEN", course }, true)).toBe(
-		"read",
-	);
-	expect(questionAccess(admin, { status: "PUBLISHED", course }, true)).toBe(
-		"read",
-	);
 });
 
 // Response ------------------------------------------------------------------
