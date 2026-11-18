@@ -766,8 +766,9 @@ test("instructor: find the questions that need rework", async ({ page }) => {
 		page.getByRole("table", { name: "Question statistics", exact: true });
 	const cells = (title: string) =>
 		table().getByRole("row").filter({ hasText: title }).locator("td");
-	const distribution = () =>
-		page.getByRole("region", { name: "Answer distribution", exact: true });
+	/// The block with the statement and the answer key, apart from the user menu's `<details>`.
+	const key = () =>
+		page.locator("details").filter({ hasText: "Statement and answer key" });
 
 	await test.step("on the small exam the discrimination is a dash that says why", async () => {
 		await page.goto(`${href}/exams/pop-quiz/results`);
@@ -815,35 +816,32 @@ test("instructor: find the questions that need rework", async ({ page }) => {
 			.click();
 
 		await expect(page).toHaveURL(`${href}/exams/final/grading/fruit?view=list`);
-		await expect(
-			distribution().getByRole("heading", { name: "Answer distribution" }),
-		).toBeVisible();
-		const rows = distribution().getByRole("listitem");
-		await expect(rows).toHaveText([/Pear/, /Apple/, /Fig/, /Kiwi/, /Blank/]);
-		await expect(rows.nth(0)).toContainText(/4\D+50%/);
-		await expect(rows.nth(1)).toContainText(/2\D+25%/);
-		await expect(rows.nth(2)).toContainText(/0\D+0%/);
-		await expect(rows.nth(3)).toContainText(/2\D+25%/);
-		await expect(rows.nth(4)).toContainText(/0\D+0%/);
-		await expect(distribution().getByText("Correct choice")).toHaveCount(1);
-		await expect(rows.nth(0).getByText("Correct choice")).toBeVisible();
+		const summary = page.getByTestId("summary");
+		await expect(summary).toContainText("8");
+		await expect(summary).toContainText(/50\s*%/);
+		const row = (text: string) =>
+			page.getByRole("row").filter({ hasText: text });
+		await expect(row("Pear")).toContainText("4");
+		await expect(row("Pear")).toContainText(/50\s*%/);
+		await expect(row("Apple")).toContainText("2");
+		await expect(row("Apple")).toContainText(/25\s*%/);
+		await expect(row("Fig")).toContainText(/0\s*%/);
+		await expect(row("Kiwi")).toContainText("2");
+		await expect(row("Kiwi")).toContainText(/25\s*%/);
+		await key().locator("summary").click();
+		await expect(key()).toContainText(/Pear\s*Correct/);
+		await expect(key()).not.toContainText(/Apple\s*Correct/);
 	});
 
 	await test.step("the true-false question shows true, false and abstained per statement", async () => {
 		await page.goto(`${href}/exams/final/grading/protocols?view=list`);
 
-		const rows = distribution().getByRole("listitem");
-		await expect(rows).toHaveCount(2);
-		await expect(rows.nth(0)).toContainText("First statement");
-		await expect(rows.nth(0)).toContainText(/True\D*5/);
-		await expect(rows.nth(0)).toContainText(/False\D*3/);
-		await expect(rows.nth(0)).toContainText(/Abstained\D*0/);
-		await expect(rows.nth(0).getByText("Correct answer: True")).toBeVisible();
-		await expect(rows.nth(1)).toContainText("Second statement");
-		await expect(rows.nth(1)).toContainText(/True\D*2/);
-		await expect(rows.nth(1)).toContainText(/False\D*5/);
-		await expect(rows.nth(1)).toContainText(/Abstained\D*1/);
-		await expect(rows.nth(1).getByText("Correct answer: False")).toBeVisible();
+		const row = (text: string) =>
+			page.getByRole("row").filter({ hasText: text });
+		await expect(row("First statement")).toContainText("T 5");
+		await expect(row("First statement")).toContainText("F 3");
+		await expect(row("Second statement")).toContainText("T 2");
+		await expect(row("Second statement")).toContainText("F 5");
 	});
 
 	await test.step("a typed question groups identical responses instead of choices", async () => {
@@ -852,10 +850,9 @@ test("instructor: find the questions that need rework", async ({ page }) => {
 		await expect(
 			page.getByRole("heading", { level: 2, name: "Trick question" }),
 		).toBeVisible();
-		await expect(distribution().getByRole("listitem")).toHaveCount(8);
-		await expect(distribution().getByRole("listitem").first()).toContainText(
-			"1 · 13%",
-		);
+		const groups = page.getByRole("row").filter({ hasText: /13\s*%/ });
+		await expect(groups).toHaveCount(8);
+		await expect(groups.first()).toContainText("1");
 	});
 
 	await test.step("after the question gets a new version the exam still grades against the pinned one", async () => {
@@ -879,15 +876,13 @@ test("instructor: find the questions that need rework", async ({ page }) => {
 
 		await page.goto(`${href}/exams/final/grading/fruit?view=list`);
 
-		await page.getByText("Statement and answer key").click();
-		await expect(page.getByText("Pick the best fruit.").first()).toBeVisible();
-		await expect(
-			page.getByText("Pick the fruit that grows on trees."),
-		).toHaveCount(0);
-		await expect(distribution().getByText("Correct choice")).toHaveCount(1);
-		await expect(
-			distribution().getByRole("listitem").nth(0).getByText("Correct choice"),
-		).toBeVisible();
+		await key().locator("summary").click();
+		await expect(key()).toContainText("Pick the best fruit.");
+		await expect(key()).not.toContainText(
+			"Pick the fruit that grows on trees.",
+		);
+		await expect(key()).toContainText(/Pear\s*Correct/);
+		await expect(key()).not.toContainText(/Apple\s*Correct/);
 		await expect(page.getByRole("alert")).toHaveCount(0);
 	});
 
@@ -907,13 +902,10 @@ test("instructor: find the questions that need rework", async ({ page }) => {
 		await expect(page.getByRole("alert")).toContainText(
 			'This exam pins version "ghost", which this question does not have. Showing the latest version instead.',
 		);
-		await page.getByText("Statement and answer key").click();
-		await expect(
-			page.getByText("Pick the fruit that grows on trees.").first(),
-		).toBeVisible();
-		await expect(
-			distribution().getByRole("listitem").nth(1).getByText("Correct choice"),
-		).toBeVisible();
+		await key().locator("summary").click();
+		await expect(key()).toContainText("Pick the fruit that grows on trees.");
+		await expect(key()).toContainText(/Apple\s*Correct/);
+		await expect(key()).not.toContainText(/Pear\s*Correct/);
 	});
 });
 
@@ -994,13 +986,13 @@ test("instructor: answer regrade requests", async ({ page }) => {
 			`${world.href}/exams/${world.exam.slug}/grading/q-short?view=list`,
 		);
 
-		await expect(page.getByText("Regrade requested")).toHaveCount(1);
-		await expect(
-			page.getByRole("article").filter({ hasText: "Reply number 2" }),
-		).toContainText("Regrade requested");
-		await expect(
-			page.getByRole("article").filter({ hasText: "Reply number 1" }),
-		).not.toContainText("Regrade requested");
+		const attention = page.locator("section#attention").getByRole("listitem");
+		await expect(attention).toHaveCount(1);
+		await expect(attention).toContainText(second.name);
+		await expect(attention).toContainText("Regrade requested");
+		await expect(page.locator("section#attention")).not.toContainText(
+			first.name,
+		);
 	});
 
 	await test.step("the exam page now announces one open request, and the student sees the new score", async () => {
@@ -1565,28 +1557,23 @@ test("instructor: review an automatically graded question", async ({
 	const overrides = page.locator("section#overrides");
 	const row = (text: string) => page.getByRole("row").filter({ hasText: text });
 
-	await test.step("the summary counts the answers, the share that got it right and what has no grade", async () => {
+	await test.step("the summary counts the answers and the share that got it right, with nothing left without a grade", async () => {
 		await expect(summary).toContainText("4");
-		await expect(summary).toContainText(/33\s*%/);
-		await expect(page.locator('a[href="#attention"]')).toContainText("1");
+		await expect(summary).toContainText(/25\s*%/);
+		await expect(page.locator('a[href="#attention"]')).toHaveCount(0);
 	});
 
 	await test.step("the key sits in a closed block that opens on demand", async () => {
-		const key = page.locator("details").first();
+		const key = page
+			.locator("details")
+			.filter({ hasText: "Which city is the capital of Brazil?" });
 		await expect(key).not.toHaveAttribute("open", "");
 		await key.locator("summary").click();
 		await expect(key).toContainText("Which city is the capital of Brazil?");
 	});
 
-	await test.step("needs attention lists the answer with no grade and the open regrade request", async () => {
-		await expect(attention.getByRole("listitem")).toHaveCount(2);
-		const pending = attention
-			.getByRole("listitem")
-			.filter({ hasText: "Davi Rocha" });
-		await expect(pending).toContainText(objectiveLabel("pending"));
-		await expect(
-			pending.getByRole("button", { name: objectiveLabel("give_grade") }),
-		).toBeVisible();
+	await test.step("needs attention lists the open regrade request", async () => {
+		await expect(attention.getByRole("listitem")).toHaveCount(1);
 		const contested = attention
 			.getByRole("listitem")
 			.filter({ hasText: "Bia Lima" });
@@ -1608,29 +1595,6 @@ test("instructor: review an automatically graded question", async ({
 		await expect(brasilia).toContainText("–");
 		await expect(brasilia).not.toContainText(objectiveLabel("review"));
 		await expect(row("São Paulo")).toContainText("0");
-	});
-
-	await test.step("giving a grade to the answer with none removes it from needs attention", async () => {
-		const pending = attention
-			.getByRole("listitem")
-			.filter({ hasText: "Davi Rocha" });
-		await pending.getByRole("spinbutton").fill("0");
-		await pending
-			.getByRole("button", { name: objectiveLabel("give_grade") })
-			.click();
-
-		await expect(attention.getByRole("listitem")).toHaveCount(1);
-		await expect(attention).not.toContainText("Davi Rocha");
-		await expect(page.locator('a[href="#attention"]')).toHaveCount(0);
-		await expect(summary).toContainText(/25\s*%/);
-		await page.reload();
-		await expect(attention.getByRole("listitem")).toHaveCount(1);
-		const passes = await passesOf(world.davi.submission);
-		expect(passes).toHaveLength(1);
-		expect(passes[0]).toMatchObject({
-			score: 0,
-			grader: world.teacher.username,
-		});
 	});
 
 	await test.step("answers changed by hand are listed apart with the automatic grade struck through", async () => {

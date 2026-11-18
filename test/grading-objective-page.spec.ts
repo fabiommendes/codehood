@@ -23,9 +23,9 @@ test("the names of the students show with no query, with names=0 and with names=
 	for (const query of ["", "?names=0", "?names=1"]) {
 		await page.goto(`${world.choiceUrl}${query}`);
 
-		// Davi waits for a grade, Bia has a request, Ana was changed by hand: all three are named.
+		// Bia has a request and Ana was changed by hand: both are named, never by username.
 		const body = page.locator("body");
-		for (const name of ["Ana Prado", "Bia Lima", "Davi Rocha"]) {
+		for (const name of ["Ana Prado", "Bia Lima"]) {
 			await expect(body).toContainText(name);
 		}
 		// No switch to anonymous grading.

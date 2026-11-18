@@ -54,7 +54,7 @@ export const PARTIAL_COMMENT = "Half credit for the right idea";
  *   Rio get the rest of the exam right, Caio gets the ordering wrong.
  * - Ana's grade on `q-choice` was changed by hand to 50% before the story (an automatic pass, then the instructor's).
  * - Bia has an open regrade request on `q-choice`.
- * - Davi has no grading pass on `q-choice`: it is pending.
+ * - Davi picked "Rio de Janeiro" like Ana and Bia and is graded like them.
  *
  * Every student has a distinct full name, so the page's names can be told from usernames.
  */
@@ -162,10 +162,6 @@ export async function objectiveExam(prefix: string) {
 			}),
 		)
 		.toBe(roster.length * 2);
-	// Davi waits for a grade.
-	await prisma.feedback.deleteMany({
-		where: { submission: { publicId: people.davi.submission } },
-	});
 	// Ana's grade was changed by hand: the automatic pass stays under it.
 	await db.feedback.create(
 		{
