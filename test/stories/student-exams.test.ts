@@ -1045,3 +1045,76 @@ test("student: see what each question is worth", async ({ page }) => {
 		await expect(page.getByText("25%").first()).toBeVisible();
 	});
 });
+
+/**
+ * Interface the steps rely on, on `exams/<slug>` for a student with no attempt
+ * in a closed exam:
+ *
+ * - Before the grades are released, no question text is on the page.
+ * - After the release, each question's stem is visible as plain text.
+ * - Never an answer field (`radio`, `checkbox`, `textbox`), nor the buttons
+ *   "Start exam" and "Submit exam".
+ */
+test("student: read the questions of an exam I missed", async ({ page }) => {
+	const teacher = await seedUser({
+		role: "INSTRUCTOR",
+		username: "missed-prof",
+	});
+	const student = await seedUser({ role: "STUDENT", username: "missed-stu" });
+	const course = await persistedCourseFactory.create({
+		instructor: teacher.username,
+	});
+	await db.enrollment.create(
+		{ course: course.id, username: student.username },
+		FULL_ACCESS,
+	);
+	const href = courseHref({
+		discipline: course.discipline.slug,
+		instructor: course.instructor.username,
+		edition: course.edition.slug,
+	});
+	await db.question.create(
+		{
+			status: "PUBLISHED",
+			version: "1",
+			course: course.id,
+			slug: "missed-capital",
+			question: capitalChoice,
+		},
+		FULL_ACCESS,
+	);
+	const exam = await persistedExamFactory.create({
+		course: course.id,
+		slug: "missed-exam",
+		title: "Missed exam",
+		type: "EXAM",
+		status: "SCHEDULED",
+		scheduledAt: new Date(Date.now() - 3 * DAY),
+		duration: { hours: 1 },
+		questions: [{ slug: "missed-capital" }],
+	});
+	await logInAs(page, student);
+
+	await test.step("before the release the page shows no question", async () => {
+		await page.goto(`${href}/exams/${exam.slug}`);
+
+		await expect(page.getByText("You did not take this exam.")).toBeVisible();
+		await expect(page.getByText(capitalChoice.stem)).toHaveCount(0);
+	});
+
+	await test.step("after the release the questions are listed to be read, with nothing to answer", async () => {
+		await db.exam.releaseGrades(
+			{ course: course.id, slug: exam.slug },
+			{ actor: teacher },
+		);
+		await page.reload();
+
+		await expect(page.getByText(capitalChoice.stem)).toBeVisible();
+		for (const role of ["radio", "checkbox", "textbox"] as const) {
+			await expect(page.getByRole(role)).toHaveCount(0);
+		}
+		for (const name of ["Start exam", "Submit exam"]) {
+			await expect(page.getByRole("button", { name })).toHaveCount(0);
+		}
+	});
+});
