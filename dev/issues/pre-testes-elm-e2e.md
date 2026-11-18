@@ -17,7 +17,7 @@ Na `teste2-elm` (`paradigmas`, 2026-11-13), o professor observou que os
 pré-testes das questões Elm não estão funcionando. A causa ainda não foi
 investigada. O fluxo envolve duas partes:
 
-- **No navegador** (R23 de `dev/specs/to-review/fila-de-correcao-externa.md`):
+- **No navegador** (RFC `dev/rfc/fila-de-correcao-externa.md`):
   `pretestSources` (`src/utils/pretest-sources.ts`) escolhe as fontes de teste
   com regiões todas públicas, o runner de Elm as executa e `summarizeReport`
   (`src/components/exam/code-pretest.ts`) mostra o resultado em

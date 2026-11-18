@@ -29,8 +29,8 @@ repete em CLI.
   editor de calendário. As ações em `src/actions/` mexem em estado e em dados
   do aluno (status, liberação de notas, correção, matrícula), não em conteúdo.
 - O servidor nunca executa código enviado por aluno. Questões de código são
-  corrigidas fora do processo por um bot com sandbox próprio
-  (`dev/specs/to-review/auto-grading.md`, "Out of scope"). Rodar código de
+  corrigidas fora do processo por um worker com sandbox próprio (fila
+  `GradingJob`, `dev/rfc/fila-de-correcao-externa.md`). Rodar código de
   aluno no mesmo processo que guarda as notas e as chaves de API não tem
   sandbox que compense.
 - O servidor nunca mescla conflitos de conteúdo. Dois instrutores que
@@ -47,6 +47,39 @@ repete em CLI.
 
 `SYSTEM` não é usuário; é o actor sentinela de quem não tem pessoa por trás e
 ignora as regras de permissão por projeto (ADR 0005).
+
+### Nota do curso
+
+- O servidor não calcula a nota final do curso e não tem linguagem de
+  fórmula. O instrutor a calcula na própria máquina, com uma função Python que
+  a CLI chama, e a CLI envia o resultado como colunas de nota (`GradeColumn`).
+- Motivo: uma fórmula no `codehood.toml` avaliada pelo servidor exigiria
+  gramática, avaliador, mensagens de erro e uma versão a manter compatível, e
+  ainda não cobriria casos reais (prova substitutiva, trabalhos corrigidos fora
+  do codehood, menção UnB, critério mínimo que sobrepõe a menção). Uma função
+  Python cobre todos. O preço: a coluna só está tão atual quanto o último push.
+- A coluna é número ou rótulo, sem escala própria no servidor, e não existe
+  marcador de "nota final": o título da coluna diz o que ela é. A web não edita
+  valores; só libera a coluna para os alunos, como os resultados de uma prova.
+- O contrato da função do instrutor está em
+  `cli/dev/specs/to-review/push-grades.md`.
+
+### Datas do curso
+
+- `Course.startDate`/`endDate` e `Edition.startDate`/`endDate` são datas do
+  calendário, gravadas como `String` `YYYY-MM-DD` (schema `isoDate`, tipo
+  `IsoDate`), não instantes. O sufixo `*At` fica reservado para instantes.
+- A data não tem fuso. O fuso do servidor só entra ao transformar "dia +
+  horário" num instante (`slotInstant`) e ao comparar com agora: uma data vale
+  o dia inteiro no fuso do servidor, com fim inclusivo (`todayIn` em
+  `src/utils/schedule-time.ts`). Nada de `new Date("YYYY-MM-DD")` solto.
+- A semana 0 é a semana ISO (segunda a domingo) que contém `startDate`.
+  `courseWeekZero(startDate)` não recebe fuso nem faz heurística. A CLI conta
+  igual (`cli/codehood/push/calendar.py`), e as duas regras precisam continuar
+  iguais: a CLI numera as semanas do `calendar.md` e o servidor as mostra.
+- Motivo: gravar instante obrigava a escolher um fuso para saber "que dia é",
+  e meia-noite local e meia-noite UTC no mesmo banco faziam a agenda pular uma
+  semana conforme a hora do dia.
 
 ## Consequências
 

@@ -18,6 +18,12 @@ questões para o aluno (`public: true`,
 `src/pages/[discipline]/[course]/exams/[slug].astro:93-95`, `:108-120`); o
 gabarito só vai para quem tem `enrollment.manage`.
 
+Hoje isso é regra deliberada, não esquecimento: com a nota liberada, cada
+questão respondida aparece em modo `review` com as marcas da biblioteca, mas
+o resultado montado para o aluno (`src/services/review.ts`) deixa `correct`
+de fora. O documento privado é lido no servidor só para calcular o
+resultado. Esta issue propõe mudar essa regra.
+
 ## Proposta
 
 - Quando `attemptState(...).kind === "results"` (o que já usa

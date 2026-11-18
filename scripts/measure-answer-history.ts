@@ -1,6 +1,7 @@
 /**
- * Measures the answer-edit history of exams (spec
- * `dev/specs/to-review/historico-de-edicao-no-servidor.md`, T9): how big a history
+ * Measures the answer-edit history of exams (RFC
+ * `dev/rfc/historico-de-edicao-de-respostas-abertas.md`; results in
+ * `dev/issues/historico-de-edicao-limites-medidos.md`): how big a history
  * gets, what a batch costs the server, how long the write transaction holds the
  * database, and what a summary costs. It is not part of any test suite.
  *

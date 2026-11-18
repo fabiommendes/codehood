@@ -1,7 +1,7 @@
 /**
  * `db.answerEdit`: who may send, when the attempt still takes history, and
- * the per-exam switch (spec `dev/specs/to-review/historico-de-edicao-no-servidor.md`,
- * R4, R5, R14, R15). The clock is injected through `now`; nothing waits.
+ * the per-exam switch (RFC
+ * `dev/rfc/historico-de-edicao-de-respostas-abertas.md`). The clock is injected through `now`; nothing waits.
  */
 import { expect, test } from "@playwright/test";
 import { FULL_ACCESS } from "@/auth/actor";

@@ -2,7 +2,7 @@
 type: doc
 status: active
 tags: [seed, gaps, cli, push]
-relatedTo: [seed-cli-pyxel101]
+relatedTo: [push, push-exams, bootstrap]
 ---
 
 # Lacunas medidas pelo curso `pyxel101`
@@ -15,9 +15,9 @@ Este documento é temporário. Quando uma lacuna vira issue ou spec, a coluna
 "Estado" aponta para ela. Quando é resolvida, a linha sai. Quando as tabelas
 esvaziarem, o arquivo é apagado.
 
-Os desejos `W1` a `W14` estão na spec `dev/specs/to-review/seed-cli-pyxel101.md`
-(R18). "Formato proposto" quer dizer que o arquivo usa um formato inventado
-para o desejo ficar concreto. Ele não foi decidido e pode mudar quando a
+Os desejos `W1` a `W14` estão em [README.md](README.md#desejos). "Formato
+proposto" quer dizer que o arquivo usa um formato inventado para o desejo
+ficar concreto. Ele não foi decidido e pode mudar quando a
 lacuna for atacada. "Onde" diz quem precisa mudar: `cli`, `server`, `mdq` ou
 `desenho` (`cli/docs/design/mapping-local-filesystem.md`).
 
@@ -55,7 +55,7 @@ não são Markdown (agora com extensão) e as aulas que os citam; a aula 5 sobe
 
 | G | W | Onde | Arquivos | Esperado | Observado | Estado |
 | :-- | :-- | :-- | :-- | :-- | :-- | :-- |
-| G21 | W5 | server | `repositories/lab*/`, `solutions/*/` (`tests_ocultos/`, `autograde.toml`, formato proposto) | Aluno entrega por git; testes ocultos rodam e dão nota | `solutions/` não é consumido; o Codehood não recebe entrega por git nem roda testes | issue `dev/issues/entrega-por-git.md`; `dev/specs/to-review/auto-grading.md` cobre só questões mdq |
+| G21 | W5 | server | `repositories/lab*/`, `solutions/*/` (`tests_ocultos/`, `autograde.toml`, formato proposto) | Aluno entrega por git; testes ocultos rodam e dão nota | `solutions/` não é consumido; o Codehood não recebe entrega por git nem roda testes | issue `dev/issues/entrega-por-git.md`; a fila de correção externa (`dev/rfc/fila-de-correcao-externa.md`) cobre só questões mdq |
 | G22 | W5 | server | `README.md` (nota máxima de 70% após o prazo) | Entrega atrasada com desconto | Entrega fora do prazo é recusada | issue `dev/issues/politica-de-atraso.md` |
 | G23 | W9 | server | `repositories/projeto-final/`, `RUBRICA.md` (formato proposto) | Projeto em grupo: repositório por grupo, rubrica, banca agendada | Só existe repositório da turma; sem grupos nem rubrica | aberta |
 | G24 | W12 | cli | `grades.py` | `student.attendance` vem do roll call do servidor; `labs` vem da correção automática | `codehood.grades.Student` não expõe presença, embora o servidor tenha `Attendance`; `grades.py` lê a frequência de uma coluna do CSV | aberta |

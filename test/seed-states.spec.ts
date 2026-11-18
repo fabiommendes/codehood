@@ -1,6 +1,70 @@
 /**
  * What the dev seed (`src/db/bootstrap.ts`) shows: one test per state the seed
- * is meant to reach, from the matrix of `dev/specs/to-do/seed-enxuto.md`.
+ * is meant to reach, from the matrix below.
+ *
+ * Why several exams and not one: an exam has one status and one window. "In
+ * progress" needs an open exam, a regrade request needs released grades, and
+ * release is refused while an answer is pending or an exception is open. So
+ * the showcase is three `EXAM`s at three moments of a course in its seventh
+ * week: `test-01` released 3 days ago, `test-02` closed today and being
+ * graded (the main showcase), `test-03` open now. The others stay apart too:
+ * `quiz-01` (only a closed QUIZ releases without `releaseGrades`), `quiz-02`
+ * (per-attempt timer and expired attempt need an open exam with a duration
+ * and no date), `midterm` (future, closed attachments), `final` (DRAFT,
+ * simulation under way), `practice` (PRACTICE changes the defaults for
+ * running code and for the history), `cs201/test-trees` (ready to release
+ * needs no pending answer and no exception).
+ *
+ * | State                                                         | Exam                                  |
+ * | :------------------------------------------------------------ | :------------------------------------ |
+ * | dated DRAFT with a DRAFT question                              | `final`                               |
+ * | SCHEDULED within 7 days, `extraTime`                          | `midterm`                             |
+ * | open, student not started                                     | `quiz-02`, `test-03` (student)        |
+ * | open, attempt in progress                                     | `test-03`                             |
+ * | attempt expired without delivery                              | `quiz-02` (knuth)                     |
+ * | delivered, waiting for grading                                | `test-02`                             |
+ * | absent                                                        | `test-02` (wirth)                     |
+ * | ready to release                                              | `cs201/test-trees`                    |
+ * | released less than 7 days ago                                 | `test-01`                             |
+ * | QUIZ released on close                                        | `quiz-01`                             |
+ * | PRACTICE                                                      | `practice`                            |
+ * | one question of each type                                     | `quiz-02`                             |
+ * | run code: PRACTICE default, QUIZ default, explicit EXAM       | `practice`, `quiz-02`, `test-03`      |
+ * | question and exam attachments                                 | `quiz-02`                             |
+ * | attachment closed before opening                              | `midterm`                             |
+ * | question with two versions, different CSV                     | `csv-versions`, `v1` in `quiz-02`     |
+ * | Elm pretest by examples and by module                         | `practice`                            |
+ * | external queue, 8 states                                      | `test-03`                             |
+ * | repeated sends in practice                                    | `practice`                            |
+ * | graded sends in a closed attempt                              | `test-02`                             |
+ * | simulation under way, send queued                             | `final`                               |
+ * | simulation delivered                                          | `practice`                            |
+ * | auto, manual, pending, will-not-grade and blank grading       | `test-02`                             |
+ * | pending blank, pending ordering                               | `test-02`                             |
+ * | blank graded one by one                                       | `quiz-01`                             |
+ * | bot grade with `notes`                                        | `test-02`                             |
+ * | code run while grading (JS, Python, Prolog)                   | `test-02`                             |
+ * | initial rubric not copied                                     | `test-02`                             |
+ * | rubric in use: groups, negative item, split item              | `test-02`                             |
+ * | passes: leaf and item, adjustment, review, bot                | `test-02`                             |
+ * | equal pending answers and a different one                     | `test-02`                             |
+ * | rubric seen by the student                                    | `test-01`                             |
+ * | history: paste, marker and rebase, incomplete, no typing      | `test-02`                             |
+ * | history switched off after being recorded                     | `test-03`                             |
+ * | practice without history                                      | `practice`                            |
+ * | exception: extra time in a future exam                        | `midterm`                             |
+ * | exception: second call blocks the release                     | `test-02` (backus)                    |
+ * | exception: personal window open, reopen                       | `test-02` (liskov)                    |
+ * | stats: popular distractor, unchosen option, negative discrimination, no variance | `test-01`              |
+ * | weights 3, 2 and 1, total differs from the mean               | `test-01`                             |
+ * | regrade open, accepted, rejected, answer without request      | `test-01`                             |
+ * | student home: open, soon, today, results, regrades            | 2, `midterm`, yes, `test-01`, `test-01` |
+ * | instructor home: in progress, to grade, regrades, reports, today | ada                                |
+ * | instructor home: to release                                   | alan                                  |
+ * | empty instructor home                                         | instructor                            |
+ *
+ * Left out on purpose: the "N more open exams" link, which needs 4 open
+ * exams (`test/stories/student-finding-course-material.test.ts` covers it).
  *
  * It reads a private copy of the seeded database `test/run.ts` prepares. Each
  * state is found by what it is (type, status, dates, submission and job

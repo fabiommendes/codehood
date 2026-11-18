@@ -35,4 +35,5 @@ para um curso longo.
 
 ## Relacionadas
 
-- `dev/specs/to-do/card-de-navegacao-do-curso.md`
+- `dev/adr/0019-navegacao-do-curso-pelo-card-da-sidebar.md`; o card em
+  `src/components/nav/CourseCard.astro` e `src/utils/course-nav.ts`

@@ -2,7 +2,7 @@
 type: issue
 status: todo
 tags: [submissions, git, grading-bot, cli]
-relatedTo: [auto-grading, classroom-invite]
+relatedTo: [classroom-invite]
 kind: enhancement
 created: 2026-10-21
 creator: Fábio Macêdo Mendes
@@ -15,8 +15,8 @@ creator: Fábio Macêdo Mendes
 Trabalhos de programação são entregues hoje como resposta dentro de uma
 prova. Para projetos maiores, o natural é o aluno trabalhar num repositório.
 
-Combina com o `Classroom invite` que já existe e com o spec de auto-grading
-(`dev/specs/to-review/auto-grading.md`, bloqueado pelo mdq-js). Os
+Combina com o `Classroom invite` que já existe e com a correção automática
+da fila externa (`dev/rfc/fila-de-correcao-externa.md`). Os
 repositórios que o servidor já serve por git (`/git/<token>/<slug>.git`) vão
 no sentido contrário: do professor para o aluno, só leitura.
 

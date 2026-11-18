@@ -2,7 +2,7 @@
 type: issue
 status: todo
 tags: [api, rpc, grading-bot]
-relatedTo: [auto-grading, grading-bot]
+relatedTo: [grading-bot]
 kind: enhancement
 created: 2026-10-21
 creator: Fábio Macêdo Mendes

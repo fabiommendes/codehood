@@ -3,10 +3,15 @@
  * items, each with a signed value, grouped by path.
  *
  * Grading starts the rubric: the first write that involves it copies the
- * question's initial rubric into the database. Changing the base, the value
- * of an item or deleting an applied item recomputes, in the same
- * transaction, the score of every pass graded with the rubric. Reads and
- * writes need `rubric.read` and `rubric.write` on the exam's course.
+ * question's initial rubric (from the pinned question version) into the
+ * database; later pushes do not touch the copy. A pass graded with the rubric
+ * scores `clamp(base + sum of applied item values + adjustment)` into [0, 1]
+ * (`rubricScore`), retired items included. Changing the base, the value of an
+ * item or deleting an applied item recomputes, in the same transaction, the
+ * score of every pass graded with the rubric. "Review" is not stored: a pass
+ * is in review when it applies a retired item (as after a split, which keeps
+ * the score). Reads and writes need `rubric.read` and `rubric.write` on the
+ * exam's course.
  */
 import type { z } from "zod";
 import { ensurePerm } from "@/auth/permissions";

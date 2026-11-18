@@ -1,7 +1,5 @@
 /**
- * Story of a student reading how a rubric graded their answer (spec
- * `dev/specs/to-do/rubrica-de-correcao.md`, R20 and R30). The view does not
- * exist yet; this file is the contract it is built to.
+ * Story of a student reading how a rubric graded their answer.
  *
  * UI contract of the attempt review at `/<discipline>/<course>/exams/<exam>`,
  * once the grades are released:

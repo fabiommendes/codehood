@@ -1118,6 +1118,15 @@ async function createDemoCoursesIfMissing(): Promise<void> {
 		FULL_ACCESS,
 	);
 	await seedReleasedQuiz(cs101, ada, { hopper, hamilton });
+	// Order matters below. `elm-soma` must exist before the showcase
+	// (`test-02`), which creates `explain-recursion` and `factorial-returns`.
+	// `test-03` needs `js-double-it` from the showcase, and the edit history of
+	// `test-03` is typed and switched off only after the exam exists. The
+	// external queue leaves jobs `QUEUED` on purpose, so every later
+	// `gradingJob.claim` (showcase, practice, simulations) passes the `exam`
+	// filter, or it would take the oldest job of another exam. `quiz-02` comes
+	// after `seedReleasedExam` (`n-log-n`), `seedAttachments`
+	// (`csv-attachments`, `pdf-attachment`) and `js-double-it`.
 	await seedElmQuestion(cs101.id);
 	await seedGradingShowcase(cs101.id, ada, {
 		hopper,

@@ -1,7 +1,5 @@
 /**
- * Grading passes made with a rubric (spec
- * `dev/specs/to-do/rubrica-de-correcao.md`, R6, R7, R10, R11, R19, R19a, R20),
- * through the existing `db.feedback` service.
+ * Grading passes made with a rubric, through the existing `db.feedback` service.
  *
  * API the tests expect, as additions to `feedbackCreate` / `feedbackUpdate`
  * (and `upsert`, which takes the create shape):

@@ -43,7 +43,7 @@ Whenever a new command is created, document it in this file.
 
 `manage import-resources <discipline-slug> <instructor> <edition> <manifest> [--prune]`
 : Imports a course's files, links, notes, and snippets from a YAML manifest
-  shaped like the sync payload (see `dev/specs/to-review/resources.md`). Additive
+  shaped like the sync payload. Additive
   and update-in-place by default; `--prune` also deletes resources not named
   in the manifest. `contentHash` is computed locally, the way the CLI will.
   Exists because the CLI's own sync endpoints don't yet, and the web app is

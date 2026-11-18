@@ -117,7 +117,7 @@ The server, `cli/` and `workers/chalk-worker/` share one version
 (`pnpm run check:versions`). The mdq commit codehood builds against is pinned in
 `.mdq-ref`: `pnpm run check:siblings` compares `../mdq` with it (warnings in
 `pnpm run lint`, errors in CI and in the release) and `pnpm run mdq:bump` adopts
-`../mdq` HEAD. See `dev/specs/to-review/versoes-e-repositorios-irmaos.md`.
+`../mdq` HEAD. See ADR 0014 (`dev/adr/0014-versao-unica-e-mdq-fixado-por-mdq-ref.md`).
 
 ## Linting
 

@@ -1,7 +1,6 @@
 /**
  * Every course-scoped service accepts `course` as either the course's
- * numeric id or its natural key `{discipline, instructor, edition}` — see
- * `dev/specs/to-review/course-ref-unification.md`. One course, one row
+ * numeric id or its natural key `{discipline, instructor, edition}`. One course, one row
  * created under each address form, one list read under each address form:
  * both forms must resolve to the same course and agree on what it holds.
  */

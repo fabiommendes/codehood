@@ -2,7 +2,7 @@
 type: issue
 status: todo
 tags: [exams, grading, deadlines]
-relatedTo: [exam-state, course-grade, per-student-exceptions]
+relatedTo: [exam-state, course-grade]
 kind: enhancement
 created: 2026-10-21
 creator: Fábio Macêdo Mendes
@@ -16,7 +16,7 @@ Hoje uma resposta fora da janela simplesmente não é aceita. Em listas de
 exercício é comum aceitar atraso com desconto (por exemplo, 10% por dia, até
 3 dias).
 
-As [exceções por aluno](../specs/to-review/per-student-exceptions.md), de que
+As exceções por aluno, de que
 esta issue depende, já estão implementadas (`ExamException` em
 `prisma/schema.prisma:1056`; prazo pessoal em `src/services/exam-state.ts:173`).
 

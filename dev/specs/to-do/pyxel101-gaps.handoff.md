@@ -2,7 +2,7 @@
 type: handoff
 status: to-do
 tags: [seed, gaps, cli, push, resources, questions, calendar]
-relatedTo: [seed-cli-pyxel101, push, push-exams]
+relatedTo: [push, push-exams]
 ---
 
 # Handoff: fechar as lacunas do curso `pyxel101`
@@ -10,8 +10,8 @@ relatedTo: [seed-cli-pyxel101, push, push-exams]
 ## Onde estamos
 
 O commit `30df063` criou o curso `cli/seed/pyxel101/` e o comando
-`pnpm run db:seed:cli`, que sobe o curso com `ch push` como `ada` (spec em
-`dev/specs/to-review/seed-cli-pyxel101.md`). As lacunas que sobram estão em
+`pnpm run db:seed:cli`, que sobe o curso com `ch push` como `ada` (desejos,
+ementa e regras de escrita em `cli/seed/README.md`). As lacunas que sobram estão em
 `cli/seed/GAPS.md`. Cada linha diz o arquivo do curso que exercita a lacuna,
 o esperado, o observado e quem precisa mudar.
 

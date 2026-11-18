@@ -2,7 +2,7 @@
 Tests for the attachments of questions and exams: a file linked from an
 `## [attachments]` section is read from disk, hashed, versioned with the
 document, and uploaded with the `PUT` that needs it. See
-`dev/specs/to-do/anexos-de-questoes-e-provas.md`, R21 to R25.
+`dev/adr/0010-blobs-publicos-e-permanentes.md`.
 """
 
 from __future__ import annotations

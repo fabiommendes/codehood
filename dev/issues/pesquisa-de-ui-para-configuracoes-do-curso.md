@@ -12,13 +12,16 @@ creator: claude
 
 ## Problema
 
-A página `<curso>/settings` (spec `dev/specs/to-review/configuracoes-do-curso.md`)
-funciona, mas é caótica: os dados do curso (só leitura), a passphrase, o link
-de convite, a lista de convites e os comandos da CLI estão empilhados numa
-página só, sem uma hierarquia clara. Não há navegação entre grupos de
-configuração, as seções não têm limites bem definidos e configurações de
+A página `<curso>/settings` (`src/pages/[discipline]/[course]/settings.astro`)
+funciona, mas é caótica: os dados do curso (só leitura) e os comandos da CLI
+estão empilhados numa página só, sem uma hierarquia clara. A passphrase, o
+link de convite e a lista de convites voltaram para a turma
+(`src/components/EnrollDialog.astro`, commit `4af164d`). Não há navegação
+entre grupos de configuração, as seções não têm limites bem definidos e configurações de
 naturezas diferentes (o que o curso é, quem entra nele, como sincronizar)
 dividem o mesmo espaço.
+
+Descrição e datas não são editáveis pela web até a CLI mandar `If-Match`.
 
 Conforme mais opções chegarem (edição de dados quando o sync bidirecional
 fechar, clone tokens, calendar feed, encerrar o curso), a página só piora.

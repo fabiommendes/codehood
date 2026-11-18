@@ -5,6 +5,16 @@
  * The dots put the window inline, collapsed to its title bar, or maximized
  * over the content area of the app shell. The component knows nothing about
  * what it frames: the host passes the actions, the editor and the output.
+ *
+ * The `inline` dot is grey, not red: red promises "close" and `inline`
+ * closes nothing; red and green toggle back to `inline` when clicked again.
+ * Maximizing keeps the node where it is in the DOM (no portal), since moving
+ * it would remount CodeMirror and xterm and lose their state. The shell bars
+ * declare themselves with `data-shell-bar` instead of the window taking
+ * selectors, so the window depends neither on the exam nor on the layout.
+ * Bars and `#content` are measured in JS on maximize and on every `resize`,
+ * because their height follows scrolling and line wrapping, which fixed CSS
+ * variables cannot track.
  */
 
 import {
