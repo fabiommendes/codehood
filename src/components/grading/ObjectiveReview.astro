@@ -1,0 +1,179 @@
+---
+/// The body of the grading page of an automatically graded question: summary, needs attention, one block per section, changed by hand, and the editing shortcut.
+import { m } from "@/i18n";
+import type {
+	ObjectiveReview,
+	ReviewSection,
+} from "@/services/objective-review";
+import AttentionList from "./AttentionList";
+import GroupedAnswers from "./GroupedAnswers";
+import { percentOf } from "./grade-actions";
+import type { GradingTarget } from "./grading-target";
+import Icon from "./Icon.astro";
+import Members from "./Members";
+import NumericHistogram from "./NumericHistogram";
+import OrderingMatrix from "./OrderingMatrix";
+import Overrides from "./Overrides";
+
+interface Props {
+	review: ObjectiveReview;
+	target: GradingTarget;
+	/// Display names by username.
+	names: Record<string, string>;
+	/// The page that lists the open regrade requests.
+	regradesHref: string;
+	/// The page that edits the question.
+	editHref: string;
+}
+
+const { review, target, names, regradesHref, editHref } = Astro.props;
+const { summary, attention, sections, overrides } = review;
+
+/// The heading, the column titles and the dialog's detail title of a grouped block.
+function labels(section: Extract<ReviewSection, { kind: "groups" }>) {
+	switch (section.block) {
+		case "choices":
+			return {
+				title: m.grades_objective_section_choices(),
+				header: m.grades_objective_header_choice(),
+			};
+		case "alternatives":
+			return {
+				title: m.grades_objective_section_alternatives(),
+				header: m.grades_objective_header_choice(),
+				detail: m.grades_objective_detail_marked(),
+			};
+		case "combinations":
+			return {
+				title: m.grades_objective_section_combinations(),
+				header: m.grades_objective_header_combination(),
+			};
+		case "statements":
+			return {
+				title: m.grades_objective_section_statements(),
+				header: m.grades_objective_header_statement(),
+				count: m.grades_objective_count_missed(),
+				detail: m.grades_objective_answer(),
+			};
+		case "texts":
+			return {
+				title: m.grades_objective_section_texts(),
+				header: m.grades_objective_header_text(),
+				detail: m.grades_objective_detail_wrote(),
+			};
+		case "blank":
+			return {
+				title: section.label ?? m.grades_objective_section_values(),
+				header: m.grades_objective_header_blank(),
+				detail: m.grades_objective_detail_wrote(),
+			};
+		case "values":
+			return {
+				title: m.grades_objective_section_values(),
+				header: m.grades_objective_header_value(),
+			};
+		case "orders":
+			return {
+				title: m.grades_objective_section_orders(),
+				header: m.grades_objective_header_order(),
+			};
+	}
+}
+
+const overrideRows = overrides.map((row) => ({
+	...row,
+	when: row.when.toISOString(),
+	adjustment: row.adjustment && {
+		publicId: row.adjustment.publicId,
+		updatedAt: row.adjustment.updatedAt.toISOString(),
+	},
+}));
+---
+
+<p class="mt-6 flex flex-wrap items-center gap-x-3 gap-y-1 text-lg" data-testid="summary">
+  <span set:html={m.grades_objective_summary_answers({ count: summary.answers })} />
+  {summary.correct !== null && (
+    <>
+      <span class="text-muted">·</span>
+      <span set:html={m.grades_objective_summary_correct({ percent: percentOf(summary.correct) })} />
+    </>
+  )}
+  {summary.lowDiscrimination !== null && (
+    <span class="badge badge-warning badge-soft" title={m.grades_objective_summary_low_discrimination_hint()}>
+      {m.grades_objective_summary_low_discrimination({ value: summary.lowDiscrimination.toFixed(2) })}
+    </span>
+  )}
+  {summary.pending > 0 && <a href="#attention" class="badge badge-warning">{m.grades_objective_summary_pending({ count: summary.pending })}</a>}
+</p>
+
+{attention.length > 0 && (
+  <section id="attention" class="mt-6">
+    <h3 class="page-subsubheader">{m.grades_objective_attention_title()} ({attention.length})</h3>
+    <AttentionList client:load rows={attention} target={target} names={names} regradesHref={regradesHref} />
+  </section>
+)}
+
+{sections.map((section) => {
+  if (section.kind === "groups") {
+    const text = labels(section);
+    return (
+      <section class="mt-8">
+        <h3 class="page-subsubheader">{text.title}</h3>
+        <div class="mt-3">
+          <GroupedAnswers
+            client:load
+            rows={section.rows}
+            column={section.column}
+            responseHeader={text.header}
+            countHeader={text.count}
+            target={target}
+            names={names}
+            detailHeader={text.detail}
+          />
+        </div>
+      </section>
+    );
+  }
+  if (section.kind === "histogram") {
+    return (
+      <section class="mt-8">
+        <h3 class="page-subsubheader">{m.grades_objective_section_histogram()}</h3>
+        <div class="mt-3"><NumericHistogram client:load histogram={section.histogram} /></div>
+      </section>
+    );
+  }
+  if (section.kind === "matrix") {
+    return (
+      <section class="mt-8">
+        <h3 class="page-subsubheader">{m.grades_objective_section_matrix()}</h3>
+        <div class="mt-3"><OrderingMatrix client:load matrix={section.matrix} /></div>
+      </section>
+    );
+  }
+  return (
+    <section class="mt-8">
+      <h3 class="page-subsubheader">{m.grades_objective_section_missed({ count: section.members.length })}</h3>
+      <div class="mt-3">
+        <Members client:load members={section.members} target={target} names={names} detailHeader={m.grades_objective_detail_blanks()} />
+      </div>
+    </section>
+  );
+})}
+
+{overrides.length > 0 && (
+  <section id="overrides" class="mt-8">
+    <h3 class="page-subsubheader">{m.grades_objective_overrides_title()} ({overrides.length})</h3>
+    <div class="mt-3">
+      <Overrides client:load rows={overrideRows} target={target} names={names} />
+    </div>
+  </section>
+)}
+
+<p role="note" class="alert alert-info alert-soft mt-8 py-2 text-sm">{m.grades_objective_note()}</p>
+
+<div class="fab">
+  <a href={editHref} class="btn btn-lg btn-circle btn-primary" aria-label={m.grades_objective_edit_question()} title={m.grades_objective_edit_question()}>
+    <Icon name="pencil" />
+  </a>
+</div>
+<div class="h-20" aria-hidden="true"></div>

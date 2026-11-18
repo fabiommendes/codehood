@@ -4,48 +4,6 @@ import DesignLayout from "@/layouts/DesignLayout.astro";
 export const prerender = false;
 
 const base = "/design/playground/correcao-objetivas";
-const grading = [
-	[
-		"multiple-choice",
-		"Múltipla escolha",
-		"Lista de alternativas com contagem, nota e média de quem escolheu; destaca distrator escolhido por alunos fortes (gabarito suspeito).",
-	],
-	[
-		"multiple-selection",
-		"Múltipla seleção",
-		'Primeiro quanto cada alternativa foi marcada contra o gabarito, depois as 5 combinações mais comuns e "outras".',
-	],
-	[
-		"true-false",
-		"Verdadeiro ou falso",
-		"Grade afirmação por afirmação: quem errou cada item, sem olhar o padrão inteiro.",
-	],
-	[
-		"numeric",
-		"Numérica",
-		"Histograma de valores com a faixa de tolerância marcada, e os erros típicos (unidade, arredondamento, raiz) como grupos.",
-	],
-	[
-		"short-answer",
-		"Resposta curta",
-		"Lista de textos distintos com marca de aceito ou recusado, para achar o texto certo que ficou fora do gabarito.",
-	],
-	[
-		"fill-in",
-		"Lacunas",
-		"Uma tabelinha por lacuna (valor, contagem, aceita?) e a lista de quem errou alguma.",
-	],
-	[
-		"ordering",
-		"Ordenação",
-		"Matriz etapa por posição, para ver que par se confunde, e as ordens inteiras agrupadas.",
-	],
-	[
-		"sem-atencao",
-		"Múltipla escolha, sem pendências",
-		'O quadro comum sem nada para atender: o "Requer atenção" vira uma frase e "Alteradas à mão" some.',
-	],
-];
 const attempt = [
 	[
 		"aluno-sobrescrever",
@@ -64,17 +22,10 @@ const attempt = [
   <div class="mb-8 max-w-3xl">
     <h1 class="text-3xl font-bold">Correção de questões objetivas</h1>
     <p class="mt-3 text-base-content/70">
-      Mockups com dados fixos. Todos compartilham o quadro: enunciado e gabarito, resumo, requer atenção e alteradas à mão.
-      Só o miolo muda por tipo.
+      Mockups com dados fixos da prova de um aluno. A página de correção de uma questão objetiva já está em produção.
     </p>
   </div>
-  <h2 class="text-xl font-semibold">Página de correção de uma questão</h2>
-  <ul class="menu mt-3 rounded-box border border-edge bg-base-100">
-    {grading.map(([slug, name, what]) => (
-      <li><a href={`${base}/${slug}`}><span class="font-medium">{name}</span><span class="text-sm text-muted">{what}</span></a></li>
-    ))}
-  </ul>
-  <h2 class="mt-8 text-xl font-semibold">Prova de um aluno</h2>
+  <h2 class="text-xl font-semibold">Prova de um aluno</h2>
   <ul class="menu mt-3 rounded-box border border-edge bg-base-100">
     {attempt.map(([slug, name, what]) => (
       <li><a href={`${base}/${slug}`}><span class="font-medium">{name}</span><span class="text-sm text-muted">{what}</span></a></li>

@@ -1,12 +1,15 @@
 import type { JSX } from "solid-js";
-import { ICONS, type IconName } from "./_icons";
+import { ICONS, type IconName } from "./icons";
 
 /// A decorative stroke icon; the button around it carries the accessible name.
-export default function Icon(props: { name: IconName }): JSX.Element {
+export default function Icon(props: {
+	name: IconName;
+	class?: string;
+}): JSX.Element {
 	return (
 		<svg
 			viewBox="0 0 24 24"
-			class="size-5"
+			class={props.class ?? "size-5"}
 			fill="none"
 			stroke="currentColor"
 			stroke-width="1.5"

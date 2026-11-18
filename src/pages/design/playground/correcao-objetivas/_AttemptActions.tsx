@@ -7,15 +7,15 @@ import {
 	onMount,
 	Show,
 } from "solid-js";
-import Dialog from "./_Dialog";
+import Dialog from "@/components/grading/Dialog";
+import Icon from "@/components/grading/Icon";
+import SortTable from "@/components/grading/SortTable";
 import {
 	ATTEMPT_LIST,
 	ATTEMPT_QUESTIONS,
 	type AttemptStatus,
 	fmt,
 } from "./_data";
-import Icon from "./_Icon";
-import SortTable from "./_SortTable";
 
 type DialogName =
 	| "sanction"
@@ -334,7 +334,11 @@ export default function AttemptActions(props: Props): JSX.Element {
 				size="max-w-md"
 				open={open() === "bonus"}
 				onClose={() => setOpen(null)}
-				action={{ label: "Adicionar bônus", tone: "btn-primary" }}
+				action={{
+					label: "Adicionar bônus",
+					tone: "btn-primary",
+					onClick: () => undefined,
+				}}
 			>
 				<div class="flex flex-col gap-3">
 					<div class="join w-full" role="radiogroup" aria-label="Operação">
@@ -393,7 +397,11 @@ export default function AttemptActions(props: Props): JSX.Element {
 				size="max-w-md"
 				open={open() === "sanction"}
 				onClose={() => setOpen(null)}
-				action={{ label: "Sancionar", tone: "btn-error" }}
+				action={{
+					label: "Sancionar",
+					tone: "btn-error",
+					onClick: () => undefined,
+				}}
 			>
 				<div class="flex flex-col gap-3">
 					<PercentRow
@@ -410,7 +418,11 @@ export default function AttemptActions(props: Props): JSX.Element {
 				size="max-w-md"
 				open={open() === "question-sanction"}
 				onClose={() => setOpen(null)}
-				action={{ label: "Sancionar questão", tone: "btn-error" }}
+				action={{
+					label: "Sancionar questão",
+					tone: "btn-error",
+					onClick: () => undefined,
+				}}
 			>
 				<div class="flex flex-col gap-3">
 					<PercentRow
@@ -428,7 +440,11 @@ export default function AttemptActions(props: Props): JSX.Element {
 				size="max-w-md"
 				open={open() === "grade"}
 				onClose={() => setOpen(null)}
-				action={{ label: "Salvar nota", tone: "btn-primary" }}
+				action={{
+					label: "Salvar nota",
+					tone: "btn-primary",
+					onClick: () => undefined,
+				}}
 			>
 				<div class="flex flex-col gap-3">
 					<fieldset class="fieldset py-0">

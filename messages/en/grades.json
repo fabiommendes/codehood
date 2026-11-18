@@ -350,5 +350,112 @@
 	"grades_adjustment_penalty_offset": "Penalty −{points}",
 	"grades_objective_blank": "Blank {number}",
 	"grades_objective_others": "Others",
-	"grades_objective_spellings": "{count} spellings"
+	"grades_objective_spellings": "{count} spellings",
+	"grades_objective_cancel": "Cancel",
+	"grades_objective_close": "Close",
+	"grades_objective_save": "Save",
+	"grades_objective_grade_label": "Grade (0 to 100)",
+	"grades_objective_comment_optional": "Comment (optional)",
+	"grades_objective_mark_correct": "Mark as right",
+	"grades_objective_give_grade": "Give grade",
+	"grades_objective_score_placeholder": "0 to 100",
+	"grades_objective_pending": "No grade",
+	"grades_objective_pending_detail": "This answer has no grading pass yet.",
+	"grades_objective_regrade": "Regrade requested",
+	"grades_objective_regrade_detail": "The student asked for a review of this answer.",
+	"grades_objective_view_request": "View request",
+	"grades_objective_members_label": "Students of the group",
+	"grades_objective_student": "Student",
+	"grades_objective_answer": "Answer",
+	"grades_objective_mean_others": "Average on the others",
+	"grades_objective_grade": "Grade",
+	"grades_objective_changed": "changed",
+	"grades_objective_actions": "Actions",
+	"grades_objective_change_grade": "Change grade",
+	"grades_objective_overrides_label": "Grades changed by hand",
+	"grades_objective_kind": "Type",
+	"grades_objective_kind_sanction": "Sanction",
+	"grades_objective_kind_grade": "Grade changed",
+	"grades_objective_comment": "Comment",
+	"grades_objective_when": "When",
+	"grades_objective_undo": "Undo",
+	"grades_objective_marked": "marked",
+	"grades_objective_in_key": "in the key",
+	"grades_objective_out_of_key": "not in the key",
+	"grades_objective_varies": "varies",
+	"grades_objective_students": "Students",
+	"grades_objective_yes": "yes",
+	"grades_objective_no": "no",
+	"grades_objective_partial": "partial",
+	"grades_objective_changed_count": [
+		{
+			"declarations": ["input count", "local countPlural = count: plural"],
+			"selectors": ["countPlural"],
+			"match": {
+				"countPlural=one": "{count} changed",
+				"countPlural=other": "{count} changed"
+			}
+		}
+	],
+	"grades_objective_accepted": "Accepted?",
+	"grades_objective_grade_given": "Grade given",
+	"grades_objective_marking": "Marking",
+	"grades_objective_marking_hint": "Average grade on the other questions of the students who gave this answer. Shown for 3 or more students. \"check\" asks to look at the key.",
+	"grades_objective_expected": "expected",
+	"grades_objective_review": "check",
+	"grades_objective_review_hint": "Students who do well elsewhere gave this answer: the key may be wrong.",
+	"grades_objective_view_students": "View students: {name}",
+	"grades_objective_group_summary": [
+		{
+			"declarations": ["input count", "local countPlural = count: plural"],
+			"selectors": ["countPlural"],
+			"match": {
+				"countPlural=one": "{count} student · {percent}%",
+				"countPlural=other": "{count} students · {percent}%"
+			}
+		}
+	],
+	"grades_objective_matrix_label": "Step by position",
+	"grades_objective_step": "Step",
+	"grades_objective_tolerance": "tolerance {low} to {high}",
+	"grades_objective_outside_window": "Outside the window",
+	"grades_objective_edit_question": "Edit question",
+	"grades_objective_summary_answers": [
+		{
+			"declarations": ["input count", "local countPlural = count: plural"],
+			"selectors": ["countPlural"],
+			"match": {
+				"countPlural=one": "<strong>{count}</strong> answer",
+				"countPlural=other": "<strong>{count}</strong> answers"
+			}
+		}
+	],
+	"grades_objective_summary_correct": "<strong>{percent}%</strong> right",
+	"grades_objective_summary_low_discrimination": "low discrimination ({value})",
+	"grades_objective_summary_low_discrimination_hint": "Students who do well on the exam miss this as often as those who do badly. Check the key.",
+	"grades_objective_summary_pending": "{count} without a grade",
+	"grades_objective_attention_title": "Needs attention",
+	"grades_objective_overrides_title": "Changed by hand",
+	"grades_objective_note": "Pinning a new version of the question in the exam does not grade the existing answers again. For now, use \"Change grade\".",
+	"grades_objective_section_choices": "Grouped answers",
+	"grades_objective_section_alternatives": "By alternative",
+	"grades_objective_section_combinations": "Most common combinations",
+	"grades_objective_section_statements": "Statement by statement",
+	"grades_objective_section_texts": "Distinct texts",
+	"grades_objective_section_values": "Grouped by value",
+	"grades_objective_section_orders": "Whole orders",
+	"grades_objective_section_histogram": "Values sent",
+	"grades_objective_section_matrix": "Where each step went",
+	"grades_objective_section_missed": "Who missed a blank ({count})",
+	"grades_objective_header_choice": "Alternative",
+	"grades_objective_header_combination": "Combination",
+	"grades_objective_header_statement": "Statement",
+	"grades_objective_header_text": "Text",
+	"grades_objective_header_value": "Value",
+	"grades_objective_header_order": "Order",
+	"grades_objective_header_blank": "Value",
+	"grades_objective_count_missed": "Missed",
+	"grades_objective_detail_marked": "Marked",
+	"grades_objective_detail_wrote": "Wrote",
+	"grades_objective_detail_blanks": "Blanks missed"
 }

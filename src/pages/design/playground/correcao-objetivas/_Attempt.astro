@@ -1,10 +1,10 @@
 ---
 /// The student attempt page with a grade change, either per question or as a bonus on the exam.
 import { QuestionFrame } from "@/components/exam/QuestionFrame";
+import Icon from "@/components/grading/Icon.astro";
 import AttemptActions from "./_AttemptActions";
 import { ATTEMPT_LIST, ATTEMPT_QUESTIONS, ATTEMPT_STUDENT, fmt } from "./_data";
 import type { Grading } from "./_guard";
-import Icon from "./_Icon.astro";
 import Shell from "./_Shell.astro";
 
 interface Props {

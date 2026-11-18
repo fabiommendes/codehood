@@ -27,7 +27,7 @@ export default function SortTable<T>(props: Props<T>): JSX.Element {
 			compareNullsLast(read(a), read(b), current.direction, (x, y) =>
 				typeof x === "number" && typeof y === "number"
 					? x - y
-					: String(x).localeCompare(String(y), "pt-BR"),
+					: String(x).localeCompare(String(y), undefined),
 			),
 		);
 	});

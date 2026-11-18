@@ -28,9 +28,17 @@ uma submissão que já tem uma correção `auto`.
 3. O professor corrige o gabarito, publica `v2` e fixa `v2` na prova.
 4. A página de correção da questão mostra as notas de `v1`.
 
-## O que decidir
+## Decisão
 
-- Recorrigir ao trocar a versão fixada, com uma nova correção `auto` que não
-  apague o histórico, ou oferecer um botão "recorrigir" na página da questão.
-- O que fazer com uma resposta cuja correção mais recente é manual: manter a
-  manual parece o certo.
+Ao fixar outra versão da questão na prova, recorrigir as respostas:
+
+- A resposta cujo passe mais novo é humano (`graderId` preenchido e `botId`
+  nulo) é **pulada**: a nota alterada à mão fica.
+- As demais ganham um passe `auto` novo, sem apagar o histórico.
+
+A página de correção da questão objetiva avisa enquanto isto não existe: fixar
+uma nova versão não corrige de novo as respostas existentes, e "Alterar nota"
+é o caminho.
+
+Rota: `src/pages/[discipline]/[course]/exams/[slug]/grading/[question].astro`.
+Vale para toda questão com `isAutoGraded(doc)` (automática e não `code`).

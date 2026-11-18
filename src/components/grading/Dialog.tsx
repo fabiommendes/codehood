@@ -1,5 +1,6 @@
 import { createEffect, type JSX } from "solid-js";
-import Icon from "./_Icon";
+import { m } from "@/i18n";
+import Icon from "./Icon";
 
 interface Props {
 	/// Unique in the page: names the dialog by its heading.
@@ -11,11 +12,18 @@ interface Props {
 	children: JSX.Element;
 	/// Width class of the box; defaults to a wide one.
 	size?: string;
-	/// Primary action; when given the footer is Cancelar on the left and this on the right.
-	action?: { label: string; tone: "btn-primary" | "btn-error" };
+	/// Primary action; when given the footer is Cancel on the left and this on the right.
+	action?: {
+		label: string;
+		tone: "btn-primary" | "btn-error";
+		onClick: () => void;
+		disabled?: boolean;
+	};
 }
 
-/// A wide DaisyUI modal on a `<dialog>` that follows `open`.
+/**
+ * A wide DaisyUI modal on a `<dialog>` that follows `open`.
+ */
 export default function Dialog(props: Props): JSX.Element {
 	let dialog: HTMLDialogElement | undefined;
 	createEffect(() => {
@@ -46,10 +54,17 @@ export default function Dialog(props: Props): JSX.Element {
 							type="submit"
 							class={props.action ? "btn btn-ghost btn-sm" : "btn btn-sm"}
 						>
-							{props.action ? "Cancelar" : "Fechar"}
+							{props.action
+								? m.grades_objective_cancel()
+								: m.grades_objective_close()}
 						</button>
 						{props.action && (
-							<button type="submit" class={`btn btn-sm ${props.action.tone}`}>
+							<button
+								type="button"
+								class={`btn btn-sm ${props.action.tone}`}
+								disabled={props.action.disabled}
+								onClick={() => props.action?.onClick()}
+							>
 								{props.action.label}
 							</button>
 						)}
@@ -57,7 +72,7 @@ export default function Dialog(props: Props): JSX.Element {
 				</div>
 			</div>
 			<form method="dialog" class="modal-backdrop">
-				<button type="submit">Fechar</button>
+				<button type="submit">{m.grades_close_backdrop()}</button>
 			</form>
 		</dialog>
 	);
@@ -66,7 +81,6 @@ export default function Dialog(props: Props): JSX.Element {
 /// Icon button that opens the students of a row.
 export function PeopleButton(props: {
 	label: string;
-	active?: boolean;
 	onClick: () => void;
 	disabled?: boolean;
 }): JSX.Element {

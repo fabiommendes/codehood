@@ -111,9 +111,7 @@ test("an automatic question has no rubric and no view switch, and keeps the view
 	await expect(
 		page.getByRole("button", { name: /save and next/i }),
 	).toHaveCount(0);
-	await expect(
-		page.getByRole("region", { name: "Answer distribution" }),
-	).toBeVisible();
+	await expect(page.getByTestId("summary")).toBeVisible();
 	await expect(
 		page.getByRole("link", { name: "Next question" }),
 	).toHaveAttribute("href", /view=list/);

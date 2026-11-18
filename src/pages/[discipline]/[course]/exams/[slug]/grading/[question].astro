@@ -5,23 +5,24 @@ import QuestionNumber from "@/components/exam/QuestionNumber.astro";
 import { pointsByPosition } from "@/components/exam/question-points";
 import Answer from "@/components/grading/Answer.astro";
 import AnswerControls from "@/components/grading/AnswerControls";
-import AnswerDistributionSection from "@/components/grading/AnswerDistribution.astro";
 import AnswerKey from "@/components/grading/AnswerKey";
 import AppliedItems from "@/components/grading/AppliedItems";
 import CodeAnswerKey from "@/components/grading/CodeAnswerKey.astro";
 import CodeQueue from "@/components/grading/CodeQueue.astro";
 import CodeSends from "@/components/grading/CodeSends.astro";
+import Icon from "@/components/grading/Icon.astro";
+import ObjectiveReview from "@/components/grading/ObjectiveReview.astro";
 import PassHistory from "@/components/grading/PassHistory.astro";
 import RubricGrader from "@/components/grading/RubricGrader";
-import SummaryDistribution from "@/components/grading/SummaryDistribution.astro";
 import { db } from "@/db";
+import { loadResultPolicy } from "@/db/result-policy";
 import { m } from "@/i18n";
 import AppLayout from "@/layouts/AppLayout.astro";
 import { publicForm } from "@/mdq";
 import { formatScore } from "@/services/exam-result";
 import { answersTo, gradingOrder } from "@/services/grading";
-import { answerDistribution } from "@/services/question-stats";
-import { summaryGroups } from "@/services/response-summary";
+import { objectiveReview, restMeans } from "@/services/objective-review";
+import { questionStats } from "@/services/question-stats";
 import { pendingBlanks, reviewResult } from "@/services/review";
 import { breadcrumbs } from "@/utils/breadcrumbs";
 import { graderState } from "@/utils/grader-state";
@@ -33,7 +34,7 @@ import {
 	loadStudents,
 } from "@/utils/load-grading";
 import { highlightCodeBlocks, renderMarkdown } from "@/utils/markdown";
-import { isAutoGraded } from "@/utils/question-display";
+import { isAutoGraded, questionTypeLabels } from "@/utils/question-display";
 
 export const prerender = false;
 
@@ -45,7 +46,17 @@ const {
 } = Astro.params;
 const result = await loadGrading(Astro, discipline, courseSegment, slug);
 if ("redirect" in result) return result.redirect;
-const { course, href, tabs, exam, questions, answers, attempts } = result;
+const {
+	course,
+	href,
+	tabs,
+	exam,
+	questions,
+	answers,
+	attempts,
+	feedback,
+	exceptions,
+} = result;
 
 const position = questions.indexOf(questionSlug ?? "");
 if (!questionSlug || position < 0) return Astro.rewrite("/404");
@@ -86,9 +97,10 @@ const next = questions[position + 1];
 const names = wantsNames(Astro.url);
 const queueHref = `${href}/exams/${exam.slug}/grading`;
 const here = `${queueHref}/${questionSlug}`;
-// Student names reach the page only when asked for.
+// A manual question shows student names only when asked for; an automatic one always does.
+const auto = isAutoGraded(doc);
 const studentNames = new Map(
-	names
+	names || auto
 		? (await loadStudents(course.id, actor)).map((student) => [
 				student.username,
 				student.name,
@@ -139,7 +151,6 @@ const sanctionLabel = (author: string) => {
 const rowColumns =
 	"grid grid-cols-[minmax(7rem,11rem)_minmax(0,1fr)_4.5rem_minmax(5rem,auto)] gap-3";
 const wantedList = wantsList(Astro.url);
-const auto = isAutoGraded(doc);
 const listView = wantedList && !auto;
 
 // A code question that goes to a worker also shows its queue and the sends of each answer.
@@ -198,12 +209,8 @@ const rubric =
 				{ actor },
 			);
 const grader = rubric && graderState(ownAnswers, rubric, actor.username);
-const distribution = answerDistribution(
-	doc,
-	answers.filter((answer) => answer.question === questionSlug),
-);
 const shown = (
-	listView || auto ? [...pending, ...resolved] : gradingOrder(ownAnswers)
+	auto ? [] : listView ? [...pending, ...resolved] : gradingOrder(ownAnswers)
 ).map((answer, index) => ({
 	answer,
 	label: m.grades_question_answer_n({ n: index + 1 }),
@@ -218,13 +225,55 @@ const shown = (
 				}),
 	blanks: pendingBlanks(doc, answer.payload),
 }));
-const groups =
-	auto && !distribution
-		? summaryGroups(
-				doc,
-				ownAnswers.map((answer) => answer.payload),
-			)
-		: [];
+
+// The model of an automatic question's page.
+const review = auto
+	? await (async () => {
+			const policy = (await loadResultPolicy(course.id))(exam);
+			const rest = restMeans(
+				exam.questions,
+				questionSlug,
+				attempts,
+				feedback,
+				policy,
+			);
+			const stats = questionStats(
+				exam,
+				questions,
+				attempts,
+				feedback,
+				new Date(),
+				exceptions,
+				policy,
+			)[position];
+			return objectiveReview({
+				question: doc,
+				slug: questionSlug,
+				answers: ownAnswers.map((answer) => ({
+					...answer,
+					restMean: rest.get(answer.author) ?? null,
+				})),
+				stats: stats ?? { correct: null, discrimination: null },
+				regrades: openRegrades,
+				sanctions: new Map(
+					sanctions
+						.filter(
+							(sanction) =>
+								sanction.question === questionSlug && sanction.op === "FACTOR",
+						)
+						.map((sanction) => [
+							sanction.author,
+							{
+								publicId: sanction.publicId,
+								value: Number(sanction.value),
+								reason: sanction.reason,
+								updatedAt: sanction.updatedAt,
+							},
+						]),
+				),
+			});
+		})()
+	: null;
 ---
 
 <AppLayout title={m.grades_question_title({ question: `${m.exams_attempt_question_short({ number: position + 1 })} ${title}`, exam: exam.title })}
@@ -235,15 +284,32 @@ const groups =
 
   <a href={gradingHref(queueHref, { names })} class="text-sm text-muted hover:text-primary">← {m.grades_question_back()}</a>
 
-  <p class="mt-2 text-sm"><QuestionNumber number={position + 1} points={points} /></p>
-  <h2 class="page-subheader">{title}</h2>
+  <p class="mt-2 text-sm">
+    <QuestionNumber number={position + 1} points={points} />
+    {auto && <span class="badge badge-ghost badge-sm ml-1">{questionTypeLabels[doc.type]}</span>}
+  </p>
+  {auto ? (
+    <div class="relative flex items-center gap-2">
+      {previous ? (
+        <a href={gradingHref(`${queueHref}/${previous}`, { names, list: wantedList })} class="btn btn-ghost btn-sm btn-square text-base-content/60 lg:absolute lg:right-full lg:mr-1" aria-label={m.grades_question_previous()} title={m.grades_question_previous()}>
+          <Icon name="chevronLeft" />
+        </a>
+      ) : <span class="btn btn-ghost btn-sm btn-square invisible lg:absolute lg:right-full lg:mr-1" aria-hidden="true"></span>}
+      <h2 class="page-subheader">{title}</h2>
+      {next && (
+        <a href={gradingHref(`${queueHref}/${next}`, { names, list: wantedList })} class="btn btn-ghost btn-sm btn-square text-base-content/60" aria-label={m.grades_question_next()} title={m.grades_question_next()}>
+          <Icon name="chevronRight" />
+        </a>
+      )}
+    </div>
+  ) : <h2 class="page-subheader">{title}</h2>}
 
-  <nav class="mt-3 flex gap-4 text-sm">
+  {!auto && <nav class="mt-3 flex gap-4 text-sm">
     {previous && <a href={gradingHref(`${queueHref}/${previous}`, { names, list: wantedList })} class="link">{m.grades_question_previous()}</a>}
     {next && <a href={gradingHref(`${queueHref}/${next}`, { names, list: wantedList })} class="link">{m.grades_question_next()}</a>}
-    {!auto && <a href={gradingHref(here, { names, list: !listView })} class="link">{listView ? m.grades_question_view_one() : m.grades_question_view_list()}</a>}
+    <a href={gradingHref(here, { names, list: !listView })} class="link">{listView ? m.grades_question_view_one() : m.grades_question_view_list()}</a>
     <a href={gradingHref(here, { names: !names, list: wantedList })} role="switch" aria-checked={names ? "true" : "false"} class="link ml-auto">{m.grades_question_show_names()}</a>
-  </nav>
+  </nav>}
 
   {versionMissing && (
     <div role="alert" class="alert alert-warning mt-4">
@@ -268,9 +334,9 @@ const groups =
         />
       )
     ) : (
-      <details class="mt-4 rounded-box border border-edge bg-base-100">
-        <summary class="cursor-pointer px-4 py-2 text-sm font-medium">{m.grades_grader_questions()}</summary>
-        <div class="p-4">
+      <details class:list={["mt-4 rounded-box border border-edge", auto ? "overflow-hidden bg-base-200/25 shadow-sm" : "bg-base-100"]}>
+        <summary class:list={["cursor-pointer px-4 py-2 text-sm font-medium", auto && "bg-base-200/50"]}>{m.grades_grader_questions()}</summary>
+        <div class:list={[auto ? "border-t border-edge p-6" : "p-4"]}>
           {hasKey ? (
             doc.type === "code" ? <CodeAnswerKey question={doc} /> : <AnswerKey client:load question={doc} codeBlocks={keyBlocks} />
           ) : (
@@ -289,10 +355,17 @@ const groups =
     />
   )}
 
-  {(listView || auto) && distribution && <AnswerDistributionSection distribution={distribution} />}
-  {auto && !distribution && groups.length > 0 && <SummaryDistribution groups={groups} />}
+  {review && (
+    <ObjectiveReview
+      review={review}
+      target={{ discipline: discipline!, course: courseSegment!, exam: exam.slug, question: questionSlug }}
+      names={Object.fromEntries(studentNames)}
+      regradesHref={regradesHref}
+      editHref={`${href}/questions/${questionSlug}`}
+    />
+  )}
 
-  {shown.length === 0 && <p class="mt-8 text-base-content/70">{m.grades_question_no_answers()}</p>}
+  {!auto && shown.length === 0 && <p class="mt-8 text-base-content/70">{m.grades_question_no_answers()}</p>}
 
   {
     !listView && grader && shown.length > 0 && (
@@ -337,7 +410,7 @@ const groups =
     )
   }
 
-  {(listView || auto) && (
+  {listView && (
   <div class="mt-8 flex flex-col gap-6">
     {
       shown.map(({ answer, label, isPending, result, blanks }, index) => (
