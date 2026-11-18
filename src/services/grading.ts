@@ -578,3 +578,60 @@ export function compareStudents(
 		a.username.localeCompare(b.username)
 	);
 }
+
+/// How a student stands on the attempt page's roster.
+export type RosterStatus =
+	| "none"
+	| "in-progress"
+	| "pending"
+	| "adjusted"
+	| "submitted";
+
+/// One student of the attempt page's roster.
+export interface RosterRow {
+	username: string;
+	name: string;
+	/// The student's school registration, `null` when they have none.
+	schoolId: string | null;
+	/// The attempt's total in `[-1, 1]`, or `null` without a closed attempt or with an answer pending.
+	total: number | null;
+	status: RosterStatus;
+}
+
+/**
+ * One row per active student, sorted by name: `none` without an attempt; `in-progress` while open; `pending` with a pending answer; `adjusted` with any active adjustment or manual change; else `submitted`.
+ *
+ * @params adjusted The usernames with an active adjustment or a grade changed by hand.
+ */
+export function attemptRoster(
+	students: readonly (GradedStudent & { schoolId: string | null })[],
+	rows: readonly AttemptRow[],
+	adjusted: ReadonlySet<string>,
+): RosterRow[] {
+	void students;
+	void rows;
+	void adjusted;
+	throw new Error("not implemented");
+}
+
+/// The state color of a question on the attempt page.
+export type QuestionMark =
+	| "correct"
+	| "partial"
+	| "wrong"
+	| "blank"
+	| "changed"
+	| "pending"
+	| "not-graded";
+
+/** The state color of a question on the attempt page: `changed` wins, then blank (no counting submission or null payload), then status and score (≥ 1 correct, > 0 partial, else wrong). */
+export function questionMark(
+	outcome: QuestionOutcome,
+	payload: unknown,
+	changed: boolean,
+): QuestionMark {
+	void outcome;
+	void payload;
+	void changed;
+	throw new Error("not implemented");
+}

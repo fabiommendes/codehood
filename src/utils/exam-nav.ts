@@ -20,7 +20,9 @@ export interface ExamNavInput {
 	pending?: number;
 	/// Regrade requests still open.
 	regrades?: number;
-	/// Sanctions still active.
+	/// Adjustments still active.
+	adjustments?: number;
+	/// Sanctions still active; `adjustments` replaces it.
 	sanctions?: number;
 }
 
