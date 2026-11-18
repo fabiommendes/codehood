@@ -6,13 +6,19 @@
  */
 import * as env from "@/core/constants";
 import { m } from "@/i18n";
-import { BaseSerializableError, RuleViolation } from "./error";
+import {
+	BaseSerializableError,
+	FieldError,
+	InvalidData,
+	RuleViolation,
+} from "./error";
 import type { ErrorResponse } from "./error-response";
 
 /**
  * Convert exceptions to a user-facing error response.
  *
- * Codehood defines a few different types of user-facing errors. Anything else,
+ * Codehood defines a few different types of user-facing errors. A
+ * {@link FieldError} is one of them: a 400 that points at its field. Anything else,
  * and a {@link RuleViolation}, is a bug on the server: in production it
  * becomes a bare 500 whose message says nothing about the exception, which is
  * logged instead. Elsewhere the message is passed through to help debugging.
@@ -21,6 +27,11 @@ export function responseFromException(
 	error: unknown,
 	production: boolean = env.PRODUCTION,
 ): ErrorResponse {
+	if (error instanceof FieldError) {
+		return new InvalidData({
+			[error.field]: [{ code: "invalid", message: error.message }],
+		}).toJSON();
+	}
 	const internal =
 		error instanceof RuleViolation || !(error instanceof BaseSerializableError);
 	if (internal && production) {

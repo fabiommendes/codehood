@@ -210,7 +210,9 @@ test("IndexedDB revoke that fails can be retried and then erases the records", a
 							return new Proxy(database, {
 								get(db, member) {
 									if (member === "transaction")
-										return (...args: Parameters<IDBDatabase["transaction"]>) => {
+										return (
+											...args: Parameters<IDBDatabase["transaction"]>
+										) => {
 											if (failing) throw new Error("injected failure");
 											return db.transaction(...args);
 										};
@@ -252,5 +254,9 @@ test("IndexedDB revoke that fails can be retried and then erases the records", a
 		},
 		{ prefix: `${PREFIX}-retry`, ref: REF, initial: INITIAL, now: NOW },
 	);
-	expect(outcome).toEqual({ first: "rejected", second: "resolved", left: null });
+	expect(outcome).toEqual({
+		first: "rejected",
+		second: "resolved",
+		left: null,
+	});
 });

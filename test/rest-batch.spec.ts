@@ -89,9 +89,12 @@ test("rest.batch supports every registered verb and commits successes around fai
 		},
 	]);
 	expect(post.result.map((item: { status: number }) => item.status)).toEqual([
-		200, 400, 500, 200,
+		200, 400, 400, 200,
 	]);
-	expect(JSON.stringify(post.result[2].body)).not.toContain(slug);
+	expect(post.result[2].body).toMatchObject({
+		code: "invalid-data",
+		errors: { slug: [{ code: "invalid" }] },
+	});
 	const patch = await batch(request, headers, "PATCH", [
 		{ id: 1, path: `/api/discipline/${slug}`, body: { name: "Patched" } },
 		{ id: 2, path: `/api/discipline/${slug}`, body: { name: "Patched again" } },

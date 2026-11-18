@@ -31,6 +31,9 @@
 
 ### Fixed
 
+- A API REST responde 400 (`invalid-data`, com o erro no campo) quando um
+  Service rejeita o valor de um campo, como o slug repetido de uma disciplina.
+  Antes respondia 500.
 - Monitor de edição: repetir o logout depois de uma falha na revogação do
   IndexedDB tenta de novo, em vez de devolver a mesma rejeição.
 - Prova: enviar de uma aba que não viu uma edição não apaga mais o rascunho
