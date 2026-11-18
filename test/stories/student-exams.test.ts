@@ -833,8 +833,9 @@ test("student: see the adjustments to my grade", async ({ page }) => {
 		await expect(adjustments()).toContainText("Grade replaced by 70%");
 		await expect(adjustments()).toContainText("Grade of the project");
 		await expect(adjustments()).toContainText(/Final total\s*70%/);
-		await expect(page.getByText("First question")).toHaveCount(0);
-		await expect(page.getByText("Second question")).toHaveCount(0);
+		await expect(page.getByRole("radio", { checked: true })).toHaveCount(0);
+		await expect(page.getByRole("checkbox", { checked: true })).toHaveCount(0);
+		await expect(page.getByText("Correct.")).toHaveCount(0);
 		await expect(requestRegrade()).toHaveCount(0);
 		await keepsNotesPrivate();
 	});
@@ -1355,8 +1356,8 @@ test("student: see what each question is worth", async ({ page }) => {
  *
  * - Before the grades are released, no question text is on the page.
  * - After the release, each question's stem is visible as plain text.
- * - Never an answer field (`radio`, `checkbox`, `textbox`), nor the buttons
- *   "Start exam" and "Submit exam".
+ * - Any answer field present is disabled and unmarked; no review, and no
+ *   buttons "Start exam" or "Submit exam".
  */
 test("student: read the questions of an exam I missed", async ({ page }) => {
 	const teacher = await seedUser({
@@ -1414,8 +1415,11 @@ test("student: read the questions of an exam I missed", async ({ page }) => {
 
 		await expect(page.getByText(capitalChoice.stem)).toBeVisible();
 		for (const role of ["radio", "checkbox", "textbox"] as const) {
-			await expect(page.getByRole(role)).toHaveCount(0);
+			await expect(page.getByRole(role, { disabled: false })).toHaveCount(0);
 		}
+		await expect(page.getByRole("radio", { checked: true })).toHaveCount(0);
+		await expect(page.getByRole("checkbox", { checked: true })).toHaveCount(0);
+		await expect(page.getByText("Correct.")).toHaveCount(0);
 		for (const name of ["Start exam", "Submit exam"]) {
 			await expect(page.getByRole("button", { name })).toHaveCount(0);
 		}

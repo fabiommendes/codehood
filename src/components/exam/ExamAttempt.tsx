@@ -192,8 +192,8 @@ export default function ExamAttempt(props: ExamAttemptProps): JSX.Element {
 	const serverNow = () => new Date(Date.now() + skew());
 
 	const [kind, setKind] = createSignal(props.state.kind);
-	// A student who did not take the exam reads the questions with nothing to answer.
-	const reading = () => kind() === "missed";
+	// A student who did not take the exam reads the questions with nothing to answer and no review.
+	const reading = () => kind() === "missed" || props.empty === true;
 	const [now, setNow] = createSignal(props.now);
 	const [busy, setBusy] = createSignal(false);
 	const [failure, setFailure] = createSignal<string | null>(null);
@@ -1272,7 +1272,6 @@ export default function ExamAttempt(props: ExamAttemptProps): JSX.Element {
 										question={entry.question}
 										payload={answers()[entry.slug]}
 										readonly={kind() !== "in-progress" || closing()}
-										reading={reading()}
 										review={
 											kind() === "results" && !reading()
 												? props.reviews?.[entry.slug]
