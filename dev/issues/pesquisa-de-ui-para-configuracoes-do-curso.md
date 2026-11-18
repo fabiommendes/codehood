@@ -1,6 +1,6 @@
 ---
 type: issue
-status: todo
+status: backlog
 tags: [course, settings, ui, navigation, instructor, research]
 kind: enhancement
 priority: medium

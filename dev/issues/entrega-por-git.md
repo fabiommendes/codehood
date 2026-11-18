@@ -1,6 +1,6 @@
 ---
 type: issue
-status: todo
+status: backlog
 tags: [submissions, git, grading-bot, cli]
 relatedTo: [classroom-invite]
 kind: enhancement

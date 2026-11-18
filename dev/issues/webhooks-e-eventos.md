@@ -1,6 +1,6 @@
 ---
 type: issue
-status: todo
+status: backlog
 tags: [api, rpc, grading-bot]
 relatedTo: [grading-bot]
 kind: enhancement

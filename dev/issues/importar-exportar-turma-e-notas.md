@@ -1,6 +1,6 @@
 ---
 type: issue
-status: todo
+status: backlog
 tags: [cli, enrollment, grades, csv]
 relatedTo: [grade-column-service, enrollment-service]
 kind: enhancement

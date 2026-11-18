@@ -1,6 +1,6 @@
 ---
 type: issue
-status: todo
+status: backlog
 tags: [exams, grading, deadlines]
 relatedTo: [exam-state, course-grade]
 kind: enhancement

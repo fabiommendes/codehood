@@ -1,6 +1,6 @@
 ---
 type: issue
-status: open
+status: backlog
 tags: [runner, python, performance]
 relatedTo: [ambiente-de-execucao-no-cliente]
 created: 2026-11-07

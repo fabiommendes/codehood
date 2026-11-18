@@ -1,6 +1,6 @@
 ---
 type: issue
-status: todo
+status: backlog
 tags: [email, notifications]
 relatedTo: [email-service, student-home, instructor-home]
 kind: enhancement

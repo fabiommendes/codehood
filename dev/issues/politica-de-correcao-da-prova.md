@@ -1,3 +1,11 @@
+---
+type: issue
+status: todo
+tags: [mdq, exams, grading, shuffle]
+kind: enhancement
+created: 2026-11-13
+---
+
 # Prova não guarda nem aplica a política de correção do MDQ
 
 O MDQ declara na prova três campos que o servidor ignora:

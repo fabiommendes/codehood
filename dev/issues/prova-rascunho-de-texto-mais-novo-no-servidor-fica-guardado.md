@@ -1,6 +1,6 @@
 ---
 type: issue
-status: todo
+status: deferred
 tags: [exam, student, drafts]
 kind: bug
 priority: low
