@@ -63,12 +63,13 @@ import {
 import { parseCourseParams } from "@/urls";
 import type { Prisma, PrismaTx } from "../client";
 import { courseRefWhere, valueOrNotFound } from "../utils";
-import { unsafePinnedDocument } from "./exam-questions";
 import {
-	examReleaseSelect,
-	makeFeedbackService,
-	releasedToStudents,
-} from "./feedback.service";
+	type ExamGrant,
+	grantedDocument,
+	issueExamGrant,
+	unsafePinnedDocument,
+} from "./exam-questions";
+import { examReleaseSelect, makeFeedbackService } from "./feedback.service";
 import { promoteExpiredSends } from "./grading-job-queue";
 
 //
@@ -767,6 +768,8 @@ async function studentViews(
 		course: exam.course,
 	});
 
+	// Without a grant the sends are listed, but no report leaves.
+	const grant = await issueExamGrant(tx, { response: input.response }, actor);
 	const questions = await tx.questionRef.findMany({
 		where: {
 			courseId: exam.courseId,
@@ -792,7 +795,7 @@ async function studentViews(
 		},
 		orderBy: [{ createdAt: "asc" }, { id: "asc" }],
 	});
-	const released = releasedToStudents(exam, new Date());
+	const released = grant?.view === "review";
 
 	const views: GradingJobStudentBatchView = {};
 	for (const question of questions) {
@@ -808,9 +811,10 @@ async function studentViews(
 			(row) => row.gradingJob?.state === "DONE" && row.runnerReport !== null,
 		);
 		// The document is only read to show a report, and most polls find none yet.
-		const document = reported
-			? await codeDocument(tx, { examId: exam.id, question })
-			: undefined;
+		const document =
+			grant && reported
+				? await grantedCodeDocument(tx, grant, actor, question.slug)
+				: undefined;
 		const sent: SentSubmission[] = own.map((row) => ({
 			kind: row.kind,
 			status: row.status,
@@ -866,6 +870,20 @@ export async function privateDocument(
 		),
 	);
 	return data.privatePayload as unknown as QuestionDocument;
+}
+
+/// The code question of the grant, read as the student sees it.
+async function grantedCodeDocument(
+	tx: PrismaTx,
+	grant: ExamGrant,
+	actor: Actor,
+	slug: string,
+): Promise<CodeQuestion> {
+	const document = await grantedDocument(tx, grant, actor, slug);
+	if (document.type !== "code") {
+		throw new ImproperBehavior("a grading job points at a non-code question");
+	}
+	return document;
 }
 
 /// The code question a job grades.
