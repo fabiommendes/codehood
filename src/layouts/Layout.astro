@@ -41,6 +41,14 @@ const { title = "Codehood" } = Astro.props;
 				} catch (e) {}
 			})();
 		</script>
+		<!-- Page transitions, only with JavaScript on: see global.css. -->
+		<script is:inline>
+			document.head.append(
+				Object.assign(document.createElement("style"), {
+					textContent: "@view-transition { navigation: auto; }",
+				}),
+			);
+		</script>
 		<meta charset="utf-8" />
 		<meta name="viewport" content="width=device-width" />
 		<link rel="icon" type="image/svg+xml" href="/favicon.svg" />

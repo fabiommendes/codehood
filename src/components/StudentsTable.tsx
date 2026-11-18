@@ -1,7 +1,8 @@
 import { actions } from "astro:actions";
 import type { JSX } from "solid-js";
 import type { z } from "zod";
-import Table, { type ColumnConfig } from "@/components/ui/Table";
+import SearchableTable from "@/components/ui/SearchableTable";
+import type { ColumnConfig } from "@/components/ui/Table";
 import type { enrollmentSchema } from "@/core/schemas/enrollment";
 import { locale, m } from "@/i18n";
 
@@ -14,6 +15,8 @@ interface Props {
 	/// The course's URL segments, e.g. `discipline: "cs101"`, `course: "ada_2026-1"`.
 	discipline: string;
 	course: string;
+	/// Controls shown beside the search box, such as the download and add buttons.
+	children?: JSX.Element;
 }
 
 function formatDate(date: Date): string {
@@ -25,10 +28,11 @@ function formatDate(date: Date): string {
 }
 
 /**
- * The Students tab's table — the fifth caller of `ui/Table.tsx`, alongside
- * the four admin tables. The drop control posts to the same
- * `course.dropEnrollment` action a student's own "Leave course" button uses,
- * gated per-actor by `enrollment.delete`.
+ * The Students tab's table, searchable by any of the student's fields.
+ *
+ * The drop control posts to the same `course.dropEnrollment` action a
+ * student's own "Leave course" button uses, gated per-actor by
+ * `enrollment.delete`.
  */
 export default function StudentsTable(props: Props): JSX.Element {
 	const columns: ColumnConfig<EnrolledUser>[] = [
@@ -70,10 +74,26 @@ export default function StudentsTable(props: Props): JSX.Element {
 				<>
 					<button
 						type="button"
-						class="btn btn-outline btn-error btn-sm"
+						class="btn btn-square btn-ghost btn-sm text-error"
 						data-open-dialog={`drop-student-${user.username}`}
+						aria-label={m.courses_students_drop_label({ name: user.name })}
+						title={m.courses_students_drop()}
 					>
-						{m.courses_students_drop()}
+						<svg
+							width="18"
+							height="18"
+							viewBox="0 0 24 24"
+							fill="none"
+							aria-hidden="true"
+						>
+							<path
+								d="M15 19v-1a4 4 0 0 0-4-4H7a4 4 0 0 0-4 4v1M9 10.5a3.25 3.25 0 1 0 0-6.5 3.25 3.25 0 0 0 0 6.5ZM16 11h6"
+								stroke="currentColor"
+								stroke-width="1.6"
+								stroke-linecap="round"
+								stroke-linejoin="round"
+							/>
+						</svg>
 					</button>
 
 					<dialog id={`drop-student-${user.username}`} class="modal">
@@ -124,5 +144,19 @@ export default function StudentsTable(props: Props): JSX.Element {
 		},
 	];
 
-	return <Table columns={columns} data={props.students} class="mt-4" />;
+	return (
+		<SearchableTable
+			columns={columns}
+			data={props.students}
+			searchText={(user) =>
+				[user.name, user.username, user.email, user.githubId, user.schoolId]
+					.filter(Boolean)
+					.join(" ")
+			}
+			empty={m.courses_roster_empty()}
+			class="mt-4"
+		>
+			{props.children}
+		</SearchableTable>
+	);
 }

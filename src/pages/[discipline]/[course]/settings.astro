@@ -1,20 +1,10 @@
 ---
 // A course's settings, for its instructor: what the course is (read only, it
-// comes from the course repository), how students join it (passphrase,
-// classroom invite links), and the CLI commands that set up its repository.
+// comes from the course repository) and the CLI commands that set up its repository.
 // It has no tab of its own: the course card on the home links it.
-import { actions } from "astro:actions";
 import CourseHeader from "@/components/CourseHeader.astro";
-import Field from "@/components/form/Field";
-import FormAlert from "@/components/form/FormAlert";
-import Alert from "@/components/ui/Alert";
 import { PUBLIC_URL } from "@/core/constants";
-import { inviteClassroom } from "@/core/schemas/invite";
-import { passphraseGenerate } from "@/core/schemas/passphrase";
-import { db } from "@/db";
-import { errorMessage } from "@/forms/field-errors";
-import { actionForm, formState } from "@/forms/form-state";
-import { locale, m } from "@/i18n";
+import { m } from "@/i18n";
 import AppLayout from "@/layouts/AppLayout.astro";
 import { breadcrumbs } from "@/utils/breadcrumbs";
 import { homeNav } from "@/utils/course-tabs-nav";
@@ -30,57 +20,6 @@ const result = await loadCourse(Astro, discipline, courseSegment, {
 if ("redirect" in result) return result.redirect;
 const { course, href, tabs } = result;
 
-// biome-ignore lint/style/noNonNullAssertion: loadCourse({ manage: true }) already required Astro.locals.user.
-const actor = Astro.locals.actor!;
-
-/// The course's URL segments, which every course-scoped action takes.
-const courseParams = {
-	discipline: course.discipline.slug,
-	course: `${course.instructor.username}_${course.edition.slug}`,
-};
-
-const revokeResult = Astro.getActionResult(actions.admin.revokeInvite);
-const passphraseResult = Astro.getActionResult(
-	actions.course.generatePassphrase,
-);
-
-// createClassroomInvite has no `accept: "form"`, so a plain form posting to it
-// sends a body Astro cannot parse. Without JavaScript the invite form posts to
-// this page, which calls the action itself. Forms that post to an action carry
-// `?_action=<name>` in the URL, which keeps them out of this block.
-let inviteUrl: string | null = null;
-let inviteError: string | null = null;
-if (Astro.request.method === "POST" && !Astro.url.searchParams.has("_action")) {
-	const formData = await Astro.request.formData();
-	const maxUsesRaw = formData.get("maxUses");
-	const maxUses = maxUsesRaw ? Number(maxUsesRaw) : undefined;
-	const { data, error } = await Astro.callAction(
-		actions.auth.createClassroomInvite,
-		{ ...courseParams, maxUses },
-	);
-	if (error)
-		inviteError =
-			errorMessage(error) || m.courses_roster_invite_login_required();
-	else inviteUrl = new URL(`/invite/${data.token}`, Astro.url).toString();
-}
-
-const passphraseForm = await actionForm(
-	Astro,
-	actions.course.generatePassphrase,
-	passphraseGenerate,
-	{ id: "custom-passphrase" },
-);
-const inviteForm = formState(inviteClassroom, undefined, { id: "invite" });
-
-const invites = await db.invite.findMany(
-	{ course: course.id, kind: "CLASSROOM" },
-	{ actor },
-);
-const [currentPassphrase] = await db.passphrase.findMany(
-	{ course: course.id, active: true },
-	{ actor },
-);
-
 const initCommand = [
 	"codehood init",
 	`--discipline ${course.discipline.slug}`,
@@ -89,23 +28,6 @@ const initCommand = [
 	`--server ${PUBLIC_URL}`,
 ].join(" ");
 const cliCommands = [initCommand, "codehood login"];
-
-function formatDate(date: Date): string {
-	return date.toLocaleDateString(locale, {
-		year: "numeric",
-		month: "short",
-		day: "numeric",
-	});
-}
-
-function formatTime(date: Date): string {
-	return date.toLocaleTimeString(locale, {
-		hour: "2-digit",
-		minute: "2-digit",
-		second: "2-digit",
-		hourCycle: "h23",
-	});
-}
 
 /// A field of the course and where its value comes from.
 const courseFields = [
@@ -135,9 +57,6 @@ const courseFields = [
 		source: m.courses_settings_from_file({ file: "calendar.md" }),
 	},
 ];
-
-const RENEW_ICON =
-	"M4 12a8 8 0 0 1 14.93-4M20 4v5h-5 M20 12a8 8 0 0 1-14.93 4M4 20v-5h5";
 ---
 
 <AppLayout title={m.courses_settings_page_title({ discipline: course.discipline.name })}
@@ -146,7 +65,6 @@ const RENEW_ICON =
     page: "settings",
     sections: [
       { id: "settings-course", label: m.courses_settings_course_heading() },
-      { id: "settings-enrollment", label: m.courses_settings_enrollment_heading() },
       { id: "settings-cli", label: m.courses_settings_cli_heading() },
     ],
   })}
@@ -174,120 +92,6 @@ const RENEW_ICON =
     </dl>
   </section>
 
-  <section class="mt-10" aria-labelledby="settings-enrollment">
-    <h2 id="settings-enrollment" class="page-subheader">{m.courses_settings_enrollment_heading()}</h2>
-
-    <FormAlert error={revokeResult?.error && errorMessage(revokeResult.error)} class="mt-4" />
-    {
-      revokeResult && !revokeResult.error && (
-        <Alert variant="success" class="mt-4">
-          <span>{m.courses_roster_invite_revoked()}</span>
-        </Alert>
-      )
-    }
-    <FormAlert error={passphraseResult?.error && errorMessage(passphraseResult.error)} class="mt-4" />
-
-    <div class="mt-4 grid gap-4 md:grid-cols-2">
-      <div class="card card-border bg-base-100">
-        <div class="card-body gap-3 p-5">
-          <h3 class="font-semibold">{m.courses_roster_passphrase()}</h3>
-          <p class="text-sm text-muted">{m.courses_roster_passphrase_body()}</p>
-          <div id="passphrase-error" class="alert alert-error" hidden><span></span></div>
-          <div class="flex flex-col items-center gap-1 rounded-box bg-base-200 py-6">
-            <span
-              id="passphrase-value"
-              class:list={[
-                "font-mono text-4xl font-bold tracking-[0.3em]",
-                currentPassphrase ? "text-primary" : "text-base-content/25",
-              ]}
-            >{currentPassphrase?.value ?? "——————"}</span>
-            <p id="passphrase-meta" class="text-xs text-muted">
-              {currentPassphrase
-                ? m.courses_roster_passphrase_live_until({ time: formatTime(currentPassphrase.expiresAt) })
-                : m.courses_roster_passphrase_none()}
-            </p>
-          </div>
-          <form method="post" action={actions.course.generatePassphrase} id="passphrase-form">
-            <input type="hidden" name="discipline" value={courseParams.discipline} />
-            <input type="hidden" name="course" value={courseParams.course} />
-            <details class="collapse collapse-arrow">
-              <summary class="collapse-title min-h-0 px-0 py-2 text-sm font-medium">{m.courses_roster_advanced()}</summary>
-              <div class="collapse-content px-0">
-                <Field {...passphraseForm.field("value")} class="font-mono uppercase" />
-              </div>
-            </details>
-            <button
-              type="submit"
-              class="btn btn-primary btn-sm mt-2"
-              aria-label={m.courses_roster_renew_label()}
-              title={m.courses_roster_renew()}
-            >
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-                <path d={RENEW_ICON} stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"></path>
-              </svg>
-              {m.courses_roster_renew()}
-            </button>
-          </form>
-        </div>
-      </div>
-
-      <div class="card card-border bg-base-100">
-        <div class="card-body gap-3 p-5">
-          <h3 class="font-semibold">{m.courses_roster_invite_title()}</h3>
-          <p class="text-sm text-muted">{m.courses_roster_invite_body()}</p>
-          <div id="invite-error" class="alert alert-error" hidden={!inviteError}><span>{inviteError}</span></div>
-          <div id="invite-url-row" class="join w-full" hidden={!inviteUrl}>
-            <input type="text" readonly value={inviteUrl ?? ""} class="input join-item w-full font-mono text-sm" id="invite-url" />
-            <button
-              type="button"
-              class="btn btn-primary join-item"
-              data-copy-from="invite-url"
-              data-copied={m.repositories_copied()}
-              aria-label={m.courses_roster_copy_invite()}
-            >{m.repositories_copy()}</button>
-          </div>
-          <form method="POST" action={Astro.url.pathname} id="invite-form">
-            <Field {...inviteForm.field("maxUses")} />
-            <div class="mt-2 flex justify-end">
-              <button type="submit" class="btn btn-primary btn-sm">{m.courses_roster_generate()}</button>
-            </div>
-          </form>
-        </div>
-      </div>
-    </div>
-
-    <h3 class="mt-6 font-semibold">{m.courses_roster_revoke_title()}</h3>
-    <p class="mt-1 text-sm text-muted">{m.courses_roster_revoke_body()}</p>
-    <div id="revoke-error" class="alert alert-error mt-3" hidden><span></span></div>
-    <ul id="invites-list" aria-label={m.courses_roster_revoke_title()} class="mt-3 flex flex-col gap-2">
-      {invites.map((invite) => {
-        const expired = invite.expiresAt < new Date();
-        return (
-          <li class="card card-border bg-base-100" data-invite-id={invite.publicId}>
-            <div class="card-body flex-row items-center gap-4 px-4 py-3">
-              <div class="min-w-0 flex-1">
-                <p class="text-sm font-medium">{formatDate(invite.createdAt)}</p>
-                <p class="text-xs text-muted">
-                  {m.courses_roster_invite_used({ used: invite.redemptions, max: invite.maxUses ?? "∞" })}{" · "}
-                  <span class={expired ? "text-error" : ""}>
-                    {expired
-                      ? m.courses_roster_invite_expired()
-                      : m.courses_roster_invite_expires({ date: formatDate(invite.expiresAt) })}
-                  </span>
-                </p>
-              </div>
-              <form method="post" action={actions.admin.revokeInvite} data-role="revoke-invite">
-                <input type="hidden" name="publicId" value={invite.publicId} />
-                <button type="submit" class="btn btn-outline btn-error btn-sm">{m.courses_roster_revoke()}</button>
-              </form>
-            </div>
-          </li>
-        );
-      })}
-    </ul>
-    <p id="no-invites" class="mt-3 text-sm text-muted" hidden={invites.length > 0}>{m.courses_roster_no_invites()}</p>
-  </section>
-
   <section class="mt-10" aria-labelledby="settings-cli">
     <h2 id="settings-cli" class="page-subheader">{m.courses_settings_cli_heading()}</h2>
     <p class="mt-1 text-sm text-muted">
@@ -306,103 +110,16 @@ const RENEW_ICON =
 </AppLayout>
 
 <script>
-  import { actions } from "astro:actions";
-  import { errorMessage } from "@/forms/field-errors";
-  import { locale, m } from "@/i18n";
-
-  function showError(box: HTMLElement, message: string) {
-    const span = box.querySelector("span");
-    if (span) span.textContent = message;
-    box.hidden = false;
-  }
-
-  // Copy buttons: `data-copy` holds the text, `data-copy-from` the id of an
-  // input whose value is copied. The label reads "Copied" for a moment.
-  document.querySelectorAll<HTMLButtonElement>("button[data-copy], button[data-copy-from]").forEach((button) => {
+  // Copy buttons: `data-copy` holds the text. The label reads "Copied" for a
+  // moment.
+  document.querySelectorAll<HTMLButtonElement>("button[data-copy]").forEach((button) => {
     const label = button.textContent;
     button.addEventListener("click", async () => {
-      const from = button.dataset.copyFrom;
-      const input = from ? (document.getElementById(from) as HTMLInputElement | null) : null;
-      await navigator.clipboard.writeText(input ? input.value : (button.dataset.copy ?? ""));
+      await navigator.clipboard.writeText(button.dataset.copy ?? "");
       button.textContent = button.dataset.copied ?? label;
       setTimeout(() => {
         button.textContent = label;
       }, 1500);
     });
-  });
-
-  // Passphrase: renewing keeps the page in place, so the code stays on screen
-  // for the class to read.
-  const passphraseForm = document.getElementById("passphrase-form") as HTMLFormElement | null;
-  const passphraseValue = document.getElementById("passphrase-value");
-  const passphraseMeta = document.getElementById("passphrase-meta");
-  const passphraseError = document.getElementById("passphrase-error");
-
-  passphraseForm?.addEventListener("submit", async (event) => {
-    event.preventDefault();
-    if (passphraseError) passphraseError.hidden = true;
-    const { data, error } = await actions.course.generatePassphrase(new FormData(passphraseForm));
-    if (error) {
-      if (passphraseError) showError(passphraseError, errorMessage(error));
-      return;
-    }
-    if (passphraseValue) {
-      passphraseValue.textContent = data.value;
-      passphraseValue.classList.remove("text-base-content/25");
-      passphraseValue.classList.add("text-primary");
-    }
-    if (passphraseMeta)
-      passphraseMeta.textContent = m.courses_roster_passphrase_live_until({
-        time: new Date(data.expiresAt).toLocaleTimeString(locale, {
-          hour: "2-digit",
-          minute: "2-digit",
-          second: "2-digit",
-          hourCycle: "h23",
-        }),
-      });
-    passphraseForm.reset();
-  });
-
-  // Invite link: the new link shows above the form, ready to copy.
-  const inviteForm = document.getElementById("invite-form") as HTMLFormElement | null;
-  const inviteUrlRow = document.getElementById("invite-url-row");
-  const inviteUrlInput = document.getElementById("invite-url") as HTMLInputElement | null;
-  const inviteError = document.getElementById("invite-error");
-  const passphraseFields = passphraseForm ? new FormData(passphraseForm) : null;
-
-  inviteForm?.addEventListener("submit", async (event) => {
-    event.preventDefault();
-    if (inviteError) inviteError.hidden = true;
-    const maxUsesRaw = new FormData(inviteForm).get("maxUses");
-    const { data, error } = await actions.auth.createClassroomInvite({
-      discipline: String(passphraseFields?.get("discipline") ?? ""),
-      course: String(passphraseFields?.get("course") ?? ""),
-      maxUses: maxUsesRaw ? Number(maxUsesRaw) : undefined,
-    });
-    if (error) {
-      if (inviteError) showError(inviteError, errorMessage(error) || m.courses_roster_something_wrong());
-      return;
-    }
-    if (inviteUrlInput) inviteUrlInput.value = new URL(`/invite/${data.token}`, window.location.origin).toString();
-    if (inviteUrlRow) inviteUrlRow.hidden = false;
-  });
-
-  // Revoking an invite removes its row and leaves the rest of the list.
-  const invitesList = document.getElementById("invites-list");
-  const noInvites = document.getElementById("no-invites");
-  const revokeError = document.getElementById("revoke-error");
-
-  invitesList?.addEventListener("submit", async (event) => {
-    const form = event.target;
-    if (!(form instanceof HTMLFormElement) || form.dataset.role !== "revoke-invite") return;
-    event.preventDefault();
-    if (revokeError) revokeError.hidden = true;
-    const { error } = await actions.admin.revokeInvite(new FormData(form));
-    if (error) {
-      if (revokeError) showError(revokeError, errorMessage(error));
-      return;
-    }
-    form.closest("[data-invite-id]")?.remove();
-    if (noInvites && !invitesList.querySelector("[data-invite-id]")) noInvites.hidden = false;
   });
 </script>

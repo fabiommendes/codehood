@@ -66,6 +66,7 @@ import { loggingAnswerHistoryRemoval } from "./answer-edit.service";
 import {
 	examTimingFromDb,
 	examTimingSelect,
+	freezeQuestionVersions,
 	loadExceptionTiming,
 } from "./exam-questions";
 import { enqueueGradingJob, promoteFinalSends } from "./grading-job-queue";
@@ -216,6 +217,7 @@ export const makeResponseService = defineService<ResponseT>()(() => {
 				},
 				include: responseInclude(opts.actor),
 			});
+			if (!preview) await freezeQuestionVersions(tx, exam.id);
 
 			return fromDb(row);
 		},
@@ -1217,16 +1219,16 @@ async function resolveOrCreateAttempt(
 		}
 
 		checkExpectedUpdatedAt(null, expected);
-		return withExam(
-			await invalidIfExists(tx.response.create, {
-				data: {
-					publicId: generateToken(9),
-					authorId,
-					examId: exam.id,
-					preview,
-				},
-			}),
-		);
+		const created = await invalidIfExists(tx.response.create, {
+			data: {
+				publicId: generateToken(9),
+				authorId,
+				examId: exam.id,
+				preview,
+			},
+		});
+		if (!preview) await freezeQuestionVersions(tx, exam.id);
+		return withExam(created);
 	}
 
 	const windowStart = dateToSlotKey(

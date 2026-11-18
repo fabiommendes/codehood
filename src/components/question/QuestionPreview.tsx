@@ -3,6 +3,7 @@ import {
 	type Accessor,
 	createMemo,
 	createSignal,
+	createUniqueId,
 	type JSX,
 	Match,
 	Show,
@@ -23,6 +24,7 @@ import {
 } from "@/mdq";
 import type { CodeBlocksHtml } from "@/utils/code-blocks";
 import { pretestSources } from "@/utils/pretest-sources";
+import { withViewTransition } from "@/utils/view-transition";
 import { AttachmentList, type AttachmentListProps } from "./AttachmentList";
 import { CodeBlocks } from "./CodeBlocks";
 import { ResetIcon, SubmitIcon } from "./icons";
@@ -76,6 +78,8 @@ export default function QuestionPreview(
 	props: QuestionPreviewProps,
 ): JSX.Element {
 	const [internalTab, setInternalTab] = createSignal<PreviewTab>("student");
+	/// Names the active tab for the view transition that slides it.
+	const tabsId = createUniqueId();
 	const tab = () => (props.tab ? props.tab() : internalTab());
 
 	return (
@@ -88,7 +92,15 @@ export default function QuestionPreview(
 							role="tab"
 							class={`tab ${tab() === entry.id ? "tab-active" : ""}`}
 							aria-selected={tab() === entry.id}
-							onClick={() => setInternalTab(entry.id)}
+							style={
+								tab() === entry.id
+									? {
+											"view-transition-name": `tab-${tabsId}`,
+											"view-transition-class": "tab",
+										}
+									: undefined
+							}
+							onClick={() => withViewTransition(() => setInternalTab(entry.id))}
 						>
 							{entry.label()}
 						</button>

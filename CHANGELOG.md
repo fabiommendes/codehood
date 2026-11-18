@@ -22,6 +22,17 @@
 
 ### Changed
 
+- Transições de página: o navegador mantém a página antiga até a nova pintar
+  e faz um fade curto entre as duas, sem o quadro em branco. Navbar e sidebar
+  ficam paradas, o sublinhado da aba de links desliza para a aba nova, e as
+  abas em Solid da prévia de questão deslizam ao trocar.
+- Página de estudantes: "Adicionar estudante" virou um botão de ícone ao lado
+  do CSV e abre um modal com abas para e-mail, link de convite e frase-senha.
+  Link de convite e frase-senha saíram das configurações do curso. "Remover"
+  virou ícone. A tabela ganhou busca por qualquer campo do aluno
+  (`SearchableTable`, filtra no navegador), na mesma linha dos botões; a
+  linha com o título e a contagem de alunos saiu.
+
 - Editor de código com recursos de IDE: fecha parênteses e aspas e envolve a
   seleção neles, autocomplete (Python com `lang-python`; Lua, Elm e Prolog
   completam palavras do próprio código), múltiplos cursores (Ctrl+D,

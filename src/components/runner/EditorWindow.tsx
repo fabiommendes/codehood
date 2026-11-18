@@ -263,12 +263,14 @@ export default function EditorWindow(props: EditorWindowProps): JSX.Element {
 		}
 		section.style.setProperty("view-transition-name", `editor-window-${id}`);
 		section.style.setProperty("view-transition-class", "editor-window");
+		document.documentElement.classList.add("editor-window-morph");
 		const mine = document.startViewTransition(() => apply(next));
 		transition = mine;
 		void mine.finished.finally(() => {
 			// A later transition owns the name now.
 			if (transition !== mine) return;
 			transition = null;
+			document.documentElement.classList.remove("editor-window-morph");
 			section.style.removeProperty("view-transition-name");
 			section.style.removeProperty("view-transition-class");
 			settle();

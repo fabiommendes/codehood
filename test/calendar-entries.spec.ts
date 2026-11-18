@@ -63,6 +63,7 @@ function exam(slug: string, overrides: Partial<Exam> = {}): Exam {
 		allowCodeRun: null,
 		answerHistory: null,
 		gradesReleasedAt: null,
+		questionsFrozenAt: null,
 		author: "ada",
 		rev: null,
 		tags: [],

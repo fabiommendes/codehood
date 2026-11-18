@@ -134,3 +134,12 @@ duração.
   G12 (b) e (c).
 - **J8 (R23).** "Uma consulta" em `grantedQuestions` não tem caso unit; fica
   para o critério de `TEST_PERF_LOG`.
+- **J9 (R3, R11).** `freezeQuestionVersions` grava `questionsFrozenAt` sem
+  mover `Exam.updatedAt` (`writeCache`): o congelamento é efeito da primeira
+  tentativa, e não pode dar 412 no próximo push condicional de quem leu a
+  prova antes. O pin que o push ignora (R11) já protege a prova.
+- **J10 (R11).** `exam.update` reescreve as linhas com `deleteMany` e
+  `create`, com a versão já reconciliada (pin mantido, questão nova na última
+  versão), em vez de um diff linha a linha. O resultado é o mesmo.
+- **J11 (R6).** `exam.create` com `status: "COMPLETED"` não congela; o
+  congelamento preguiçoso do grant (R9) cobre esse caso.

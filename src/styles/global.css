@@ -763,3 +763,49 @@ h6 {
 		justify-content: flex-end;
 	}
 }
+
+/* Page transitions: the browser keeps the old page on screen until the new one
+   paints and cross-fades the two, instead of flashing a blank frame. The bars
+   get a name of their own, so they stay in place while the content fades.
+   Layout.astro turns them on from a script: with JavaScript off, Chromium
+   leaves the transition over the page after a form post and every click
+   lands on it. */
+::view-transition-group(*) {
+	animation-duration: 180ms;
+}
+
+[data-app-navbar] {
+	view-transition-name: app-navbar;
+}
+
+[data-app-sidebar] {
+	view-transition-name: app-sidebar;
+}
+
+/* The navbar is the same on every page: the new one replaces the old at once. */
+::view-transition-old(app-navbar),
+::view-transition-new(app-navbar) {
+	animation: none;
+}
+
+/* The underline of the active tab in a strip of links slides to the new tab. */
+[data-tab-underline] {
+	view-transition-name: tab-underline;
+}
+
+/* A tab that moves keeps its label at its own size instead of stretching it
+   along with the box. */
+::view-transition-old(*.tab),
+::view-transition-new(*.tab) {
+	height: 100%;
+	width: 100%;
+	object-fit: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+	::view-transition-group(*),
+	::view-transition-old(*),
+	::view-transition-new(*) {
+		animation: none;
+	}
+}

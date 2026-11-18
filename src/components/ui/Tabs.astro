@@ -36,8 +36,8 @@ interface Props {
 
 const { items, active, name } = Astro.props;
 
-const activeClasses = "border-primary font-bold text-primary";
-const inactiveClasses = "border-transparent font-medium text-muted";
+const activeClasses = "font-bold text-primary";
+const inactiveClasses = "font-medium text-muted";
 
 const panelCss = name
 	? items
@@ -86,13 +86,20 @@ const panelCss = name
 					href={item.href}
 					aria-selected={item.key === active ? "true" : "false"}
 					class:list={[
-						"-mb-px shrink-0 border-b-2 pb-3 text-sm",
+						"relative -mb-px shrink-0 border-b-2 border-transparent pb-3 text-sm",
 						item.key === active
 							? activeClasses
 							: [inactiveClasses, "hover:text-base-content"],
 					]}
 				>
 					{item.label}
+					{item.key === active && (
+						<span
+							data-tab-underline
+							aria-hidden="true"
+							class="absolute inset-x-0 -bottom-0.5 h-0.5 bg-primary"
+						/>
+					)}
 				</a>
 			))}
 		</div>
