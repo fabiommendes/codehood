@@ -47,6 +47,8 @@ export interface AttemptView {
 	/// The highlighted fenced blocks of every question in `questions`.
 	codeBlocks: CodeBlocksHtml;
 	codeSends: Record<string, CodeSends>;
+	/// Whether the instructor created the attempt for a student who did not take the exam.
+	empty: boolean;
 }
 
 export interface AttemptViewInput {
@@ -218,5 +220,6 @@ export async function loadAttemptView(
 			),
 		),
 		codeSends,
+		empty: false,
 	};
 }
