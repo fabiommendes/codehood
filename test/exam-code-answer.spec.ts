@@ -440,11 +440,41 @@ test("choosing the server's version after the deadline save puts the server in s
 		.toBe("console.log('server')");
 });
 
+test("submitting from a tab that missed an edit keeps the draft the other tab holds", async ({
+	page,
+}) => {
+	const s = await setup({ page, type: "EXAM" });
+	await page.goto(s.url);
+	await expect(editor(page)).toBeVisible();
+
+	const other = await page.context().newPage();
+	await other.route(ANSWER_ACTION, (route) => route.abort());
+	await other.goto(s.url);
+	await editor(other).fill("console.log('unsent')");
+	await expect(footer(other)).toContainText("has not received your changes");
+
+	await page
+		.getByRole("button", { name: /^Submit/ })
+		.first()
+		.click();
+	await page
+		.getByRole("dialog")
+		.getByRole("button", { name: /submit|confirm/i })
+		.click();
+	await expect(page.getByText("Submitted").first()).toBeVisible();
+
+	const draft = await page.evaluate(
+		(key) => localStorage.getItem(key),
+		s.draftKey(),
+	);
+	expect(JSON.parse(draft ?? "null")?.code).toBe("console.log('unsent')");
+});
+
 test("submitting removes this exam's drafts and no others", async ({
 	page,
 }) => {
 	const s = await setup({ page, type: "EXAM" });
-	await seedDraft(page, s.draftKey("ghost"), "x");
+	await page.goto("/login");
 	await page.evaluate(
 		(key) =>
 			localStorage.setItem(
