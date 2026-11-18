@@ -277,6 +277,7 @@
 	"exams_attempt_edit_exception": "Editar exceção",
 	"exams_attempt_reopen": "Reabrir tentativa",
 	"exams_detail_duration_personal": "Duração: {duration} + {extra} para você",
+	"exams_detail_questions_frozen": "Versões das questões congeladas em {date}",
 	"exams_detail_code_run_off": "Execução de código desligada nesta prova",
 	"exams_detail_settings_heading": "Configurações",
 	"exams_detail_new_date": "Nova data: {date}",

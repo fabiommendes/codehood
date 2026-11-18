@@ -358,6 +358,18 @@ with the instructor's reason, and the total. It shows no answers, and before
 the release it shows nothing of the grade.
 
 
+### Read the questions of an exam I missed
+
+    status: todo
+    url: /<discipline>/<course>/exams/<exam>
+
+Student did not take an exam and wants to study what it asked. While the exam
+is closed but the grades are not out, the exam page shows no question. Once the
+grades are released the page lists the questions in the exam's order, to be
+read only: no field to answer, no button to submit, no answer key and no
+review.
+
+
 ### See a question grade my instructor changed
 
     status: todo

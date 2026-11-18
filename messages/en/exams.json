@@ -277,6 +277,7 @@
 	"exams_attempt_edit_exception": "Edit exception",
 	"exams_attempt_reopen": "Reopen attempt",
 	"exams_detail_duration_personal": "Duration: {duration} + {extra} for you",
+	"exams_detail_questions_frozen": "Question versions frozen on {date}",
 	"exams_detail_code_run_off": "Code execution is off for this exam",
 	"exams_detail_settings_heading": "Settings",
 	"exams_detail_new_date": "New date: {date}",
