@@ -63,6 +63,7 @@ export * from "./enrollment";
 export * from "./exam";
 export * from "./exam-adjustment";
 export * from "./exam-exception";
+export * from "./exam-question";
 export * from "./feedback";
 export * from "./grade-column";
 export * from "./grading-job";

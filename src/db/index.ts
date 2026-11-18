@@ -19,6 +19,7 @@ import { makeEnrollmentService } from "./services/enrollment.service";
 import { makeExamService } from "./services/exam.service";
 import { makeExamAdjustmentService } from "./services/exam-adjustment.service";
 import { makeExamExceptionService } from "./services/exam-exception.service";
+import { makeExamQuestionService } from "./services/exam-question.service";
 import { makeFeedbackService } from "./services/feedback.service";
 import { makeGradeColumnService } from "./services/grade-column.service";
 import { makeGradingJobService } from "./services/grading-job.service";
@@ -310,6 +311,7 @@ export const db = {
 	enrollment: makeEnrollmentService(),
 	exam: makeExamService(attachmentService, blobService),
 	examException: makeExamExceptionService(),
+	examQuestion: makeExamQuestionService(),
 	manualGrade: makeManualGradeService(),
 	examAdjustment: makeExamAdjustmentService(),
 	feedback: feedbackService,
