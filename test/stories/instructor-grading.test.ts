@@ -11,7 +11,7 @@ import {
 } from "@/mdq/fixtures";
 import { courseHref } from "@/urls";
 import { expect, test } from "../fixtures";
-import { adjustableExam, HANA_SCHOOL_ID } from "./adjustment-support";
+import { addExam, adjustableExam, HANA_SCHOOL_ID } from "./adjustment-support";
 import { logInAs, resetDatabase, seedUser } from "./helpers";
 import {
 	CHALLENGE_COMMENT,
@@ -1564,6 +1564,322 @@ test("instructor: adjust a student's grade", async ({ page }) => {
 		}
 		// Hana's replacement was revoked: nothing is struck through for her.
 		await expect(resultRow("Hana Souza").getByRole("deletion")).toHaveCount(0);
+	});
+});
+
+/**
+ * Screen contract for the story below, beyond the pages named in "instructor: adjust a student's grade":
+ *
+ * - On the page of a student with no attempt every question reads "Not answered", and the summary
+ *   "Grade adjustments" lists the adjustments as for any attempt.
+ * - The navigation of the exam has a link "Adjustments" followed by the number of active adjustments.
+ * - A refusal of the adjustment dialog is an alert that carries the message of the server: for a
+ *   student whose own window has not closed, `The exam has not closed for "<username>" yet`; for
+ *   a username that is not enrolled, `"<username>" is not enrolled in this course`.
+ * - A practice exam has no "Add bonus" and no "Sanction" on a student's page and no "Adjustments" link.
+ */
+test("instructor: grade a student who did not take the exam", async ({
+	page,
+}) => {
+	const world = await adjustableExam("gap");
+	const { davi, hana } = world;
+	const iris = await seedUser({
+		role: "STUDENT",
+		username: "gap-iris",
+		name: "Iris Moraes",
+	});
+	const kai = await seedUser({
+		role: "STUDENT",
+		username: "gap-kai",
+		name: "Kai Duarte",
+	});
+	const jade = await seedUser({
+		role: "STUDENT",
+		username: "gap-jade",
+		name: "Jade Prates",
+	});
+	for (const student of [iris, kai]) {
+		await db.enrollment.create(
+			{ course: world.course.id, username: student.username },
+			FULL_ACCESS,
+		);
+	}
+	// The window closed for the class two hours ago; Iris has a makeup date two days ahead.
+	await prisma.exam.update({
+		where: { id: world.exam.id },
+		data: {
+			status: "SCHEDULED",
+			scheduledAt: new Date(Date.now() - 180 * MINUTE),
+			durationMs: 60 * MINUTE,
+		},
+	});
+	await db.examException.create(
+		{
+			course: world.course.id,
+			exam: world.exam.slug,
+			username: iris.username,
+			scheduledAt: new Date(Date.now() + 2 * 24 * 60 * MINUTE),
+		},
+		FULL_ACCESS,
+	);
+	await logInAs(page, world.teacher);
+
+	const adjustmentsUrl = `${world.examUrl}/adjustments`;
+	const summary = () => page.getByRole("region", { name: "Grade adjustments" });
+	const results = () =>
+		page.getByRole("table", { name: "Results", exact: true });
+	const table = () =>
+		page.getByRole("table", { name: "Adjustments", exact: true });
+	/// What the database holds that a refused adjustment must leave alone.
+	const stored = async () => ({
+		adjustments: await prisma.examAdjustment.count(),
+		attempts: await prisma.response.count(),
+	});
+
+	/// Opens "Adjust students" on the adjustments page and submits a replacement of 70% for `usernames`; it returns the dialog.
+	async function adjustBatch(usernames: string[]) {
+		await page.goto(adjustmentsUrl);
+		await page.getByRole("button", { name: "Adjust students" }).click();
+		const dialog = page.getByRole("dialog", { name: "Adjust grades" });
+		await dialog.getByLabel("Usernames").fill(usernames.join(" "));
+		await dialog.getByRole("radio", { name: "Replace grade" }).check();
+		await dialog.getByLabel("Value").fill("70");
+		await dialog
+			.getByLabel(/^Reason/)
+			.fill("Project grade replaces the second exam");
+		await dialog.getByRole("button", { name: "Adjust", exact: true }).click();
+		return dialog;
+	}
+
+	await test.step("the batch for a student who took the exam and one who did not lists two active adjustments and counts them in the navigation", async () => {
+		const dialog = await adjustBatch([davi.username, hana.username]);
+		await expect(dialog).toBeHidden();
+
+		await expect(
+			table().getByRole("row").filter({ hasText: "Active" }),
+		).toHaveCount(2);
+		await expect(
+			page
+				.getByRole("listitem")
+				.filter({ hasText: /^Adjustments\s*2$/ })
+				.first(),
+		).toBeVisible();
+		await page.goto(`${world.examUrl}/results`);
+		await expect(
+			results()
+				.getByRole("row")
+				.filter({ hasText: "Hana Souza" })
+				.getByRole("insertion"),
+		).toHaveText("70%");
+	});
+
+	await test.step("the page of the student without an attempt shows every question unanswered and the replacement applied", async () => {
+		await page.goto(`${world.examUrl}/attempts/${hana.username}`);
+
+		await expect(
+			page.getByRole("article", { name: /^Question \d/ }),
+		).toHaveCount(4);
+		await expect(
+			page.getByRole("article", { name: /^Question \d/ }).filter({
+				hasText: "Not answered",
+			}),
+		).toHaveCount(4);
+		await expect(summary()).toContainText("Grade replaced by 70%");
+		await expect(summary()).toContainText(/Final total\s*70%/);
+	});
+
+	await test.step("a second adjustment uses the same empty attempt and the student keeps one row in the results", async () => {
+		const before = await stored();
+		await page.getByRole("button", { name: "Add bonus", exact: true }).click();
+		const dialog = page.getByRole("dialog", { name: "Add bonus" });
+		await dialog.getByRole("radio", { name: "Add points" }).check();
+		await dialog.getByLabel("Value").fill("10");
+		await dialog.getByLabel(/^Reason/).fill("Participation");
+		await dialog
+			.getByRole("button", { name: "Add bonus", exact: true })
+			.click();
+
+		await expect(dialog).toBeHidden();
+		await expect(summary()).toContainText(/Final total\s*80%/);
+		expect(await stored()).toEqual({
+			adjustments: before.adjustments + 1,
+			attempts: before.attempts,
+		});
+		await page.goto(`${world.examUrl}/results`);
+		const row = results().getByRole("row").filter({ hasText: "Hana Souza" });
+		await expect(row).toHaveCount(1);
+		await expect(row.getByRole("insertion")).toHaveText("80%");
+	});
+
+	await test.step("a student whose own window has not opened is refused and nothing is written", async () => {
+		const before = await stored();
+		const dialog = await adjustBatch([iris.username]);
+
+		await expect(dialog.getByRole("alert")).toContainText(
+			`The exam has not closed for "${iris.username}" yet`,
+		);
+		expect(await stored()).toEqual(before);
+	});
+
+	await test.step("one username that is not enrolled rejects the whole batch", async () => {
+		const before = await stored();
+		const dialog = await adjustBatch([kai.username, jade.username]);
+
+		await expect(dialog.getByRole("alert")).toContainText(
+			`"${jade.username}" is not enrolled in this course`,
+		);
+		expect(await stored()).toEqual(before);
+	});
+
+	await test.step("a practice exam offers no adjustment and the service refuses one", async () => {
+		const practice = await addExam(world, "practice-gap", ["q-one"], {
+			type: "PRACTICE",
+		});
+		const before = await stored();
+		await page.goto(
+			`${world.href}/exams/${practice.slug}/attempts/${hana.username}`,
+		);
+
+		await expect(
+			page.getByRole("button", { name: "Student list" }),
+		).toBeVisible();
+		await expect(
+			page.getByRole("button", { name: "Add bonus", exact: true }),
+		).toHaveCount(0);
+		await expect(
+			page.getByRole("button", { name: "Sanction", exact: true }),
+		).toHaveCount(0);
+		await expect(page.getByRole("link", { name: /^Adjustments/ })).toHaveCount(
+			0,
+		);
+		await expect(
+			db.examAdjustment.create(
+				{
+					course: world.course.id,
+					exam: practice.slug,
+					usernames: [hana.username],
+					op: "OFFSET",
+					value: "0.1",
+					reason: "No practice grade",
+				},
+				{ actor: world.teacher },
+			),
+		).rejects.toThrow();
+		expect(await stored()).toEqual(before);
+	});
+});
+
+/**
+ * Screen contract for the story below:
+ *
+ * - The "Student list" dialog has a table whose headers "Student", "Registration", "Username", "Total"
+ *   and "Status" are buttons that sort the rows, ascending on the first click and descending on the
+ *   second (`aria-sort`); a student without a registration shows "—" in it.
+ * - On a student's page, "Previous student" and "Next student" links lead to the neighbours in the
+ *   order of the list by name.
+ * - The bar of questions is a navigation "Questions" with a link `Q<n>` to `#question-<n>`.
+ */
+test("instructor: find a student in a large class", async ({ page }) => {
+	const world = await adjustableExam("find");
+	const { ana, bia, caio, eva, hana } = world;
+	// Eva has no registration (the column stores `!<username>` for that); Caio's total is adjusted.
+	await prisma.user.update({
+		where: { username: eva.username },
+		data: { schoolId: `!${eva.username}` },
+	});
+	await db.examAdjustment.create(
+		{
+			course: world.course.id,
+			exam: world.exam.slug,
+			usernames: [caio.username],
+			op: "OFFSET",
+			value: "0.1",
+			reason: "Participation",
+		},
+		{ actor: world.teacher },
+	);
+	await logInAs(page, world.teacher);
+	const attemptUrl = (username: string) =>
+		`${world.examUrl}/attempts/${username}`;
+	const heading = (name: string) => page.getByRole("heading", { name });
+
+	/// The rows of the open student list, header excluded.
+	const listRows = () =>
+		page
+			.getByRole("dialog")
+			.getByRole("row")
+			.filter({ has: page.getByRole("link") });
+	const header = (name: string) =>
+		page.getByRole("dialog").getByRole("columnheader", { name });
+
+	await page.goto(attemptUrl(ana.username));
+	await page.getByRole("button", { name: "Student list" }).click();
+
+	await test.step("a student without a registration shows a dash and is found by name", async () => {
+		await page.getByRole("dialog").getByRole("searchbox").fill("Eva");
+
+		await expect(listRows()).toHaveCount(1);
+		await expect(listRows().first()).toContainText("Eva Tavares");
+		await expect(listRows().first()).toContainText("—");
+		await page.getByRole("dialog").getByRole("searchbox").fill("");
+		await expect(listRows()).toHaveCount(7);
+	});
+
+	await test.step("sorting by total puts the lowest first, then the highest first", async () => {
+		await header("Total").getByRole("button").click();
+		await expect(header("Total")).toHaveAttribute("aria-sort", "ascending");
+		await expect(listRows().first()).toContainText("50%");
+
+		await header("Total").getByRole("button").click();
+		await expect(header("Total")).toHaveAttribute("aria-sort", "descending");
+		await expect(listRows().first()).toContainText("100%");
+	});
+
+	await test.step("sorting by status groups the students without an attempt, the adjusted and the submitted", async () => {
+		await header("Status").getByRole("button").click();
+		await expect(header("Status")).toHaveAttribute("aria-sort", "ascending");
+		await expect(listRows().first()).toContainText("Hana Souza");
+		await expect(listRows().first()).toContainText(/no attempt/i);
+		await expect(listRows().nth(1)).toContainText("Caio Nunes");
+		await expect(listRows().nth(1)).toContainText(/adjusted/i);
+		await expect(listRows().last()).toContainText(/submitted/i);
+
+		await header("Status").getByRole("button").click();
+		await expect(header("Status")).toHaveAttribute("aria-sort", "descending");
+		await expect(listRows().first()).toContainText(/submitted/i);
+		await expect(listRows().last()).toContainText("Hana Souza");
+	});
+
+	await test.step("the arrows go to the neighbour before and after, in the order of the list", async () => {
+		await page.goto(attemptUrl(bia.username));
+
+		await page.getByRole("link", { name: "Next student" }).click();
+		await expect(page).toHaveURL(attemptUrl(caio.username));
+		await expect(heading("Caio Nunes")).toBeVisible();
+
+		await page.getByRole("link", { name: "Previous student" }).click();
+		await expect(page).toHaveURL(attemptUrl(bia.username));
+		await page.getByRole("link", { name: "Previous student" }).click();
+		await expect(page).toHaveURL(attemptUrl(ana.username));
+		await expect(heading("Ana Prado")).toBeVisible();
+	});
+
+	await test.step("a click on Q7 in the bar leads to question 7 of a long exam", async () => {
+		const questions = Array.from({ length: 8 }, (_, i) => `long-q${i + 1}`);
+		const long = await addExam(world, "long-exam", questions);
+		await page.goto(
+			`${world.href}/exams/${long.slug}/attempts/${hana.username}`,
+		);
+		const bar = page.getByRole("navigation", { name: "Questions" });
+		await expect(bar.getByRole("link")).toHaveCount(8);
+
+		await bar.getByRole("link", { name: /^Question 7/ }).click();
+
+		await expect(page).toHaveURL(/#question-7$/);
+		await expect(
+			page.getByRole("article", { name: "Question 7", exact: true }),
+		).toBeInViewport();
+		await expect(bar).toBeInViewport();
 	});
 });
 

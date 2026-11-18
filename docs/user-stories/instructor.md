@@ -480,7 +480,7 @@ question's statistics; a changed grade on a real answer does.
 
 ### Grade a student who did not take the exam
 
-    status: todo
+    status: implemented
     url: /<discipline>/<course>/exams/<exam>/results
 
 Instructor gives a grade to a student with no attempt at an exam: the project
@@ -496,7 +496,7 @@ class's grades.
 
 ### Find a student in a large class
 
-    status: todo
+    status: implemented
     url: /<discipline>/<course>/exams/<exam>/attempts/<username>
 
 Instructor has a student in mind and a class of eighty. From any attempt of the

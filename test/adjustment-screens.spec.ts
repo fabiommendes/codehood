@@ -6,6 +6,7 @@ import {
 	type AdjustableExam,
 	adjust,
 	adjustableExam,
+	pendingExam,
 } from "./stories/adjustment-support";
 import { logInAs, resetDatabase, seedUser } from "./stories/helpers";
 
@@ -233,4 +234,213 @@ test("an undo the server refuses shows an error on the page", async ({
 	await article.getByRole("button", { name: "Undo" }).click();
 
 	await expect(page.getByRole("alert")).toBeVisible();
+});
+
+/// Sanctions the whole exam of the attempt on display, through the dialog; `kept` is the percentage that stays, or `"zero"`.
+async function sanctionExam(page: Page, kept: string, reason: string) {
+	await page.getByRole("button", { name: "Sanction", exact: true }).click();
+	const dialog = page.getByRole("dialog", { name: "Sanction", exact: true });
+	if (kept === "zero") await dialog.getByLabel("Zero").check();
+	else await dialog.getByLabel("% of the grade kept").fill(kept);
+	await dialog.getByLabel(/^Reason/).fill(reason);
+	await dialog.getByRole("button", { name: "Sanction", exact: true }).click();
+	return dialog;
+}
+
+test("a penalty on a student who has a bonus applies first, then the bonus: 50% kept of 50%, plus 10, is 35%", async ({
+	page,
+}) => {
+	const w = await world(page, "scr-order");
+	await adjust(w, [w.ana.username], { reason: "Participation" });
+	await page.goto(`${w.examUrl}/attempts/${w.ana.username}`);
+	await expect(summary(page)).toContainText(/Final total\s*60%/);
+
+	const dialog = await sanctionExam(page, "50", "Consultation not authorised");
+
+	await expect(dialog).toBeHidden();
+	await expect(summary(page)).toContainText(/Original total\s*50%/);
+	await expect(summary(page)).toContainText(/Penalty ×0\.5[\s\S]*Bonus \+10/);
+	await expect(summary(page)).toContainText(/Final total\s*35%/);
+});
+
+test("zeroing the exam gives 0% over a replacement and a bonus, which stay listed", async ({
+	page,
+}) => {
+	const w = await world(page, "scr-zero-set");
+	await adjust(w, [w.davi.username], { op: "SET", value: "0.8" });
+	await adjust(w, [w.davi.username], { op: "OFFSET", value: "0.1" });
+	await page.goto(`${w.examUrl}/attempts/${w.davi.username}`);
+	await expect(summary(page)).toContainText(/Final total\s*90%/);
+
+	const dialog = await sanctionExam(page, "zero", "Cheating");
+
+	await expect(dialog).toBeHidden();
+	await expect(summary(page)).toContainText("Zeroed");
+	await expect(summary(page)).toContainText("Grade replaced by 80%");
+	await expect(summary(page)).toContainText("Bonus +10");
+	await expect(summary(page)).toContainText(/Final total\s*0%/);
+});
+
+test("the sanction of a question offers no bonus, refuses a share above 100 and a second sanction on the same question", async ({
+	page,
+}) => {
+	const w = await world(page, "scr-question");
+	await page.goto(`${w.examUrl}/attempts/${w.bia.username}`);
+	const article = page.getByRole("article", {
+		name: "Question 1",
+		exact: true,
+	});
+
+	await article.getByRole("button", { name: "Sanction question" }).click();
+	const dialog = page.getByRole("dialog", { name: /Sanction question/ });
+	await expect(dialog.getByRole("radio")).toHaveCount(0);
+	await expect(dialog.getByLabel("% of the grade kept")).toBeVisible();
+	await dialog.getByLabel("% of the grade kept").fill("110");
+	await dialog.getByLabel(/^Reason/).fill("A bonus in disguise");
+	await dialog
+		.getByRole("button", { name: "Sanction question", exact: true })
+		.click();
+	await expect(dialog.getByRole("alert")).toBeVisible();
+	expect(await activeCount(w)).toBe(0);
+
+	await dialog.getByLabel("% of the grade kept").fill("50");
+	await dialog
+		.getByRole("button", { name: "Sanction question", exact: true })
+		.click();
+	await expect(dialog).toBeHidden();
+	await expect(article).toContainText("Penalty ×0.5");
+	expect(await activeCount(w)).toBe(1);
+
+	// The hammer gives way to the edit of the sanction: a second one is not offered, and the service refuses it.
+	await expect(
+		article.getByRole("button", { name: "Sanction question" }),
+	).toHaveCount(0);
+	await expect(article.getByRole("button", { name: "Edit" })).toBeVisible();
+	await expect(
+		adjust(w, [w.bia.username], {
+			op: "FACTOR",
+			value: "0.2",
+			question: "q-one",
+			reason: "Second time",
+		}),
+	).rejects.toBeInstanceOf(InvalidData);
+	expect(await activeCount(w)).toBe(1);
+
+	await article.getByRole("button", { name: "Edit" }).click();
+	const edit = page.getByRole("dialog", { name: "Edit adjustment" });
+	await edit.getByLabel("% of the grade kept").fill("20");
+	await edit.getByRole("button", { name: "Save" }).click();
+	await expect(edit).toBeHidden();
+	await expect(article).toContainText("Penalty ×0.2");
+	expect(await activeCount(w)).toBe(1);
+});
+
+test("the grading page of a question marks a sanction only on a student whose adjustment targets that question", async ({
+	page,
+}) => {
+	const w = await world(page, "scr-badge");
+	await adjust(w, [w.bia.username], {
+		op: "FACTOR",
+		value: "0.5",
+		question: "q-one",
+		reason: "Copied",
+	});
+	await adjust(w, [w.caio.username], {
+		op: "FACTOR",
+		value: "0.5",
+		reason: "Whole exam",
+	});
+	await adjust(w, [w.davi.username], {
+		op: "FACTOR",
+		value: "0.5",
+		question: "q-two",
+		reason: "Other question",
+	});
+
+	await page.goto(`${w.examUrl}/grading/q-one`);
+
+	const changed = page.locator("section#overrides");
+	await expect(
+		changed.getByRole("row").filter({ hasText: "Bia Lima" }),
+	).toContainText("Sanction");
+	await expect(changed).not.toContainText("Caio Nunes");
+	await expect(changed).not.toContainText("Davi Rocha");
+	await expect(changed.getByRole("heading")).toContainText("(1)");
+});
+
+test("a total still pending shows next to a bonus, and zeroing the exam settles it at 0%", async ({
+	page,
+}) => {
+	const w = await world(page, "scr-pending");
+	const pending = await pendingExam(w, "scr-pending");
+	await db.examAdjustment.create(
+		{
+			course: w.course.id,
+			exam: pending.exam.slug,
+			usernames: [pending.pia.username],
+			op: "OFFSET",
+			value: "0.1",
+			reason: "Participation",
+		},
+		{ actor: w.teacher },
+	);
+	await page.goto(`${pending.url}/attempts/${pending.pia.username}`);
+
+	await expect(summary(page)).toContainText("Bonus +10");
+	await expect(summary(page)).toContainText(/Original total\s*pending/);
+	await expect(summary(page)).toContainText(/Final total\s*pending/);
+
+	const dialog = await sanctionExam(page, "zero", "Cheating");
+
+	await expect(dialog).toBeHidden();
+	await expect(summary(page)).toContainText("Zeroed");
+	await expect(summary(page)).toContainText(/Final total\s*0%/);
+	await expect(summary(page)).not.toContainText(/Final total\s*pending/);
+});
+
+test("the results show a zeroed student with a total of 0% although an essay is pending", async ({
+	page,
+}) => {
+	const w = await world(page, "scr-pending-results");
+	const pending = await pendingExam(w, "scr-pending-results");
+	await db.examAdjustment.create(
+		{
+			course: w.course.id,
+			exam: pending.exam.slug,
+			usernames: [pending.pia.username],
+			op: "FACTOR",
+			value: "0",
+			reason: "Cheating",
+		},
+		{ actor: w.teacher },
+	);
+
+	await page.goto(`${pending.url}/results`);
+
+	const row = page
+		.getByRole("table", { name: "Results", exact: true })
+		.getByRole("row")
+		.filter({ hasText: "Pia Costa" });
+	await expect(row.getByRole("insertion")).toHaveText("0%");
+});
+
+test("releasing the grades is not blocked by the empty attempt a replacement created", async ({
+	page,
+}) => {
+	const w = await adjustableExam("scr-release");
+	await adjust(w, [w.hana.username], { op: "SET", value: "0.7" });
+	await logInAs(page, w.teacher);
+	await page.goto(w.examUrl);
+
+	await page.getByRole("button", { name: "Release results" }).click();
+	await page
+		.getByRole("dialog")
+		.getByRole("button", { name: "Release results" })
+		.click();
+
+	await expect(page.getByText(/^Released/)).toBeVisible();
+	const released = await prisma.exam.findUniqueOrThrow({
+		where: { id: w.exam.id },
+	});
+	expect(released.gradesReleasedAt).not.toBeNull();
 });

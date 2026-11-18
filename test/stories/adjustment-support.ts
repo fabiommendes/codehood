@@ -3,7 +3,7 @@ import { db } from "@/db";
 import { prisma } from "@/db/client";
 import { persistedCourseFactory } from "@/fixtures/course.factory";
 import { persistedExamFactory } from "@/fixtures/exam.factory";
-import { capitalChoice } from "@/mdq/fixtures";
+import { capitalChoice, capitalShortAnswerManual } from "@/mdq/fixtures";
 import { courseHref } from "@/urls";
 import { seedUser } from "./helpers";
 
@@ -156,4 +156,98 @@ export function adjust(
 		},
 		{ actor: world.teacher },
 	);
+}
+
+/**
+ * Adds to the world's course a closed exam of choice questions `questions`, creating those that are not one of {@link QUESTIONS}.
+ *
+ * Nobody answers it: it serves to look at the page of a student who has no attempt. A `PRACTICE` exam is ongoing.
+ */
+export async function addExam(
+	world: AdjustableExam,
+	slug: string,
+	questions: readonly string[],
+	extra: { type?: "EXAM" | "PRACTICE" } = {},
+) {
+	for (const question of questions) {
+		if ((QUESTIONS as readonly string[]).includes(question)) continue;
+		await db.question.create(
+			{
+				course: world.course.id,
+				slug: question,
+				status: "PUBLISHED",
+				version: "1",
+				question: {
+					...capitalChoice,
+					id: question,
+					title: `Capital ${question}`,
+				},
+			},
+			FULL_ACCESS,
+		);
+	}
+	const type = extra.type ?? "EXAM";
+	return persistedExamFactory.create({
+		course: world.course.id,
+		slug,
+		title: slug,
+		type,
+		status: type === "PRACTICE" ? "ONGOING" : "COMPLETED",
+		duration: { hours: 1 },
+		questions: questions.map((question) => ({ slug: question })),
+	});
+}
+
+/**
+ * Adds a closed exam of one choice question and one essay, and Pia, whose essay nobody graded, so her total is pending.
+ *
+ * Pia got the choice question right.
+ */
+export async function pendingExam(world: AdjustableExam, prefix: string) {
+	await db.question.create(
+		{
+			course: world.course.id,
+			slug: "q-essay",
+			status: "PUBLISHED",
+			version: "1",
+			question: { ...capitalShortAnswerManual, id: "q-essay", title: "Essay" },
+		},
+		FULL_ACCESS,
+	);
+	const exam = await persistedExamFactory.create({
+		course: world.course.id,
+		slug: "pending-exam",
+		title: "Pending exam",
+		type: "EXAM",
+		status: "ONGOING",
+		duration: { hours: 1 },
+		questions: [{ slug: QUESTIONS[0] }, { slug: "q-essay" }],
+	});
+	const pia = await seedUser({
+		role: "STUDENT",
+		username: `${prefix}-pia`,
+		name: "Pia Costa",
+	});
+	await db.enrollment.create(
+		{ course: world.course.id, username: pia.username },
+		FULL_ACCESS,
+	);
+	for (const [question, payload] of [
+		[QUESTIONS[0], RIGHT],
+		["q-essay", "Brasilia, I think"],
+	] as const) {
+		await db.response.submit(
+			{ course: world.course.id, exam: exam.slug, question, payload },
+			{ actor: pia },
+		);
+	}
+	await db.response.finish(
+		{ course: world.course.id, exam: exam.slug },
+		{ actor: pia },
+	);
+	await prisma.exam.update({
+		where: { id: exam.id },
+		data: { status: "COMPLETED" },
+	});
+	return { exam, pia, url: `${world.href}/exams/${exam.slug}` };
 }
