@@ -24,6 +24,7 @@ import { answersTo, gradingOrder } from "@/services/grading";
 import { objectiveReview, restMeans } from "@/services/objective-review";
 import { questionStats } from "@/services/question-stats";
 import { pendingBlanks, reviewResult } from "@/services/review";
+import { adjustmentLabel } from "@/utils/adjustment-label";
 import { breadcrumbs } from "@/utils/breadcrumbs";
 import { graderState } from "@/utils/grader-state";
 import { gradingHref, wantsList, wantsNames } from "@/utils/grading-urls";
@@ -127,7 +128,7 @@ const openRegrades = new Map(
 	).map((request) => [request.submission, request.publicId]),
 );
 const regradesHref = `${href}/exams/${exam.slug}/regrades`;
-// The sanctions of the exam, and the factor of each student's on this question.
+// The adjustments of the exam, and the factor of each student's on this question.
 const sanctions = await db.examAdjustment.findMany(
 	{ course: course.id, exam: exam.slug },
 	{ actor },
@@ -141,9 +142,7 @@ const sanctioned = new Map(
 const sanctionLabel = (author: string) => {
 	const factor = sanctioned.get(author);
 	if (factor === undefined) return undefined;
-	return factor === 0
-		? m.grades_sanction_zeroed()
-		: m.grades_sanction_reduced({ factor });
+	return adjustmentLabel({ op: "FACTOR", value: factor });
 };
 
 // The view the request asks for, which links forward; an automatic question ignores it.

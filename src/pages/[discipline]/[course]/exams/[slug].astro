@@ -242,7 +242,7 @@ const examOutcome = view.result;
     practice: exam.type === "PRACTICE",
     pending: canManage ? pendingAnswers : undefined,
     regrades: canManage ? openRegrades : undefined,
-    sanctions: canManage ? (staff?.sanctions ?? 0) : undefined,
+    adjustments: canManage ? (staff?.adjustments ?? 0) : undefined,
     sections: canManage ? [] : [
       ...(exam.preamble ? [{ id: "instructions", label: m.exams_detail_instructions() }] : []),
       { id: "questions", label: m.exams_detail_questions_heading() },

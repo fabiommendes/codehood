@@ -5,15 +5,17 @@
  * An exam cell reads the total the instructor has graded so far. A hidden
  * pushed column carries the control that releases it to the students.
  */
+import Icon from "@/components/grading/Icon.astro";
 import ReleaseGradeColumn from "@/components/grading/ReleaseGradeColumn";
 import { m } from "@/i18n";
-import { formatScore, reducesGrade } from "@/services/exam-result";
+import { formatScore } from "@/services/exam-result";
 import {
 	formatGradeValue,
 	type GradeCell,
 	type GradesTable,
 	type PushedGrades,
 } from "@/services/grades-table";
+import { adjustmentLabel } from "@/utils/adjustment-label";
 import { formatAttendancePercent } from "@/utils/course-grades";
 
 interface Props {
@@ -47,18 +49,18 @@ const label = (cell: GradeCell): string => {
 			return "";
 	}
 };
-/// The tooltip of a sanctioned total: the factor and the reason the student is told, never the notes.
-const sanctionTitle = (cell: GradeCell): string | undefined => {
-	if (cell.kind !== "total") return undefined;
-	const reduction = cell.adjustments?.find(reducesGrade);
-	if (!reduction) return undefined;
-	const factor = String(reduction.value);
-	return reduction.reason
-		? m.grades_sanction_cell_title_reason({
-				factor,
-				reason: reduction.reason,
-			})
-		: m.grades_sanction_cell_title({ factor });
+/// The tooltip of an adjusted total: what was applied to it, in order, never the notes.
+const adjustmentTitle = (cell: GradeCell): string | undefined => {
+	if (cell.kind !== "total" || !cell.adjustments) return undefined;
+	return cell.adjustments
+		.map((adjustment) => adjustmentLabel(adjustment))
+		.join(", ");
+};
+/// The color of an adjusted total: red when the adjustments lowered it, green when they raised it.
+const totalTone = (cell: GradeCell): string | undefined => {
+	if (cell.kind !== "total" || cell.original?.total == null) return undefined;
+	if (cell.total < cell.original.total) return "text-error";
+	return cell.total > cell.original.total ? "text-success" : undefined;
 };
 const hasAttempt = (cell: GradeCell): boolean =>
 	cell.kind === "total" ||
@@ -127,19 +129,32 @@ const hasAttempt = (cell: GradeCell): boolean =>
             {row.cells.map((cell, index) => (
               <td class="max-sm:px-2">
                 {hasAttempt(cell) ? (
-                  <a
-                    href={`${href}/exams/${table.columns[index]?.exam.slug}/attempts/${row.username}`}
-                    class:list={["link", sanctionTitle(cell) && "text-error"]}
-                    title={sanctionTitle(cell)}
-                  >
-                    {label(cell)}
-                    {sanctionTitle(cell) && (
-                      <svg aria-hidden="true" viewBox="0 0 16 16" class="ml-1 inline size-3.5 align-text-bottom" fill="currentColor">
-                        <path d="M8 1.5 15 14H1L8 1.5Zm-.75 5v3.5h1.5V6.5h-1.5Zm0 4.5v1.5h1.5V11h-1.5Z" />
-                      </svg>
+                  <>
+                    <a
+                      href={`${href}/exams/${table.columns[index]?.exam.slug}/attempts/${row.username}`}
+                      class="link"
+                      title={adjustmentTitle(cell)}
+                    >
+                      {cell.kind === "total" && cell.original?.total != null ? (
+                        <>
+                          <ins class:list={["font-semibold no-underline", totalTone(cell)]}>{label(cell)}</ins>{" "}
+                          <del class="text-muted">{formatScore(cell.original.total)}</del>
+                        </>
+                      ) : (
+                        label(cell)
+                      )}
+                    </a>
+                    {cell.kind === "total" && cell.adjustments && (
+                      <a
+                        href={`${href}/exams/${table.columns[index]?.exam.slug}/adjustments`}
+                        class="link ml-1 align-middle text-muted"
+                        aria-label={m.grades_adjustment_title()}
+                        title={m.grades_adjustment_title()}
+                      >
+                        <Icon name="badgePlus" />
+                      </a>
                     )}
-                    {sanctionTitle(cell) && <span class="sr-only">{sanctionTitle(cell)}</span>}
-                  </a>
+                  </>
                 ) : (
                   label(cell)
                 )}

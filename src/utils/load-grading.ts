@@ -151,21 +151,22 @@ export async function loadExamGrading(
 }
 
 /**
- * The students of a course, dropped ones included.
+ * The students of a course, dropped ones included, each with the school registration they have.
  *
  * Active students come first, then the dropped ones.
  */
 export async function loadStudents(
 	course: Course["id"],
 	actor: UserActor,
-): Promise<GradedStudent[]> {
+): Promise<(GradedStudent & { schoolId: string | null })[]> {
 	const rows = await db.enrollment.findMany(
 		{ course, status: ["ACTIVE", "DROPPED"] },
 		{ actor },
 	);
-	const students = rows.map(({ username, name, status }) => ({
+	const students = rows.map(({ username, name, status, schoolId }) => ({
 		username,
 		name,
+		schoolId: schoolId ?? null,
 		dropped: status === "DROPPED",
 	}));
 	return [
@@ -281,7 +282,7 @@ export async function gradingExamNav(
 		practice: exam.type === "PRACTICE",
 		pending: answers.filter((answer) => answer.state === "pending").length,
 		regrades: regrades.length,
-		sanctions: known.length,
+		adjustments: known.length,
 	});
 	return context ? { ...nav, context } : nav;
 }

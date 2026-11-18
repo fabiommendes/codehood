@@ -340,7 +340,11 @@ export function examResult(
 }
 
 /// The order exam adjustments apply in.
-const ADJUSTMENT_ORDER: readonly AdjustmentOp[] = ["SET", "FACTOR", "OFFSET"];
+export const ADJUSTMENT_ORDER: readonly AdjustmentOp[] = [
+	"SET",
+	"FACTOR",
+	"OFFSET",
+];
 
 /// The adjustment with the lowest value, or `undefined` with none.
 function lowestFactor(

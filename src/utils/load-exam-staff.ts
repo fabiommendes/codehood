@@ -38,9 +38,9 @@ export interface ExamStaffData {
 	pending: number;
 	/// Regrade requests still open.
 	openRegrades: number;
-	/// Active sanctions on the exam's attempts.
-	sanctions: number;
-	/// The total of each sanctioned attempt as it would be without any sanction, by the student's username.
+	/// Active adjustments on the exam's attempts.
+	adjustments: number;
+	/// The total of each adjusted attempt as it would be without any adjustment, by the student's username.
 	originalTotals: ReadonlyMap<string, number | null>;
 	/// Exceptions whose personal window has not closed, dropped students aside.
 	openExceptions: number;
@@ -69,7 +69,7 @@ export async function loadExamStaffData(
 			releaseBlocker: "not-an-exam",
 			pending: 0,
 			openRegrades: 0,
-			sanctions: 0,
+			adjustments: 0,
 			originalTotals: new Map(),
 			openExceptions: 0,
 			inProgress: 0,
@@ -139,7 +139,7 @@ export async function loadExamStaffData(
 		releaseBlocker: blockerOf(schedule, results, now),
 		pending: resultRows.reduce((sum, row) => sum + row.pending, 0),
 		openRegrades: regrades.length,
-		sanctions: sanctions.length,
+		adjustments: sanctions.length,
 		originalTotals: new Map(
 			attempts
 				.filter((entry) => sanctionsOf.has(entry.publicId))

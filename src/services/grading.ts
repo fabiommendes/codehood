@@ -608,10 +608,27 @@ export function attemptRoster(
 	rows: readonly AttemptRow[],
 	adjusted: ReadonlySet<string>,
 ): RosterRow[] {
-	void students;
-	void rows;
-	void adjusted;
-	throw new Error("not implemented");
+	const rowsByAuthor = new Map(rows.map((row) => [row.author, row]));
+	return students
+		.filter((student) => !student.dropped)
+		.sort(compareStudents)
+		.map((student): RosterRow => {
+			const row = rowsByAuthor.get(student.username);
+			const base = {
+				username: student.username,
+				name: student.name,
+				schoolId: student.schoolId,
+				total: row?.total ?? null,
+			};
+			if (!row) return { ...base, status: "none" };
+			if (row.state === "in-progress")
+				return { ...base, status: "in-progress" };
+			if (row.pending > 0) return { ...base, status: "pending" };
+			return {
+				...base,
+				status: adjusted.has(student.username) ? "adjusted" : "submitted",
+			};
+		});
 }
 
 /// The state color of a question on the attempt page.
@@ -630,8 +647,11 @@ export function questionMark(
 	payload: unknown,
 	changed: boolean,
 ): QuestionMark {
-	void outcome;
-	void payload;
-	void changed;
-	throw new Error("not implemented");
+	if (changed) return "changed";
+	if (outcome.submission === undefined || payload == null) return "blank";
+	if (outcome.status === "pending") return "pending";
+	if (outcome.status === "not-graded") return "not-graded";
+	const score = outcome.score ?? 0;
+	if (score >= 1) return "correct";
+	return score > 0 ? "partial" : "wrong";
 }
