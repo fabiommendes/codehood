@@ -19050,24 +19050,20 @@
                 "properties": {
                   "status": {
                     "type": "string",
-                    "nullable": true,
                     "enum": [
                       "OPEN",
                       "TRIAGED",
                       "RESOLVED",
-                      "DISMISSED",
-                      null
+                      "DISMISSED"
                     ]
                   },
                   "kind": {
                     "type": "string",
-                    "nullable": true,
                     "enum": [
                       "BUG",
                       "SUGGESTION",
                       "CONTENT",
-                      "OTHER",
-                      null
+                      "OTHER"
                     ]
                   },
                   "note": {

@@ -128,8 +128,8 @@ export const reportCreateWithoutAttachments = contentNeedsCourse(
 
 /// What the triage may change. The author never edits.
 export const reportUpdate = z.object({
-	status: reportStatus.nullish(),
-	kind: reportKind.nullish(),
+	status: reportStatus.optional(),
+	kind: reportKind.optional(),
 	note: z.string().max(REPORT_MESSAGE_MAX).nullish(),
 });
 

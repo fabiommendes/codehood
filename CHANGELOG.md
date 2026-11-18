@@ -62,6 +62,8 @@
 
 ### Fixed
 
+- `PATCH` de uma denúncia com `status` ou `kind` nulo responde 400 em vez de
+  falhar no banco; `maxUses` do convite segue a regra do ADR 0006 (`nullish`).
 - A tabela de notas mostra a célula vazia, e não "Pending", para uma prova
   sem questões.
 - `DELETE` de um curso que ainda tem provas, senhas de matrícula ou vínculos

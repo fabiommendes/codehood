@@ -79,7 +79,7 @@ export const inviteFilter = z.object({
 export const inviteUpdate = z
 	.object({
 		expiresAt: instant.optional(),
-		maxUses: z.number().int().min(1).nullable().optional(),
+		maxUses: z.number().int().min(1).nullish(),
 	})
 	.strict();
 

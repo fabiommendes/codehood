@@ -50,7 +50,3 @@ Achados ao escrever o ADR 0006:
   `enrollment.ts:26`, `blob.ts:26`, `passphrase.ts:14` e `:20`,
   `session.ts:13`, `repository.ts:59`, `invite.ts:78` (`inviteUpdate`),
   `report.ts:87` e `:123`.
-- `reportUpdate.status` e `reportUpdate.kind` são `.nullish()` (`report.ts:124`)
-  sobre colunas não anuláveis: um `null` chega ao Prisma e falha.
-- `inviteUpdate.maxUses` usa `.nullable().optional()` (`invite.ts:81`), mesmo
-  efeito de `.nullish()` mas fora da forma da regra.
