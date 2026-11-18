@@ -112,6 +112,47 @@ duração.
 | G17 | Aluno `in-progress`, grant real `g`; uma segunda prova do mesmo curso | `assertExamGrant`, `grantedQuestions` e `grantedDocument` com `{ ...g }`, `structuredClone(g)`, `Object.assign({}, g)` e um literal com os mesmos campos, ids via `unsafeBrand` e `as unknown as ExamGrant`. Atribuir `g.examId` com o id da segunda prova; `g.questions.push(...)`; atribuir `g.questions[0].dataId` | Todas as chamadas com cópia ou literal lançam `ImproperBehavior`. As três mutações lançam `TypeError`. Depois delas, `grantedQuestions(g)` ainda devolve as questões da prova original | R15, R16, R18 | Verificação só pelo formato; congelamento raso |
 | G18 | Quatro provas do mesmo aluno: `in-progress`; `scheduledAt` amanhã; `EXAM` entregue e liberada; prova antiga com tentativa por `prisma` e `questionsFrozenAt` nulo | `grantViews(prisma, [ids], aluno)` | Mapa: `answer`, `null`, `review`, `answer`. A prova antiga continua com `questionsFrozenAt` nulo e pin nulo | R19, R9 | `grantViews` divergindo da tabela de `issueExamGrant`; escrita numa leitura em lote |
 
+## T4. Service `db.examQuestion`
+
+Arquivo: `test/exam-question-service.spec.ts`. Escopo: `unit`. Todos os casos
+falham hoje porque `db.examQuestion` não existe. O `target` é `{ course:
+course.id, exam: exam.slug }` e o ator vai em `actorOf(user)`.
+
+Documentos usados abaixo:
+
+- **`mc`**: `capitalChoice` (`src/mdq/fixtures.ts`) com `weight: 2` e
+  `tags: ["geo"]`; a escolha certa é `brasilia`, e `rio` vale 0 e não tem
+  feedback.
+- **`mcV2`**: `mc` com outro `title`, outro `stem`, `weight: 3`, e `rio` como
+  escolha certa, com o feedback `"V2 FEEDBACK"`. É o push de `v2` em `mc`.
+- **`essay`**: um documento sem `weight`, com `tags`.
+- **`code`**: `sumCode`, com `meta.worker` preenchido, como `pushCode` em
+  `test/grading-job.spec.ts`. **`codeSemWorker`**: o mesmo, sem `meta.worker`.
+  Confira que `pretestSources(sumCode)` não é vazio.
+
+O `weight` de uma versão é o `weight` do documento (`payloadWeight` em
+`exam.service.ts` lê `publicPayload.weight`).
+
+| # | Cenário | Ação | Esperado | R | Bug que pega |
+| :-- | :-- | :-- | :-- | :-- | :-- |
+| Q1 | Prova padrão `EXAM` (`scheduledAt` 10 min atrás, 60 min) com `questions: [{ slug: essay }, { slug: mc, version: "v1" }]`, criadas nessa ordem inversa (`mc` antes de `essay`). Depois de criar a prova, push de `mcV2` em `mc` | Sem tentativa: `forAttempt` e `titles`. Depois `db.response.create` do aluno: `forAttempt` e `titles` | Sem tentativa: `forAttempt` é `null` e `titles` é `{}` (B6). Com tentativa: `{ view: "answer", answering: true }` e `questions` na ordem `[essay, mc]`. `mc` vem com `version: "v1"`, `weight: 2`, `stem` de `v1`; `essay` vem com `weight: 1`. Nenhum item tem a chave `tags` nem a chave `code`, e nada de `score` nas escolhas. `titles` devolve `{ [mc]: título de v1, [essay]: título dele }` | R25, R26, R27, R29 | Ler a última versão em vez do pin; `weight` da prova em vez do da versão; `tags` vazando; grant antes de iniciar |
+| Q2 | Prova padrão com `[code, codeSemWorker, mc]`; aluno com tentativa | `forAttempt`; `db.response.finish`; `forAttempt` | Antes de entregar: `code` com `{ sendable: true, pretests: [não vazio] }`, `codeSemWorker` com `sendable: false`, `mc` sem a chave `code`. Depois de entregar: `answering: false`, `code` com `sendable: true` e `pretests: []` | R27 | Pretestes servidos depois da entrega; `code` em questão que não é `code` |
+| Q3 | `EXAM` padrão com `[mc (v1), mc2]`, em que `mc2` é outra múltipla escolha. O aluno responde `mc` com `"rio"` e não responde `mc2`; o colega responde `mc2`. Os dois chamam `finish`. Push de `mcV2` em `mc` (a prova já está congelada em `v1`). `outcomes = [{ question: mc, submission: publicId da resposta do aluno, score: 0.25, blanks: null }, { question: mc2, submission: publicId da resposta do colega, score: 1, blanks: null }]` | `reviews(target, outcomes)`; `db.exam.close`; `releaseGrades`; `reviews(target, outcomes)` | Antes da liberação: `{}`. Depois: só a chave `mc`, com `score: 0.25` (a nota vem de quem chama e não é recalculada). Não há chave `mc2`, porque a submissão é de outra tentativa. O JSON da saída não contém `brasilia` nem `V2 FEEDBACK`: o documento é o de `v1` e a chave não vaza | R28 | Revisão antes da liberação; ler resposta de outra tentativa; recalcular nota; corrigir pela versão nova; vazar gabarito |
+| Q4 | Faltante: `EXAM` padrão com `[mc, essay]`, aluno sem tentativa, `db.exam.close` | `forAttempt`; `releaseGrades`; `forAttempt`, `reviews(target, outcomes qualquer)` e `titles` | Antes: `null`. Depois: `{ view: "answer", answering: false }` com as duas questões e sem `code`. `reviews` é `{}`. `titles` traz as duas | R39, R28, R29 | Faltante com revisão, ou sem enunciado depois da liberação |
+| Q5 | Simulação: prova `DRAFT` com `[mc (v1)]` e push de `mcV2` | O instrutor chama `forAttempt` sem simulação; `db.response.create` (simulação) e `forAttempt`; `db.response.answer` com `"rio"`, `finish`, `reviews` com o `publicId` da submissão da simulação e `score: 0` | `null`; depois `answer` com `answering: true`, `mc` em `v1` com o `stem` de `v1`; por fim, `reviews` com a chave `mc` (simulação libera ao entregar) | R37 | Simulação por outro caminho, que lê a última versão ou o documento privado |
+
+## T5. `studentViews`, anexo de questão e `exam.findOne`/`findMany`
+
+Escopo: `unit`. Sem e2e: a regra aparece inteira nos services, e a rota REST
+nova é de T8.
+
+| # | Arquivo | Cenário | Ação | Esperado | R | Falha hoje? |
+| :-- | :-- | :-- | :-- | :-- | :-- | :-- |
+| V1 | `test/exam-before-open.spec.ts` | Um aluno e cinco provas `EXAM` do mesmo curso, cada uma com duas questões: A aberta e sem tentativa; B aberta e com `db.response.create`; C encerrada (`db.exam.close`) e liberada, aluno sem tentativa; D encerrada, sem liberação, aluno sem tentativa; E com `scheduledAt` amanhã. O preâmbulo de A é conhecido | `db.exam.findMany({ course }, aluno)`, `db.exam.findOne` de A e de B pelo aluno, `findMany` pelo instrutor | Para o aluno, `questions` é `[]` em A, D e E, e a lista inteira em B e C. `findOne` concorda com `findMany`. O preâmbulo de A continua visível, porque R33 só esconde `questions`. O instrutor recebe todas as listas | R33 | Sim: hoje A devolve as questões, porque a prova está aberta |
+| V2 | `test/exam-attachments.spec.ts` | Use `setup`, `filesFor`, `createQuestion` e `createExam` do arquivo. `q` tem `v1` com `data.csv` (bytes `b1`); a prova está aberta, `q` sem pin, e há um anexo da prova em si. Aluno e colega matriculados | O aluno sem tentativa pede `questionAttachment(q, "data.csv")` e `attachment` da prova. O aluno faz `db.response.create`, o que congela `v1`. Push de `v2` em `q`, com `data.csv` de bytes `b2`. Pedem `questionAttachment`: o aluno, o colega sem tentativa e o instrutor sem tentativa | Sem tentativa: `questionAttachment` dá 404, e o anexo da prova baixa. Com tentativa: `b1`. Colega: 404. Instrutor: `b1`, a versão fixada, como hoje | R35, R36 | Sim: hoje o aluno sem tentativa baixa o anexo da questão com a prova aberta |
+| V3 | `test/grading-job.spec.ts` | `world({ examType: "QUIZ", meta: { attempts: 1 } })`, com a prova criada com `scheduledAt` 10 min atrás e 60 min de duração. Um colega com exceção `scheduledAt` 1 h no futuro. `sentBy(w, "DONE", GRADED)`. `db.exam.close` | (a) `forStudent(lookup(w), asStudent(w))`. (b) `prisma.examException.update` move o `scheduledAt` do colega para 3 h atrás, e o aluno chama de novo. (c) `prisma.exam.update` com `status: "ARCHIVED"`, e o aluno chama de novo | (a) `report` sem `score`: a segunda chamada pendente do colega segura a liberação. (b) `report` com `score`. (c) A submissão continua listada, mas sem `report` | R21, R34 | (a) Provavelmente sim: `examReleaseSelect(actor)` só carrega a matrícula do aluno, e a exceção do colega conta como de desmatriculado. Se passar, fica como regressão. (c) Sim: hoje o relatório sai com a prova arquivada |
+| V4 | `test/grading-job.spec.ts` | Instrutor com simulação (`db.response.create` do instrutor) numa `EXAM` com `meta: { attempts: 1 }`, sem liberação. Submissão `SUBMIT` da simulação com job `DONE` e `runnerReport: GRADED`, montada como em `enqueue`/`sentBy`, mas sobre a resposta da simulação | `forStudent({ response: simulação.publicId, question }, actorOf(instructor))` | `report` com `score`: a simulação libera como prática | R34, R37 | Não: regressão. O grant de simulação precisa manter o que o modo `PRACTICE` faz hoje |
+
 ## Decisões do projetista
 
 - **J1 (R9, R19).** G11, G12, G15 e G18 ficam em `test/exam-grant.spec.ts`
@@ -143,3 +184,12 @@ duração.
   versão), em vez de um diff linha a linha. O resultado é o mesmo.
 - **J11 (R6).** `exam.create` com `status: "COMPLETED"` não congela; o
   congelamento preguiçoso do grant (R9) cobre esse caso.
+- **J12 (R28).** Em `reviews`, um `outcome` cuja `submission` não é da
+  tentativa do grant, ou cujo slug não está no grant, fica fora do resultado
+  em silêncio, sem erro. Coberto por Q3.
+- **J13 (R34).** "Sem grant, o relatório não sai": `forStudent` continua
+  listando as submissões e o estado do job, mas sem `report`. Não é
+  `NotFound`. Coberto por V3 (c).
+- **J14 (R33).** Sem grant, `exam.findOne` e `findMany` escondem só
+  `questions`; o preâmbulo e os anexos da prova seguem a fase pessoal, como
+  hoje (R36). Coberto por V1 e V2.
