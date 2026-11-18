@@ -603,6 +603,7 @@ def stored_exam(body: dict) -> dict:
         "allowCodeRun": None,
         "answerHistory": None,
         "gradesReleasedAt": None,
+        "questionsFrozenAt": None,
         "author": "ada",
         "rev": body.get("rev"),
         "tags": [],

@@ -1355,6 +1355,7 @@ def _exam_json(slug: str, status: str = "SCHEDULED", **overrides) -> dict:
         "allowCodeRun": None,
         "answerHistory": None,
         "gradesReleasedAt": None,
+        "questionsFrozenAt": None,
         "author": "ada",
         "rev": "v1:abc",
         "tags": ["b", "a"],

@@ -47,6 +47,7 @@ EXAM = {
     "allowCodeRun": None,
     "answerHistory": None,
     "gradesReleasedAt": RELEASED_AT,
+    "questionsFrozenAt": None,
     "author": "ada",
     "rev": None,
     "tags": [],
