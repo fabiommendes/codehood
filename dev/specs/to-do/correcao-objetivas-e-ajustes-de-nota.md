@@ -360,8 +360,14 @@ Depois da liberação das notas (mesma regra de `feedback.read` da
 - G2. `sanctions.astro` vira `adjustments.astro`: lista ativos e revogados;
   criação em lote por nomes de usuário, **inclusive de aluno sem tentativa**
   (E1); edita e revoga. Item no `examNav` com o contador de ativos.
-- G3. Tabelas de resultados e de notas mostram o efeito líquido (total
-  original riscado e total final) com link para a página de ajustes.
+- G3. Tabelas de resultados e de notas mostram o efeito líquido: com
+  qualquer ajuste ativo (da prova ou de questão), o total sem nenhum ajuste
+  riscado e o total final, com link para a página de ajustes. As duas
+  tabelas usam o mesmo "original". Os resumos (página da tentativa, F1)
+  seguem D8: o original já inclui os ajustes de questão, que aparecem como
+  selo na questão.
+- G2a. Na lista de alunos e nos resultados, uma tentativa vazia
+  (`createdBy` não nulo) sem ajuste ativo conta como "sem tentativa".
 - G4. Na correção de uma questão, selo só para ajuste cujo alvo é a questão.
 - G5. `results.astro`: o botão "Sancionar selecionados" vira "Ajustar
   selecionados".

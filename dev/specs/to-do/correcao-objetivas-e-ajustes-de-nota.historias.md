@@ -232,9 +232,9 @@ texto novo delas está em "Textos para as histórias renomeadas", no fim.
   G não tem tentativa, H não tem tentativa e tem uma exceção com nova data no
   futuro. Um usuário que não está matriculado. Uma prova `PRACTICE`.
 - **Passos e resultados:**
-  1. Nos resultados da prova, G aparece como "sem tentativa". Seleciona F e
-     G e usa "Ajustar selecionados": "Substituir", 70, motivo "Nota do
-     projeto substitui a prova 2".
+  1. Na página de ajustes, cria em lote para F e G: "Substituir", 70,
+     motivo "Nota do projeto substitui a prova 2" (G2; os resultados só
+     listam quem tem tentativa, então G não pode ser selecionado lá antes).
   2. A página de ajustes lista dois ajustes ativos, e o item da navegação da
      prova mostra o contador 2. Nos resultados, G passa a ter total 70% e a
      situação "ajustada".
