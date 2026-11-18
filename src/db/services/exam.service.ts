@@ -71,9 +71,9 @@ import {
 	type WithAttachments,
 } from "@/services/attachment-files";
 import {
+	adjustmentsByResponse,
 	type ExamResult,
 	examResult,
-	sanctionsByResponse,
 } from "@/services/exam-result";
 import {
 	attachmentsOpen,
@@ -989,7 +989,7 @@ async function attemptResults(
 		weight: weights[i] ?? 1,
 	}));
 	const policy = (await loadResultPolicy(exam.courseId, tx))(exam);
-	const sanctions = sanctionsByResponse(
+	const sanctions = adjustmentsByResponse(
 		await activeAdjustmentsOf(exam.courseId, [exam.id], tx),
 	);
 	return attempts.map(({ publicId, submissions }) =>

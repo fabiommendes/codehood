@@ -620,8 +620,8 @@ Componentes (renomeados de `Sanction*`, em `src/components/grading/`):
 
 ### Regras comuns (o coordenador cola no topo de todo brief)
 
-- Leia `CLAUDE.md`, a spec `dev/specs/to-do/correcao-objetivas-e-ajustes-de-nota.md`
-  e a seção desta tarefa em `dev/specs/to-do/correcao-objetivas-e-ajustes-de-nota.plano.md`
+- Leia `CLAUDE.md`, a spec `dev/specs/to-review/correcao-objetivas-e-ajustes-de-nota.md`
+  e a seção desta tarefa em `dev/specs/to-review/correcao-objetivas-e-ajustes-de-nota.plano.md`
   (seções 1 e 2). As interfaces da seção 2 são o contrato: não as mude sem
   avisar o coordenador.
 - Worktree novo: `pnpm install --frozen-lockfile --offline` e

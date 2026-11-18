@@ -4,15 +4,18 @@
 
 ### Added
 
-- Sanção de nota. O professor zera uma questão ou zera (ou reduz por um
-  fator) a nota da prova inteira de um ou mais alunos, por cola ou outro
-  problema, com motivo para o aluno e anotações privadas. A sanção vale por
-  cima de toda correção (recorreção, rubrica e revisão não a desfazem), é
-  revogável e fica registrada (`ExamSanction`). Telas: seleção em lote nos
-  resultados, página "Sanções" da prova, botões na tentativa, marca vermelha
-  na tabela de notas. O aluno vê a sanção junto com a nota liberada e não pede
-  revisão do que foi sancionado. REST em
-  `/api/course/{discipline}/{course}/exam/{slug}/sanction`.
+- Correção das objetivas e ajustes de nota. Cada questão objetiva da prova tem
+  uma página de correção com a distribuição das respostas, as respostas
+  agrupadas, o pedido de revisão aberto e a nota alterada à mão, que se desfaz
+  com um clique (a nota automática volta, o histórico fica). O professor também
+  dá nota a uma questão que o aluno deixou em branco, e isso cria uma tentativa
+  vazia quando o aluno não entregou a prova. O ajuste de nota (`ExamAdjustment`,
+  que substitui a sanção) vale por cima de toda correção, na prova ou numa
+  questão, é revogável e traz motivo para o aluno e anotações privadas:
+  bônus (`FACTOR` acima de 1 ou `OFFSET` positivo), penalidade (`FACTOR` abaixo
+  de 1, `OFFSET` negativo, questão zerada ou reduzida) e substituição (`SET`).
+  O aluno vê o ajuste junto com a nota liberada e não pede revisão do que foi
+  reduzido. REST em `/api/course/{discipline}/{course}/exam/{slug}/adjustment`.
 - Janela do editor de código: barra de título com o nome do arquivo e três
   bolinhas que deixam o editor na página, recolhido à barra de título ou
   maximizado sobre a área de conteúdo. Maximizado, o enunciado fica num painel

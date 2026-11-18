@@ -34,6 +34,15 @@ The [Role](#role) that sees and manages everything. Admins invite instructors,
 and the first one is created outside the app by a management command or dev seed,
 since nothing exists yet to invite them.
 
+## Ajuste de nota
+
+Type: domain
+
+The instructor's change to a student's grade, on the whole [Exam](#exam) or on
+one [Question](#question): `SET` replaces it, `FACTOR` multiplies it, `OFFSET`
+adds to it. A question takes only a `FACTOR` below 1. Applied on top of every
+grade, revocable. Stored as an `ExamAdjustment`.
+
 ## API key
 
 Type: domain
@@ -555,9 +564,9 @@ and writes the score through the [REST API](#rest-api) as a
 
 Type: domain
 
-The instructor's decision to zero or reduce a student's score on one
-[Question](#question) or on the whole [Exam](#exam). It is applied on top of
-every grade and can be revoked. Stored as an `ExamSanction`.
+An [Ajuste de nota](#ajuste-de-nota) that lowers a grade: a `FACTOR` below 1,
+such as zeroing a question or halving the exam. The only adjustment that blocks
+a [Regrade request](#regrade-request).
 
 ## Service
 
@@ -614,6 +623,14 @@ Type: domain
 One attempt at a single question inside a [Response](#response), carrying the
 answer payload plus grade, feedback, and status. Attempts accumulate rather than
 overwrite, so a response keeps its full history.
+
+## Tentativa vazia
+
+Type: domain
+
+A [Response](#response) the instructor created for a student who did not take
+the exam, with no [Submission](#submission), so a grade can be given to them
+(an [Ajuste de nota](#ajuste-de-nota) or a grade on an unanswered question).
 
 ## Time slot
 

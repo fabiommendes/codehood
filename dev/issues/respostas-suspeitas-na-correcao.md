@@ -15,7 +15,7 @@ O mockup da correção de objetivas
 "Requer atenção", uma linha de **resposta suspeita** com dois botões de
 ícone: `eye-off` ("Ignorar") e `gavel` ("Aplicar sanção", que abre o diálogo
 de ajuste com alvo na questão). A spec
-`dev/specs/to-do/correcao-objetivas-e-ajustes-de-nota.md` deixou isso de fora:
+`dev/specs/to-review/correcao-objetivas-e-ajustes-de-nota.md` deixou isso de fora:
 o código não tem detector de suspeita nem lugar para guardar o "ignorado".
 
 ## O que decidir

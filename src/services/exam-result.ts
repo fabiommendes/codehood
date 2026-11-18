@@ -60,9 +60,6 @@ export function adjustmentsByResponse(
 	return byResponse;
 }
 
-/** @deprecated Alias kept for `exam.service.ts`. */
-export const sanctionsByResponse = adjustmentsByResponse;
-
 /** Whether the adjustment lowers a grade: a `FACTOR` below 1. Only these block a regrade request. */
 export function reducesGrade(adjustment: {
 	op: AdjustmentOp;

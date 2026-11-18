@@ -1137,7 +1137,7 @@ async function createDemoCoursesIfMissing(): Promise<void> {
 		},
 		FULL_ACCESS,
 	);
-	await seedReleasedQuiz(cs101, ada, { hopper, hamilton });
+	await seedReleasedQuiz(cs101, ada, { hopper, hamilton, liskov });
 	// Order matters below. `elm-soma` must exist before the showcase
 	// (`test-02`), which creates `explain-recursion` and `factorial-returns`.
 	// `test-03` needs `js-double-it` from the showcase, and the edit history of
@@ -2067,7 +2067,7 @@ async function answerExam(
 async function seedReleasedQuiz(
 	cs101: Course,
 	instructor: User,
-	students: { hopper: User; hamilton: User },
+	students: { hopper: User; hamilton: User; liskov: User },
 ): Promise<void> {
 	const course = cs101.id;
 	const exam = "quiz-01";
@@ -2132,6 +2132,18 @@ async function seedReleasedQuiz(
 			scheduledAt: slotInstant(cs101.startDate, "MONDAY", 3, 14 * 60),
 		},
 		FULL_ACCESS,
+	);
+	// Liskov never took the quiz: the instructor replaces her grade, which creates an empty attempt.
+	await db.examAdjustment.create(
+		{
+			course,
+			exam,
+			usernames: [students.liskov.username],
+			op: "SET",
+			value: "0.6",
+			reason: "Prova feita em separado, nota lançada pelo professor.",
+		},
+		{ actor: instructor },
 	);
 }
 
@@ -3721,6 +3733,33 @@ async function seedReleasedExam(
 			{ id: "bottom", text: "The bottom" },
 		],
 	});
+	// A short answer, a fill-in and an ordering, so a hand change can reach every objective type.
+	await algorithmQuestion("stack-underflow-name", {
+		type: "short-answer",
+		title: "Popping an empty stack",
+		stem: "What is the error called when `pop` runs on an empty stack?",
+		accept: ["underflow"],
+	});
+	await algorithmQuestion("stack-ops-blanks", {
+		type: "fill-in",
+		title: "Stack operations",
+		stem: "`push` adds an item to the [^end] of a stack, and `pop` removes [^count] item.",
+		blanks: [
+			{ id: "end", type: "short-answer", accept: ["top"] },
+			{ id: "count", type: "numeric", answer: 1 },
+		],
+	});
+	await algorithmQuestion("stack-sequence", {
+		type: "ordering",
+		title: "Stack sequence",
+		stem: "Sort the calls so the stack ends up holding only the number 1.",
+		content: "text",
+		lines: [
+			[0, "push(1)"],
+			[0, "push(2)"],
+			[0, "pop()"],
+		],
+	});
 	await db.exam.create(
 		{
 			course,
@@ -3739,6 +3778,9 @@ async function seedReleasedExam(
 				{ slug: "factorial-of-five", version: "v1" },
 				{ slug: "stack-top", version: "v1" },
 				{ slug: essay, version: "v1" },
+				{ slug: "stack-underflow-name", version: "v1" },
+				{ slug: "stack-ops-blanks", version: "v1" },
+				{ slug: "stack-sequence", version: "v1" },
 			],
 		},
 		FULL_ACCESS,
@@ -3828,6 +3870,23 @@ async function seedReleasedExam(
 	const submissions: Record<string, Record<string, string>> = {};
 	for (const [index, student] of students.entries()) {
 		const answers: SeededAnswers = Object.fromEntries(rows[index] ?? []);
+		// Hopper writes the right idea in other words; the seventh student leaves it blank.
+		if (index === 0) answers["stack-underflow-name"] = "empty stack error";
+		else if (index !== 6) answers["stack-underflow-name"] = "underflow";
+		answers["stack-ops-blanks"] =
+			index === 1 ? { end: "head", count: 1 } : { end: "top", count: 1 };
+		answers["stack-sequence"] =
+			index === 7
+				? [
+						[0, "pop()"],
+						[0, "push(2)"],
+						[0, "push(1)"],
+					]
+				: [
+						[0, "push(1)"],
+						[0, "push(2)"],
+						[0, "pop()"],
+					];
 		const text = essays[student.username];
 		if (text) answers[essay] = text;
 		submissions[student.username] = await answerExam(
@@ -3880,6 +3939,77 @@ async function seedReleasedExam(
 		},
 		FULL_ACCESS,
 	);
+	// Changes by hand on objective answers, one per question type, each over the automatic grade.
+	const change = (
+		student: number,
+		question: string,
+		score: string,
+		feedback: string,
+	) =>
+		db.feedback.create(
+			{
+				submission: {
+					publicId:
+						submissions[students[student]?.username ?? ""]?.[question] ?? "",
+				},
+				ref: "manual-1",
+				score,
+				feedback,
+			},
+			{ actor: instructor },
+		);
+	await change(0, "stack-underflow-name", "1", "Same idea, other words.");
+	await change(1, "stack-ops-blanks", "0.75", "The head is the top here.");
+	await change(
+		6,
+		"fastest-sort",
+		"0.5",
+		"Bubble sort is not it, but the reasoning had merit.",
+	);
+	await change(6, "n-log-n", "0.25", "Named merge sort in the explanation.");
+	await change(7, "stack-facts", "0.5", "Two of three read right.");
+	await change(7, "factorial-of-five", "0.5", "4! slip, the method was right.");
+	await change(
+		7,
+		"stack-sequence",
+		"0.5",
+		"The calls are right, only reversed.",
+	);
+	// The seventh student left the short answer blank, and the instructor grades it anyway.
+	await db.manualGrade.gradeUnanswered(
+		{
+			course,
+			exam,
+			question: "stack-underflow-name",
+			author: students[6]?.username ?? "",
+			score: "0.5",
+			comment: "Said it aloud during the review.",
+		},
+		{ actor: instructor },
+	);
+	// An exam-level bonus, replacement, offsets, and a halved question.
+	const adjust = (
+		student: number,
+		op: "SET" | "FACTOR" | "OFFSET",
+		value: string,
+		extra: { question?: string; reason?: string } = {},
+	) =>
+		db.examAdjustment.create(
+			{
+				course,
+				exam,
+				usernames: [students[student]?.username ?? ""],
+				op,
+				value,
+				...extra,
+			},
+			{ actor: instructor },
+		);
+	await adjust(0, "FACTOR", "1.1", { reason: "Bônus de participação." });
+	await adjust(1, "SET", "0.7", { reason: "Nota substituída após a revisão." });
+	await adjust(6, "OFFSET", "0.1", { reason: "Pontos extras do desafio." });
+	await adjust(7, "OFFSET", "-0.05", { reason: "Atraso na entrega." });
+	await adjust(6, "FACTOR", "0.5", { question: "pivot-trap" });
 	// Sanctions go before the release, so the students see them with their grades.
 	await db.examAdjustment.create(
 		{
