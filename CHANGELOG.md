@@ -62,6 +62,8 @@
 
 ### Fixed
 
+- A tabela de notas mostra a célula vazia, e não "Pending", para uma prova
+  sem questões.
 - `DELETE` de um curso que ainda tem provas, senhas de matrícula ou vínculos
   de questão responde 409 em vez de 500. O curso vazio continua sendo apagado.
 - `ch push` não publica mais `__pycache__/`, `*.pyc`, `elm-stuff/` e

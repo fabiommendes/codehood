@@ -174,6 +174,8 @@ export function gradesTable(
 				return { kind: examPhase(own, now) === "closed" ? "missed" : "empty" };
 			}
 			if (row.state === "in-progress") return { kind: "in-progress" };
+			// No questions, nothing to grade: not pending work.
+			if (row.pending === 0 && row.total === null) return { kind: "empty" };
 			return row.pending === 0 && row.total !== null
 				? {
 						kind: "total",

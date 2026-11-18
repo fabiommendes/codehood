@@ -15,13 +15,6 @@ Encontrados percorrendo todas as páginas como aluno, professor e admin, em
 
 ## Correção
 
-### Tabela de notas mostra "Pending" para prova sem questões
-
-- Obtido: `totalOf` devolve `null` quando não há questões
-  (`src/services/exam-result.ts:171`), e a tabela trata `null` como pendente
-  (`src/services/grades-table.ts:161-163`).
-- Esperado: a célula não sugere trabalho que não existe.
-
 ### Coluna que ninguém fez vira "no average · 0 of 4" e "Missed"
 
 - Obtido: o cabeçalho mostra "no average · 0 of N"

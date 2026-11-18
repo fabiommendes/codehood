@@ -345,6 +345,15 @@ test("gradesTable: a closed attempt with a pending answer is a pending cell", ()
 	expect(cells).toEqual([{ kind: "pending" }]);
 });
 
+test("gradesTable: an attempt at an exam with no questions is an empty cell, not a pending one", () => {
+	const cells = cellsOf(
+		[exam("e1", { questions: [] })],
+		[sat("e1", "ana", {})],
+	);
+
+	expect(cells).toEqual([{ kind: "empty" }]);
+});
+
 test("gradesTable: an attempt that still accepts answers on an open exam is an in-progress cell", () => {
 	const cells = cellsOf(
 		[exam("e1", { status: "ONGOING" })],
