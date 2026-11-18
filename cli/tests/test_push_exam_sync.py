@@ -163,6 +163,7 @@ def read_exam(payload: Payload, status: str = "SCHEDULED") -> generated.Exam:
             "allowCodeRun": payload["allowCodeRun"],
             "answerHistory": None,
             "gradesReleasedAt": None,
+            "questionsFrozenAt": None,
             "author": "ada",
             "rev": "v1:abc",
             "tags": sorted(payload["tags"]),  # type: ignore[type-var]

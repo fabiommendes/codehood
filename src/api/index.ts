@@ -202,6 +202,29 @@ export const examReleaseApi = POST(
 	},
 );
 
+export const examAttemptQuestionsApi = GET(
+	"/api/course/[discipline]/[course]/exam/[slug]/questions",
+	{
+		out: schema.attemptQuestionsSchema,
+		summary: "Read the questions of the caller's own attempt at an exam.",
+		description:
+			"Answers the questions the exam grant lets the caller read, in exam order, at the version pinned for the attempt. A caller with no attempt to read through, such as a student who has not started, an exam that is not open or a classmate, gets 404.",
+		operationId: "examAttemptQuestions",
+		tags: ["Exams"],
+		handler: async ({ actor, params }) => {
+			const found = await db.examQuestion.forAttempt(
+				{ course: parseCourseParams(params), exam: params.slug as string },
+				{ actor },
+			);
+			if (!found)
+				throw new NotFound("exam", {
+					context: { course: String(params.course), slug: String(params.slug) },
+				});
+			return found;
+		},
+	},
+);
+
 export const examExceptionApi = CRUD(
 	"/api/course/[discipline]/[course]/exam/[slug]/exception",
 	{
