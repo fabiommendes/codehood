@@ -140,6 +140,8 @@ export function adjust(
 		op?: "SET" | "FACTOR" | "OFFSET";
 		value?: string;
 		reason?: string;
+		/// The slug of the question the adjustment hits, instead of the whole exam.
+		question?: string;
 	} = {},
 ) {
 	return db.examAdjustment.create(
@@ -150,6 +152,7 @@ export function adjust(
 			op: extra.op ?? "OFFSET",
 			value: extra.value ?? "0.1",
 			reason: extra.reason ?? "Arranged by the test",
+			...(extra.question ? { question: extra.question } : {}),
 		},
 		{ actor: world.teacher },
 	);

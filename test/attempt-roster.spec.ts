@@ -21,8 +21,14 @@ function student(username: string, overrides: Partial<Student> = {}): Student {
 	};
 }
 
+/// An attempt row that may carry who created the attempt, which only an instructor's empty attempt has.
+type RowWithCreator = AttemptRow & { createdBy?: string | null };
+
 /// The attempt of `author`: closed, nothing pending, graded 80%, unless `overrides` say otherwise.
-function row(author: string, overrides: Partial<AttemptRow> = {}): AttemptRow {
+function row(
+	author: string,
+	overrides: Partial<RowWithCreator> = {},
+): RowWithCreator {
 	return {
 		author,
 		name: author,
@@ -175,6 +181,34 @@ test.describe("attemptRoster", () => {
 		const result = attemptRoster(students, rows, NOBODY);
 
 		expect(result.map((r) => r.username)).toEqual(["ana"]);
+	});
+
+	test("an empty attempt the instructor created, with no active adjustment, is `none`", () => {
+		const rows = [
+			row("ana", { createdBy: "prof", answered: 0, total: 0, pending: 0 }),
+		];
+
+		const [ana] = attemptRoster([student("ana")], rows, NOBODY);
+
+		expect(ana?.status).toBe("none");
+	});
+
+	test("an empty attempt the instructor created, with an active adjustment, is `adjusted`", () => {
+		const rows = [
+			row("ana", { createdBy: "prof", answered: 0, total: 0.7, pending: 0 }),
+		];
+
+		const [ana] = attemptRoster([student("ana")], rows, new Set(["ana"]));
+
+		expect(ana).toMatchObject({ status: "adjusted", total: 0.7 });
+	});
+
+	test("an attempt the student made, with no answer and no adjustment, is still `submitted`", () => {
+		const rows = [row("ana", { createdBy: null, answered: 0, total: 0 })];
+
+		const [ana] = attemptRoster([student("ana")], rows, NOBODY);
+
+		expect(ana?.status).toBe("submitted");
 	});
 
 	test("an empty class has an empty roster", () => {

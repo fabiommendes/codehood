@@ -124,4 +124,86 @@ for (const [label, path, rowOf] of TABLES) {
 		await expect(penalty).toHaveText("50%");
 		expect(await colorOf(bonus)).not.toBe(await colorOf(penalty));
 	});
+
+	test(`${label}: a question penalty alone strikes the total with no adjustment and links to the adjustments`, async ({
+		page,
+	}) => {
+		const w = await world(page, `tbl-question-${path}`);
+		await adjust(w, [w.davi.username], {
+			op: "FACTOR",
+			value: "0.5",
+			question: "q-one",
+		});
+
+		await open(page, w);
+
+		const davi = rowOf(page, "Davi Rocha");
+		await expect(davi.getByRole("deletion")).toHaveText("100%");
+		await expect(davi.getByRole("insertion")).toHaveText("88%");
+		await expect(
+			davi.getByRole("link", { name: "Adjustments" }),
+		).toHaveAttribute("href", `${w.examUrl}/adjustments`);
+		await expect(rowOf(page, "Fabio Reis").getByRole("deletion")).toHaveCount(
+			0,
+		);
+	});
+
+	test(`${label}: a question penalty with an exam bonus strikes the total with no adjustment at all`, async ({
+		page,
+	}) => {
+		const w = await world(page, `tbl-mix-${path}`);
+		await adjust(w, [w.davi.username], {
+			op: "FACTOR",
+			value: "0.4",
+			question: "q-one",
+		});
+		await adjust(w, [w.davi.username]);
+		await adjust(w, [w.davi.username], { op: "OFFSET", value: "0.05" });
+
+		await open(page, w);
+
+		const davi = rowOf(page, "Davi Rocha");
+		await expect(davi.getByRole("deletion")).toHaveText("100%");
+		await expect(davi.getByRole("insertion")).toHaveText("100%");
+	});
 }
+
+test("a bonus total is not in the colour of a penalty, the `text-error` one", async ({
+	page,
+}) => {
+	const w = await world(page, "tbl-bonus-colour");
+	await adjust(w, [w.ana.username]);
+	await page.goto(`${w.examUrl}/results`);
+
+	const error = await page.evaluate(() => {
+		const probe = document.createElement("span");
+		probe.className = "text-error";
+		probe.textContent = "x";
+		document.body.append(probe);
+		const color = getComputedStyle(probe).color;
+		probe.remove();
+		return color;
+	});
+	const bonus = resultsRow(page, "Ana Prado").getByRole("insertion");
+
+	await expect(bonus).toHaveText("60%");
+	expect(await colorOf(bonus)).not.toBe(error);
+});
+
+test("the attempt page summary keeps the question penalties in the original total", async ({
+	page,
+}) => {
+	const w = await world(page, "tbl-summary");
+	await adjust(w, [w.davi.username], {
+		op: "FACTOR",
+		value: "0.4",
+		question: "q-one",
+	});
+	await adjust(w, [w.davi.username]);
+
+	await page.goto(`${w.examUrl}/attempts/${w.davi.username}`);
+
+	const summary = page.getByRole("region", { name: "Grade adjustments" });
+	await expect(summary).toContainText(/Original total\s*85%/);
+	await expect(summary).toContainText(/Final total\s*95%/);
+});
