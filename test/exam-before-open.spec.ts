@@ -1,7 +1,9 @@
 import { expect, test } from "@playwright/test";
 import { FULL_ACCESS } from "@/auth/actor";
 import { db } from "@/db";
+import { prisma } from "@/db/client";
 import { persistedOpenExam } from "@/fixtures/exam.factory";
+import { persistedResponseFactory } from "@/fixtures/response.factory";
 import {
 	actorOf,
 	enroll,
@@ -109,13 +111,50 @@ test("a student with a later scheduled exception sees nothing of the exam while 
 	}
 });
 
-test("a student sees the preamble and the questions once the exam opened for them, and after it closed", async () => {
-	for (const scheduledAt of [fromNow(-10), fromNow(-5 * 60)]) {
-		const w = await world(scheduledAt);
-		for (const exam of await readsOf(w, w.student)) {
-			expect(exam?.preamble).toBe(PREAMBLE);
-			expect(slugsOf(exam)).toEqual(w.slugs);
-		}
+/// Opens an attempt of the student of `w` at its exam.
+const attempt = (w: World, author = w.student) =>
+	persistedResponseFactory.create({
+		course: w.course.id,
+		exam: w.exam.slug,
+		author: author.username,
+	});
+
+test("a student sees the preamble of an open exam, and the questions only once they have an attempt", async () => {
+	const w = await world(fromNow(-10));
+
+	for (const exam of await readsOf(w, w.student)) {
+		expect(exam?.preamble).toBe(PREAMBLE);
+		expect(exam?.questions).toEqual([]);
+	}
+
+	await attempt(w);
+
+	for (const exam of await readsOf(w, w.student)) {
+		expect(exam?.preamble).toBe(PREAMBLE);
+		expect(slugsOf(exam)).toEqual(w.slugs);
+	}
+	for (const exam of await readsOf(w, w.classmate)) {
+		expect(exam?.preamble).toBe(PREAMBLE);
+		expect(exam?.questions).toEqual([]);
+	}
+});
+
+test("after the exam closed, a student without an attempt sees the preamble, and the questions only once the grades are released", async () => {
+	const w = await world(fromNow(-5 * 60));
+
+	for (const exam of await readsOf(w, w.student)) {
+		expect(exam?.preamble).toBe(PREAMBLE);
+		expect(exam?.questions).toEqual([]);
+	}
+
+	await prisma.exam.update({
+		where: { id: w.exam.id },
+		data: { gradesReleasedAt: fromNow(-60) },
+	});
+
+	for (const exam of await readsOf(w, w.student)) {
+		expect(exam?.preamble).toBe(PREAMBLE);
+		expect(slugsOf(exam)).toEqual(w.slugs);
 	}
 });
 
@@ -133,6 +172,14 @@ test("an exception that brings the exam forward opens it for that student only",
 	);
 
 	for (const exam of await readsOf(w, w.student)) {
+		expect(exam?.preamble).toBe(PREAMBLE);
+		expect(exam?.questions).toEqual([]);
+	}
+
+	await attempt(w);
+
+	for (const exam of await readsOf(w, w.student)) {
+		expect(exam?.preamble).toBe(PREAMBLE);
 		expect(slugsOf(exam)).toEqual(w.slugs);
 	}
 	for (const exam of await readsOf(w, w.classmate)) {
@@ -152,4 +199,70 @@ test("the instructor and SYSTEM always see the preamble and the questions", asyn
 		expect(exam?.preamble).toBe(PREAMBLE);
 		expect(slugsOf(exam)).toEqual(w.slugs);
 	}
+});
+
+test("a student gets the questions of an exam only with an attempt or a release, and the instructor always", async () => {
+	const { course, instructor } = await makeCourse();
+	const student = await enroll(course.id);
+	const questions = [
+		await makeQuestion(course.id),
+		await makeQuestion(course.id),
+	];
+	const slugs = questions.map((q) => q.slug).sort();
+	const exam = (fields: Parameters<typeof persistedOpenExam>[2]) =>
+		persistedOpenExam(course.id, slugs, {
+			slug: tag("exam-"),
+			type: "EXAM",
+			duration: { minutes: 60 },
+			...fields,
+		});
+	const a = await exam({ scheduledAt: fromNow(-10), preamble: PREAMBLE });
+	const b = await exam({ scheduledAt: fromNow(-10) });
+	const c = await exam({ scheduledAt: fromNow(-10) });
+	const d = await exam({ scheduledAt: fromNow(-10) });
+	const e = await exam({ status: "SCHEDULED", scheduledAt: fromNow(24 * 60) });
+	await persistedResponseFactory.create({
+		course: course.id,
+		exam: b.slug,
+		author: student.username,
+	});
+	for (const closed of [c, d]) {
+		await db.exam.close(
+			{ course: course.id, slug: closed.slug },
+			{ actor: instructor },
+		);
+	}
+	await prisma.exam.update({
+		where: { id: c.id },
+		data: { gradesReleasedAt: fromNow(-1) },
+	});
+
+	const byStudent = await db.exam.findMany(
+		{ course: course.id },
+		actorOf(student),
+	);
+	const byInstructor = await db.exam.findMany(
+		{ course: course.id },
+		actorOf(instructor),
+	);
+	const ofList = (list: typeof byStudent, slug: string) =>
+		list.find((x) => x.slug === slug);
+	const expected = [
+		[a, []],
+		[b, slugs],
+		[c, slugs],
+		[d, []],
+		[e, []],
+	] as const;
+
+	for (const [created, visible] of expected) {
+		const one = await db.exam.findOne(
+			{ course: course.id, slug: created.slug },
+			actorOf(student),
+		);
+		expect(slugsOf(ofList(byStudent, created.slug))).toEqual(visible);
+		expect(slugsOf(one)).toEqual(visible);
+		expect(slugsOf(ofList(byInstructor, created.slug))).toEqual(slugs);
+	}
+	expect(ofList(byStudent, a.slug)?.preamble).toBe(PREAMBLE);
 });

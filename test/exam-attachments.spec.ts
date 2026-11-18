@@ -9,6 +9,7 @@ import { isoDate } from "@/core/schemas/base";
 import type { questionSchema } from "@/core/schemas/question";
 import { db } from "@/db";
 import { prisma } from "@/db/client";
+import { persistedResponseFactory } from "@/fixtures/response.factory";
 import { persistedUserFactory } from "@/fixtures/user.factory";
 
 type Doc = z.infer<typeof questionSchema>["question"];
@@ -597,7 +598,7 @@ test("B15: replacing a file on an open exam makes the old name 404 and the new o
 	expect(Buffer.from(served.bytes)).toEqual(c.bytes);
 });
 
-test("B16: a question attachment is served from the version the exam pins, behind the window", async () => {
+test("B16: a question attachment is served from the version the exam pins, to a student with an attempt, behind the window", async () => {
 	const ctx = await setup();
 	const h1 = filesFor("data.csv");
 	const h2 = filesFor("data.csv", "new.csv");
@@ -636,6 +637,15 @@ test("B16: a question attachment is served from the version the exam pins, behin
 		actor = ctx.student,
 	) => db.exam.questionAttachment(pk(ctx, exam), question, name, { actor });
 
+	await expect(get("pinned", "q", "data.csv")).rejects.toBeInstanceOf(NotFound);
+	for (const exam of ["pinned", "latest"]) {
+		await persistedResponseFactory.create({
+			course: ctx.course.id,
+			exam,
+			author: ctx.student.username,
+		});
+	}
+
 	expect(Buffer.from((await get("pinned", "q", "data.csv")).bytes)).toEqual(v1);
 	await expect(get("pinned", "q", "new.csv")).rejects.toMatchObject({
 		status: 404,
@@ -653,6 +663,53 @@ test("B16: a question attachment is served from the version the exam pins, behin
 	await expect(
 		get("latest", "q", "data.csv", ctx.outsider),
 	).rejects.toMatchObject({ status: 404 });
+});
+
+test("B16: an attempt, and not the open window, lets a student download the attachment of a question", async () => {
+	const ctx = await setup();
+	const classmate = await enroll(ctx.course.id);
+	const h1 = filesFor("data.csv");
+	const h2 = filesFor("data.csv");
+	await createQuestion(ctx, "q", [
+		{ version: "v1", entries: h1.write.attachments, write: h1.write },
+	]);
+	const own = filesFor("brief.csv");
+	await createExam(ctx, {
+		questions: [{ slug: "q", version: null }],
+		...own.write,
+	});
+	const get = (actor: { username: string } | Ctx["instructor"]) =>
+		db.exam.questionAttachment(pk(ctx), "q", "data.csv", {
+			actor: actor as Ctx["instructor"],
+		});
+	const b1 = h1.made[0]?.bytes as Buffer;
+
+	await expect(get(ctx.student)).rejects.toBeInstanceOf(NotFound);
+	const ownFile = await db.exam.attachment(pk(ctx), "brief.csv", {
+		actor: ctx.student as Ctx["instructor"],
+	});
+	expect(Buffer.from(ownFile.bytes)).toEqual(own.made[0]?.bytes);
+
+	await persistedResponseFactory.create({
+		course: ctx.course.id,
+		exam: "ex1",
+		author: ctx.student.username,
+	});
+	await db.question.update(
+		{ course: ctx.course.id, slug: "q" },
+		{
+			version: "v2",
+			question: docWith(...h2.write.attachments),
+			files: h2.write.files,
+			blobs: h2.write.blobs,
+		},
+		ctx.opts,
+	);
+
+	expect(Buffer.from((await get(ctx.student)).bytes)).toEqual(b1);
+	await expect(get(classmate)).rejects.toBeInstanceOf(NotFound);
+	// The attempt froze v1 into the exam, so the instructor reads it too.
+	expect(Buffer.from((await get(ctx.instructor)).bytes)).toEqual(b1);
 });
 
 test("B16: names with a literal percent, unicode and case come back with the exact filename", async () => {

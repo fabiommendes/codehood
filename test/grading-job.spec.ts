@@ -80,7 +80,11 @@ async function pushCode(course: CourseId, meta: Meta = {}) {
 
 /// A course with its instructor, an enrolled student, a code question, an exam and the student's response.
 async function world(
-	opts: { meta?: Meta; examType?: "EXAM" | "QUIZ" | "PRACTICE" } = {},
+	opts: {
+		meta?: Meta;
+		examType?: "EXAM" | "QUIZ" | "PRACTICE";
+		exam?: Parameters<typeof makeExam>[1];
+	} = {},
 ) {
 	const { course, instructor } = await makeCourse();
 	const student = await enroll(course.id);
@@ -88,6 +92,7 @@ async function world(
 	const exam = await makeExam(course.id, {
 		questions: [{ slug: question }],
 		...(opts.examType ? { type: opts.examType } : {}),
+		...opts.exam,
 	});
 	const response = await persistedResponseFactory.create({
 		course: course.id,
@@ -1137,6 +1142,84 @@ test("forStudent: with a single attempt in an exam, the score waits for the rele
 	expect(shown).not.toHaveProperty("score");
 	expect(shown).not.toHaveProperty("items");
 	expect(shown?.publicCases).toHaveLength(1);
+});
+
+test("forStudent: a quiz is released once every exception of the course has ended, and an archived exam gives no report", async () => {
+	const w = await world({
+		examType: "QUIZ",
+		meta: { attempts: 1 },
+		exam: {
+			scheduledAt: new Date(Date.now() - 10 * 60_000),
+			duration: { minutes: 60 },
+		},
+	});
+	const classmate = await enroll(w.course.id);
+	await db.examException.create(
+		{
+			course: w.course.id,
+			exam: w.exam.slug,
+			username: classmate.username,
+			extraTime: { minutes: 0 },
+			scheduledAt: new Date(Date.now() + 60 * 60_000),
+		},
+		FULL_ACCESS,
+	);
+	await sentBy(w, "DONE", GRADED);
+	await db.exam.close(
+		{ course: w.course.id, slug: w.exam.slug },
+		actorOf(w.instructor),
+	);
+
+	const held = await db.gradingJob.forStudent(lookup(w), asStudent(w));
+	expect(held.submissions[0]?.report?.outcome).toBe("graded");
+	expect(held.submissions[0]?.report).not.toHaveProperty("score");
+
+	await prisma.examException.update({
+		where: {
+			examId_username: { examId: w.exam.id, username: classmate.username },
+		},
+		data: { scheduledAt: new Date(Date.now() - 3 * 60 * 60_000) },
+	});
+	const released = await db.gradingJob.forStudent(lookup(w), asStudent(w));
+	expect(released.submissions[0]?.report).toMatchObject({ score: 0.75 });
+
+	await prisma.exam.update({
+		where: { id: w.exam.id },
+		data: { status: "ARCHIVED" },
+	});
+	const archived = await db.gradingJob.forStudent(lookup(w), asStudent(w));
+	expect(archived.submissions).toHaveLength(1);
+	expect(archived.submissions[0]?.report).toBeUndefined();
+});
+
+test("forStudent: the simulation of the instructor releases its report as practice", async () => {
+	const w = await world({ meta: { attempts: 1 } });
+	const simulation = await db.response.create(
+		{
+			course: w.course.id,
+			exam: w.exam.slug,
+			author: w.instructor.username,
+		},
+		actorOf(w.instructor),
+	);
+	const row = await prisma.response.findUniqueOrThrow({
+		where: { publicId: simulation.publicId },
+	});
+	const sub = await enqueue({ ...w, responseId: row.id }, { state: "DONE" });
+	await prisma.submission.update({
+		where: { publicId: sub },
+		data: { runnerReport: GRADED as never },
+	});
+
+	const view = await db.gradingJob.forStudent(
+		{ response: simulation.publicId, question: w.question },
+		actorOf(w.instructor),
+	);
+
+	expect(view.submissions[0]?.report).toMatchObject({
+		outcome: "graded",
+		score: 0.75,
+	});
 });
 
 test("forStudent: a student sees only their own submissions", async () => {
