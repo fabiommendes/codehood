@@ -190,3 +190,73 @@ test("IndexedDB revoke fences every old handle across pages without erasing a fr
 		.soft(remaining.independent, "other prefix is unaffected")
 		.toEqual(expected);
 });
+
+test("IndexedDB revoke that fails can be retried and then erases the records", async ({
+	page,
+}) => {
+	await page.goto("/");
+	await page.addScriptTag({ content: browserBundle });
+	const outcome = await page.evaluate(
+		async ({ prefix, ref, initial, now }) => {
+			let failing = false;
+			/// Wraps the real factory so every transaction throws while `failing`.
+			const flaky = {
+				open(name: string, version?: number) {
+					const request = indexedDB.open(name, version);
+					return new Proxy(request, {
+						get(target, key) {
+							if (key !== "result") return Reflect.get(target, key);
+							const database = target.result as IDBDatabase;
+							return new Proxy(database, {
+								get(db, member) {
+									if (member === "transaction")
+										return (
+											...args: Parameters<IDBDatabase["transaction"]>
+										) => {
+											if (failing) throw new Error("injected failure");
+											return db.transaction(...args);
+										};
+									const value = Reflect.get(db, member);
+									return typeof value === "function" ? value.bind(db) : value;
+								},
+							});
+						},
+						set(target, key, value) {
+							return Reflect.set(target, key, value);
+						},
+					});
+				},
+				cmp: (a: unknown, b: unknown) => indexedDB.cmp(a, b),
+				databases: () => indexedDB.databases(),
+			} as unknown as IDBFactory;
+			const store = await window.answerEditStorage.openIndexedDbEditStore({
+				ownerId: "carol",
+				indexedDB: flaky,
+				databasePrefix: prefix,
+			});
+			await store.commit(ref, initial, null);
+			failing = true;
+			const first = await store.revoke().then(
+				() => "resolved",
+				() => "rejected",
+			);
+			failing = false;
+			const second = await store.revoke().then(
+				() => "resolved",
+				() => "rejected",
+			);
+			const fresh = await window.answerEditStorage.openIndexedDbEditStore({
+				ownerId: "carol",
+				indexedDB,
+				databasePrefix: prefix,
+			});
+			return { first, second, left: await fresh.read(ref, now) };
+		},
+		{ prefix: `${PREFIX}-retry`, ref: REF, initial: INITIAL, now: NOW },
+	);
+	expect(outcome).toEqual({
+		first: "rejected",
+		second: "resolved",
+		left: null,
+	});
+});

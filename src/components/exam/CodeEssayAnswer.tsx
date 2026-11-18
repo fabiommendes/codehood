@@ -91,6 +91,8 @@ export interface CodeEssayAnswerProps {
  */
 export function CodeEssayAnswer(props: CodeEssayAnswerProps): JSX.Element {
 	let store: DraftStore | null = null;
+	/// Whether the conflicting draft is newer than the saved answer, so the page already holds the draft as the answer.
+	let draftIsNewer = false;
 	const [conflict, setConflict] = createSignal<CodeDraft | null>(null);
 	const [checked, setChecked] = createSignal(false);
 	const [generation, setGeneration] = createSignal(1);
@@ -121,6 +123,7 @@ export function CodeEssayAnswer(props: CodeEssayAnswerProps): JSX.Element {
 		);
 		if (found.kind === "same") store?.remove(props.draft);
 		if (found.kind === "conflict" && draft) {
+			draftIsNewer = found.newer === "draft";
 			setConflict(draft);
 			props.onConflict({ newer: found.newer, draftCode: draft.code });
 		}
@@ -152,6 +155,8 @@ export function CodeEssayAnswer(props: CodeEssayAnswerProps): JSX.Element {
 
 	function useServer(): void {
 		store?.remove(props.draft);
+		// The page took the newer draft as the answer, and may have saved it.
+		if (draftIsNewer) props.onChange(props.value);
 		restart(props.value);
 		setConflict(null);
 		props.onConflict(null);

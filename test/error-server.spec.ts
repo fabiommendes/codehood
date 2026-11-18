@@ -1,5 +1,5 @@
 import { expect, test } from "@playwright/test";
-import { NotFound, RuleViolation } from "@/core/error";
+import { FieldError, NotFound, RuleViolation } from "@/core/error";
 import { responseFromException } from "@/core/error-server";
 import { m } from "@/i18n";
 
@@ -41,11 +41,33 @@ test.describe("responseFromException in production", () => {
 		expect(response).toMatchObject({ code: "internal-error", status: 500 });
 	});
 
+	test("a field error becomes a 400 on its field, and is not logged", () => {
+		const response = responseFromException(
+			new FieldError("slug", "The slug is taken"),
+			true,
+		);
+		expect(response).toMatchObject({
+			code: "invalid-data",
+			status: 400,
+			message: "slug: The slug is taken",
+			errors: { slug: [{ code: "invalid", message: "The slug is taken" }] },
+		});
+		expect(logged).toEqual([]);
+	});
+
 	test("a user-facing error keeps its status and message", () => {
 		const error = new NotFound("course", { message: "No such course" });
 		const response = responseFromException(error, true);
 		expect(response).toMatchObject({ status: 404, message: "No such course" });
 	});
+});
+
+test("outside production a field error is also a 400", () => {
+	const response = responseFromException(
+		new FieldError("slug", "Taken"),
+		false,
+	);
+	expect(response).toMatchObject({ code: "invalid-data", status: 400 });
 });
 
 test("outside production a generic exception keeps its message", () => {

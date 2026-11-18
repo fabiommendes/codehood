@@ -804,14 +804,14 @@ export default function ExamAttempt(props: ExamAttemptProps): JSX.Element {
 		browserDraftStore().clearExam(exam);
 	}
 
-	/// Removes the local drafts that match the saved answer, and keeps those that differ, which may be the only copy.
+	/// Removes the local drafts that match the current answer, and keeps those that differ, which may be the only copy.
 	function clearSettledDrafts(): void {
 		if (!props.username) return;
 		const store = browserDraftStore();
 		for (const entry of props.questions) {
 			const ref = draftRef(entry.slug);
 			const draft = store.read(ref, serverNow().getTime());
-			const saved = props.answers[entry.slug];
+			const saved = answers()[entry.slug];
 			const at = props.answeredAt?.[entry.slug];
 			const found = compareDraft(
 				draft,
@@ -933,7 +933,7 @@ export default function ExamAttempt(props: ExamAttemptProps): JSX.Element {
 				else if (error) setFailure(errorMessage(error));
 				// The server decides what follows: awaiting grading, or the results.
 				else {
-					clearDrafts();
+					clearSettledDrafts();
 					await settleHistory(historyFlushed);
 					window.location.reload();
 				}
@@ -1006,7 +1006,7 @@ export default function ExamAttempt(props: ExamAttemptProps): JSX.Element {
 		setClosing(true);
 		flushHistoryNow();
 		void flushUntilGraceEnds(limit).then((saved) => {
-			if (saved) clearDrafts();
+			if (saved) clearSettledDrafts();
 			else setUndelivered(unsavedNumbers());
 			setKind("submitted");
 			if (props.preview) void closePreview();

@@ -84,6 +84,17 @@
   tudo. Enviar uma resposta, ou consultar os envios, de uma questão que não
   está na prova dá o mesmo "não encontrado" de uma questão que não existe, e
   o slug deixa de ser ecoado, então não dá para sondar slugs de rascunho.
+- A API REST responde 400 (`invalid-data`, com o erro no campo) quando um
+  Service rejeita o valor de um campo, como o slug repetido de uma disciplina.
+  Antes respondia 500.
+- Monitor de edição: repetir o logout depois de uma falha na revogação do
+  IndexedDB tenta de novo, em vez de devolver a mesma rejeição.
+- Prova: enviar de uma aba que não viu uma edição não apaga mais o rascunho
+  que outra aba da mesma prova guarda; só saem os rascunhos iguais à resposta
+  confirmada.
+- Prova de código: depois que o salvamento automático a 10 s do prazo grava o
+  rascunho, "Usar a versão do servidor" também grava a versão do servidor.
+  Antes a tela mostrava uma coisa e a entrega guardava outra.
 - No tablet e no celular, o breadcrumb ficava por cima da gaveta de
   navegação aberta.
 
