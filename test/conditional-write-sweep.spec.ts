@@ -822,7 +822,6 @@ const UNGUARDED: Record<string, string> = {
 			"exam.questionAttachment",
 			"report.countOpen",
 			"rubric.preview",
-			"question.codeAnswer",
 			"question.tags",
 		].map((op) => [op, "reads"]),
 	),

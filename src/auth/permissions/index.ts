@@ -5,7 +5,7 @@ import type { Role } from "@/db/client";
 type UserId = schema.UserId;
 
 import { NotAllowed } from "@/core/error";
-import { type QuestionStatus, visibility } from "@/services/question-status";
+import type { QuestionStatus } from "@/services/question-status";
 import type { Assert, AssertNever, NotNever, Pretty } from "@/typing";
 import type { JSONObject, JSONValue } from "@/typing/concrete-types";
 import type {
@@ -156,16 +156,12 @@ export type InviteTarget = { id?: number; createdBy: UserTarget };
  * The shape the `question.read`/`question.read-public` permissions need from
  * a loaded question row. `id` is only used for auditing.
  *
- * `course` accepts either course shape: `question.read` only ever checks
- * ownership, so a bare {@link CourseTarget} is enough; `question.read-public`
- * additionally checks course-contents visibility, which needs the
- * enrollments {@link CourseWithEnrollment} carries.
+ * `course` accepts either course shape: both permissions only check
+ * ownership, so a bare {@link CourseTarget} is enough.
  */
 export interface QuestionWithCourse {
 	id?: number;
 	status: QuestionStatus;
-	/// Whether an exam holding the question is open for the actor or has closed; `false` when left out.
-	released?: boolean;
 	course: CourseTarget | CourseWithEnrollment;
 }
 
@@ -411,19 +407,10 @@ const PERMISSIONS = {
 		audit: auditQuestion,
 	} satisfies PermDef<QuestionWithCourse>,
 
-	// Rule: the public half goes to whoever `visibility` gives the full
-	// document or the public half: the author, and a course member once an
-	// exam holding the question has opened for them. Everyone else is refused
-	// or sees nothing. `target.released` says whether such an exam exists.
+	// Rule: the public half goes to the author alone, who may ask for it with
+	// `filter.public`. A student reads an exam question through its grant.
 	"question.read-public": {
-		other: (actor, target) => {
-			const seen = visibility(target.status, {
-				author: isCourseOwner(actor, target.course),
-				member: courseVisible(actor, target.course),
-				released: target.released ?? false,
-			});
-			return seen === "full" || seen === "public";
-		},
+		other: (actor, target) => isCourseOwner(actor, target.course),
 		audit: auditQuestion,
 	} satisfies PermDef<QuestionWithCourse>,
 
@@ -618,18 +605,6 @@ function isEnrolled(actor: UserActor, course: CourseWithEnrollment): boolean {
 		typeof e === "object"
 			? e.username === actor.username
 			: e === actor.username,
-	);
-}
-
-/// Whether `actor` may see `course`'s contents: an admin, its instructor, or an `ACTIVE` enrollment.
-function courseVisible(
-	actor: UserActor,
-	course: CourseTarget | CourseWithEnrollment,
-): boolean {
-	return (
-		actor.role === "ADMIN" ||
-		isCourseOwner(actor, course) ||
-		("enrollments" in course && isEnrolled(actor, course))
 	);
 }
 

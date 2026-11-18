@@ -566,7 +566,7 @@ test("A14b: `files` or `blobs` without `question` and `version` are refused, not
 // -----------------------------------------------------------------------------
 // R13: reading
 
-test("A15: a student sees no files, no origin and no hash; the author with public: true neither", async () => {
+test("A15: the author with public: true sees no files, no origin and no hash, and a student sees nothing", async () => {
 	const ctx = await setup();
 	const h1 = blob();
 	await create(ctx, docWith(NOTES, link("data.csv")), {
@@ -576,10 +576,14 @@ test("A15: a student sees no files, no origin and no hash; the author with publi
 	const pk = { course: ctx.course.id, slug: "q1" };
 	await persistedOpenExam(ctx.course.id, ["q1"]);
 
-	const views = [
+	expect(
 		await db.question.findOne({ ...pk, public: true }, { actor: ctx.student }),
-		(await db.question.findMany(pk, { actor: ctx.student }))[0],
+	).toBeNull();
+	expect(await db.question.findMany(pk, { actor: ctx.student })).toEqual([]);
+
+	const views = [
 		await db.question.findOne({ ...pk, public: true }, ctx.opts),
+		(await db.question.findMany({ ...pk, public: true }, ctx.opts))[0],
 	];
 	for (const view of views) {
 		if (!view) throw new Error("question not found");

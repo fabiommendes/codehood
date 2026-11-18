@@ -32,40 +32,24 @@ test("only an archived question refuses writes", () => {
 type Row = [
 	status: QuestionStatus,
 	relation: "author" | "member" | "outsider",
-	released: boolean,
 	expected: QuestionVisibility,
 ];
 
 const TABLE: Row[] = [
-	// The author sees everything, released or not.
-	...STATUSES.flatMap((s): Row[] => [
-		[s, "author", false, "full"],
-		[s, "author", true, "full"],
-	]),
-	// A member sees nothing of a question no open or closed exam holds...
-	["PUBLISHED", "member", false, "absent"],
-	["DRAFT", "member", false, "absent"],
-	["HIDDEN", "member", false, "absent"],
-	["ARCHIVED", "member", false, "absent"],
-	// ...and the public half once such an exam releases it, never of a draft.
-	["PUBLISHED", "member", true, "public"],
-	["HIDDEN", "member", true, "public"],
-	["ARCHIVED", "member", true, "public"],
-	["DRAFT", "member", true, "absent"],
+	// The author sees everything.
+	...STATUSES.map((s): Row => [s, "author", "full"]),
+	// A member who is not the author sees nothing: an exam question reaches a student through its grant.
+	...STATUSES.map((s): Row => [s, "member", "absent"]),
 	// An outsider is refused whatever the status, so slugs stay indistinguishable.
-	...STATUSES.flatMap((s): Row[] => [
-		[s, "outsider", false, "refused"],
-		[s, "outsider", true, "refused"],
-	]),
+	...STATUSES.map((s): Row => [s, "outsider", "refused"]),
 ];
 
-for (const [status, relation, released, expected] of TABLE) {
-	test(`visibility: ${status} ${relation}${released ? " released" : ""} is ${expected}`, () => {
+for (const [status, relation, expected] of TABLE) {
+	test(`visibility: ${status} ${relation} is ${expected}`, () => {
 		expect(
 			visibility(status, {
 				author: relation === "author",
 				member: relation !== "outsider",
-				released,
 			}),
 		).toBe(expected);
 	});

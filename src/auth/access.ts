@@ -87,27 +87,23 @@ export function requireAccess(
 }
 
 /**
- * How much of a question `actor` gets, from its status and whether an exam holding it has opened for them.
+ * How much of a question `actor` gets.
  *
  * `write` is the whole document and goes to whoever writes the course's
- * contents; `read` is the public half.
+ * contents. Anyone else in the course gets `none`, and an outsider only `see`s it.
  */
 export function questionAccess(
 	actor: Actor,
 	row: { status: QuestionStatus; course: CourseWithEnrollment },
-	released: boolean,
 ): Access {
 	switch (
 		visibility(row.status, {
 			author: hasPerm(actor, "course.update-contents", row.course),
 			member: hasPerm(actor, "course.read-contents", row.course),
-			released,
 		})
 	) {
 		case "full":
 			return "write";
-		case "public":
-			return "read";
 		case "absent":
 			return "none";
 		case "refused":

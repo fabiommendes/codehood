@@ -9,11 +9,7 @@ import { isDeepStrictEqual } from "node:util";
 import { z } from "zod";
 import { accessError, questionAccess, requireAccess } from "@/auth/access";
 import { type Actor, SYSTEM } from "@/auth/actor";
-import {
-	type CourseWithEnrollment,
-	ensurePerm,
-	hasPerm,
-} from "@/auth/permissions";
+import { ensurePerm, hasPerm } from "@/auth/permissions";
 import { generateToken } from "@/auth/token";
 import { InvalidData, NotAllowed, NotFound } from "@/core/error";
 import type { QuestionRefId } from "@/core/schemas/base";
@@ -63,8 +59,7 @@ import {
 	sameFiles,
 	serveAttachmentFile,
 } from "@/services/attachment-files";
-import { attachmentsOpen, hiddenExamStatuses } from "@/services/exam-state";
-import { type QuestionStatus, writable } from "@/services/question-status";
+import { writable } from "@/services/question-status";
 import type { JSONValue } from "@/typing/concrete-types";
 import {
 	cutPage,
@@ -76,22 +71,15 @@ import {
 	scanDirection,
 	seekOf,
 } from "@/utils/cursor";
-import { type PretestSource, pretestSources } from "@/utils/pretest-sources";
 import {
 	type Prisma,
 	type PrismaClient,
 	type PrismaTx,
 	prisma,
 } from "../client";
-import {
-	courseRefWhere,
-	fromMs,
-	valueOrNotAllowed,
-	valueOrNotFound,
-} from "../utils";
+import { courseRefWhere, valueOrNotAllowed, valueOrNotFound } from "../utils";
 import type { AttachmentService } from "./attachment.service";
 import type { BlobService } from "./blob.service";
-import { courseContentsWhere } from "./course.service";
 
 export { questionStatus, questionType } from "@/core/schemas/question";
 export type { QuestionRefId };
@@ -286,13 +274,9 @@ const buildQuestionService = (deps: Deps) =>
 				if (!row) return null;
 
 				// An outsider is refused whatever the status, so a hidden slug cannot
-				// be told from a published one; a draft, hidden or archived question
-				// is missing for a non-author, unless an exam still pins it.
-				const access = questionAccess(
-					opts.actor,
-					row,
-					await isReleased(tx, row, opts.actor),
-				);
+				// be told from a published one; a course member who is not the author
+				// finds nothing: a student reads exam questions through the grant.
+				const access = questionAccess(opts.actor, row);
 				const error = accessError(access, "read", "question.read");
 				if (error instanceof NotFound) return null;
 				if (error) throw error;
@@ -333,67 +317,6 @@ const buildQuestionService = (deps: Deps) =>
 				return fromDb(
 					pinned ? { ...fullRow, latest: pinned } : (fullRow as DbQuestion),
 				);
-			},
-		});
-
-		/**
-		 * What a student's page needs to show a code question beyond its public form: the pretest sources, and whether answers go to a worker.
-		 *
-		 * Read access is the one of `findOne`, but the sources come from the private
-		 * document: only what `pretestSources` lets out leaves the service, never the
-		 * answer key or a hidden test. Any other type, or a question the actor
-		 * cannot read, has no sources and no worker.
-		 */
-		const codeAnswer = op({
-			transaction: false,
-			args: [questionFindOneFilter],
-			returns: z.object({
-				pretests: z.array(z.object({ format: z.string(), text: z.string() })),
-				sendable: z.boolean(),
-			}),
-			run: async (
-				tx: PrismaTx,
-				filter: QuestionFindOneFilter,
-				opts: ServiceOptsWithoutTx,
-			): Promise<CodeAnswerContext> => {
-				const none = { pretests: [], sendable: false };
-				const row = await tx.questionRef.findFirst({
-					where: refWhere(filter),
-					include: questionInclude(opts.actor),
-				});
-				if (!row) return none;
-				const access = questionAccess(
-					opts.actor,
-					row,
-					await isReleased(tx, row, opts.actor),
-				);
-				const error = accessError(access, "read", "question.read");
-				if (error instanceof NotFound) return none;
-				if (error) throw error;
-
-				const pinned = await findPinnedVersion(
-					tx,
-					row.id,
-					filter.version,
-					true,
-				);
-				const fullRow = valueOrNotFound(
-					"question",
-					await tx.questionRef.findUnique({
-						where: { id: row.id },
-						include: pinned
-							? { ...questionInclude(opts.actor, true), latest: false }
-							: questionInclude(opts.actor, true),
-					}),
-				);
-				const { question } = fromDb(
-					pinned ? { ...fullRow, latest: pinned } : (fullRow as DbQuestion),
-				);
-				if (question.type !== "code") return none;
-				return {
-					pretests: pretestSources(question),
-					sendable: workerColumns(question).worker !== null,
-				};
 			},
 		});
 
@@ -783,14 +706,7 @@ const buildQuestionService = (deps: Deps) =>
 					where: { publicId: pk.publicId },
 					include: questionInclude(opts.actor),
 				});
-				if (
-					!ref ||
-					questionAccess(
-						opts.actor,
-						ref,
-						await isReleased(tx, ref, opts.actor),
-					) !== "write"
-				) {
+				if (!ref || questionAccess(opts.actor, ref) !== "write") {
 					throw notFound();
 				}
 
@@ -814,7 +730,6 @@ const buildQuestionService = (deps: Deps) =>
 		return {
 			create,
 			findOne,
-			codeAnswer,
 			attachment,
 			findMany,
 			findPage,
@@ -835,12 +750,6 @@ export type LegacyUpgradeReport = {
 	upgraded: number;
 	current: number;
 	failed: { id: number; slug: string; reason: string }[];
-};
-
-/// What `codeAnswer` tells the page about a code question.
-export type CodeAnswerContext = {
-	pretests: PretestSource[];
-	sendable: boolean;
 };
 
 /// The service `buildQuestionService` makes, with `findOne` and `findMany` overloaded on `filter.public` to narrow the view they return.
@@ -913,29 +822,14 @@ export const makeQuestionService = (
 /**
  * Prisma `where` fragment implementing the same read rule as the question permissions.
  *
- * `released` holds the ids of the questions an exam has released to `actor`
- * (see `releasedRefIds`), the only ones a member reads the public half of.
+ * Only the course's instructor reads a question; a member reads exam questions through the grant.
  */
 export function questionWhere(
 	actor: Actor,
-	isPublic = false,
-	released: Iterable<number> = [],
+	_isPublic = false,
 ): Prisma.QuestionRefWhereInput {
 	if (actor === SYSTEM) return {};
-
-	const owned = { course: { instructor: { username: actor.username } } };
-	if (!isPublic) return owned;
-
-	return {
-		OR: [
-			owned,
-			{
-				status: { not: "DRAFT" },
-				id: { in: [...released] },
-				course: courseContentsWhere(actor),
-			},
-		],
-	};
+	return { course: { instructor: { username: actor.username } } };
 }
 
 /// Leaves out a question that has no version yet, which no view can show.
@@ -1049,17 +943,11 @@ async function listScope(
 		throw new NotAllowed("question.read");
 	}
 
-	const released =
-		isPublic && !full
-			? await releasedRefIds(tx, actor, {
-					questionRef: { courseId: course.id },
-				})
-			: [];
 	return {
 		isPublic,
 		where: {
 			AND: [
-				questionWhere(actor, isPublic, released),
+				questionWhere(actor, isPublic),
 				{
 					courseId: course.id,
 					...(filter.slugs ? { slug: { in: filter.slugs } } : {}),
@@ -1180,91 +1068,8 @@ async function writableRef(
 	if (!found) checkExpectedUpdatedAt(null, opts.expectedUpdatedAt);
 	const ref = valueOrNotFound("question", found);
 
-	requireAccess(
-		questionAccess(actor, ref, await isReleased(tx, ref, actor)),
-		"write",
-		action,
-		opts,
-	);
+	requireAccess(questionAccess(actor, ref), "write", action, opts);
 	return ref;
-}
-
-/// Whether `actor` reads the public half of the question as a course member: an exam holding it is open for them or has closed.
-async function isReleased(
-	tx: PrismaTx,
-	row: {
-		id: number;
-		status: QuestionStatus;
-		course: CourseWithEnrollment;
-	},
-	actor: Actor,
-): Promise<boolean> {
-	if (row.status === "DRAFT" || actor === SYSTEM) return false;
-	if (hasPerm(actor, "course.update-contents", row.course)) return false;
-	return (await releasedRefIds(tx, actor, { questionRefId: row.id })).size > 0;
-}
-
-/**
- * The ids of the questions matching `where` that an exam has released to `actor`.
- *
- * An exam releases its questions to a member of its course once it is open
- * for them, after their own exception, and keeps them released after it
- * closes. A draft or archived exam releases nothing.
- */
-async function releasedRefIds(
-	tx: PrismaTx,
-	actor: Actor,
-	where: Prisma.QuestionsForExamWhereInput,
-): Promise<Set<number>> {
-	if (actor === SYSTEM) return new Set();
-	const links = await tx.questionsForExam.findMany({
-		where: {
-			...where,
-			exam: {
-				status: { notIn: [...hiddenExamStatuses] },
-				course: courseContentsWhere(actor),
-			},
-		},
-		select: {
-			questionRefId: true,
-			exam: {
-				select: {
-					type: true,
-					status: true,
-					scheduledAt: true,
-					durationMs: true,
-					extraTimeMs: true,
-					exceptions: {
-						where: { username: actor.username },
-						select: { extraTimeMs: true, scheduledAt: true },
-					},
-				},
-			},
-		},
-	});
-	const now = new Date();
-	const released = new Set<number>();
-	for (const { questionRefId, exam } of links) {
-		const [exception] = exam.exceptions;
-		const open = attachmentsOpen(
-			{
-				type: exam.type,
-				status: exam.status,
-				scheduledAt: exam.scheduledAt,
-				duration: fromMs(exam.durationMs),
-				extraTime: fromMs(exam.extraTimeMs),
-			},
-			exception
-				? {
-						extraTime: fromMs(exception.extraTimeMs),
-						scheduledAt: exception.scheduledAt,
-					}
-				: null,
-			now,
-		);
-		if (open) released.add(questionRefId);
-	}
-	return released;
 }
 
 /**

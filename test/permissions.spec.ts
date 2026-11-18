@@ -266,38 +266,21 @@ test("question.read is exactly course.update-contents on question.course: no adm
 	expect(hasPerm(student, "question.read", question("PUBLISHED"))).toBe(false);
 });
 
-test("question.read-public grants question.read, or a course-contents viewer once an exam releases it", () => {
+test("question.read-public grants only the owning instructor", () => {
 	const course = courseFixture();
-	const draft = { status: "DRAFT" as const, released: true, course };
-	const published = { status: "PUBLISHED" as const, course };
-	const released = { status: "PUBLISHED" as const, released: true, course };
+	const question = { status: "PUBLISHED" as const, course };
+	const draft = { status: "DRAFT" as const, course };
 
-	// The owning instructor sees all, regardless of status (question.read alone grants it).
-	for (const question of [draft, published, released]) {
-		expect(hasPerm(instructor, "question.read-public", question)).toBe(true);
-	}
-
-	// An enrolled student is denied a draft, even released, and a question no
-	// open or closed exam holds.
-	expect(hasPerm(enrolledStudent, "question.read-public", draft)).toBe(false);
-	expect(hasPerm(enrolledStudent, "question.read-public", published)).toBe(
-		false,
-	);
-	// The same student is granted once an exam releases it.
-	expect(hasPerm(enrolledStudent, "question.read-public", released)).toBe(true);
-
-	// An outsider is denied either way: never enrolled, never course.read-contents.
-	for (const question of [draft, published, released]) {
-		expect(hasPerm(outsiderStudent, "question.read-public", question)).toBe(
+	for (const target of [draft, question]) {
+		expect(hasPerm(instructor, "question.read-public", target)).toBe(true);
+		expect(hasPerm(enrolledStudent, "question.read-public", target)).toBe(
 			false,
 		);
+		expect(hasPerm(outsiderStudent, "question.read-public", target)).toBe(
+			false,
+		);
+		expect(hasPerm(admin, "question.read-public", target)).toBe(false);
 	}
-
-	// A non-owning admin has course.read-contents (so a release grants it) but
-	// no question.read branch (so a draft still denies it).
-	expect(hasPerm(admin, "question.read-public", draft)).toBe(false);
-	expect(hasPerm(admin, "question.read-public", published)).toBe(false);
-	expect(hasPerm(admin, "question.read-public", released)).toBe(true);
 });
 
 test("SYSTEM bypasses every rule", () => {

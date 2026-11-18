@@ -228,15 +228,12 @@ test("questionWhere selects exactly the rows question.read and question.read-pub
 			{ ...input, status },
 			{ actor: instructorActor },
 		);
-		// An archived question is left unreleased, so both sides of the flag are covered.
-		const released = status !== "ARCHIVED";
 		rows.push({
 			id: question.id,
-			target: { id: question.id, status, released, course: courseTarget },
+			target: { id: question.id, status, course: courseTarget },
 		});
 	}
 	const ids = rows.map((r) => r.id);
-	const released = rows.filter((r) => r.target.released).map((r) => r.id);
 
 	const actors: { label: string; actor: Actor }[] = [
 		{ label: "SYSTEM", actor: SYSTEM },
@@ -249,7 +246,7 @@ test("questionWhere selects exactly the rows question.read and question.read-pub
 	const select = (isPublic: boolean) => async (actor: Actor) => {
 		const found = await prisma.questionRef.findMany({
 			where: {
-				AND: [{ id: { in: ids } }, questionWhere(actor, isPublic, released)],
+				AND: [{ id: { in: ids } }, questionWhere(actor, isPublic)],
 			},
 			select: { id: true },
 		});
@@ -274,10 +271,7 @@ test("questionWhere selects exactly the rows question.read and question.read-pub
 		actors,
 	);
 
-	// A member reads only what an exam released, and never a draft.
-	const readable = rows
-		.filter((r) => r.target.released && r.target.status !== "DRAFT")
-		.map((r) => r.id);
-	expect(await select(true)(actorOf(active))).toEqual(readable);
+	// A member who is not the author reads no question at all.
+	expect(await select(true)(actorOf(active))).toEqual([]);
 	expect(await select(true)(actorOf(dropped))).toEqual([]);
 });
