@@ -197,7 +197,14 @@ function indexedDbHandle(
 					store.put(crypto.randomUUID(), REVOCATION_KEY);
 				},
 				true,
-			).finally(() => database.close());
+			).then(
+				() => database.close(),
+				(error: unknown) => {
+					/// The connection stays open and the next call tries again.
+					revocation = undefined;
+					throw error;
+				},
+			);
 			return revocation;
 		},
 	};

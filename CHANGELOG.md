@@ -31,6 +31,8 @@
 
 ### Fixed
 
+- Monitor de edição: repetir o logout depois de uma falha na revogação do
+  IndexedDB tenta de novo, em vez de devolver a mesma rejeição.
 - Prova: enviar de uma aba que não viu uma edição não apaga mais o rascunho
   que outra aba da mesma prova guarda; só saem os rascunhos iguais à resposta
   confirmada.
