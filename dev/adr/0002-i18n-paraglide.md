@@ -2,7 +2,6 @@
 type: adr
 status: accepted
 tags: [i18n, ui, build]
-relatedTo: [specs/to-do/i18n]
 created: 2026-10-20
 decided: 2026-11-06
 deciders: [fabio, claude]
@@ -14,8 +13,7 @@ deciders: [fabio, claude]
 
 Todo texto da interface, das mensagens de erro e dos e-mails está escrito em
 inglês direto no código, e as datas usam `"en-US"` fixo. Cada instalação do
-Codehood atende a um único idioma e faz o próprio build. O detalhamento e o
-plano estão em [`dev/specs/to-do/i18n.md`](../specs/to-do/i18n.md).
+Codehood atende a um único idioma e faz o próprio build.
 
 ## Options
 
@@ -98,6 +96,33 @@ descarta os outros idiomas. Um valor fora de `locales` faz o build falhar.
 
 Datas, números e tempo relativo usam os helpers de `src/i18n/`, que passam o
 locale da instalação ao `Intl`. Ninguém escreve `"en-US"` fixo.
+
+### 5. Regras de build e lint
+
+- **R1.** Sem `CODEHOOD_LOCALE`, o idioma é `en`. Um valor fora de
+  `project.inlang/settings.json` faz o build falhar com a lista dos idiomas
+  disponíveis.
+- **R5.** `pnpm run lint` (`scripts/i18n-check.ts`) falha quando um idioma não
+  tem uma chave do idioma base, tem uma chave que o base não tem, usa
+  parâmetros diferentes numa mesma chave, quando um arquivo de `messages/` não
+  está listado em `settings.json` (o plugin não aceita glob) e quando uma chave
+  não começa com o nome da área do arquivo.
+- Acrescentar um idioma é criar `messages/<locale>/`, listá-lo em
+  `settings.json` e preencher os mapas indexados por `Locale` (o `tsc` aponta
+  quais). A tradução pt-BR segue os termos do `GLOSSARY.md`.
+
+### 6. Fora do escopo
+
+Não passam por `m.*`:
+
+- a CLI Python (`cli/`) e a saída dos comandos de `src/commands/`;
+- `src/pages/design/*` (documentação do design system) e
+  `src/pages/{api,rpc}/docs` (documentação para desenvolvedores);
+- logs e mensagens de exceções internas que nunca chegam ao usuário;
+- conteúdo criado por usuários (disciplinas, questões, materiais).
+
+O `code` dos erros continua estável e em inglês, porque clientes dependem dele;
+só a mensagem é traduzida.
 
 ## Consequences
 

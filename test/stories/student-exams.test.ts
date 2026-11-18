@@ -12,7 +12,7 @@ import { courseHref } from "@/urls";
 import { expect, type Page, test } from "../fixtures";
 import { logInAs, resetDatabase, seedUser } from "./helpers";
 import { REGRADE_MESSAGE, releasedExam } from "./regrade-setup";
-import { gradedExam, NOTES, REASON } from "./sanction-support";
+import { gradedExam, NOTES } from "./sanction-support";
 import { weightedExam } from "./weighted-exam-support";
 
 test.beforeEach(resetDatabase);
@@ -595,86 +595,389 @@ test("student: ask for a regrade", async ({ page }) => {
 /**
  * Interface the steps rely on, on `exams/<slug>` once the grades are out:
  *
- * - An alert, `role="alert"`, reading "Your grade on this exam was zeroed"
- *   (or "Your grade on this exam was reduced to 50%" for a factor of 0.5),
- *   with the reason in its text and nothing the instructor kept private.
- * - A badge "Zeroed" on each question with its own sanction.
- * - No "Request regrade" button on a sanctioned attempt.
+ * - When the attempt has an adjustment on the whole exam, a region named
+ *   "Grade adjustments" with "Original total" and "Final total", each followed
+ *   by a percentage, and one list item per adjustment, in the order SET,
+ *   FACTOR, OFFSET, holding the label and the reason the instructor wrote.
+ * - Labels: "Grade replaced by 80%", "Penalty ×0.5", "Bonus +10", "Zeroed".
+ * - A badge with the label of the adjustment on each question that has one.
+ * - For an attempt the instructor created, "You did not take this exam" in
+ *   place of the questions.
+ * - "Request regrade" on an answer unless an adjustment lowers the exam or
+ *   that question.
  */
-test("student: see that my grade was sanctioned", async ({ page }) => {
-	const world = await gradedExam("honour-stu");
-	const { ana, bia } = world;
-	await db.examAdjustment.create(
-		{
-			course: world.course.id,
-			exam: world.exam.slug,
-			usernames: [ana.username],
-			op: "FACTOR",
-			value: "0",
-			reason: REASON,
-			notes: NOTES,
-		},
-		{ actor: world.teacher },
+test("student: see the adjustments to my grade", async ({ page }) => {
+	const world = await gradedExam("adjust-stu");
+	const { ana, bia, caio, davi } = world;
+	const eli = await lateStudent(world, "adjust-stu-eli", BOTH_RIGHT);
+	const fay = await lateStudent(world, "adjust-stu-fay", null);
+	const ivy = await lateStudent(world, "adjust-stu-ivy", BOTH_RIGHT);
+	const jon = await lateStudent(world, "adjust-stu-jon", BOTH_RIGHT);
+	const lia = await lateStudent(world, "adjust-stu-lia", BOTH_RIGHT);
+	const gina = await lateStudent(world, "adjust-stu-gina", {
+		"q-first": "brasilia",
+		"q-second": "rio",
+	});
+	const hugo = await lateStudent(world, "adjust-stu-hugo", {
+		"q-first": "brasilia",
+	});
+	const adjust = (
+		student: { username: string },
+		adjustment: { op: "SET" | "FACTOR" | "OFFSET"; value: string },
+		reason: string,
+		question?: string,
+	) =>
+		db.examAdjustment
+			.create(
+				{
+					course: world.course.id,
+					exam: world.exam.slug,
+					usernames: [student.username],
+					...adjustment,
+					...(question ? { question } : {}),
+					reason,
+					notes: NOTES,
+				},
+				{ actor: world.teacher },
+			)
+			.then((rows) => rows[0]?.publicId ?? "");
+	const revoke = (publicId: string) =>
+		db.examAdjustment.revoke(
+			{ course: world.course.id, exam: world.exam.slug, publicId },
+			{ actor: world.teacher },
+		);
+	// Created out of the order they apply in: SET, then the factors, then the offsets.
+	const participation = await adjust(
+		ana,
+		{ op: "OFFSET", value: "0.1" },
+		"Class participation",
 	);
-	await db.examAdjustment.create(
-		{
-			course: world.course.id,
-			exam: world.exam.slug,
-			usernames: [ana.username],
-			op: "FACTOR",
-			value: "0",
-			question: "q-first",
-			reason: REASON,
-			notes: NOTES,
-		},
-		{ actor: world.teacher },
+	await adjust(ana, { op: "FACTOR", value: "0.5" }, "Late project");
+	await adjust(ana, { op: "SET", value: "0.8" }, "Make-up exam");
+	await adjust(ana, { op: "FACTOR", value: "0.9" }, "Missed lab");
+	await adjust(bia, { op: "OFFSET", value: "0.1" }, "Bonus on a full grade");
+	const copied = await adjust(
+		caio,
+		{ op: "FACTOR", value: "0.5" },
+		"Copied a neighbour",
 	);
-	const alert = () =>
-		page
-			.getByRole("alert")
-			.filter({ hasText: "Your grade on this exam was zeroed" });
-	await logInAs(page, ana);
+	await adjust(
+		davi,
+		{ op: "FACTOR", value: "0" },
+		"Copied one answer",
+		"q-first",
+	);
+	await adjust(
+		eli,
+		{ op: "FACTOR", value: "0.5" },
+		"Half credit for the second",
+		"q-second",
+	);
+	await adjust(fay, { op: "SET", value: "0.7" }, "Grade of the project");
+	await adjust(ivy, { op: "SET", value: "0.8" }, "Make-up grade");
+	await adjust(ivy, { op: "FACTOR", value: "0" }, "Cheated on the make-up");
+	await adjust(jon, { op: "SET", value: "0.145" }, "Weighted project grade");
+	await adjust(lia, { op: "FACTOR", value: "1.1" }, "Curve");
+	await adjust(lia, { op: "OFFSET", value: "-0.1" }, "Late submission");
 
-	await test.step("before the release nothing shows that a sanction exists", async () => {
+	// The instructor changes a grade by hand: on a real answer, and on a question the student left blank.
+	const second = (
+		await db.response.findMany(
+			{
+				course: world.course.id,
+				exam: world.exam.slug,
+				author: gina.username,
+			},
+			FULL_ACCESS,
+		)
+	)
+		.flatMap((response) => response.submissions)
+		.find((submission) => submission.question === "q-second");
+	await db.feedback.create(
+		{
+			submission: { publicId: second?.publicId ?? "" },
+			ref: "manual-1",
+			score: "1",
+			feedback: "Accepted in class",
+			grader: world.teacher.username,
+		},
+		FULL_ACCESS,
+	);
+	await prisma.feedback.updateMany({
+		where: { ref: "auto", submission: { publicId: second?.publicId ?? "" } },
+		data: { updatedAt: new Date(Date.now() - 24 * 60 * MINUTE) },
+	});
+	await db.manualGrade.gradeUnanswered(
+		{
+			course: world.course.id,
+			exam: world.exam.slug,
+			author: hugo.username,
+			question: "q-second",
+			score: "1",
+			comment: "Counted in class",
+		},
+		{ actor: world.teacher },
+	);
+
+	const adjustments = () =>
+		page.getByRole("region", { name: "Grade adjustments" });
+	const requestRegrade = () =>
+		page.getByRole("button", { name: "Request regrade" });
+	/// Opens the exam page as `student` and checks the instructor's private notes are nowhere in it.
+	const visit = async (student: { username: string }) => {
+		await logInAs(page, student);
 		await page.goto(world.examUrl);
-
 		await expect(
 			page.getByRole("heading", { name: world.exam.title }).first(),
 		).toBeVisible();
-		await expect(page.getByText(/sanction|zeroed/i)).toHaveCount(0);
-		await expect(page.getByText(REASON)).toHaveCount(0);
-		expect(await page.content()).not.toContain(REASON);
-		expect(await page.content()).not.toContain(NOTES);
-	});
-
-	await test.step("after the release the alert says why, and the private notes stay private", async () => {
-		await world.release();
-		await page.reload();
-
-		await expect(alert()).toBeVisible();
-		await expect(alert()).toContainText(REASON);
+	};
+	const keepsNotesPrivate = async () => {
 		await expect(page.getByText(NOTES)).toHaveCount(0);
 		expect(await page.content()).not.toContain(NOTES);
+	};
+
+	await test.step("before the release nothing shows the adjustments or a final total", async () => {
+		await visit(ana);
+
+		await expect(adjustments()).toHaveCount(0);
+		await expect(page.getByText(/Original total|Final total/)).toHaveCount(0);
+		for (const text of [
+			"Class participation",
+			"Make-up exam",
+			"Bonus +10",
+			"Grade replaced by 80%",
+		]) {
+			await expect(page.getByText(text)).toHaveCount(0);
+		}
+		await keepsNotesPrivate();
 	});
 
-	await test.step("the zeroed question is marked and no grade of the attempt can be contested", async () => {
+	await test.step("before the release a student who did not take the exam reads so, with no grade", async () => {
+		await visit(fay);
+
+		await expect(page.getByText(/did not take this exam/i)).toBeVisible();
+		await expect(page.getByText(/results are not out yet/i)).toHaveCount(0);
+		await expect(page.getByText(/\d+%/)).toHaveCount(0);
+		await keepsNotesPrivate();
+	});
+
+	await world.release();
+
+	await test.step("after the release every adjustment is listed in order, between the original and the final total", async () => {
+		await visit(ana);
+
+		await expect(adjustments()).toBeVisible();
+		await expect(adjustments()).toContainText(/Original total\s*100%/);
+		await expect(adjustments()).toContainText(/Final total\s*46%/);
+		const lines = adjustments().getByRole("listitem");
+		await expect(lines).toHaveCount(4);
+		await expect(lines).toContainText([
+			"Grade replaced by 80%",
+			"Penalty ×0.5",
+			"Penalty ×0.9",
+			"Bonus +10",
+		]);
+		await expect(lines.nth(0)).toContainText("Make-up exam");
+		await expect(lines.nth(1)).toContainText("Late project");
+		await expect(lines.nth(2)).toContainText("Missed lab");
+		await expect(lines.nth(3)).toContainText("Class participation");
+		await keepsNotesPrivate();
+	});
+
+	await test.step("a bonus over a full grade ends at 100%, and the grade can still be contested", async () => {
+		await visit(bia);
+
+		await expect(adjustments()).toContainText(/Original total\s*100%/);
+		await expect(adjustments()).toContainText(/Final total\s*100%/);
+		await expect(adjustments()).toContainText("Bonus +10");
+		await expect(adjustments()).toContainText("Bonus on a full grade");
+		await expect(adjustments()).not.toContainText("110%");
+		await expect(requestRegrade().first()).toBeVisible();
+		await keepsNotesPrivate();
+	});
+
+	await test.step("a penalty on the whole exam leaves nothing to contest", async () => {
+		await visit(caio);
+
+		await expect(adjustments()).toContainText("Penalty ×0.5");
+		await expect(adjustments()).toContainText("Copied a neighbour");
+		await expect(adjustments()).toContainText(/Final total\s*50%/);
+		await expect(requestRegrade()).toHaveCount(0);
+		await keepsNotesPrivate();
+	});
+
+	await test.step("a zeroed question is marked, and only the other one can be contested", async () => {
+		await visit(davi);
+
 		await expect(page.getByText("Zeroed", { exact: true })).toHaveCount(1);
-		await expect(
-			page.getByRole("button", { name: "Request regrade" }),
-		).toHaveCount(0);
+		await expect(adjustments()).toHaveCount(0);
+		await expect(requestRegrade()).toHaveCount(1);
+		await keepsNotesPrivate();
 	});
 
-	await test.step("a classmate with no sanction sees none of it and can still ask for a regrade", async () => {
-		await logInAs(page, bia);
-		await page.goto(world.examUrl);
+	await test.step("a question with a factor of 0.5 is marked with its own penalty", async () => {
+		await visit(eli);
+
+		await expect(page.getByText("Penalty ×0.5", { exact: true })).toHaveCount(
+			1,
+		);
+		await expect(page.getByText("Zeroed", { exact: true })).toHaveCount(0);
+		await expect(requestRegrade()).toHaveCount(1);
+		await keepsNotesPrivate();
+	});
+
+	await test.step("a student who did not take the exam reads so, with the replaced grade and no answers", async () => {
+		await visit(fay);
+
+		await expect(page.getByText(/You did not take this exam/)).toBeVisible();
+		await expect(adjustments()).toContainText("Grade replaced by 70%");
+		await expect(adjustments()).toContainText("Grade of the project");
+		await expect(adjustments()).toContainText(/Final total\s*70%/);
+		await expect(page.getByText("First question")).toHaveCount(0);
+		await expect(page.getByText("Second question")).toHaveCount(0);
+		await expect(requestRegrade()).toHaveCount(0);
+		await keepsNotesPrivate();
+	});
+
+	await test.step("a replacement and a zero together give 0%, and both lines are listed", async () => {
+		await visit(ivy);
+
+		await expect(adjustments()).toContainText(/Original total\s*100%/);
+		await expect(adjustments()).toContainText(/Final total\s*0%/);
+		const lines = adjustments().getByRole("listitem");
+		await expect(lines).toHaveCount(2);
+		await expect(lines).toContainText(["Grade replaced by 80%", "Zeroed"]);
+		await expect(lines.nth(0)).toContainText("Make-up grade");
+		await expect(lines.nth(1)).toContainText("Cheated on the make-up");
+		await keepsNotesPrivate();
+	});
+
+	await test.step("a replaced grade can still be contested, and the header card and the final total round alike", async () => {
+		await visit(jon);
+
+		await expect(requestRegrade().first()).toBeVisible();
+		await expect(adjustments()).toContainText("Grade replaced by 14.5%");
+		await expect(adjustments()).toContainText(/Final total\s*15%/);
+		// The header card and the final total: the same text, as `formatScore` writes it.
+		await expect(page.getByText("15%", { exact: true })).toHaveCount(2);
+		await expect(page.getByText("14%", { exact: true })).toHaveCount(0);
+	});
+
+	await test.step("a factor above 1 reads as a bonus and a negative offset as a penalty", async () => {
+		await visit(lia);
+
+		const lines = adjustments().getByRole("listitem");
+		await expect(lines).toContainText(["Bonus ×1.1", "Penalty −10"]);
+		await expect(adjustments()).toContainText(/Final total\s*100%/);
+	});
+
+	await test.step("a question graded by hand shows the new score and the comment on a real answer", async () => {
+		await visit(gina);
 
 		await expect(
-			page.getByRole("button", { name: "Request regrade" }).first(),
-		).toBeVisible();
-		await expect(alert()).toHaveCount(0);
-		await expect(page.getByText("Zeroed", { exact: true })).toHaveCount(0);
+			page
+				.getByRole("region", { name: "Question 2" })
+				.getByLabel("Rio de Janeiro"),
+		).toBeChecked();
+		await expect(page.getByText(/Score\s*100%/)).toHaveCount(2);
+		await expect(page.getByText("Accepted in class")).toBeVisible();
+		await expect(page.getByText("100%", { exact: true }).first()).toBeVisible();
+		await expect(adjustments()).toHaveCount(0);
+		await keepsNotesPrivate();
+	});
+
+	await test.step("a blank question graded by hand shows the score and the comment, and no answer", async () => {
+		await visit(hugo);
+
+		await expect(page.getByRole("radio", { checked: true })).toHaveCount(1);
+		await expect(page.getByText(/Score\s*100%/)).toHaveCount(2);
+		await expect(page.getByText("Counted in class")).toBeVisible();
+		await expect(page.getByText(/did not take this exam/i)).toHaveCount(0);
+		await expect(page.getByText("100%", { exact: true }).first()).toBeVisible();
+		await keepsNotesPrivate();
+	});
+
+	await test.step("the adjusted total shows on the student's home and on the course's exams list", async () => {
+		await logInAs(page, fay);
+
+		await page.goto("/");
+		const results = section(page, "New results");
+		await expect(results.getByText("Honour exam")).toBeVisible();
+		await expect(results.getByText("70%", { exact: true })).toBeVisible();
+
+		await page.goto(`${world.href}/exams`);
+		const past = section(page, "Past exams and grades");
+		await expect(past.getByText("Honour exam")).toBeVisible();
+		await expect(past.getByText("70%", { exact: true })).toBeVisible();
+	});
+
+	await test.step("after the instructor revokes an adjustment its line goes away and the total comes back", async () => {
+		await revoke(participation);
+		await visit(ana);
+
+		const lines = adjustments().getByRole("listitem");
+		await expect(lines).toHaveCount(3);
+		await expect(lines).toContainText([
+			"Grade replaced by 80%",
+			"Penalty ×0.5",
+			"Penalty ×0.9",
+		]);
+		await expect(page.getByText("Class participation")).toHaveCount(0);
+		await expect(page.getByText("Bonus +10")).toHaveCount(0);
+		await expect(adjustments()).toContainText(/Final total\s*36%/);
+	});
+
+	await test.step("after the penalty on the whole exam is revoked the student can ask for a regrade again", async () => {
+		await revoke(copied);
+		await visit(caio);
+
+		await expect(adjustments()).toHaveCount(0);
+		await expect(page.getByText("Copied a neighbour")).toHaveCount(0);
+		await expect(requestRegrade().first()).toBeVisible();
 	});
 });
+
+/// The choice ids that answer both questions of `gradedExam` rightly.
+const BOTH_RIGHT = { "q-first": "brasilia", "q-second": "brasilia" };
+
+/// Enrols a student of the closed exam of `gradedExam`, who answers the questions of `answers` (slug to choice id) and never starts when it is `null`.
+async function lateStudent(
+	world: Awaited<ReturnType<typeof gradedExam>>,
+	username: string,
+	answers: Record<string, string> | null,
+) {
+	const student = await seedUser({ role: "STUDENT", username });
+	await db.enrollment.create(
+		{ course: world.course.id, username },
+		FULL_ACCESS,
+	);
+	if (!answers) return student;
+	// The exam is reopened for the arrangement only.
+	await prisma.exam.update({
+		where: { id: world.exam.id },
+		data: { status: "ONGOING" },
+	});
+	for (const [question, payload] of Object.entries(answers)) {
+		await db.response.submit(
+			{
+				course: world.course.id,
+				exam: world.exam.slug,
+				question,
+				payload,
+			},
+			{ actor: student },
+		);
+	}
+	await db.response.finish(
+		{ course: world.course.id, exam: world.exam.slug },
+		{ actor: student },
+	);
+	await prisma.exam.update({
+		where: { id: world.exam.id },
+		data: { status: "COMPLETED" },
+	});
+	return student;
+}
 
 //
 // Utilities

@@ -10,8 +10,8 @@ relatedTo: [course-grade, push, codehood-toml]
 The server does not compute a course's final grade. The instructor computes
 it on their own machine and push sends the result as grade columns, which
 the server shows beside the exams. This spec is the CLI's half. The server's
-half is `dev/specs/to-review/course-grade.md` in the server repository, which is
-authoritative for the endpoints.
+half is the grade column REST API (`gradesApi` in `src/api/index.ts`), which is
+authoritative for the endpoints; the decision is in ADR 0012, "Nota do curso".
 
 ## Scope
 

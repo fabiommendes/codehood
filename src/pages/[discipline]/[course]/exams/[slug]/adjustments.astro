@@ -1,0 +1,143 @@
+---
+import CourseHeader from "@/components/CourseHeader.astro";
+import AdjustmentActions from "@/components/grading/AdjustmentActions";
+import AdjustStudents from "@/components/grading/AdjustStudents";
+import { db } from "@/db";
+import { m } from "@/i18n";
+import AppLayout from "@/layouts/AppLayout.astro";
+import { adjustmentLabel } from "@/utils/adjustment-label";
+import { breadcrumbs } from "@/utils/breadcrumbs";
+import { examNav } from "@/utils/exam-nav";
+import { loadExamStaff } from "@/utils/load-exam-staff";
+import { formatDateTime } from "@/utils/schedule-time";
+
+export const prerender = false;
+
+const { discipline, course: courseSegment, slug } = Astro.params;
+const result = await loadExamStaff(Astro, discipline, courseSegment, slug);
+if ("redirect" in result) return result.redirect;
+const { course, href, tabs, exam, data } = result;
+
+// biome-ignore lint/style/noNonNullAssertion: loadExamStaff already redirected an anonymous visitor.
+const actor = Astro.locals.actor!;
+const [adjustments, stored] = await Promise.all([
+	db.examAdjustment.findMany(
+		{ course: course.id, exam: exam.slug, revoked: true },
+		{ actor },
+	),
+	db.question.findMany(
+		{
+			course: course.id,
+			public: false,
+			slugs: exam.questions.map((question) => question.slug),
+		},
+		{ actor },
+	),
+]);
+const names = new Map(
+	data.students.map((student) => [student.username, student.name]),
+);
+const titles = new Map(
+	stored.map((entry) => [entry.slug, entry.question.title ?? entry.slug]),
+);
+const examHref = `${href}/exams/${exam.slug}`;
+const rows = adjustments.map((entry) => ({
+	entry,
+	student: names.get(entry.author) ?? entry.author,
+	label: adjustmentLabel({ op: entry.op, value: Number(entry.value) }),
+	target:
+		entry.question === null
+			? m.grades_adjustment_target_exam()
+			: (titles.get(entry.question) ?? entry.question),
+	notes: "notes" in entry ? entry.notes : null,
+	by: "createdBy" in entry ? entry.createdBy : "",
+	revokedBy: "revokedBy" in entry ? (entry.revokedBy ?? "") : "",
+	active: entry.revokedAt === null,
+}));
+---
+
+<AppLayout title={`${m.grades_adjustment_title()} · ${exam.title}`}
+  trail={breadcrumbs(Astro.url, { course, item: exam.title, page: m.grades_adjustment_title() })}
+  nav={examNav({
+    href: examHref,
+    title: exam.title,
+    manage: true,
+    pending: data.pending,
+    regrades: data.openRegrades,
+    adjustments: data.adjustments,
+  })}
+>
+  <CourseHeader course={course} tabs={tabs} active="exams" />
+
+  <div class="mt-6 flex flex-wrap items-center justify-between gap-2">
+    <h2 class="page-subheader">{m.grades_adjustment_title()}</h2>
+    <AdjustStudents client:load discipline={discipline!} course={courseSegment!} exam={exam.slug} />
+  </div>
+
+  {
+    rows.length === 0 ? (
+      <p class="mt-6 text-base-content/70">{m.grades_adjustment_empty()}</p>
+    ) : (
+      <div class="mt-6 overflow-x-auto rounded-box border border-edge bg-base-100 shadow-sm">
+        <table aria-label={m.grades_adjustment_title()} class="table">
+          <thead class="bg-base-200/50">
+            <tr class="uppercase">
+              <th scope="col">{m.grades_adjustment_col_student()}</th>
+              <th scope="col">{m.grades_adjustment_col_target()}</th>
+              <th scope="col">{m.grades_adjustment_col_adjustment()}</th>
+              <th scope="col">{m.grades_adjustment_col_reason()}</th>
+              <th scope="col">{m.grades_adjustment_col_date()}</th>
+              <th scope="col"><span class="sr-only">{m.grades_adjustment_col_actions()}</span></th>
+            </tr>
+          </thead>
+          <tbody>
+            {rows.map(({ entry, student, label, target, notes, by, revokedBy, active }) => (
+              <tr class:list={["align-top", !active && "text-base-content/60"]}>
+                <th scope="row" class="font-medium">
+                  <a href={`${examHref}/attempts/${entry.author}`} class="link">{student}</a>
+                </th>
+                <td>{target}</td>
+                <td>
+                  <div class="flex flex-wrap items-center gap-2">
+                    <span class="font-medium">{label}</span>
+                    <span class:list={["badge badge-sm", active ? "badge-success" : "badge-ghost"]}>
+                      {active ? m.grades_adjustment_active() : m.grades_adjustment_revoked()}
+                    </span>
+                  </div>
+                </td>
+                <td>
+                  <div class="whitespace-pre-wrap">{entry.reason}</div>
+                  {notes && (
+                    <div class="mt-1 whitespace-pre-wrap text-xs text-muted"><span class="font-medium">{m.grades_adjustment_col_notes()}:</span> {notes}</div>
+                  )}
+                </td>
+                <td class="whitespace-nowrap">
+                  {formatDateTime(entry.createdAt, { year: "numeric" })}
+                  {by && <div class="text-xs text-muted">{m.grades_adjustment_by_line({ name: by })}</div>}
+                  {revokedBy && <div class="text-xs text-muted">{m.grades_adjustment_revoked_by_line({ name: revokedBy })}</div>}
+                </td>
+                <td>
+                  {active && (
+                    <AdjustmentActions
+                      client:load
+                      discipline={discipline!}
+                      course={courseSegment!}
+                      exam={exam.slug}
+                      adjustment={entry.publicId}
+                      updatedAt={entry.updatedAt.toISOString()}
+                      op={entry.op}
+                      onQuestion={entry.question !== null}
+                      value={entry.value}
+                      reason={entry.reason}
+                      notes={notes}
+                    />
+                  )}
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    )
+  }
+</AppLayout>

@@ -1,8 +1,8 @@
 /**
- * A retried item must not store its gap markers twice (spec
- * `dev/specs/to-review/historico-de-edicao-no-servidor.md`, R8 and R12).
+ * A retried item must not store its gap markers twice (RFC
+ * `dev/rfc/historico-de-edicao-de-respostas-abertas.md`).
  *
- * The client resends an item whenever it did not see the answer (R24, R25), so
+ * The client resends an item whenever it did not see the answer, so
  * the server meets the same item again.
  *
  * Each marker carries a client-generated id: a marker whose id is already

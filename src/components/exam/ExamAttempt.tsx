@@ -26,11 +26,11 @@ import {
 	type ExamResult,
 	formatScore,
 	type QuestionOutcome,
-	reducesGrade,
 } from "@/services/exam-result";
 import type { AttemptState } from "@/services/exam-state";
 import type { ReviewResult } from "@/services/review";
 import { examQuestionAttachmentUrl } from "@/urls";
+import { adjustmentLabel } from "@/utils/adjustment-label";
 import type { CodeBlocksHtml } from "@/utils/code-blocks";
 import type { PretestSource } from "@/utils/pretest-sources";
 import { formatRelative } from "@/utils/relative-time";
@@ -81,6 +81,8 @@ export interface ExamAttemptProps {
 	answers: Record<string, AnswerPayload>;
 	/// The graded outcome per question, present once the grades are released.
 	result?: ExamResult;
+	/// Whether the instructor created the attempt for a student who did not take the exam.
+	empty?: boolean;
 	/// The marks and feedback of each answered question, by question slug, once the grades are released.
 	reviews?: Record<string, ReviewResult>;
 	/// What the student may do about the regrade of each question's answer, by question slug.
@@ -1082,37 +1084,55 @@ export default function ExamAttempt(props: ExamAttemptProps): JSX.Element {
 						kind() === "results"
 					}
 				>
+					<Show when={props.empty}>
+						<p role="status" class={NOTICE}>
+							{m.exams_attempt_empty()}
+						</p>
+					</Show>
 					<Show
 						when={
-							kind() === "results"
-								? props.result?.adjustments?.find(reducesGrade)
+							kind() === "results" && props.result?.adjustments?.length
+								? props.result
 								: undefined
 						}
 					>
-						{(sanction) => (
-							<p role="alert" class="alert alert-warning text-sm">
-								<span class="whitespace-pre-wrap">
-									<strong>
-										{sanction().value === 0
-											? m.exams_sanction_exam_zeroed()
-											: m.exams_sanction_exam_reduced({
-													percent: formatPercent(sanction().value),
-												})}
-									</strong>
-									<Show when={sanction().reason}>
-										{(reason) => (
-											<> {m.exams_sanction_reason({ reason: reason() })}</>
+						{(result) => (
+							<section
+								aria-label={m.exams_adjustments_label()}
+								class="rounded-box border border-edge bg-base-100 p-4 text-sm"
+							>
+								<p>
+									<span class="text-muted">
+										{m.exams_adjustments_original()}
+									</span>{" "}
+									<strong>{totalText(result().original?.total ?? null)}</strong>
+								</p>
+								<ul class="my-2 space-y-1">
+									<For each={result().adjustments}>
+										{(adjustment) => (
+											<li class="whitespace-pre-wrap">
+												<span class="badge badge-warning badge-sm">
+													{adjustmentLabel(adjustment)}
+												</span>
+												<Show when={adjustment.reason}>
+													{(reason) => <span class="ml-2">{reason()}</span>}
+												</Show>
+											</li>
 										)}
-									</Show>
-								</span>
-							</p>
+									</For>
+								</ul>
+								<p>
+									<span class="text-muted">{m.exams_adjustments_final()}</span>{" "}
+									<strong>{totalText(result().total)}</strong>
+								</p>
+							</section>
 						)}
 					</Show>
 					{/* Once the results are out, the score above says it all. */}
 					<Show
 						when={kind() === "in-progress"}
 						fallback={
-							<Show when={kind() === "submitted"}>
+							<Show when={kind() === "submitted" && !props.empty}>
 								<p role="status" class={NOTICE}>
 									{m.exams_attempt_submitted_waiting()}
 								</p>
@@ -1808,16 +1828,12 @@ function Outcome(props: {
 						</Switch>
 					</p>
 					<Show when={outcome().adjustment}>
-						{(sanction) => (
+						{(adjustment) => (
 							<p class="mt-1">
 								<span class="badge badge-warning badge-sm">
-									{sanction().value === 0
-										? m.exams_sanction_question_zeroed()
-										: m.exams_sanction_question_reduced({
-												percent: formatPercent(sanction().value),
-											})}
+									{adjustmentLabel(adjustment())}
 								</span>
-								<Show when={sanction().reason}>
+								<Show when={adjustment().reason}>
 									{(reason) => (
 										<span class="ml-2 text-sm text-base-content/70">
 											{reason()}
@@ -1852,7 +1868,7 @@ function Outcome(props: {
 	);
 }
 
-/// A factor in `[0, 1]` as a whole percentage, without the sign.
-function formatPercent(factor: number): string {
-	return String(Math.round(factor * 100));
+/// An exam total as a whole percentage, or the waiting notice while it is not known.
+function totalText(total: number | null): string {
+	return total === null ? m.exams_attempt_waiting() : formatScore(total);
 }

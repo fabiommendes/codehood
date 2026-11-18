@@ -5,6 +5,7 @@
 // flush with their parent and are told apart by size, weight and colour.
 import CourseTile from "@/components/CourseTile.astro";
 import type { MarkedEntry, MarkedNav } from "@/utils/course-nav";
+import { courseTransitionName } from "@/utils/view-transition";
 
 interface Props {
 	course: { code: string; edition: string; href: string };
@@ -33,6 +34,8 @@ const sections = nav?.sections.filter((s) => s.entries.length > 0) ?? [];
 
 <section
   data-course-card
+  data-course-transition
+  style={`--course-transition: ${courseTransitionName(course.href)}`}
   aria-label={course.code}
   class="cut mx-4 mb-4 border border-edge bg-base-200/60"
 >

@@ -11,6 +11,7 @@ import {
 } from "@/mdq/fixtures";
 import { courseHref } from "@/urls";
 import { expect, test } from "../fixtures";
+import { adjustableExam, HANA_SCHOOL_ID } from "./adjustment-support";
 import { logInAs, resetDatabase, seedUser } from "./helpers";
 import {
 	CHALLENGE_COMMENT,
@@ -21,7 +22,6 @@ import {
 	passesOf,
 } from "./objective-support";
 import { releasedExam, requestRegrade } from "./regrade-setup";
-import { gradedExam, NOTES, REASON } from "./sanction-support";
 import { weightedExam } from "./weighted-exam-support";
 
 test.beforeEach(resetDatabase);
@@ -1267,312 +1267,303 @@ test("instructor: grade an exam whose questions have different weights", async (
 });
 
 /**
- * Interface the steps rely on, by screen:
+ * Interface the steps rely on, by screen. Names are the English messages.
+ *
+ * `exams/<slug>/attempts/<username>` (also for an enrolled student without an attempt)
+ *   - Heading with the student's name; to its right three icon buttons "Sanction",
+ *     "Add bonus" and "Student list".
+ *   - Nav "Questions" with one link per question, named "Question <n>: <state>", the state
+ *     being "correct", "partial", "wrong", "blank", "changed by hand", "pending" or "not graded".
+ *   - One article "Question <n>" per question, with the buttons "Change grade", "Sanction
+ *     question" and, once the grade was changed by hand, "Undo" and the badge "changed by hand".
+ *     A question the student left blank reads "Not answered".
+ *   - Section "Grade adjustments" with "Original total <p>%", one line per adjustment (the
+ *     `adjustmentLabel` text, then the reason) in order of application, and "Final total <p>%".
+ *     A question under a penalty carries the badge of its label, e.g. "Penalty ×0.5".
+ *   - Dialog "Add bonus": radios "Add points", "Multiply", "Replace grade", field "Value" (points,
+ *     or a percentage), field "Reason", buttons "Cancel" and "Add bonus"; the preview shows the new total.
+ *   - Dialog "Sanction": field "% of the grade kept", checkbox "Zero", field "Reason", buttons
+ *     "Cancel" and "Sanction". The one of a question is titled "Sanction question" and has the button "Sanction question".
+ *   - Dialog of "Change grade": field "Grade (0 to 100)", buttons "Mark as correct", "Save", "Cancel".
+ *   - A refusal of the server shows in the dialog as an alert and nothing is saved.
+ *   - Dialog "Student list": a search box, and a table with one row per active student: name
+ *     (a link to the student's attempt), registration, username, total and situation ("no attempt",
+ *     "in progress", "pending", "adjusted" or "submitted"); the search also matches the registration.
+ *
+ * `exams/<slug>/adjustments`
+ *   - Heading "Adjustments", a table "Adjustments" with one row per adjustment, active and revoked
+ *     (student, target, the `adjustmentLabel` text, reason, notes, "Active" or "Revoked").
+ *   - Button "Adjust students" opens the dialog "Adjust grades": field "Usernames" (one or more, separated
+ *     by spaces, commas or lines), radios "Add points", "Multiply", "Replace grade", fields "Value" and
+ *     "Reason", buttons "Cancel" and "Adjust". It takes students without an attempt.
+ *   - An active row has "Edit" (dialog "Edit adjustment": "Value", "Reason", "Save", "Cancel") and
+ *     "Revoke" (dialog "Revoke adjustment": "Revoke adjustment", "Cancel"); a revoked row has neither.
  *
  * `exams/<slug>/results`
- *   - Table "Results", one row per attempt, with a checkbox named "Select <name>".
- *   - Button "Sanction selected", disabled while nothing is selected.
- *   - Dialog with the fields "Target" (select: "Whole exam", then each
- *     question's title), "Factor" (text, "0"), "Reason" and "Private notes";
- *     buttons "Sanction" and "Cancel".
- *   - A sanctioned total is an `<ins>` holding the new total beside a `<del>`
- *     holding the original.
- *   - The exam's nav has a link "Sanctions" followed by the count of active ones.
- *
- * `exams/<slug>/sanctions`
- *   - Heading "Sanctions" and a table "Sanctions", one row per sanction, showing
- *     the student, the target ("Whole exam" or the question title), the reason,
- *     the notes and the state ("Active" or "Revoked").
- *   - An active row has buttons "Edit" (dialog "Edit sanction": "Factor",
- *     "Reason", "Private notes", "Save", "Cancel") and "Revoke" (dialog
- *     "Revoke sanction": "Revoke sanction", "Cancel"); a revoked row has neither.
- *
- * `exams/<slug>/attempts/<username>`
- *   - Status "This attempt was sanctioned" with the reason, the notes and a
- *     link "Manage sanctions".
- *   - Each question's article has a button "Zero question" (dialog "Zero
- *     question": "Reason", "Private notes", "Zero question", "Cancel") and,
- *     once zeroed, the badge "Zeroed" in place of the button.
- *
- * `grades`
- *   - The link of a sanctioned total has a `title` starting with "Sanctioned"
- *     and carrying the reason, never the notes.
+ *   - Table "Results" with a checkbox "Select <name>" per row; button "Adjust selected", disabled
+ *     while nothing is selected, opens the dialog "Adjust grades" (same fields, "Target" first).
+ *   - An adjusted total is an `<ins>` with the final total beside a `<del>` with the original, and
+ *     a link "Adjustments" to the exam's adjustments page.
  */
-test("instructor: sanction a student's grade", async ({ page }) => {
-	const world = await gradedExam("honour-ins");
-	const { ana, caio, davi } = world;
-	const NEW_NOTES = "Confirmed by the neighbour, who admitted it";
-	const FACTOR_ERROR = "A multiplier is between 0 and 2.";
-	await world.release();
+test("instructor: adjust a student's grade", async ({ page }) => {
+	const world = await adjustableExam("adjust-ins");
+	const { ana, bia, caio, davi, eva, fabio, hana } = world;
 	await logInAs(page, world.teacher);
 
+	const attemptUrl = (username: string) =>
+		`${world.examUrl}/attempts/${username}`;
+	const summary = () => page.getByRole("region", { name: "Grade adjustments" });
+	const article = (number: number) =>
+		page.getByRole("article", { name: `Question ${number}`, exact: true });
 	const results = () =>
 		page.getByRole("table", { name: "Results", exact: true });
 	const resultRow = (name: string) =>
 		results().getByRole("row").filter({ hasText: name });
-	const sanctions = () =>
-		page.getByRole("table", { name: "Sanctions", exact: true });
-	const sanctionRow = (name: string) =>
-		sanctions().getByRole("row").filter({ hasText: name });
+	const table = () =>
+		page.getByRole("table", { name: "Adjustments", exact: true });
+	const tableRow = (name: string) =>
+		table().getByRole("row").filter({ hasText: name });
 	const active = () =>
 		db.examAdjustment.findMany(
 			{ course: world.course.id, exam: world.exam.slug },
 			{ actor: world.teacher },
 		);
 
-	await test.step("with nobody selected there is nothing to sanction", async () => {
-		await page.goto(`${world.examUrl}/results`);
+	/// Adds a bonus of `kind` to the attempt on display, through the dialog; it returns the dialog, still open when the server refuses.
+	async function addBonus(
+		kind: "Add points" | "Multiply" | "Replace grade",
+		value: string,
+		reason: string,
+	) {
+		await page.getByRole("button", { name: "Add bonus", exact: true }).click();
+		const dialog = page.getByRole("dialog", { name: "Add bonus" });
+		await dialog.getByRole("radio", { name: kind }).check();
+		await dialog.getByLabel("Value").fill(value);
+		await dialog.getByLabel(/^Reason/).fill(reason);
+		await dialog
+			.getByRole("button", { name: "Add bonus", exact: true })
+			.click();
+		return dialog;
+	}
 
-		await expect(resultRow("Ana Prado")).toBeVisible();
-		for (const name of ["Ana Prado", "Bia Lima", "Caio Nunes", "Davi Rocha"]) {
-			await expect(resultRow(name).getByRole("cell").last()).toHaveText("100%");
-		}
-		await expect(
-			page.getByRole("button", { name: "Sanction selected" }),
-		).toBeDisabled();
+	await test.step("a bonus of points on Ana shows the original total, the line and the final total", async () => {
+		await page.goto(attemptUrl(ana.username));
+		await page.getByRole("button", { name: "Add bonus", exact: true }).click();
+		const dialog = page.getByRole("dialog", { name: "Add bonus" });
+		await dialog.getByRole("radio", { name: "Add points" }).check();
+		await dialog.getByLabel("Value").fill("10");
+		await dialog.getByLabel(/^Reason/).fill("Participation");
+		await expect(dialog).toContainText("60%");
+		await dialog
+			.getByRole("button", { name: "Add bonus", exact: true })
+			.click();
+
+		await expect(dialog).toBeHidden();
+		await expect(summary()).toContainText(/Original total\s*50%/);
+		await expect(summary()).toContainText("Bonus +10");
+		await expect(summary()).toContainText("Participation");
+		await expect(summary()).toContainText(/Final total\s*60%/);
 	});
 
-	await test.step("a factor outside [0, 200%] is refused and nothing is saved", async () => {
-		await resultRow("Ana Prado")
-			.getByRole("checkbox", { name: "Select Ana Prado" })
-			.check();
+	await test.step("a multiplier and a replacement give the right lines and totals, and a second replacement is refused", async () => {
+		await page.goto(attemptUrl(caio.username));
+		await addBonus("Multiply", "110", "Curve");
+		await expect(summary()).toContainText("Bonus ×1.1");
+		await expect(summary()).toContainText(/Original total\s*50%/);
+		await expect(summary()).toContainText(/Final total\s*55%/);
+
+		await addBonus("Replace grade", "80", "Project grade");
+		await expect(summary()).toContainText(
+			/Grade replaced by 80%[\s\S]*Bonus ×1\.1/,
+		);
+		await expect(summary()).toContainText(/Final total\s*88%/);
+
+		const before = (await active()).length;
+		const dialog = await addBonus("Replace grade", "70", "Again");
+		await expect(dialog.getByRole("alert")).toContainText(
+			"edit the existing one",
+		);
+		expect(await active()).toHaveLength(before);
+		await dialog.getByRole("button", { name: "Cancel" }).click();
+		await expect(dialog).toBeHidden();
+	});
+
+	await test.step("zeroing the exam gives a total of zero", async () => {
+		await page.goto(attemptUrl(davi.username));
+		await page.getByRole("button", { name: "Sanction", exact: true }).click();
+		const dialog = page.getByRole("dialog", { name: "Sanction", exact: true });
+		await dialog.getByLabel("Zero").check();
+		await dialog.getByLabel(/^Reason/).fill("Unauthorised consultation");
+		await dialog.getByRole("button", { name: "Sanction", exact: true }).click();
+
+		await expect(dialog).toBeHidden();
+		await expect(summary()).toContainText(/Original total\s*100%/);
+		await expect(summary()).toContainText("Zeroed");
+		await expect(summary()).toContainText("Unauthorised consultation");
+		await expect(summary()).toContainText(/Final total\s*0%/);
+	});
+
+	await test.step("a blank question is graded by hand, the nav marks it, and undo takes it back", async () => {
+		await page.goto(attemptUrl(eva.username));
+		const nav = page.getByRole("navigation", { name: "Questions" });
+		await expect(
+			nav.getByRole("link", { name: "Question 4: blank" }),
+		).toBeVisible();
+		await expect(article(4)).toContainText("Not answered");
+
+		await article(4).getByRole("button", { name: "Change grade" }).click();
+		const dialog = page.getByRole("dialog");
+		await dialog.getByLabel("Grade (0 to 100)").fill("100");
+		await dialog.getByRole("button", { name: "Save", exact: true }).click();
+
+		await expect(
+			nav.getByRole("link", { name: "Question 4: changed by hand" }),
+		).toBeVisible();
+		await expect(article(4)).toContainText("100%");
+		await expect(article(4)).toContainText("changed by hand");
+
+		await article(4).getByRole("button", { name: "Undo" }).click();
+		await expect(
+			nav.getByRole("link", { name: "Question 4: blank" }),
+		).toBeVisible();
+		await expect(article(4)).not.toContainText("changed by hand");
+		await expect(
+			nav.getByRole("link", { name: "Question 4: changed by hand" }),
+		).toHaveCount(0);
+	});
+
+	await test.step("the hammer on a question keeps half of it, with the badge and a smaller total", async () => {
+		await page.goto(attemptUrl(fabio.username));
+		await article(1).getByRole("button", { name: "Sanction question" }).click();
+		const dialog = page.getByRole("dialog", { name: /Sanction question/ });
+		await dialog.getByLabel("% of the grade kept").fill("50");
+		await dialog.getByLabel(/^Reason/).fill("Copied from a neighbour");
+		await dialog
+			.getByRole("button", { name: "Sanction question", exact: true })
+			.click();
+
+		await expect(dialog).toBeHidden();
+		await expect(article(1)).toContainText("Penalty ×0.5");
+		await expect(article(2)).not.toContainText("Penalty");
+
+		await page.goto(`${world.examUrl}/results`);
+		await expect(resultRow("Fabio Reis").getByRole("deletion")).toHaveText(
+			"100%",
+		);
+		await expect(resultRow("Fabio Reis").getByRole("insertion")).toHaveText(
+			"88%",
+		);
+	});
+
+	await test.step("the student list finds a student by registration and opens one without an attempt", async () => {
+		await page.goto(attemptUrl(bia.username));
+		await page.getByRole("button", { name: "Student list" }).click();
+		const dialog = page.getByRole("dialog");
+		await expect(
+			dialog.getByRole("row").filter({ hasText: "Bia Lima" }),
+		).toBeVisible();
+
+		await dialog.getByRole("searchbox").fill(HANA_SCHOOL_ID);
+		const hanaRow = dialog.getByRole("row").filter({ hasText: "Hana Souza" });
+		await expect(hanaRow).toBeVisible();
+		await expect(hanaRow).toContainText(/no attempt/i);
+		await expect(
+			dialog.getByRole("row").filter({ hasText: "Bia Lima" }),
+		).toHaveCount(0);
+
+		await hanaRow.getByRole("link", { name: "Hana Souza" }).click();
+		await expect(page).toHaveURL(attemptUrl(hana.username));
+		await expect(
+			page.getByRole("heading", { name: "Hana Souza" }),
+		).toBeVisible();
+		await expect(
+			page.getByRole("article", { name: /^Question \d/ }),
+		).toHaveCount(4);
+	});
+
+	await test.step("the adjustments page adjusts in batch a student without an attempt, edits it and revokes it", async () => {
+		await page.goto(`${world.examUrl}/adjustments`);
+		await expect(
+			page.getByRole("heading", { name: "Adjustments", exact: true }),
+		).toBeVisible();
+		await expect(tableRow("Ana Prado")).toContainText("Bonus +10");
+		await expect(tableRow("Ana Prado")).toContainText("Active");
+
+		await page.getByRole("button", { name: "Adjust students" }).click();
+		const dialog = page.getByRole("dialog", { name: "Adjust grades" });
+		await dialog.getByLabel("Usernames").fill(hana.username);
+		await dialog.getByRole("radio", { name: "Replace grade" }).check();
+		await dialog.getByLabel("Value").fill("80");
+		await dialog.getByLabel(/^Reason/).fill("Project grade stands in");
+		await dialog.getByRole("button", { name: "Adjust", exact: true }).click();
+
+		await expect(dialog).toBeHidden();
+		await expect(tableRow("Hana Souza")).toContainText("Grade replaced by 80%");
+		await expect(tableRow("Hana Souza")).toContainText(
+			"Project grade stands in",
+		);
+		await expect(tableRow("Hana Souza")).toContainText("Active");
+
+		await tableRow("Hana Souza").getByRole("button", { name: "Edit" }).click();
+		const edit = page.getByRole("dialog", { name: "Edit adjustment" });
+		await expect(edit.getByLabel("Value")).toHaveValue("80");
+		await edit.getByLabel("Value").fill("90");
+		await edit.getByRole("button", { name: "Save" }).click();
+		await expect(edit).toBeHidden();
+		await expect(tableRow("Hana Souza")).toContainText("Grade replaced by 90%");
+
+		await tableRow("Hana Souza")
+			.getByRole("button", { name: "Revoke" })
+			.click();
+		const revoke = page.getByRole("dialog", { name: "Revoke adjustment" });
+		await revoke
+			.getByRole("button", { name: "Revoke adjustment", exact: true })
+			.click();
+		await expect(revoke).toBeHidden();
+		await expect(tableRow("Hana Souza")).toContainText("Revoked");
+		await expect(tableRow("Hana Souza")).toContainText("Grade replaced by 90%");
+		await expect(tableRow("Hana Souza").getByRole("button")).toHaveCount(0);
+		await expect(tableRow("Ana Prado")).toContainText("Active");
+	});
+
+	await test.step("the results adjust the selected students and show each original total struck through beside the final one", async () => {
+		await page.goto(`${world.examUrl}/results`);
+		await expect(
+			page.getByRole("button", { name: "Adjust selected" }),
+		).toBeDisabled();
+
 		await resultRow("Bia Lima")
 			.getByRole("checkbox", { name: "Select Bia Lima" })
 			.check();
-		await page.getByRole("button", { name: "Sanction selected" }).click();
-
-		const dialog = page.getByRole("dialog");
+		await resultRow("Eva Tavares")
+			.getByRole("checkbox", { name: "Select Eva Tavares" })
+			.check();
+		await page.getByRole("button", { name: "Adjust selected" }).click();
+		const dialog = page.getByRole("dialog", { name: "Adjust grades" });
 		await expect(dialog.getByText("2 students selected")).toBeVisible();
-		await expect(dialog.getByLabel("Target").getByRole("option")).toHaveText([
-			"Whole exam",
-			"First question",
-			"Second question",
-		]);
-		await dialog.getByLabel("% of the grade kept").fill("250");
-		await dialog.getByRole("button", { name: "Sanction", exact: true }).click();
-
-		await expect(dialog.getByText(FACTOR_ERROR)).toBeVisible();
-		expect(await active()).toHaveLength(0);
-	});
-
-	await test.step("two students are sanctioned on the whole exam at once", async () => {
-		const dialog = page.getByRole("dialog");
-		await dialog.getByLabel("Target").selectOption({ label: "Whole exam" });
-		await dialog.getByLabel("% of the grade kept").fill("0");
-		await dialog.getByLabel("Reason", { exact: true }).fill(REASON);
-		await dialog.getByLabel("Private notes").fill(NOTES);
-		await dialog.getByRole("button", { name: "Sanction", exact: true }).click();
-
+		await dialog.getByRole("radio", { name: "Add points" }).check();
+		await dialog.getByLabel("Value").fill("5");
+		await dialog.getByLabel(/^Reason/).fill("Extra credit");
+		await dialog.getByRole("button", { name: "Adjust", exact: true }).click();
 		await expect(dialog).toBeHidden();
-		for (const name of ["Ana Prado", "Bia Lima"]) {
-			await expect(resultRow(name).getByRole("deletion")).toHaveText("100%");
-			await expect(resultRow(name).getByRole("insertion")).toHaveText("0%");
+
+		const struck: [string, string, string][] = [
+			["Ana Prado", "50%", "60%"],
+			["Bia Lima", "75%", "80%"],
+			["Caio Nunes", "50%", "88%"],
+			["Davi Rocha", "100%", "0%"],
+			["Eva Tavares", "75%", "80%"],
+			["Fabio Reis", "100%", "88%"],
+		];
+		for (const [name, original, final] of struck) {
+			await expect(resultRow(name).getByRole("deletion")).toHaveText(original);
+			await expect(resultRow(name).getByRole("insertion")).toHaveText(final);
+			await expect(
+				resultRow(name).getByRole("link", { name: "Adjustments" }),
+			).toHaveAttribute("href", `${world.examUrl}/adjustments`);
 		}
-		for (const name of ["Caio Nunes", "Davi Rocha"]) {
-			await expect(resultRow(name).getByRole("deletion")).toHaveCount(0);
-			await expect(resultRow(name).getByRole("cell").last()).toHaveText("100%");
-		}
-		await expect(
-			page.getByRole("button", { name: "Sanction selected" }),
-		).toBeDisabled();
-	});
-
-	await test.step("zeroing the same question twice shows the error in the dialog, then the extra sanction is revoked", async () => {
-		const pick = async () => {
-			await resultRow("Davi Rocha")
-				.getByRole("checkbox", { name: "Select Davi Rocha" })
-				.check();
-			await page.getByRole("button", { name: "Sanction selected" }).click();
-			const dialog = page.getByRole("dialog");
-			await dialog
-				.getByLabel("Target")
-				.selectOption({ label: "First question" });
-			await dialog
-				.getByRole("button", { name: "Sanction", exact: true })
-				.click();
-			return dialog;
-		};
-
-		const first = await pick();
-		await expect(first).toBeHidden();
-		expect(await active()).toHaveLength(3);
-
-		await resultRow("Davi Rocha")
-			.getByRole("checkbox", { name: "Select Davi Rocha" })
-			.waitFor();
-		const second = await pick();
-		await expect(second.getByRole("alert")).toBeVisible();
-		await expect(second.getByRole("alert")).toContainText(davi.username);
-		expect(await active()).toHaveLength(3);
-		await second.getByRole("button", { name: "Cancel" }).click();
-		await expect(second).toBeHidden();
-
-		// Back to the state the next steps read: the extra sanction is revoked on the sanctions page.
-		await page.goto(`${world.examUrl}/sanctions`);
-		await sanctionRow("Davi Rocha")
-			.getByRole("button", { name: "Revoke" })
-			.click();
-		const dialog = page.getByRole("dialog", { name: "Revoke sanction" });
-		await dialog
-			.getByRole("button", { name: "Revoke sanction", exact: true })
-			.click();
-		await expect(dialog).toBeHidden();
-		await expect(sanctionRow("Davi Rocha")).toContainText("Revoked");
-		expect(await active()).toHaveLength(2);
-	});
-
-	await test.step("the sanctions page lists both with their notes", async () => {
-		await page.goto(`${world.examUrl}/results`);
-		await expect(
-			page.getByRole("link", { name: /^Sanctions\s*2$/ }).first(),
-		).toBeVisible();
-		await page
-			.getByRole("link", { name: /^Sanctions/ })
-			.first()
-			.click();
-
-		await expect(page).toHaveURL(`${world.examUrl}/sanctions`);
-		await expect(
-			page.getByRole("heading", { name: "Sanctions", exact: true }),
-		).toBeVisible();
-		for (const name of ["Ana Prado", "Bia Lima"]) {
-			const row = sanctionRow(name);
-			await expect(row).toContainText("Whole exam");
-			await expect(row).toContainText(REASON);
-			await expect(row).toContainText(NOTES);
-			await expect(row).toContainText("Active");
-		}
-		await expect(sanctionRow("Caio Nunes")).toHaveCount(0);
-	});
-
-	await test.step("editing refuses a bad factor, then saves the new notes", async () => {
-		await sanctionRow("Ana Prado")
-			.getByRole("button", { name: "Edit" })
-			.click();
-		const dialog = page.getByRole("dialog", { name: "Edit sanction" });
-		await expect(dialog.getByLabel("% of the grade kept")).toHaveValue("0");
-		await expect(dialog.getByLabel("Reason", { exact: true })).toHaveValue(
-			REASON,
-		);
-		await expect(dialog.getByLabel("Private notes")).toHaveValue(NOTES);
-
-		await dialog.getByLabel("% of the grade kept").fill("250");
-		await dialog.getByRole("button", { name: "Save" }).click();
-		await expect(dialog.getByText(FACTOR_ERROR)).toBeVisible();
-
-		await dialog.getByLabel("% of the grade kept").fill("0");
-		await dialog.getByLabel("Private notes").fill(NEW_NOTES);
-		await dialog.getByRole("button", { name: "Save" }).click();
-
-		await expect(dialog).toBeHidden();
-		await expect(sanctionRow("Ana Prado")).toContainText(NEW_NOTES);
-		await expect(sanctionRow("Ana Prado")).not.toContainText(NOTES);
-		await expect(sanctionRow("Bia Lima")).toContainText(NOTES);
-	});
-
-	await test.step("revoking asks for confirmation and leaves the sanction listed as revoked", async () => {
-		await sanctionRow("Bia Lima")
-			.getByRole("button", { name: "Revoke" })
-			.click();
-		const dialog = page.getByRole("dialog", { name: "Revoke sanction" });
-		await dialog.getByRole("button", { name: "Cancel" }).click();
-		await expect(dialog).toBeHidden();
-		await expect(sanctionRow("Bia Lima")).toContainText("Active");
-
-		await sanctionRow("Bia Lima")
-			.getByRole("button", { name: "Revoke" })
-			.click();
-		await dialog
-			.getByRole("button", { name: "Revoke sanction", exact: true })
-			.click();
-
-		await expect(dialog).toBeHidden();
-		await expect(sanctionRow("Bia Lima")).toContainText("Revoked");
-		await expect(sanctionRow("Bia Lima")).toContainText(REASON);
-		await expect(sanctionRow("Bia Lima").getByRole("button")).toHaveCount(0);
-		await expect(sanctionRow("Ana Prado")).toContainText("Active");
-	});
-
-	await test.step("the attempt of a sanctioned student says so, with the notes", async () => {
-		await page.goto(`${world.examUrl}/attempts/${ana.username}`);
-
-		const banner = page
-			.getByRole("status")
-			.filter({ hasText: "This attempt was sanctioned" });
-		await expect(banner).toContainText(REASON);
-		await expect(banner).toContainText(NEW_NOTES);
-		await banner.getByRole("link", { name: "Manage sanctions" }).click();
-		await expect(page).toHaveURL(`${world.examUrl}/sanctions`);
-	});
-
-	await test.step("a question is zeroed from the student's attempt, after a refused reason", async () => {
-		await page.goto(`${world.examUrl}/attempts/${caio.username}`);
-		const first = page.getByRole("article", {
-			name: "Question 1",
-			exact: true,
-		});
-		const second = page.getByRole("article", {
-			name: "Question 2",
-			exact: true,
-		});
-		await expect(first.getByText("Zeroed", { exact: true })).toHaveCount(0);
-
-		await first.getByRole("button", { name: "Zero question" }).click();
-		const dialog = page.getByRole("dialog", { name: "Zero question" });
-		// The field itself stops a reason longer than the schema allows.
-		await expect(dialog.getByLabel("Reason", { exact: true })).toHaveAttribute(
-			"maxlength",
-			"2000",
-		);
-
-		await dialog.getByLabel("Reason", { exact: true }).fill(REASON);
-		await dialog.getByLabel("Private notes").fill(NOTES);
-		await dialog
-			.getByRole("button", { name: "Zero question", exact: true })
-			.click();
-
-		await expect(dialog).toBeHidden();
-		await expect(first.getByText("Zeroed", { exact: true })).toBeVisible();
-		await expect(
-			first.getByRole("button", { name: "Zero question" }),
-		).toHaveCount(0);
-		await expect(second.getByText("Zeroed", { exact: true })).toHaveCount(0);
-		await expect(
-			second.getByRole("button", { name: "Zero question" }),
-		).toBeVisible();
-
-		await page.goto(`${world.examUrl}/results`);
-		await expect(resultRow("Caio Nunes").getByRole("deletion")).toHaveText(
-			"100%",
-		);
-		await expect(resultRow("Caio Nunes").getByRole("insertion")).toHaveText(
-			"50%",
-		);
-		// Revoking Bia's sanction gave her the original total back.
-		await expect(resultRow("Bia Lima").getByRole("deletion")).toHaveCount(0);
-		await expect(resultRow("Bia Lima").getByRole("cell").last()).toHaveText(
-			"100%",
-		);
-	});
-
-	await test.step("the course grades mark the sanctioned total and only that one", async () => {
-		await page.goto(`${world.href}/grades`);
-
-		const cell = (name: string) =>
-			page
-				.getByRole("row")
-				.filter({ has: page.getByRole("rowheader", { name, exact: true }) })
-				.getByRole("cell");
-		await expect(cell("Ana Prado")).toHaveText([/^0%/]);
-		const marked = cell("Ana Prado").getByRole("link");
-		await expect(marked).toHaveAttribute("title", /^Sanctioned/);
-		await expect(marked).toHaveAttribute("title", new RegExp(REASON));
-		expect(await marked.getAttribute("title")).not.toContain(NEW_NOTES);
-
-		await expect(cell("Bia Lima")).toHaveText(["100%"]);
-		await expect(cell("Bia Lima").getByTitle(/^Sanctioned/)).toHaveCount(0);
-		await expect(cell("Davi Rocha")).toHaveText(["100%"]);
-		await expect(cell("Davi Rocha").getByTitle(/^Sanctioned/)).toHaveCount(0);
+		// Hana's replacement was revoked: nothing is struck through for her.
+		await expect(resultRow("Hana Souza").getByRole("deletion")).toHaveCount(0);
 	});
 });
 

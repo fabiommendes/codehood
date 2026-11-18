@@ -48,6 +48,51 @@ edição, todas candidatas a correção.
 - D4. O worker pull é sempre do instrutor e autentica com a chave `BOT` dele
   (o nome da chave vira `botId`, como em `runner-de-correcao` R1).
 
+## Como foi implementado
+
+O modelo pull está implementado (`src/db/services/grading-job.service.ts`,
+`workers/chalk-worker/`). Onde a proposta abaixo diverge, vale esta seção.
+
+### Trabalho e ciclo de vida
+
+Um `GradingJob` por submissão `SUBMIT` ou `FINAL` (`submissionId @unique`),
+não por par (resposta, questão). Estados (`GradingJobState`):
+
+- `QUEUED`: criado na mesma transação do envio, sem chamada externa.
+- `CLAIMED`: um worker pegou com lease. Lease padrão 120 s, máximo 600 s
+  (`DEFAULT_LEASE_MS`, `MAX_LEASE_MS` em `src/core/schemas/grading-job.ts`).
+  `renew` só pelo dono do lease. Lease vencido volta a `QUEUED` no próximo
+  `claim`, sem cron.
+- `DONE`: o report do dono do lease foi aceito, ou um pass humano fechou o
+  trabalho (o report que chegar depois recebe 409).
+- `FAILED`: `fail` com `retry: true` (ou report `runner-error`) conta uma
+  tentativa; na terceira (`MAX_JOB_ATTEMPTS = 3`) o trabalho vira `FAILED`.
+  `fail` com `retry: false` (worker desligando) devolve a `QUEUED` sem contar.
+  `requeueFailed` volta `FAILED` para `QUEUED` com as tentativas zeradas.
+- `CANCELLED`: um envio novo chegou com o anterior ainda `QUEUED`; o antigo é
+  cancelado e não gasta envio. Com o anterior `CLAIMED`, o envio novo é
+  recusado com 409.
+
+Pull e push que aceitam o mesmo worker não têm prioridade: leva o primeiro
+claim.
+
+### Nota da questão `code`
+
+A nota é `max_i(score_i − penalty × e_i)`, com piso 0, sobre os envios com
+nota (sem `PRETEST_FAILED` nem `WILL_NOT_GRADE`), onde `e_i` é o número de
+envios com nota anteriores a `i` cuja nota é menor que 1. O piso entra depois
+de `scoreCode` (piso -1) e antes do `penalty` da prova. Exemplo com
+`penalty: 0.2`: pré-teste falha, 0.6, 1.0 dá `max(0.6, 1.0 − 0.2) = 0.8`.
+Um pass humano num envio substitui a nota do bot naquele envio. O `penalty`
+vem do `meta.penalty` da questão, padrão 0.2 (`DEFAULT_CODE_PENALTY`), e vale
+0 em prova `PRACTICE`. Código:
+`codeQuestionScore` em `src/services/code-grading.ts`, usado por
+`src/services/exam-result.ts`.
+
+Motivo: segue o CodeRunner do Moodle. O aluno pode reenviar, cada envio
+errado anterior desconta, e um envio pior nunca derruba a melhor nota já
+obtida.
+
 ## Proposta
 
 ### Questão (mdq)

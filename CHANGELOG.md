@@ -28,7 +28,8 @@
 
 - Transições de página: o navegador mantém a página antiga até a nova pintar
   e faz um fade curto entre as duas, sem o quadro em branco. Navbar e sidebar
-  ficam paradas, o sublinhado da aba de links desliza para a aba nova, e as
+  ficam paradas, o curso da sidebar se transforma entre linha e card ao trocar
+  de curso, a troca de tema cresce em círculo a partir do botão, o sublinhado da aba de links desliza para a aba nova, e as
   abas em Solid da prévia de questão deslizam ao trocar.
 - Página de estudantes: "Adicionar estudante" virou um botão de ícone ao lado
   do CSV e abre um modal com abas para e-mail, link de convite e frase-senha.

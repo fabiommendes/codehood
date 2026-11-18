@@ -2,7 +2,6 @@
 type: adr
 status: accepted
 tags: [forms, ui, actions, zod]
-relatedTo: [specs/to-do/forms]
 created: 2026-10-20
 decided: 2026-10-20
 deciders: [fabio, claude]
@@ -15,8 +14,7 @@ deciders: [fabio, claude]
 Os formulários eram escritos à mão: HTML dos campos, atributos de validação,
 schema inline na action e um `alert` único para qualquer erro. O schema zod que
 valida a action já sabe quais campos existem, quais são obrigatórios e quais
-limites têm. O detalhamento e o plano estão em
-[`dev/specs/to-do/forms.md`](../specs/to-do/forms.md).
+limites têm.
 
 ## Options
 
@@ -162,3 +160,25 @@ lança erro para tipos zod que não reconhece; use `widget` ou escreva o campo.
   contrato que quebram se o Astro mudar.
 - Listas dinâmicas, objetos aninhados editáveis e upload ficam fora. Esses
   formulários continuam escritos à mão.
+- `FieldError` carrega um campo só. Um erro de service que envolve dois campos
+  escolhe um deles ou vai para `form.error`.
+- Regras que dependem do papel do usuário (por exemplo, GitHub e id escolar
+  obrigatórios para aluno) ficam na action, não no schema. Por isso só aparecem
+  como erro de campo depois do envio, nunca na validação da ilha.
+- `errorMessage` (`src/forms/field-errors.ts`) troca o "Failed to validate" de
+  um erro de entrada pelas mensagens dos campos onde não há campo para
+  exibi-las.
+
+## Formulários manuais de propósito
+
+Todo formulário com action usa um schema de `src/core/schemas`; nenhuma action
+tem `z.object` inline. Ficam fora da camada, de propósito:
+
+- Diálogos do roster (`roster.astro`): dirigidos por script, só usam
+  `formState`.
+- Respostas de `ExamAttempt`: campos dinâmicos por questão, sem schema fixo.
+- Formulário GET da landing: não chama action.
+- Formulários só com botão (revogar, sair, forçar logout): sem campo a validar.
+- Lista de notas do `RollCallManager`: itens repetidos, não um formulário.
+
+Formulário novo fora desses casos usa `actionForm` ou `createSchemaForm`.

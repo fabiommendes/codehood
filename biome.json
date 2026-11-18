@@ -67,6 +67,67 @@
 	},
 	"overrides": [
 		{
+			"includes": [
+				"**",
+				"!src/db/services/question.service.ts",
+				"!src/db/services/exam-questions.ts",
+				"!src/db/services/submission.service.ts",
+				"!src/db/services/grading-job.service.ts",
+				"!src/db/services/exam.service.ts",
+				"!src/db/services/rubric-store.ts",
+				"!src/db/services/answer-edit.service.ts",
+				"!src/db/bootstrap.ts",
+				"!src/fixtures/**",
+				"!src/mdq/legacy.ts",
+				"!test/**"
+			],
+			"plugins": ["./lint/question-content.grit"]
+		},
+		{
+			"includes": [
+				"**",
+				"!src/db/services/submission.service.ts",
+				"!src/db/services/grading-job.service.ts",
+				"!src/db/services/exam.service.ts",
+				"!src/db/services/rubric-store.ts",
+				"!src/db/services/answer-edit.service.ts",
+				"!src/db/services/exam-questions.ts"
+			],
+			"plugins": ["./lint/pinned-document.grit"]
+		},
+		{
+			"includes": [
+				"src/utils/**",
+				"src/pages/**",
+				"src/actions/**",
+				"src/api/**"
+			],
+			"plugins": ["./lint/question-system-access.grit"]
+		},
+		{
+			"includes": [
+				"**",
+				"!src/db/**",
+				"!test/exam-grant.spec.ts",
+				"!test/exam-freeze.spec.ts"
+			],
+			"linter": {
+				"rules": {
+					"style": {
+						"noRestrictedImports": {
+							"level": "error",
+							"options": {
+								"paths": {
+									"@/core/schemas": "Import the sub-module that defines the schema (@/core/schemas/<module>). Server registries may use @/core/schemas/all.",
+									"@/db/services/exam-questions": "Do not import the grant module outside src/db. Read exam questions through db.examQuestion, which issues and checks the ExamGrant."
+								}
+							}
+						}
+					}
+				}
+			}
+		},
+		{
 			"includes": ["**/*.astro"],
 			"linter": {
 				"rules": {

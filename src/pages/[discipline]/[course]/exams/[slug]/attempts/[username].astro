@@ -1,14 +1,24 @@
 ---
 import CourseHeader from "@/components/CourseHeader.astro";
 import type { AnswerPayload } from "@/components/exam/answer-payload";
-import QuestionNumber from "@/components/exam/QuestionNumber.astro";
+import { QuestionFrame } from "@/components/exam/QuestionFrame";
 import { pointsByPosition } from "@/components/exam/question-points";
 import ReopenAttempt from "@/components/exam/ReopenAttempt";
+import AdjustmentActions from "@/components/grading/AdjustmentActions";
 import Answer from "@/components/grading/Answer.astro";
 import AnswerEditSummary from "@/components/grading/AnswerEditSummary.astro";
 import AppliedItems from "@/components/grading/AppliedItems";
+import AttemptActions from "@/components/grading/AttemptActions";
 import { attemptTotalLabel } from "@/components/grading/attempt-total";
-import SanctionDialog from "@/components/grading/SanctionDialog";
+import Icon from "@/components/grading/Icon.astro";
+import QuestionActions, {
+	UndoGrade,
+} from "@/components/grading/QuestionActions";
+import {
+	MARK_STYLE,
+	MARKS,
+	markLabel,
+} from "@/components/grading/question-mark";
 import AttachmentList from "@/components/question/AttachmentList";
 import { db } from "@/db";
 import { loadResultPolicy } from "@/db/result-policy";
@@ -16,6 +26,7 @@ import { m } from "@/i18n";
 import AppLayout from "@/layouts/AppLayout.astro";
 import { publicForm } from "@/mdq";
 import {
+	ADJUSTMENT_ORDER,
 	adjustmentsByResponse,
 	examResult,
 	formatScore,
@@ -27,9 +38,16 @@ import {
 	canReopenAttempt,
 	personalTiming,
 } from "@/services/exam-state";
-import { attemptRows } from "@/services/grading";
+import {
+	attemptRoster,
+	attemptRows,
+	autoScoreOf,
+	isManualChange,
+	questionMark,
+} from "@/services/grading";
 import { reviewResult } from "@/services/review";
 import { questionAttachmentUrl } from "@/urls";
+import { adjustmentEffect, adjustmentLabel } from "@/utils/adjustment-label";
 import { breadcrumbs } from "@/utils/breadcrumbs";
 import { gradingHref } from "@/utils/grading-urls";
 import { highlightQuestionCodeBlocks } from "@/utils/highlight-code-blocks";
@@ -45,52 +63,61 @@ export const prerender = false;
 const { discipline, course: courseSegment, slug, username } = Astro.params;
 const result = await loadGrading(Astro, discipline, courseSegment, slug, {
 	practice: true,
-	author: username,
 });
 if ("redirect" in result) return result.redirect;
-const { course, href, tabs, exam, questions, attempts, feedback, exceptions } =
-	result;
-
-const attempt = attempts.find((entry) => entry.author === username);
-if (!attempt) return Astro.rewrite("/404");
+const {
+	course,
+	href,
+	tabs,
+	exam,
+	questions,
+	answers,
+	attempts,
+	feedback,
+	exceptions,
+} = result;
 
 // biome-ignore lint/style/noNonNullAssertion: loadGrading already redirected an anonymous visitor.
 const actor = Astro.locals.actor!;
 const now = new Date();
-const [students, stored, sanctions] = await Promise.all([
+const [students, stored, adjustments] = await Promise.all([
 	loadStudents(course.id, actor),
 	db.question.findMany(
 		{ course: course.id, public: false, slugs: questions },
 		{ actor },
 	),
-	db.examAdjustment.findMany(
-		{ course: course.id, exam: exam.slug, author: attempt.author },
-		{ actor },
-	),
+	db.examAdjustment.findMany({ course: course.id, exam: exam.slug }, { actor }),
 ]);
-const sanctionsOf = adjustmentsByResponse(sanctions);
+// An enrolled student without an attempt has a page too, with every question unanswered.
+const attempt = attempts.find((entry) => entry.author === username);
+const student = students.find((entry) => entry.username === username);
+if (!attempt && (!student || student.dropped)) return Astro.rewrite("/404");
+const author = attempt?.author ?? student?.username ?? "";
+
+const adjustmentsOf = adjustmentsByResponse(adjustments);
 const docs = new Map(stored.map((entry) => [entry.slug, entry.question]));
 const versions = new Map(stored.map((entry) => [entry.slug, entry.version]));
 const publicIds = new Map(stored.map((entry) => [entry.slug, entry.publicId]));
 
 const policy = (await loadResultPolicy(course.id))(exam);
 
-// The results table builds its row the same way, so the two never disagree.
-const [row] = attemptRows(
+// The results table builds its rows the same way, so the two never disagree.
+const allRows = attemptRows(
 	exam,
 	exam.questions,
-	[attempt],
+	attempts,
 	feedback,
-	sanctionsOf,
+	adjustmentsOf,
 	students,
 	now,
 	exceptions,
 	policy,
 );
-if (!row) return Astro.rewrite("/404");
-const closed = row.state === "submitted";
+const row = allRows.find((entry) => entry.author === author);
+const name = student?.name ?? row?.name ?? author;
+const closed = row?.state === "submitted";
 // The student's exception, if any, and whether their personal window still lets the attempt reopen.
-const exception = exceptions.get(row.author) ?? null;
+const exception = exceptions.get(author) ?? null;
 const exceptionExtra = exception?.extraTime
 	? m.exams_exceptions_extra({
 			minutes: durationToMinutes(exception.extraTime),
@@ -101,9 +128,12 @@ const exceptionDate = exception?.scheduledAt
 	: null;
 const canReopen =
 	closed &&
+	!!attempt &&
 	!attempt.acceptingSubmissions &&
 	canReopenAttempt(exam, exception, attempt, now);
-const deadline = attemptDeadline(personalTiming(exam, exception), attempt);
+const deadline = attempt
+	? attemptDeadline(personalTiming(exam, exception), attempt)
+	: null;
 // Open regrade requests of this student, by the submission they contest.
 const openRegrades = new Map(
 	(
@@ -112,58 +142,86 @@ const openRegrades = new Map(
 				course: course.id,
 				exam: exam.slug,
 				status: "OPEN",
-				author: attempt.author,
+				author,
 			},
 			{ actor },
 		)
 	).map((request) => [request.submission, request.publicId]),
 );
 // The first attempt of the author, the one `attempt` above holds.
-const edits = await db.answerEdit.summary(
-	{ course: course.id, exam: exam.slug, author: attempt.author },
-	{ actor },
-);
+const edits = attempt
+	? await db.answerEdit.summary(
+			{ course: course.id, exam: exam.slug, author },
+			{ actor },
+		)
+	: { enabled: false, questions: [] };
 const editSummaries = new Map(
 	edits.questions.map((entry) => [entry.question, entry.summary]),
 );
 const outcomes = examResult(
 	exam.questions,
-	attempt.submissions,
+	attempt?.submissions ?? [],
 	feedback,
-	sanctionsOf.get(attempt.publicId) ?? [],
+	attempt ? (adjustmentsOf.get(attempt.publicId) ?? []) : [],
 	policy,
 );
 
-// The sanction on the whole exam, and whether this attempt can take one at all.
-const examAdjustment = sanctions
-	.filter(
-		(entry) =>
-			entry.response === attempt.publicId &&
-			entry.question === null &&
-			entry.op === "FACTOR",
-	)
-	.sort((a, b) => Number(a.value) - Number(b.value))[0];
-const examAdjustmentNotes =
-	examAdjustment && "notes" in examAdjustment ? examAdjustment.notes : null;
-const sanctionable = exam.type !== "PRACTICE";
+// What the instructor changed by hand, by author and question, and the students with any adjustment or change.
+const changedBy = new Map<string, (typeof answers)[number]>();
+const adjusted = new Set(adjustments.map((entry) => entry.author));
+for (const answer of answers) {
+	if (!isManualChange([...answer.passes].reverse(), answer.createdBy)) continue;
+	adjusted.add(answer.author);
+	if (answer.author === author) changedBy.set(answer.question, answer);
+}
+const roster = attemptRoster(students, allRows, adjusted);
+const at = roster.findIndex((entry) => entry.username === author);
+const neighbour = (offset: number) =>
+	at < 0 ? undefined : roster[(at + offset + roster.length) % roster.length];
+
+// The active adjustments of this student: the ones of the whole exam in order of application, and the one of each question.
+const mine = adjustments.filter((entry) => entry.author === author);
+const onExam = ADJUSTMENT_ORDER.flatMap((op) =>
+	mine.filter((entry) => entry.question === null && entry.op === op),
+);
+const onQuestion = new Map(
+	mine
+		.filter((entry) => entry.question !== null && entry.op === "FACTOR")
+		.map((entry) => [entry.question, entry]),
+);
+const notesOf = (entry: object): string | null =>
+	"notes" in entry && typeof entry.notes === "string" ? entry.notes : null;
+const adjustable = exam.type !== "PRACTICE";
+const examHref = `${href}/exams/${exam.slug}`;
 
 const points = pointsByPosition(exam.questions);
 const rows = outcomes.questions.map((outcome, index) => {
 	const doc = docs.get(outcome.question);
-	const counting = attempt.submissions
+	const counting = (attempt?.submissions ?? [])
 		.filter((submission) => submission.question === outcome.question)
-		.reduce<(typeof attempt.submissions)[number] | null>(
+		.reduce<NonNullable<typeof attempt>["submissions"][number] | null>(
 			(newest, submission) =>
 				!newest || submission.createdAt > newest.createdAt
 					? submission
 					: newest,
 			null,
 		);
+	const changedAnswer = changedBy.get(outcome.question);
+	const mark = questionMark(
+		outcome,
+		counting?.payload,
+		changedAnswer !== undefined,
+	);
 	return {
 		label: m.exams_attempt_question_label({ number: index + 1 }),
 		number: index + 1,
 		points: points[index] ?? "0",
 		outcome,
+		mark,
+		autoScore: changedAnswer
+			? autoScoreOf([...changedAnswer.passes].reverse())
+			: null,
+		adjustment: onQuestion.get(outcome.question),
 		title: doc?.title ?? outcome.question,
 		asked: doc ? publicForm(doc) : null,
 		attachmentUrl: (name: string) => {
@@ -194,33 +252,93 @@ const stateLabel = (status: string, score: number | null): string => {
 		return formatScore(score);
 	return m.exams_attempt_waiting();
 };
+/// The color of an adjustment's line: red when it lowers the grade, green when it raises it.
+const lineTone = (entry: { op: string; value: string }): string => {
+	if (entry.op === "SET") return "";
+	const lowers =
+		entry.op === "OFFSET" ? Number(entry.value) < 0 : Number(entry.value) < 1;
+	return lowers ? "text-error" : "text-success";
+};
+/// The total as the automatic grading alone would give it, and how many questions were changed by hand.
+const changedCount = rows.filter((entry) => entry.mark === "changed").length;
+const automaticTotal = ((): number | null => {
+	const weights = exam.questions.map((question) => question.weight);
+	const weightSum = weights.reduce((sum, weight) => sum + weight, 0);
+	if (outcomes.questions.some((outcome) => outcome.status === "pending")) {
+		return null;
+	}
+	if (weightSum === 0) return 0;
+	return (
+		rows.reduce(
+			(sum, entry, index) =>
+				sum +
+				((entry.mark === "changed" ? entry.autoScore : entry.outcome.score) ??
+					0) *
+					(weights[index] ?? 0),
+			0,
+		) / weightSum
+	);
+})();
+const totalText = (total: number | null | undefined): string =>
+	total == null ? m.grades_adjustment_total_pending() : formatScore(total);
 ---
 
-<AppLayout title={`${row.name} · ${exam.title}`}
-  trail={breadcrumbs(Astro.url, { course, item: exam.title, student: row.name })}
-  nav={await gradingExamNav(result, actor, row.name)}
+<AppLayout title={`${name} · ${exam.title}`}
+  trail={breadcrumbs(Astro.url, { course, item: exam.title, student: name })}
+  nav={await gradingExamNav(result, actor, name, adjustments)}
 >
   <CourseHeader course={course} tabs={tabs} active="exams" />
 
-  <h2 class="mt-6 page-subheader">
-    {row.name}
-    {row.dropped && <span class="badge badge-outline badge-sm ml-2">{m.exams_attempt_dropped()}</span>}
-  </h2>
+  <div class="mt-6 flex flex-wrap items-center justify-between gap-2">
+    <div class="flex items-center gap-1">
+      {neighbour(-1) && (
+        <a href={`${examHref}/attempts/${neighbour(-1)?.username}`} class="btn btn-ghost btn-sm btn-square text-base-content/60" aria-label={m.grades_adjustment_previous_student()} title={m.grades_adjustment_previous_student()}>
+          <Icon name="chevronLeft" />
+        </a>
+      )}
+      <h2 class="page-subheader">
+        {name}
+        {student?.dropped && <span class="badge badge-outline badge-sm ml-2">{m.exams_attempt_dropped()}</span>}
+      </h2>
+      {neighbour(1) && (
+        <a href={`${examHref}/attempts/${neighbour(1)?.username}`} class="btn btn-ghost btn-sm btn-square text-base-content/60" aria-label={m.grades_adjustment_next_student()} title={m.grades_adjustment_next_student()}>
+          <Icon name="chevronRight" />
+        </a>
+      )}
+    </div>
+    <AttemptActions
+      client:load
+      discipline={discipline!}
+      course={courseSegment!}
+      exam={exam.slug}
+      author={author}
+      base={outcomes.original?.total ?? outcomes.total}
+      adjustments={onExam.map((entry) => ({ op: entry.op, value: entry.value }))}
+      roster={roster}
+      attemptHref={`${examHref}/attempts`}
+      adjustable={adjustable}
+    />
+  </div>
 
   <dl class="mt-4 grid grid-cols-1 gap-x-8 gap-y-3 rounded-box border border-edge bg-base-100 p-6 sm:grid-cols-3">
     <div>
       <dt class="text-sm text-muted">{m.exams_attempt_started()}</dt>
-      <dd class="mt-0.5 font-medium">{formatDateTime(row.startedAt, { year: "numeric" })}</dd>
+      <dd class="mt-0.5 font-medium">{row ? formatDateTime(row.startedAt, { year: "numeric" }) : "—"}</dd>
     </div>
     <div>
       <dt class="text-sm text-muted">{m.exams_attempt_submitted()}</dt>
       <dd class="mt-0.5 font-medium">
-        {closed ? formatDateTime(attemptClosedAt(attempt) ?? deadline ?? attempt.updatedAt, { year: "numeric" }) : m.exams_attempt_in_progress()}
+        {!row ? "—" : closed && attempt ? formatDateTime(attemptClosedAt(attempt) ?? deadline ?? attempt.updatedAt, { year: "numeric" }) : m.exams_attempt_in_progress()}
       </dd>
     </div>
     <div>
       <dt class="text-sm text-muted">{m.exams_attempt_total()}</dt>
-      <dd class="mt-0.5 font-medium">{attemptTotalLabel(row.total, row.state)}</dd>
+      <dd class="mt-0.5 font-medium">
+        {row ? attemptTotalLabel(row.total, row.state) : m.grades_adjustment_status_none()}
+        {changedCount > 0 && automaticTotal !== null && (
+          <span class="text-sm font-normal text-muted">{m.grades_adjustment_total_detail({ total: formatScore(automaticTotal), count: changedCount })}</span>
+        )}
+      </dd>
     </div>
   </dl>
 
@@ -230,41 +348,47 @@ const stateLabel = (status: string, score: number | null): string => {
         <span class="font-medium">{m.exams_attempt_exception()}:</span>{" "}
         {[exceptionExtra, exceptionDate && m.exams_detail_new_date({ date: exceptionDate })].filter(Boolean).join(" · ")}
         {" · "}
-        <a class="link" href={`${href}/exams/${exam.slug}/exceptions`}>{m.exams_attempt_edit_exception()}</a>
+        <a class="link" href={`${examHref}/exceptions`}>{m.exams_attempt_edit_exception()}</a>
       </p>
     )
   }
 
   {
-    examAdjustment && (
-      <div role="status" class="alert alert-error alert-soft mt-4 block text-sm">
-        <p class="font-semibold">{m.grades_sanction_banner_title()}</p>
-        <p>{Number(examAdjustment.value) === 0 ? m.grades_sanction_banner_zeroed() : m.grades_sanction_banner_factor({ percent: Math.round(Number(examAdjustment.value) * 100) })}</p>
-        {examAdjustment.reason && <p class="whitespace-pre-wrap">{m.grades_sanction_banner_reason({ reason: examAdjustment.reason })}</p>}
-        {examAdjustmentNotes && (
-          <p class="whitespace-pre-wrap">{m.grades_sanction_banner_notes({ notes: examAdjustmentNotes })}</p>
-        )}
-        <p class="mt-1"><a class="link" href={`${href}/exams/${exam.slug}/sanctions`}>{m.grades_sanction_manage()}</a></p>
-      </div>
-    )
-  }
-
-  {
-    sanctionable && !examAdjustment && (
-      <div class="mt-4">
-        <SanctionDialog
-          client:load
-          discipline={discipline!}
-          course={courseSegment!}
-          exam={exam.slug}
-          usernames={[row.author]}
-          questions={rows.map((entry) => ({ slug: entry.outcome.question, title: entry.title }))}
-          triggerLabel={m.grades_sanction_exam_button()}
-          triggerClass="btn btn-outline btn-error btn-sm"
-          title={m.grades_sanction_exam_button()}
-          submitLabel={m.grades_sanction_submit()}
-        />
-      </div>
+    onExam.length > 0 && (
+      <section aria-label={m.grades_adjustment_summary()} class="mt-4 rounded-box border border-edge bg-base-100 p-4 text-sm">
+        <h3 class="font-semibold">{m.grades_adjustment_summary()}</h3>
+        <dl class="mt-2 grid grid-cols-[1fr_auto_auto] items-center gap-y-1 tabular-nums">
+          <dt class="text-muted">{m.grades_adjustment_original_total()}</dt>
+          <dd class="px-3 text-right">{totalText(outcomes.original?.total)}</dd>
+          <span class="w-18"></span>
+          {onExam.map((entry) => (
+            <>
+              <dt>
+                <span class:list={["font-medium", lineTone(entry)]}>{adjustmentLabel({ op: entry.op, value: Number(entry.value) })}</span>
+                {entry.reason && <span class="text-muted"> · {entry.reason}</span>}
+              </dt>
+              <dd class:list={["px-3 text-right", lineTone(entry)]}>{adjustmentEffect({ op: entry.op, value: Number(entry.value) })}</dd>
+              <span class="flex w-18 justify-end">
+                <AdjustmentActions
+                  client:load
+                  discipline={discipline!}
+                  course={courseSegment!}
+                  exam={exam.slug}
+                  adjustment={entry.publicId}
+                  updatedAt={entry.updatedAt.toISOString()}
+                  op={entry.op}
+                  value={entry.value}
+                  reason={entry.reason}
+                  notes={notesOf(entry)}
+                />
+              </span>
+            </>
+          ))}
+          <dt class="border-t border-edge pt-1 font-semibold">{m.grades_adjustment_final_total()}</dt>
+          <dd class="border-t border-edge px-3 pt-1 text-right font-semibold">{totalText(outcomes.total)}</dd>
+          <span class="w-18 pt-1"></span>
+        </dl>
+      </section>
     )
   }
 
@@ -276,75 +400,102 @@ const stateLabel = (status: string, score: number | null): string => {
           discipline={discipline!}
           course={courseSegment!}
           exam={exam.slug}
-          username={row.author}
+          username={author}
         />
       </div>
     )
   }
 
-  <div class="mt-8 flex flex-col gap-6">
+  <nav aria-label={m.grades_adjustment_questions_nav()} class="sticky top-14 z-20 mt-6 flex flex-wrap items-center gap-x-4 gap-y-2 rounded-box border border-edge bg-base-100/90 px-3 py-2 backdrop-blur">
+    <div class="flex flex-wrap gap-1.5">
+      {rows.map((entry) => (
+        <a
+          href={`#question-${entry.number}`}
+          class={`btn btn-sm min-w-12 font-mono ${MARK_STYLE[entry.mark].chip}`}
+          aria-label={m.grades_adjustment_question_state({ number: entry.number, state: markLabel(entry.mark) })}
+          title={`Q${entry.number}: ${markLabel(entry.mark)}`}
+        >Q{entry.number}</a>
+      ))}
+    </div>
+    <ul class="flex flex-wrap gap-x-3 gap-y-1 text-xs text-muted" aria-label={m.grades_adjustment_legend()}>
+      {MARKS.map((mark) => (
+        <li class="flex items-center gap-1"><span class={`inline-block size-2.5 rounded-full ${MARK_STYLE[mark].dot}`}></span>{markLabel(mark)}</li>
+      ))}
+    </ul>
+  </nav>
+
+  <div class="mt-6 flex flex-col gap-8">
     {
-      rows.map(({ label, number, points, outcome, title, asked, attachmentUrl, counting, review, edits: editSummary }) => (
-        <article id={counting ? `answer-${counting.publicId}` : undefined} aria-label={label} class="card card-border bg-base-100">
-          <div class="card-body">
-            <p class="text-sm"><QuestionNumber number={number} points={points} /></p>
-            <div class="flex flex-wrap items-center justify-between gap-2">
-              <h3 class="text-lg font-semibold">{title}</h3>
-              {outcome.adjustment ? (
-                <a class="badge badge-error badge-sm" href={`${href}/exams/${exam.slug}/sanctions`}>
-                  {outcome.adjustment.value === 0 ? m.grades_sanction_zeroed() : m.grades_sanction_reduced({ factor: outcome.adjustment.value })}
-                </a>
-              ) : (
-                sanctionable && (
-                  <SanctionDialog
-                    client:load
-                    discipline={discipline!}
-                    course={courseSegment!}
-                    exam={exam.slug}
-                    usernames={[row.author]}
-                    question={outcome.question}
-                    triggerLabel={m.grades_sanction_zero_button()}
-                    triggerClass="btn btn-outline btn-error btn-xs"
-                    title={m.grades_sanction_zero_button()}
-                    submitLabel={m.grades_sanction_zero_button()}
-                  />
-                )
-              )}
+      rows.map(({ label, number, points, outcome, mark, autoScore, adjustment, title, asked, attachmentUrl, counting, review, edits: editSummary }) => (
+        <article id={counting ? `answer-${counting.publicId}` : undefined} aria-label={label}>
+          <QuestionFrame number={number} title={title} tone={MARK_STYLE[mark].tone} points={points}>
+            <div class="flex flex-col gap-3">
+            <div class="flex flex-wrap items-center justify-end gap-2">
+              <QuestionActions
+                client:load
+                target={{ discipline: discipline!, course: courseSegment!, exam: exam.slug, question: outcome.question }}
+                number={number}
+                author={author}
+                submission={counting?.publicId ?? null}
+                score={outcome.score}
+                unadjusted={outcome.adjustment?.original.score ?? outcome.score}
+                adjustable={adjustable}
+                adjustment={adjustment && {
+                  publicId: adjustment.publicId,
+                  updatedAt: adjustment.updatedAt.toISOString(),
+                  value: adjustment.value,
+                  reason: adjustment.reason,
+                  notes: notesOf(adjustment),
+                  label: adjustmentLabel({ op: "FACTOR", value: Number(adjustment.value) }),
+                }}
+              />
             </div>
             <AttachmentList attachments={asked?.attachments} url={attachmentUrl} codeBlocks={attachmentBlocks} />
-            {counting && answeredAfterDeadline(deadline, counting.createdAt) && (
-              <span class="badge badge-warning badge-sm">{m.exams_attempt_answered_late({ seconds: Math.round((counting.createdAt.getTime() - deadline!.getTime()) / 1000) })}</span>
+            {counting && deadline && answeredAfterDeadline(deadline, counting.createdAt) && (
+              <span class="badge badge-warning badge-sm">{m.exams_attempt_answered_late({ seconds: Math.round((counting.createdAt.getTime() - deadline.getTime()) / 1000) })}</span>
             )}
             {counting && openRegrades.has(counting.publicId) && (
-              <a href={`${href}/exams/${exam.slug}/regrades#regrade-${openRegrades.get(counting.publicId)}`} class="badge badge-warning badge-sm">{m.grades_regrade_requested()}</a>
+              <a href={`${examHref}/regrades#regrade-${openRegrades.get(counting.publicId)}`} class="badge badge-warning badge-sm">{m.grades_regrade_requested()}</a>
             )}
-            {counting && asked ? (
+            {counting && counting.payload !== null && asked ? (
               <>
                 <Answer question={asked} payload={counting.payload as AnswerPayload} result={review} submission={counting.publicId} />
-                <p class="mt-4 font-semibold">{stateLabel(outcome.status, outcome.score)}</p>
+                {mark !== "changed" && <p class="mt-2 font-semibold">{stateLabel(outcome.status, outcome.score)}</p>}
                 <AppliedItems items={outcome.rubricItems ?? []} />
-                {outcome.comments.map((comment) => (
-                  <p class="whitespace-pre-wrap text-sm text-base-content/70">{comment}</p>
-                ))}
-                {closed && (
-                  <p class="mt-2">
-                    <a
-                      class="link"
-                      href={gradingHref(`${href}/exams/${exam.slug}/grading/${outcome.question}`, {
-                        names: true,
-                        anchor: `answer-${counting.publicId}`,
-                      })}
-                    >
-                      {m.exams_attempt_grade_this()}
-                    </a>
-                  </p>
-                )}
               </>
             ) : (
               <p class="text-muted">{m.exams_attempt_not_answered()}</p>
             )}
+            {mark === "changed" && counting && (
+              <div class="flex flex-wrap items-center gap-x-3 gap-y-2 border-t border-edge pt-3">
+                <span class="tabular-nums">
+                  <span class="text-muted line-through">{autoScore === null ? m.grades_adjustment_no_answer() : formatScore(autoScore)}</span> →{" "}
+                  <strong>{formatScore(outcome.score ?? 0)}</strong>{" "}
+                  <span class="badge badge-sm border-yellow-200 bg-yellow-50 text-yellow-800">{m.grades_adjustment_changed_by_hand()}</span>
+                </span>
+                <span class="flex-1"></span>
+                <UndoGrade client:load target={{ discipline: discipline!, course: courseSegment!, exam: exam.slug, question: outcome.question }} submission={counting.publicId} />
+              </div>
+            )}
+            {outcome.comments.map((comment) => (
+              <p class="whitespace-pre-wrap text-sm text-base-content/70">{comment}</p>
+            ))}
+            {counting && counting.payload !== null && asked && closed && (
+              <p>
+                <a
+                  class="link"
+                  href={gradingHref(`${examHref}/grading/${outcome.question}`, {
+                    names: true,
+                    anchor: `answer-${counting.publicId}`,
+                  })}
+                >
+                  {m.exams_attempt_grade_this()}
+                </a>
+              </p>
+            )}
             {editSummary && <AnswerEditSummary summary={editSummary} enabled={edits.enabled} />}
-          </div>
+            </div>
+          </QuestionFrame>
         </article>
       ))
     }

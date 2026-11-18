@@ -1,7 +1,5 @@
 /**
- * Stories of grading one question against a rubric (spec
- * `dev/specs/to-do/rubrica-de-correcao.md`, R23 to R29). The screens do not
- * exist yet; this file is the contract they are built to. Texts are the English
+ * Stories of grading one question against a rubric. Texts are the English
  * ones. Anything not listed here is free for the implementer to choose.
  *
  * UI contract of `grading/<question>` (all names are accessible names):

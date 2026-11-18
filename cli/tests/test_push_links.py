@@ -1,8 +1,7 @@
 """
 Tests for `codehood.push.links` and the event attachment it feeds: a markdown
 link inside a `calendar.md` lesson to a file under `resources/` attaches that
-resource to the lesson's event. See `dev/specs/to-do/resources-on-calendar-events.md`,
-R7.
+resource to the lesson's event.
 """
 
 from __future__ import annotations

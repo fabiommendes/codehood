@@ -42,7 +42,7 @@ curso arquivado em `student#see-my-courses`.
 Arquivar é o momento de decidir se o histórico de edição de respostas
 (`AnswerEditHistory` e filhas) é compactado ou apagado: é o maior dado de aluno
 que o curso carrega e não serve à leitura de um curso arquivado. A medição da
-T9 (`dev/specs/to-review/historico-de-edicao-no-servidor.md`) dá de 64 a 128 KiB
+T9 (`dev/issues/historico-de-edicao-limites-medidos.md`) dá de 64 a 128 KiB
 gravados por tentativa realista e de 6 a 13 MiB por prova de 100 alunos.
 
 - `pnpm run manage answer-history-stats <curso> [prova]` mede o que o curso

@@ -487,8 +487,12 @@ export interface AttemptRow {
 	adjustments?: ExamResult["adjustments"];
 	/// The total before the adjustments of the exam, with `adjustments`.
 	original?: ExamResult["original"];
+	/// The total with no adjustment at all, question or exam, when the closed attempt has any active one.
+	unadjusted?: number | null;
 	/// When the student started the attempt.
 	startedAt: Date;
+	/// The instructor who created the attempt, `null` or absent when the student started it.
+	createdBy?: string | null;
 }
 
 /**
@@ -500,7 +504,7 @@ export interface AttemptRow {
  *
  * @params questions The exam's questions with their weights, in exam order.
  * @params feedback Every grading pass on the exam, released or not.
- * @params sanctions The active adjustments of each attempt, by the attempt's `publicId`.
+ * @params adjustments The active adjustments of each attempt, by the attempt's `publicId`.
  * @params students The course's students, dropped ones included.
  * @params exceptions The exam's exceptions, by username; each attempt is `in-progress` or `submitted` by its author's personal timing, as in {@link countingAnswers}.
  * @params policy How the exam discounts `code` submissions, as in `examResult`.
@@ -510,7 +514,7 @@ export function attemptRows(
 	questions: readonly WeightedQuestion[],
 	attempts: GradingAttempt[],
 	feedback: GradingFeedback[],
-	sanctions: ReadonlyMap<string, ResultAdjustment[]>,
+	adjustments: ReadonlyMap<string, ResultAdjustment[]>,
 	students: GradedStudent[],
 	now: Date,
 	exceptions: ReadonlyMap<string, ExceptionTiming> = new Map(),
@@ -531,15 +535,14 @@ export function attemptRows(
 				.map((submission) => submission.question)
 				.filter((slug) => slugs.includes(slug)),
 		).size;
+		const active = adjustments.get(attempt.publicId) ?? [];
 		const result = closed
-			? examResult(
-					questions,
-					attempt.submissions,
-					feedback,
-					sanctions.get(attempt.publicId) ?? [],
-					policy,
-				)
+			? examResult(questions, attempt.submissions, feedback, active, policy)
 			: null;
+		const unadjusted =
+			closed && active.length > 0
+				? examResult(questions, attempt.submissions, feedback, [], policy).total
+				: undefined;
 		return {
 			author: attempt.author,
 			name: student?.name ?? attempt.author,
@@ -552,7 +555,9 @@ export function attemptRows(
 			...(result?.adjustments
 				? { adjustments: result.adjustments, original: result.original }
 				: {}),
+			...(unadjusted !== undefined ? { unadjusted } : {}),
 			startedAt: attempt.createdAt,
+			...(attempt.createdBy ? { createdBy: attempt.createdBy } : {}),
 		};
 	});
 
@@ -577,4 +582,82 @@ export function compareStudents(
 		a.name.localeCompare(b.name, undefined, { sensitivity: "base" }) ||
 		a.username.localeCompare(b.username)
 	);
+}
+
+/// How a student stands on the attempt page's roster.
+export type RosterStatus =
+	| "none"
+	| "in-progress"
+	| "pending"
+	| "adjusted"
+	| "submitted";
+
+/// One student of the attempt page's roster.
+export interface RosterRow {
+	username: string;
+	name: string;
+	/// The student's school registration, `null` when they have none.
+	schoolId: string | null;
+	/// The attempt's total in `[-1, 1]`, or `null` without a closed attempt or with an answer pending.
+	total: number | null;
+	status: RosterStatus;
+}
+
+/**
+ * One row per active student, sorted by name: `none` without an attempt or with an empty one the instructor created; `in-progress` while open; `pending` with a pending answer; `adjusted` with any active adjustment or manual change; else `submitted`.
+ *
+ * @params adjusted The usernames with an active adjustment or a grade changed by hand.
+ */
+export function attemptRoster(
+	students: readonly (GradedStudent & { schoolId: string | null })[],
+	rows: readonly AttemptRow[],
+	adjusted: ReadonlySet<string>,
+): RosterRow[] {
+	const rowsByAuthor = new Map(rows.map((row) => [row.author, row]));
+	return students
+		.filter((student) => !student.dropped)
+		.sort(compareStudents)
+		.map((student): RosterRow => {
+			const row = rowsByAuthor.get(student.username);
+			const base = {
+				username: student.username,
+				name: student.name,
+				schoolId: student.schoolId,
+				total: row?.total ?? null,
+			};
+			if (!row) return { ...base, status: "none" };
+			if (row.state === "in-progress")
+				return { ...base, status: "in-progress" };
+			if (row.pending > 0) return { ...base, status: "pending" };
+			if (adjusted.has(student.username))
+				return { ...base, status: "adjusted" };
+			if (row.createdBy && row.answered === 0)
+				return { ...base, status: "none" };
+			return { ...base, status: "submitted" };
+		});
+}
+
+/// The state color of a question on the attempt page.
+export type QuestionMark =
+	| "correct"
+	| "partial"
+	| "wrong"
+	| "blank"
+	| "changed"
+	| "pending"
+	| "not-graded";
+
+/** The state color of a question on the attempt page: `changed` wins, then blank (no counting submission or null payload), then status and score (≥ 1 correct, > 0 partial, else wrong). */
+export function questionMark(
+	outcome: QuestionOutcome,
+	payload: unknown,
+	changed: boolean,
+): QuestionMark {
+	if (changed) return "changed";
+	if (outcome.submission === undefined || payload == null) return "blank";
+	if (outcome.status === "pending") return "pending";
+	if (outcome.status === "not-graded") return "not-graded";
+	const score = outcome.score ?? 0;
+	if (score >= 1) return "correct";
+	return score > 0 ? "partial" : "wrong";
 }

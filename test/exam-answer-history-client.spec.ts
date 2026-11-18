@@ -14,9 +14,9 @@ import { parseDevalue } from "./helpers/devalue-lite";
 import { logInAs, resetDatabase } from "./stories/helpers";
 
 // The student's page against the real history actions, with the development
-// switch on (spec `historico-de-edicao-no-servidor`, T6): R25 and R26 (the
-// transport and the final flush), R27 (local identity), R28 (the local copy is
-// erased), R29 and R31 (the exam switch reaches an open page).
+// switch on (RFC `dev/rfc/historico-de-edicao-de-respostas-abertas.md`): the
+// transport and the final flush, local identity, the local copy is erased,
+// and the exam switch reaches an open page.
 //
 // The history is sent every 55 to 65 s, so the tests do not wait for the
 // cadence: they hide the page, which is one of the moments the page flushes

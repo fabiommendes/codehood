@@ -20,15 +20,15 @@ export interface ExamNavInput {
 	pending?: number;
 	/// Regrade requests still open.
 	regrades?: number;
-	/// Sanctions still active.
-	sanctions?: number;
+	/// Adjustments still active.
+	adjustments?: number;
 }
 
 /**
  * Builds the course card links for every page of one exam.
  *
  * The manager gets one list: overview and preview, then exceptions,
- * grading, regrades, sanctions and results (practice exams have only the first two).
+ * grading, regrades, adjustments and results (practice exams have only the first two).
  * Students get the sections of the exam page.
  */
 export function examNav(input: ExamNavInput): CourseNav {
@@ -70,9 +70,9 @@ export function examNav(input: ExamNavInput): CourseNav {
 				meta: input.regrades || undefined,
 			},
 			{
-				label: m.grades_sanction_title(),
-				href: `${input.href}/sanctions`,
-				meta: input.sanctions || undefined,
+				label: m.grades_adjustment_title(),
+				href: `${input.href}/adjustments`,
+				meta: input.adjustments || undefined,
 			},
 			{
 				label: m.grades_results_title(),

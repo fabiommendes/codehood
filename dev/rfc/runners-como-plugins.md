@@ -320,7 +320,7 @@ O que o plugin mostrou:
 
 - Carregar plugins em runtime por URL. Os plugins entram só no build; trocar
   de plugin exige um novo release.
-- O runner de correção (`dev/specs/to-review/runner-de-correcao.md`). O
+- O runner de correção (hoje o chalk-worker, `workers/chalk-worker/`). O
   descritor pode ganhar uma metade `grader` depois.
 - Plugins de outras categorias (tipos de questão, temas). O formato do
   config já tem lugar para elas.

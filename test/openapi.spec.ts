@@ -151,8 +151,8 @@ test("time slots are documented only under their course, and the flat /api/time-
 });
 
 // Every `/api/course/{discipline}/{course}/...` collection carries its course
-// in the path, so its `GET` query string must never re-offer it as a field —
-// see `dev/specs/to-review/course-ref-unification.md`. `feedback` is nested
+// in the path, so its `GET` query string must never re-offer it as a field.
+// `feedback` is nested
 // one level deeper, under the submission it grades.
 const courseScopedCollections = [
 	"/api/course/{discipline}/{course}/calendar-event",

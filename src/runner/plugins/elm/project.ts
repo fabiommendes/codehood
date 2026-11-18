@@ -90,27 +90,7 @@ export function elmJson(): string {
 	);
 }
 
-/// 32-bit FNV-1a of `text`, in hex.
-function fnv1a(text: string): string {
-	let hash = 0x811c9dc5;
-	for (let i = 0; i < text.length; i++) {
-		hash ^= text.charCodeAt(i);
-		hash = Math.imul(hash, 0x01000193);
-	}
-	return (hash >>> 0).toString(16).padStart(8, "0");
-}
-
-/**
- * Directory of the cache under `/runner/rt/`.
- *
- * Changes with the compiler version and with the package list, so a browser
- * never mixes a cache with a compiler it was not built by.
- */
-export function elmCacheDir(compilerVersion: string): string {
-	return `elm-cache@${compilerVersion}-${fnv1a(elmJson())}`;
-}
-
-/// Name of the cache file inside `elmCacheDir`.
+/// Name of the cache file the build emits into the versioned bundle.
 export const ELM_CACHE_FILE = "elm-cache.bin";
 
 /**

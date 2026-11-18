@@ -44,4 +44,4 @@ emitindo as duas credenciais para clientes distintos; enviá-las juntas é erro.
 
 Um novo endpoint permanece protegido por padrão e só entra na ponte quando
 registrado como JSON no registro REST. Detalhes e limites do contrato estão em
-`dev/specs/to-review/rest-batch.md`.
+`src/api/README.md` (seção `rest.batch`).

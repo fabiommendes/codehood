@@ -1,6 +1,5 @@
 /**
- * Pure rubric rules (spec `dev/specs/to-do/rubrica-de-correcao.md`, R5 to R7,
- * R11, R12, R13, R15, R19a), tested against `src/services/rubric.ts`.
+ * Pure rubric rules, tested against `src/services/rubric.ts`.
  *
  * API the tests expect from `@/services/rubric` (no database, no I/O):
  *

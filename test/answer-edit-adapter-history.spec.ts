@@ -14,7 +14,7 @@ import {
 	rig,
 } from "./helpers/answer-edit-coordinator";
 
-// R24, R26 and R28 (spec `historico-de-edicao-no-servidor`) as seen through
+// RFC `historico-de-edicao-de-respostas-abertas`, as seen through
 // the adapter.
 //
 // Assumed signatures, the spec names the methods only:

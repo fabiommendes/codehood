@@ -281,7 +281,8 @@ test.describe("breadcrumb trails on real pages", () => {
 
 		await test.step("grading question keeps names=1 on the Grading link, with no student name", async () => {
 			await page.goto(`${href}/exams/mt1/grading/capq?names=1`);
-			await expect(page.locator("main")).toContainText("Zelda Quixote");
+			// The objective page shows names only inside the group dialogs.
+			await expect(page.locator("main")).toContainText("Distinct texts");
 			const got = await readTrail(page);
 			expect(got.links).toEqual([
 				home,

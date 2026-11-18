@@ -42,7 +42,7 @@ const phase = examPhase(
 	new Date(),
 );
 const examHref = `${href}/exams/${exam.slug}`;
-// A sanctioned attempt carries the total it would have without the sanctions.
+// An adjusted attempt carries the total it would have without the adjustments.
 const resultRows = data.resultRows.map((row) =>
 	data.originalTotals.has(row.author)
 		? { ...row, unadjusted: data.originalTotals.get(row.author) ?? null }
@@ -58,7 +58,7 @@ const resultRows = data.resultRows.map((row) =>
     manage: true,
     pending: data.pending,
     regrades: data.openRegrades,
-    sanctions: data.sanctions,
+    adjustments: data.adjustments,
   })}
 >
   <CourseHeader course={course} tabs={tabs} active="exams" />

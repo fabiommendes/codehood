@@ -16,7 +16,7 @@ The REST API lives under `/api/*` and is addressed as described in
 `rest.batch` on `/rpc` dispatches JSON-only operations through the same REST
 views, in order, without internal HTTP or a global transaction. It excludes
 login/logout, multipart and pages outside the registry. See
-[the contract](../../dev/specs/to-review/rest-batch.md) for limits and examples.
+[`rest.batch`](#restbatch) below for the contract.
 
 A list route answers `{ items, next, prev }`: one page and the cursors of the
 pages around it, `null` where the list ends. `CRUD()` pages a resource whose
@@ -117,3 +117,40 @@ Outside this directory:
 which `pnpm run generate` runs before `dev` and `build` (why it exists: ADR
 0007). `test/bruno/openapi.json` is a checked-in snapshot used by the Bruno
 request collection, not what the server serves.
+
+## `rest.batch`
+
+`params: {verb, requests: [{id, path, body?, query?}]}`. `verb` is one of
+GET, POST, PUT, PATCH, DELETE and applies to every item. GET and DELETE take
+`query` (strings or lists of strings, coerced as in REST); the other verbs
+take a JSON `body`. A path is a local absolute `/api/` path with no origin,
+query string, fragment, double slash or dot segment. The result is a list of
+`{id, status, body}` in request order. Ids may repeat and are not
+deduplicated, so a resend may repeat side effects.
+
+Items run one after another with no transaction: a failing item neither
+undoes the earlier ones nor stops the later ones. Per-item statuses: 400 for
+an invalid path, a field the verb does not take or an excluded route; 404 for
+no route; 405 for a verb the route does not register; 413 for an item over
+the limit. Domain errors keep their REST status.
+
+Limits: at most 50 items, 64 KiB of UTF-8 per serialized item, 1 MiB for the
+whole `/rpc` body (counted while reading, independent of `Content-Length`;
+over it the HTTP answer is 413 and nothing runs), 50 calls per JSON-RPC batch.
+The limits apply to input, not output: use the REST filters to keep responses
+small. A bad envelope fails as a whole (`-32602`; no credentials, `-32001`).
+
+```json
+{
+  "jsonrpc": "2.0",
+  "id": "read",
+  "method": "rest.batch",
+  "params": {
+    "verb": "GET",
+    "requests": [
+      {"id": "me", "path": "/api/user/me"},
+      {"id": "admins", "path": "/api/user", "query": {"usernames": ["admin"]}}
+    ]
+  }
+}
+```

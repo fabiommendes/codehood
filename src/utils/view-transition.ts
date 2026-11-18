@@ -12,3 +12,14 @@ export function withViewTransition(update: () => void): void {
 	}
 	document.startViewTransition(update);
 }
+
+/**
+ * The view transition name of a course in the sidebar, the same for its row
+ * and its card, so one morphs into the other between pages.
+ *
+ * @example
+ * courseTransitionName("/cs101/ada_2026-2"); // "course--cs101-ada_2026-2"
+ */
+export function courseTransitionName(href: string): string {
+	return `course-${href.replace(/[^\w-]/g, "-")}`;
+}

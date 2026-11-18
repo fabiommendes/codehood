@@ -2,7 +2,7 @@
 type: issue
 status: backlog
 tags: [ux, grading, mobile, exams]
-relatedTo: [ux-principles, web-grading, grades-table, navigation]
+relatedTo: [ux-principles, grades-table, navigation]
 kind: defect
 created: 2026-09-29
 creator: Fábio Macêdo Mendes

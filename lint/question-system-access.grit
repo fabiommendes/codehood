@@ -1,0 +1,12 @@
+language js
+
+// `db.question.*` called as the system reads every version of a question,
+// which a request handler must never do on behalf of a user. `biome.json`
+// applies this rule to `src/utils`, `src/pages`, `src/actions` and `src/api`.
+`db.question.$method($args)` as $found where {
+	$args <: contains or {
+		`FULL_ACCESS`,
+		`SYSTEM`
+	},
+	register_diagnostic(span=$found, message="`db.question.*` with `FULL_ACCESS` or `SYSTEM` bypasses question permissions. In `src/utils`, `src/pages`, `src/actions` and `src/api`, pass the user's actor, or read the exam through `db.examQuestion`.", severity="error")
+}

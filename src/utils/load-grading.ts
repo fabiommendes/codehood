@@ -151,21 +151,22 @@ export async function loadExamGrading(
 }
 
 /**
- * The students of a course, dropped ones included.
+ * The students of a course, dropped ones included, each with the school registration they have.
  *
  * Active students come first, then the dropped ones.
  */
 export async function loadStudents(
 	course: Course["id"],
 	actor: UserActor,
-): Promise<GradedStudent[]> {
+): Promise<(GradedStudent & { schoolId: string | null })[]> {
 	const rows = await db.enrollment.findMany(
 		{ course, status: ["ACTIVE", "DROPPED"] },
 		{ actor },
 	);
-	const students = rows.map(({ username, name, status }) => ({
+	const students = rows.map(({ username, name, status, schoolId }) => ({
 		username,
 		name,
+		schoolId: schoolId ?? null,
 		dropped: status === "DROPPED",
 	}));
 	return [
@@ -249,7 +250,7 @@ export async function loadGrades(
  * The course card of an exam's grading pages: the same list every page of the exam shows.
  *
  * `context` replaces the exam's title when the page belongs to something else, a student's attempt.
- * A page that already loaded the exam's `sanctions` passes them to spare the query.
+ * A page that already loaded the exam's `adjustments` passes them to spare the query.
  */
 export async function gradingExamNav(
 	loaded: Pick<
@@ -258,7 +259,7 @@ export async function gradingExamNav(
 	>,
 	actor: UserActor,
 	context?: string,
-	sanctions?: readonly unknown[],
+	adjustments?: readonly unknown[],
 ): Promise<CourseNav> {
 	const { course, href, exam, answers } = loaded;
 	const [regrades, known] = await Promise.all([
@@ -268,7 +269,7 @@ export async function gradingExamNav(
 		),
 		exam.type === "PRACTICE"
 			? []
-			: (sanctions ??
+			: (adjustments ??
 				db.examAdjustment.findMany(
 					{ course: course.id, exam: exam.slug },
 					{ actor },
@@ -281,7 +282,7 @@ export async function gradingExamNav(
 		practice: exam.type === "PRACTICE",
 		pending: answers.filter((answer) => answer.state === "pending").length,
 		regrades: regrades.length,
-		sanctions: known.length,
+		adjustments: known.length,
 	});
 	return context ? { ...nav, context } : nav;
 }

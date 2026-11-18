@@ -5,7 +5,14 @@ import { blobSecurityHeaders, contentDisposition } from "@/utils/blob-response";
 
 export const prerender = false;
 
-/// Serves an attachment of a report to whoever may read the report; anyone else gets 404.
+/**
+ * Serves an attachment of a report to whoever may read the report; anyone else gets 404.
+ *
+ * Report attachments are served only here, and the API never exposes their
+ * blob hash: `/files/[hash]` serves any blob without authentication, so the
+ * hash is the only secret protecting it. A page route because the REST
+ * registry only answers JSON.
+ */
 export const GET: APIRoute = async ({ params, locals }) => {
 	const { actor } = locals;
 	if (!actor || !params.publicId || !params.filename) return notFound();

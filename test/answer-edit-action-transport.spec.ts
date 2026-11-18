@@ -2,7 +2,7 @@ import { expect, test } from "@playwright/test";
 import * as session from "@/components/exam/answer-edit-session";
 import { AnswerEditMonitor } from "@/services/answer-edits/monitor";
 
-// R25 (spec `historico-de-edicao-no-servidor`): the real transport over the
+// RFC `historico-de-edicao-de-respostas-abertas`: the real transport over the
 // actions, with the actions injected.
 //
 // Assumed signature, the spec gives none for the factory. It is exported from

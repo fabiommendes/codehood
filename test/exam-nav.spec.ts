@@ -5,7 +5,7 @@ import { examNav } from "@/utils/exam-nav";
 const href = "/cs101/ada_2026-2/exams/test-02";
 const sections = [{ id: "questions", label: "Questions" }];
 
-function manager(practice: boolean) {
+function manager(practice: boolean, adjustments = 0) {
 	return examNav({
 		href,
 		title: "Test 2",
@@ -14,6 +14,7 @@ function manager(practice: boolean) {
 		practice,
 		pending: 3,
 		regrades: 0,
+		adjustments,
 	});
 }
 
@@ -31,7 +32,7 @@ test.describe("examNav", () => {
 			"Exceptions",
 			"Grading",
 			"Regrade requests",
-			"Sanctions",
+			"Adjustments",
 			"Results",
 		]);
 	});
@@ -44,6 +45,23 @@ test.describe("examNav", () => {
 		).toBeUndefined();
 	});
 
+	test("the Adjustments entry counts the active adjustments", () => {
+		const entries = manager(false, 2).sections[0]?.entries;
+		expect(entries?.find((e) => e.label === "Adjustments")?.meta).toBe(2);
+	});
+
+	test("the Adjustments entry hides a count of zero", () => {
+		const entries = manager(false, 0).sections[0]?.entries;
+		expect(
+			entries?.find((e) => e.label === "Adjustments")?.meta,
+		).toBeUndefined();
+	});
+
+	test("there is no Sanctions entry left", () => {
+		const labels = manager(false, 2).sections[0]?.entries.map((e) => e.label);
+		expect(labels).not.toContain("Sanctions");
+	});
+
 	test("the manager's entries are pages of their own", () => {
 		expect(manager(false).sections[0]?.entries.map((e) => e.href)).toEqual([
 			href,
@@ -51,7 +69,7 @@ test.describe("examNav", () => {
 			`${href}/exceptions`,
 			`${href}/grading`,
 			`${href}/regrades`,
-			`${href}/sanctions`,
+			`${href}/adjustments`,
 			`${href}/results`,
 		]);
 	});
@@ -77,6 +95,7 @@ test.describe("examNav", () => {
 		expect(current(`${href}/grading/q1`)).toBe("Grading");
 		expect(current(`${href}/attempts/ada`)).toBe("Results");
 		expect(current(`${href}/regrades`)).toBe("Regrade requests");
+		expect(current(`${href}/adjustments`)).toBe("Adjustments");
 	});
 
 	test("students see the sections under the exam title", () => {

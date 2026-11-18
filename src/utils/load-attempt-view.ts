@@ -47,6 +47,8 @@ export interface AttemptView {
 	/// The highlighted fenced blocks of every question in `questions`.
 	codeBlocks: CodeBlocksHtml;
 	codeSends: Record<string, CodeSends>;
+	/// Whether the instructor created the attempt for a student who did not take the exam.
+	empty: boolean;
 }
 
 export interface AttemptViewInput {
@@ -158,9 +160,10 @@ export async function loadAttemptView(
 		};
 	}
 
-	// A student who missed the exam reads no questions on this screen.
+	const empty = attempt?.createdBy != null;
+	// A student who missed the exam, or never took it, reads no questions on this screen.
 	const granted =
-		state.kind === "missed" ? [] : (input.granted?.questions ?? []);
+		state.kind === "missed" || empty ? [] : (input.granted?.questions ?? []);
 	const questions = granted.map(({ slug, weight, question }) => ({
 		slug,
 		weight,
@@ -218,5 +221,6 @@ export async function loadAttemptView(
 			),
 		),
 		codeSends,
+		empty,
 	};
 }

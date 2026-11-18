@@ -1,7 +1,7 @@
 /**
  * `db.answerEdit.append`: the size limits, numbers the database cannot hold,
- * and the independence from the saved answer (spec
- * `dev/specs/to-review/historico-de-edicao-no-servidor.md`, R16 to R20).
+ * and the independence from the saved answer (RFC
+ * `dev/rfc/historico-de-edicao-de-respostas-abertas.md`).
  */
 import { expect, test } from "@playwright/test";
 import {

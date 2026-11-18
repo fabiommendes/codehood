@@ -61,15 +61,14 @@ consiga ver.
 - A restrição de copiar e colar precisa de exceção. Ela atrapalha quem usa
   tecnologia assistiva (ditado, leitor de tela, teclado alternativo) e quem tem
   problema técnico (editor externo, layout de teclado).
-- Encaixa nas exceções por aluno que já existem
-  (`dev/specs/to-review/per-student-exceptions.md`): uma exceção libera copiar,
+- Encaixa nas exceções por aluno que já existem (`ExamException`): uma exceção libera copiar,
   colar ou os dois, para um aluno e uma prova.
 
 ### 5. Registro no histórico
 
 - Copiar e colar sempre entram no histórico de edição quando ele está ligado na
   prova (`Exam.answerHistory`,
-  `dev/specs/to-review/historico-de-edicao-no-servidor.md`), sejam permitidos
+  `dev/rfc/historico-de-edicao-de-respostas-abertas.md`), sejam permitidos
   ou não.
 - Cada evento guarda o tipo, a questão, o tamanho do texto e se foi bloqueado.
   O conteúdo colado já aparece no próprio histórico de edição.

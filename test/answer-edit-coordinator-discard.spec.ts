@@ -11,7 +11,7 @@ import {
 	rig,
 } from "./helpers/answer-edit-coordinator";
 
-// R28 (spec `historico-de-edicao-no-servidor`): the local copy is erased.
+// RFC `historico-de-edicao-de-respostas-abertas`: the local copy is erased.
 //
 // Assumed signature, the spec names the method on the adapter and says it
 // "removes the records of every field of the attempt":

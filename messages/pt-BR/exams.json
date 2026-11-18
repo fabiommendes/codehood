@@ -327,9 +327,8 @@
 	"exams_edits_hours": "{hours} h {minutes} min",
 	"exams_edits_minutes": "{minutes} min {seconds} s",
 	"exams_edits_seconds": "{seconds} s",
-	"exams_sanction_exam_zeroed": "Sua nota nesta prova foi zerada.",
-	"exams_sanction_exam_reduced": "Sua nota nesta prova foi reduzida a {percent}%.",
-	"exams_sanction_reason": "Motivo: {reason}",
-	"exams_sanction_question_zeroed": "Zerada",
-	"exams_sanction_question_reduced": "Reduzida a {percent}%"
+	"exams_attempt_empty": "Você não fez esta prova",
+	"exams_adjustments_label": "Ajustes na nota",
+	"exams_adjustments_original": "Total original",
+	"exams_adjustments_final": "Total final"
 }

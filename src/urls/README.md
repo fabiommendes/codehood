@@ -170,7 +170,7 @@ have to invent a resource for. Methods are named `namespace.verb` and live in
 `src/rpc/`. The authenticated `rest.batch` method bridges homogeneous JSON
 REST operations through the same route views, without internal HTTP. It runs
 sequentially with individual results and partial success; see
-`dev/specs/to-review/rest-batch.md`.
+`rest.batch` in `src/api/README.md`.
 
 Astro Actions post to `/_actions/<namespace>.<name>` and are called through
 `Astro.callAction` or the `actions` client import rather than by URL. Current

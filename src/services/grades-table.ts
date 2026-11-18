@@ -35,7 +35,8 @@ export type GradeCell =
 			kind: "total";
 			total: number;
 			adjustments?: ExamResult["adjustments"];
-			original?: ExamResult["original"];
+			/// The total with no adjustment at all, present whenever any active one exists.
+			unadjusted?: number | null;
 	  }
 	/// A closed attempt with some answer waiting for a grade.
 	| { kind: "pending" }
@@ -125,14 +126,14 @@ export interface GradesTableOptions {
  *
  * @params attempts Every non-practice attempt of the course.
  * @params feedback Every grading pass of the course, released or not.
- * @params sanctions The active adjustments of each attempt, by the attempt's `publicId`.
+ * @params adjustments The active adjustments of each attempt, by the attempt's `publicId`.
  */
 export function gradesTable(
 	exams: Exam[],
 	students: GradedStudent[],
 	attempts: TableAttempt[],
 	feedback: GradingFeedback[],
-	sanctions: ReadonlyMap<string, ResultAdjustment[]>,
+	adjustments: ReadonlyMap<string, ResultAdjustment[]>,
 	now: Date,
 	options: GradesTableOptions = {},
 ): GradesTable {
@@ -159,7 +160,7 @@ export function gradesTable(
 					attempt.exam === exam.slug && usernames.has(attempt.author),
 			),
 			feedback,
-			sanctions,
+			adjustments,
 			listed,
 			now,
 			exceptions,
@@ -177,8 +178,9 @@ export function gradesTable(
 				? {
 						kind: "total",
 						total: row.total,
-						...(row.adjustments
-							? { adjustments: row.adjustments, original: row.original }
+						...(row.adjustments ? { adjustments: row.adjustments } : {}),
+						...(row.unadjusted !== undefined
+							? { unadjusted: row.unadjusted }
 							: {}),
 					}
 				: { kind: "pending" };

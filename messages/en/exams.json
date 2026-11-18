@@ -327,9 +327,8 @@
 	"exams_edits_hours": "{hours} h {minutes} min",
 	"exams_edits_minutes": "{minutes} min {seconds} s",
 	"exams_edits_seconds": "{seconds} s",
-	"exams_sanction_exam_zeroed": "Your grade on this exam was zeroed.",
-	"exams_sanction_exam_reduced": "Your grade on this exam was reduced to {percent}%.",
-	"exams_sanction_reason": "Reason: {reason}",
-	"exams_sanction_question_zeroed": "Zeroed",
-	"exams_sanction_question_reduced": "Reduced to {percent}%"
+	"exams_attempt_empty": "You did not take this exam",
+	"exams_adjustments_label": "Grade adjustments",
+	"exams_adjustments_original": "Original total",
+	"exams_adjustments_final": "Final total"
 }

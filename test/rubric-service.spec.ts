@@ -1,6 +1,5 @@
 /**
- * The rubric service (spec `dev/specs/to-do/rubrica-de-correcao.md`, R1, R2,
- * R8 to R18), exposed as `db.rubric` (`src/db/services/rubric.service.ts`).
+ * The rubric service, exposed as `db.rubric` (`src/db/services/rubric.service.ts`).
  *
  * API the tests expect. Every operation takes `opts` last (`{ actor }`); the
  * actor in these tests is the course's instructor.

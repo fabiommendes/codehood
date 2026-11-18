@@ -8,8 +8,9 @@ import {
 } from "@/components/ui/table-sort";
 import { m } from "@/i18n";
 import type { AttemptRow } from "@/services/grading";
+import AdjustmentDialog from "./AdjustmentDialog";
 import { attemptTotalLabel } from "./attempt-total";
-import SanctionDialog from "./SanctionDialog";
+import Icon from "./Icon";
 
 /// An attempt's row with `unadjusted`, its total before every adjustment, question-level ones included.
 export type ResultRow = AttemptRow & { unadjusted?: number | null };
@@ -17,12 +18,12 @@ export type ResultRow = AttemptRow & { unadjusted?: number | null };
 interface Props {
 	/// The exam page's URL.
 	href: string;
-	/// The course's URL segments and the exam slug, as the sanction action takes them.
+	/// The course's URL segments and the exam slug, as the adjustment action takes them.
 	discipline: string;
 	course: string;
 	exam: string;
 	rows: ResultRow[];
-	/// The exam's questions, offered as sanction targets.
+	/// The exam's questions, offered as adjustment targets.
 	questions: readonly { slug: string; title: string }[];
 }
 
@@ -32,6 +33,13 @@ const DEFAULT_SORT: SortState<SortField> = { field: "name", direction: "asc" };
 
 /// Right-aligned tabular figures, for both the header and the cells of a numeric column.
 const NUMERIC = "text-right tabular-nums";
+
+/// The color of an adjusted total: red when the adjustments lowered it, green when they raised it.
+function totalTone(row: ResultRow): string {
+	if (row.total === null || row.unadjusted == null) return "";
+	if (row.total < row.unadjusted) return "text-error";
+	return row.total > row.unadjusted ? "text-success" : "";
+}
 
 /// Orders two attempts by `field`, breaking ties by the student's name.
 function compareRows(
@@ -62,6 +70,7 @@ function compareRows(
  */
 export default function ExamResults(props: Props): JSX.Element {
 	const [sort, setSort] = createSignal(DEFAULT_SORT);
+	const [adjusting, setAdjusting] = createSignal(false);
 	const [selected, setSelected] = createSignal<ReadonlySet<string>>(new Set());
 	const sorted = createMemo(() =>
 		[...props.rows].sort((a, b) => compareRows(a, b, sort())),
@@ -85,7 +94,7 @@ export default function ExamResults(props: Props): JSX.Element {
 					<input
 						type="checkbox"
 						class="checkbox checkbox-sm mr-3 align-middle"
-						aria-label={m.grades_sanction_select_row({ name: row.name })}
+						aria-label={m.grades_adjustment_select_row({ name: row.name })}
 						checked={selected().has(row.author)}
 						onChange={(event) =>
 							toggle(row.author, event.currentTarget.checked)
@@ -139,15 +148,23 @@ export default function ExamResults(props: Props): JSX.Element {
 					when={row.unadjusted !== undefined && row.state === "submitted"}
 					fallback={attemptTotalLabel(row.total, row.state)}
 				>
-					<ins class="font-semibold text-error no-underline">
+					<ins class={`font-semibold no-underline ${totalTone(row)}`}>
 						{attemptTotalLabel(row.total, row.state)}
 					</ins>
 					<Show when={row.unadjusted != null}>
 						{" "}
-						<del class="text-error">
+						<del class="text-muted">
 							{attemptTotalLabel(row.unadjusted ?? null, row.state)}
 						</del>
-					</Show>
+					</Show>{" "}
+					<a
+						href={`${props.href}/adjustments`}
+						class="link align-middle text-muted"
+						aria-label={m.grades_adjustment_title()}
+						title={m.grades_adjustment_title()}
+					>
+						<Icon name="badgePlus" class="inline size-4" />
+					</a>
 				</Show>
 			),
 		},
@@ -163,17 +180,27 @@ export default function ExamResults(props: Props): JSX.Element {
 							{m.grades_results_review()}
 						</a>
 					</Show>
-					<SanctionDialog
+					<button
+						type="button"
+						class="btn btn-outline btn-sm"
+						disabled={selected().size === 0}
+						onClick={() => setAdjusting(true)}
+					>
+						{m.grades_adjustment_open_selected()}
+					</button>
+					<AdjustmentDialog
+						id="adjust-selected"
+						open={adjusting()}
+						onClose={() => setAdjusting(false)}
 						discipline={props.discipline}
 						course={props.course}
 						exam={props.exam}
 						usernames={[...selected()]}
 						questions={props.questions}
 						showCount
-						triggerLabel={m.grades_sanction_open_selected()}
-						disabled={selected().size === 0}
-						title={m.grades_sanction_dialog_title()}
-						submitLabel={m.grades_sanction_submit()}
+						kind="any"
+						title={m.grades_adjustment_dialog_title()}
+						submitLabel={m.grades_adjustment_submit()}
 					/>
 				</div>
 			</div>

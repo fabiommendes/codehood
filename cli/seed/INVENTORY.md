@@ -7,7 +7,7 @@ criado sem atualizar este arquivo. Todo link de `calendar.md` para `resources/`
 e `repositories/` aponta para um caminho daqui. Já existem: `codehood.toml`,
 `README.md`, `calendar.md`.
 
-Desejos W1-W14: ver `dev/specs/to-review/seed-cli-pyxel101.md` (R18). A coluna W diz
+Desejos W1-W14: ver `cli/seed/README.md` (seção Desejos). A coluna W diz
 qual desejo o arquivo exercita. `[proposto]` marca formato sem definição no
 mapping doc, a registrar no `GAPS.md` como "formato proposto, não decidido".
 

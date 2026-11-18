@@ -16,7 +16,7 @@ import {
 	rig,
 } from "./helpers/answer-edit-coordinator";
 
-// R24 (spec `historico-de-edicao-no-servidor`): gap markers.
+// RFC `historico-de-edicao-de-respostas-abertas`: gap markers.
 //
 // Assumed signature, the spec gives the name and the arguments only:
 //
