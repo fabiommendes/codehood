@@ -394,6 +394,18 @@ que existem.
 - **R59.** `pnpm run lint` falha quando qualquer regra K é violada, seja por
   lint ou por teste.
 
+**Resultado do spike (T9).** K1 a K4 couberam no Biome; não há
+`test/question-data-sweep.spec.ts`. O `plugins` aceita `overrides` com
+`includes` e negações (`!caminho/**`), então cada plugin GritQL
+(`lint/question-content.grit`, `pinned-document.grit`,
+`question-system-access.grit`) roda só fora da sua lista de exceções; K3 é um
+override de `noRestrictedImports` (repete o caminho de `@/core/schemas`, pois o
+override substitui as opções). Duas exceções além das listadas: K1 libera
+também os cinco serviços de K2 (eles selecionam `privatePayload` ao chamar
+`unsafePinnedDocument`) e `test/**`; K3 libera `test/exam-grant.spec.ts` e
+`test/exam-freeze.spec.ts`. Limite: a regra é textual, um alias de `db.question`
+não é visto.
+
 ## Fora do escopo
 
 - **`publicId` no lugar do slug** para o aluno. Depois de R33 o slug só chega

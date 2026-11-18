@@ -1,0 +1,11 @@
+language js
+
+// `unsafePinnedDocument(s)` reads the pinned version of a question without a
+// grant. Only the system services listed in the `overrides` of `biome.json`
+// may call it.
+or {
+	`unsafePinnedDocument($args)`,
+	`unsafePinnedDocuments($args)`
+} as $found where {
+	register_diagnostic(span=$found, message="`unsafePinnedDocument(s)` reads question content with no grant. Call it only from the system services listed in `biome.json`; elsewhere use `db.examQuestion` or an `ExamGrant`.", severity="error")
+}
