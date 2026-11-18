@@ -413,6 +413,33 @@ test("when time runs out a newer draft is saved and a newer server version is ke
 	await expect(page.getByText("Submitted").first()).toBeVisible();
 });
 
+test("choosing the server's version after the deadline save puts the server in step with the screen", async ({
+	page,
+}) => {
+	const s = await setup({ page, duration: { minutes: 1 } });
+	await saveAnswer(s, "console.log('server')", 120 * SECOND);
+	await prisma.response.update({
+		where: { id: s.attempt.id },
+		data: { createdAt: new Date(Date.now() - 45 * SECOND) },
+	});
+	await seedDraft(page, s.draftKey(), "console.log('draft')");
+	await page.clock.install();
+	await page.goto(s.url);
+	await expect(page.locator("[data-code-conflict]")).toBeVisible();
+	await page.clock.fastForward(8 * SECOND);
+	await expect.poll(() => savedCode(s)).toBe("console.log('draft')");
+
+	await page.getByRole("button", { name: "Use the server's version" }).click();
+	await expect(editor(page)).toContainText("console.log('server')");
+
+	await expect
+		.poll(async () => {
+			await page.clock.runFor(SECOND);
+			return savedCode(s);
+		})
+		.toBe("console.log('server')");
+});
+
 test("submitting removes this exam's drafts and no others", async ({
 	page,
 }) => {

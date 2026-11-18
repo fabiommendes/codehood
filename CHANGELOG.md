@@ -31,6 +31,9 @@
 
 ### Fixed
 
+- Prova de código: depois que o salvamento automático a 10 s do prazo grava o
+  rascunho, "Usar a versão do servidor" também grava a versão do servidor.
+  Antes a tela mostrava uma coisa e a entrega guardava outra.
 - No tablet e no celular, o breadcrumb ficava por cima da gaveta de
   navegação aberta.
 
