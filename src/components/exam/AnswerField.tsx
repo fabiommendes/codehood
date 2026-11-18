@@ -1,4 +1,5 @@
 import type { LanguageId } from "@codehood/runner/protocol";
+import { Markdown } from "mdq/solid";
 import { type JSX, Show } from "solid-js";
 import {
 	AttachmentList,
@@ -20,6 +21,8 @@ export interface AnswerFieldProps {
 	question: QuestionPublic["question"];
 	payload: AnswerPayload | undefined;
 	readonly: boolean;
+	/// Shows the stem and the attachments only, with nothing to answer and no answer.
+	reading?: boolean;
 	/// The answer's marks and feedback, shown in `review` mode; the score is the outcome's, below.
 	review?: ReviewResult;
 	onChange: (payload: AnswerPayload, userEvent?: string) => void;
@@ -70,27 +73,44 @@ export function AnswerField(props: AnswerFieldProps): JSX.Element {
 	return (
 		<CodeBlocks html={props.codeBlocks}>
 			<Show
-				when={
-					props.question.type === "code" && !props.readonly && !props.review
-						? props.question
-						: undefined
+				when={!props.reading}
+				fallback={
+					<div
+						class="mdq-question"
+						data-type={props.question.type}
+						data-mode="reading"
+					>
+						<Markdown text={props.question.stem} />
+						<AttachmentList
+							attachments={props.question.attachments}
+							url={props.attachmentUrl ?? (() => null)}
+						/>
+					</div>
 				}
-				fallback={<EssayOrOtherField {...props} />}
 			>
-				{(question) => (
-					<CodeAnswer
-						question={question()}
-						pretests={props.pretests ?? []}
-						exampleHtml={props.exampleHtml}
-						onSubmit={props.sends ? props.onSubmit : undefined}
-						sends={props.sends}
-						runnerOrigin={props.runnerOrigin ?? null}
-						value={typeof props.payload === "string" ? props.payload : null}
-						attachments={question().attachments}
-						attachmentUrl={props.attachmentUrl}
-						onChange={(code, userEvent) => props.onChange(code, userEvent)}
-					/>
-				)}
+				<Show
+					when={
+						props.question.type === "code" && !props.readonly && !props.review
+							? props.question
+							: undefined
+					}
+					fallback={<EssayOrOtherField {...props} />}
+				>
+					{(question) => (
+						<CodeAnswer
+							question={question()}
+							pretests={props.pretests ?? []}
+							exampleHtml={props.exampleHtml}
+							onSubmit={props.sends ? props.onSubmit : undefined}
+							sends={props.sends}
+							runnerOrigin={props.runnerOrigin ?? null}
+							value={typeof props.payload === "string" ? props.payload : null}
+							attachments={question().attachments}
+							attachmentUrl={props.attachmentUrl}
+							onChange={(code, userEvent) => props.onChange(code, userEvent)}
+						/>
+					)}
+				</Show>
 			</Show>
 		</CodeBlocks>
 	);

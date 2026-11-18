@@ -192,6 +192,8 @@ export default function ExamAttempt(props: ExamAttemptProps): JSX.Element {
 	const serverNow = () => new Date(Date.now() + skew());
 
 	const [kind, setKind] = createSignal(props.state.kind);
+	// A student who did not take the exam reads the questions with nothing to answer.
+	const reading = () => kind() === "missed";
 	const [now, setNow] = createSignal(props.now);
 	const [busy, setBusy] = createSignal(false);
 	const [failure, setFailure] = createSignal<string | null>(null);
@@ -1071,19 +1073,19 @@ export default function ExamAttempt(props: ExamAttemptProps): JSX.Element {
 					</div>
 				</Match>
 
-				<Match when={kind() === "missed"}>
-					<p role="status" class={NOTICE}>
-						{m.exams_attempt_missed({ type: props.type })}
-					</p>
-				</Match>
-
 				<Match
 					when={
+						kind() === "missed" ||
 						kind() === "in-progress" ||
 						kind() === "submitted" ||
 						kind() === "results"
 					}
 				>
+					<Show when={kind() === "missed"}>
+						<p role="status" class={NOTICE}>
+							{m.exams_attempt_missed({ type: props.type })}
+						</p>
+					</Show>
 					<Show when={props.empty}>
 						<p role="status" class={NOTICE}>
 							{m.exams_attempt_empty()}
@@ -1270,8 +1272,9 @@ export default function ExamAttempt(props: ExamAttemptProps): JSX.Element {
 										question={entry.question}
 										payload={answers()[entry.slug]}
 										readonly={kind() !== "in-progress" || closing()}
+										reading={reading()}
 										review={
-											kind() === "results"
+											kind() === "results" && !reading()
 												? props.reviews?.[entry.slug]
 												: undefined
 										}
@@ -1309,7 +1312,9 @@ export default function ExamAttempt(props: ExamAttemptProps): JSX.Element {
 									/>
 									<Show
 										when={
-											kind() === "results" ? allSends()[entry.slug] : undefined
+											kind() === "results" && !reading()
+												? allSends()[entry.slug]
+												: undefined
 										}
 									>
 										{(sends) => (
@@ -1323,7 +1328,9 @@ export default function ExamAttempt(props: ExamAttemptProps): JSX.Element {
 											/>
 										)}
 									</Show>
-									<Show when={kind() === "results" && props.result}>
+									<Show
+										when={kind() === "results" && !reading() && props.result}
+									>
 										{(result) => (
 											<Outcome
 												outcome={result().questions.find(
@@ -1358,57 +1365,59 @@ export default function ExamAttempt(props: ExamAttemptProps): JSX.Element {
 						}}
 					</For>
 
-					<dialog ref={dialog} class="modal">
-						<div class="modal-box">
-							<h3 class="text-lg font-bold">
-								{m.exams_attempt_submit_title({ type: props.type })}
-							</h3>
-							<p class="mt-2 text-sm text-base-content/70">
-								{m.exams_attempt_submit_body()}
-							</p>
-							<Show when={unansweredNumbers().length > 0}>
-								<p role="alert" class="alert alert-warning mt-3 text-sm">
-									{unansweredWarning(unansweredNumbers())}
+					<Show when={!reading()}>
+						<dialog ref={dialog} class="modal">
+							<div class="modal-box">
+								<h3 class="text-lg font-bold">
+									{m.exams_attempt_submit_title({ type: props.type })}
+								</h3>
+								<p class="mt-2 text-sm text-base-content/70">
+									{m.exams_attempt_submit_body()}
 								</p>
-							</Show>
-							<Show when={conflictNumbers().length > 0}>
-								<p role="alert" class="alert alert-warning mt-3 text-sm">
-									{m.exams_attempt_submit_conflict({
-										numbers: questionList(conflictNumbers()),
-									})}
-								</p>
-							</Show>
-							<Show when={unsortedNumbers().length > 0}>
-								<p role="alert" class="alert alert-warning mt-3 text-sm">
-									{m.exams_attempt_submit_skips_ordering({
-										count: unsortedNumbers().length,
-										numbers: questionList(unsortedNumbers()),
-									})}
-								</p>
-							</Show>
-							<div class="modal-action">
-								<button
-									type="button"
-									class="btn btn-ghost"
-									disabled={busy()}
-									onClick={() => dialog?.close()}
-								>
-									{m.exams_cancel()}
-								</button>
-								<button
-									type="button"
-									class="btn btn-primary"
-									disabled={busy()}
-									onClick={submit}
-								>
-									{m.exams_attempt_submit({ type: props.type })}
-								</button>
+								<Show when={unansweredNumbers().length > 0}>
+									<p role="alert" class="alert alert-warning mt-3 text-sm">
+										{unansweredWarning(unansweredNumbers())}
+									</p>
+								</Show>
+								<Show when={conflictNumbers().length > 0}>
+									<p role="alert" class="alert alert-warning mt-3 text-sm">
+										{m.exams_attempt_submit_conflict({
+											numbers: questionList(conflictNumbers()),
+										})}
+									</p>
+								</Show>
+								<Show when={unsortedNumbers().length > 0}>
+									<p role="alert" class="alert alert-warning mt-3 text-sm">
+										{m.exams_attempt_submit_skips_ordering({
+											count: unsortedNumbers().length,
+											numbers: questionList(unsortedNumbers()),
+										})}
+									</p>
+								</Show>
+								<div class="modal-action">
+									<button
+										type="button"
+										class="btn btn-ghost"
+										disabled={busy()}
+										onClick={() => dialog?.close()}
+									>
+										{m.exams_cancel()}
+									</button>
+									<button
+										type="button"
+										class="btn btn-primary"
+										disabled={busy()}
+										onClick={submit}
+									>
+										{m.exams_attempt_submit({ type: props.type })}
+									</button>
+								</div>
 							</div>
-						</div>
-						<form method="dialog" class="modal-backdrop">
-							<button type="submit">{m.exams_close_backdrop()}</button>
-						</form>
-					</dialog>
+							<form method="dialog" class="modal-backdrop">
+								<button type="submit">{m.exams_close_backdrop()}</button>
+							</form>
+						</dialog>
+					</Show>
 				</Match>
 			</Switch>
 		</div>

@@ -255,6 +255,7 @@ const examOutcome = view.result;
     <div>
       <h2 class="page-subheader">{exam.title}</h2>
       <p class="mt-1 text-sm text-muted">{meta.join(" · ")}</p>
+      {canManage && exam.questionsFrozenAt && <p class="mt-1 text-sm text-muted" data-testid="questions-frozen">{m.exams_detail_questions_frozen({ date: formatDateTime(exam.questionsFrozenAt) })}</p>}
       {!codeRun.allowed && <p class="mt-1 text-sm text-muted" data-testid="code-run-setting">{m.exams_detail_code_run_off()}</p>}
     </div>
     <span class:list={["badge badge-sm mt-1.5 shrink-0", badge.className]}>{badge.label}</span>

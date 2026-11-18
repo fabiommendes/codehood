@@ -161,9 +161,8 @@ export async function loadAttemptView(
 	}
 
 	const empty = attempt?.createdBy != null;
-	// A student who missed the exam, or never took it, reads no questions on this screen.
-	const granted =
-		state.kind === "missed" || empty ? [] : (input.granted?.questions ?? []);
+	// A student who never took the exam reads the questions once the grades are out, which the grant decides; an empty attempt, which only carries the instructor's adjustments, lists none.
+	const granted = empty ? [] : (input.granted?.questions ?? []);
 	const questions = granted.map(({ slug, weight, question }) => ({
 		slug,
 		weight,
