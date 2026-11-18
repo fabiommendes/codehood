@@ -62,6 +62,8 @@
 
 ### Fixed
 
+- `DELETE` de um curso que ainda tem provas, senhas de matrícula ou vínculos
+  de questão responde 409 em vez de 500. O curso vazio continua sendo apagado.
 - `ch push` não publica mais `__pycache__/`, `*.pyc`, `elm-stuff/` e
   `node_modules/` como recursos: são sempre excluídos (e protegidos do prune),
   além do `[push].exclude`.

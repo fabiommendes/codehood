@@ -370,6 +370,8 @@ const buildCourseService = defineService<CourseT>()(() => {
 
 	/**
 	 * Deletes a course.
+	 *
+	 * @throws {@link NotAllowed} (409) When the course still has exams, passphrases or question links.
 	 */
 	const remove = op({
 		args: [coursePK],
@@ -383,6 +385,20 @@ const buildCourseService = defineService<CourseT>()(() => {
 			const target = valueOrNotFound("course", found);
 			if (!hasPerm(opts.actor, "course.delete", target))
 				throw new NotAllowed("course.delete");
+
+			// These relations have no `onDelete: Cascade`: the database would refuse with a 500.
+			const where = { courseId: target.id };
+			const [exams, passphrases, questionLinks] = await Promise.all([
+				tx.exam.count({ where }),
+				tx.passphrase.count({ where }),
+				tx.questionForCourse.count({ where }),
+			]);
+			if (exams + passphrases + questionLinks > 0) {
+				throw new NotAllowed("course.delete", {
+					status: 409,
+					message: `The course still has ${exams} exam(s), ${passphrases} passphrase(s) and ${questionLinks} question link(s). Remove them first.`,
+				});
+			}
 
 			await guardedDelete(tx, "course", { id: target.id }, opts);
 		},

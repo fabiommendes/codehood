@@ -1,6 +1,7 @@
 import { expect, test } from "@playwright/test";
 import { FULL_ACCESS, SYSTEM } from "@/auth/actor";
 import { type CourseWithEnrollment, hasPerm } from "@/auth/permissions";
+import { NotAllowed } from "@/core/error";
 import type { CourseId } from "@/core/schemas/base";
 import { isoDate } from "@/core/schemas/base";
 import { db } from "@/db";
@@ -140,6 +141,22 @@ test("create() rejects an instructor naming a different instructor, and allows a
 		{ actor: admin },
 	);
 	expect(course.instructor.username).toBe(instructorB.username);
+});
+
+test("delete removes an empty course and refuses, with 409, one that has exams, passphrases or question links", async () => {
+	const instructor = await makeUser("INSTRUCTOR");
+	const empty = await makeCourse(instructor.username);
+	await db.course.delete({ id: empty.id }, { actor: instructor });
+	expect(await db.course.findOne({ id: empty.id }, FULL_ACCESS)).toBeNull();
+
+	const busy = await makeCourse(instructor.username);
+	await db.passphrase.create({ course: busy.id }, { actor: instructor });
+	const refusal = await db.course
+		.delete({ id: busy.id }, { actor: instructor })
+		.catch((error: unknown) => error);
+	expect(refusal).toBeInstanceOf(NotAllowed);
+	expect((refusal as NotAllowed).status).toBe(409);
+	expect(await db.course.findOne({ id: busy.id }, FULL_ACCESS)).not.toBeNull();
 });
 
 test("findOne returns null for a course that does not exist, and throws FORBIDDEN for one that belongs to someone else", async () => {

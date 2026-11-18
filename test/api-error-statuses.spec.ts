@@ -285,6 +285,24 @@ test("DELETE under a course that does not exist answers 404, a missing item unde
 	expect(await missing.json()).toMatchObject({ deleted: false });
 });
 
+test("DELETE of a course that still has children answers 409, of an empty one 200", async ({
+	request,
+}) => {
+	const { instructor, course, path } = await makeCourse();
+	const headers = await tokenFor(request, instructor.username);
+	await db.passphrase.create({ course: course.id }, { actor: instructor });
+
+	const refused = await request.delete(path, { headers });
+	expect(refused.status()).toBe(409);
+	expect(await refused.json()).toMatchObject({ code: "not-allowed" });
+
+	const empty = await makeCourse();
+	const emptyHeaders = await tokenFor(request, empty.instructor.username);
+	expect(
+		(await request.delete(empty.path, { headers: emptyHeaders })).status(),
+	).toBe(200);
+});
+
 test("POST /api/invite takes the course by natural key only", async ({
 	request,
 }) => {
