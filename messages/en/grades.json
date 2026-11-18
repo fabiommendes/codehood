@@ -486,7 +486,7 @@
 	"grades_adjustment_roster_col_total": "Total",
 	"grades_adjustment_roster_col_status": "Status",
 	"grades_adjustment_status_none": "no attempt",
-	"grades_adjustment_status_in_progress": "in progress",
+	"grades_adjustment_status_in_progress": "answering",
 	"grades_adjustment_status_pending": "pending",
 	"grades_adjustment_status_adjusted": "adjusted",
 	"grades_adjustment_status_submitted": "submitted",
