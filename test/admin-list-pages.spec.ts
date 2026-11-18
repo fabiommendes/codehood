@@ -455,6 +455,13 @@ test("the admin reports queue pages through the open reports and its filters sta
 	});
 
 	await test.step("a filter keeps the page size and goes back to the first page", async () => {
+		// More open bugs than the page holds, so the pager shows whatever the
+		// other spec files of this worker left in the database.
+		for (let i = 0; i < 3; i++)
+			await sendReport(student, {
+				kind: "BUG",
+				message: `Filtered admin bug ${i} of ${student.username}`,
+			});
 		const bugs = { status: ["OPEN" as const], kind: ["BUG" as const] };
 		const { items } = await db.report.findPage(
 			{ ...bugs, limit: 2 },
