@@ -793,6 +793,25 @@ h6 {
 	view-transition-name: tab-underline;
 }
 
+/* A course of the sidebar morphs between its row and its card: both carry the
+   same name, and the snapshots are clipped from the top left, not scaled. */
+[data-course-transition] {
+	view-transition-name: var(--course-transition);
+	view-transition-class: course;
+}
+
+::view-transition-group(*.course) {
+	overflow: clip;
+}
+
+::view-transition-old(*.course),
+::view-transition-new(*.course) {
+	height: 100%;
+	width: 100%;
+	object-fit: none;
+	object-position: left top;
+}
+
 /* A tab that moves keeps its label at its own size instead of stretching it
    along with the box. */
 ::view-transition-old(*.tab),

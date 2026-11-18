@@ -2,6 +2,7 @@
 // One course row of the sidebar's course list.
 import CourseTile from "@/components/CourseTile.astro";
 import { m } from "@/i18n";
+import { courseTransitionName } from "@/utils/view-transition";
 import type { SidebarCourse } from "./AppSidebar.astro";
 
 interface Props {
@@ -16,6 +17,8 @@ const { course, active } = Astro.props;
   <a
     href={course.href}
     aria-current={active ? "page" : undefined}
+    data-course-transition
+    style={`--course-transition: ${courseTransitionName(course.href)}`}
     class:list={[
       "cut gap-3 text-base-content hover:bg-base-200",
       active && "pencil relative font-semibold",
