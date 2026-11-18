@@ -801,12 +801,13 @@ const buildExamService = (deps: Deps) =>
 		/**
 		 * The bytes, mime type and name of the attachment `name` of a question of an exam.
 		 *
-		 * The version served is the one the exam pins, or the latest of a question
-		 * pinned to none. The window rules are those of {@link attachment}.
+		 * The author reads the version the exam pins, or the latest of a question
+		 * pinned to none. A student needs an exam grant and reads the version the
+		 * grant holds.
 		 *
 		 * @throws {@link NotFound}
 		 * If the exam, the question in it or the attachment does not exist, or the
-		 * actor may not download it yet.
+		 * actor holds no grant for the exam.
 		 */
 		const questionAttachment = op({
 			transaction: false,
