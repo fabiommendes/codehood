@@ -59,6 +59,15 @@
 
 ### Fixed
 
+- Segurança: o enunciado de uma questão de prova só sai para o aluno com um
+  grant emitido a partir da tentativa dele. Quem faltou lê os enunciados depois
+  da liberação das notas, sem revisão. Nova rota
+  `GET /api/course/{discipline}/{course}/exam/{slug}/questions`, e uma guarda
+  por lint (Biome, GritQL) impede código novo de ler questões de prova fora
+  desse caminho.
+- As versões das questões congelam na primeira tentativa, no encerramento da
+  prova e na liberação das notas; prova de prática nunca congela. Depois disso,
+  uma nova versão da questão não muda a prova de quem já a viu.
 - Segurança: o aluno lia pela API (e pelos Actions) o enunciado e as
   alternativas das questões de uma prova agendada antes de ela abrir. Agora o
   aluno só recebe a metade pública de uma questão quando uma prova que a

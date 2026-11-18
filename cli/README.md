@@ -251,6 +251,13 @@ The server refuses while the exam is still open, while answers wait for a
 grade, or while a student exception keeps a personal window open, and the
 command says which and how many. Releasing an exam twice changes nothing.
 
+### Question slugs in exams
+
+A student sees a question's slug while the exam is open, so the slug must not
+give away the answer or the trap. The CLI never reads exam questions for
+students: the server hands them out only to a student who holds a grant from
+their own attempt.
+
 
 ## For students
 
