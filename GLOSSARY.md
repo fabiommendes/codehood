@@ -111,6 +111,13 @@ Unguessable secret in a [Repository](#repository)'s clone URL. Knowing it
 grants `git clone` and `git pull` without logging in, like a [Blob](#blob)
 hash. One per repository, so it can be rotated alone.
 
+## Counting answer
+
+Type: domain
+
+The newest [Submission](#submission) to a question within a
+[Response](#response); older ones are history. It is the one that gets graded.
+
 ## Course
 
 Also: course edition 
@@ -341,6 +348,14 @@ Type: domain
 A short expiring secret scoped to one [Course](#course), unique across the
 system. A student types it at `/courses/join` to enroll in that course.
 
+## Pending answer
+
+Type: domain
+
+A [Counting answer](#counting-answer) in a closed attempt with no
+[Verdict](#verdict) and not marked [Will-not-grade](#will-not-grade). Never
+shown as zero.
+
 ## Permission pair
 
 Type: platform
@@ -563,6 +578,16 @@ stored only as a SHA-256 hash. Not a JWT, so it can be revoked by deleting the
 row. Expiry slides over 30 days, refreshed after halfway to avoid writing on
 every request.
 
+## Simulation
+
+Also: exam simulation, preview
+Type: domain
+
+The instructor's attempt at their own [Exam](#exam): a [Response](#response)
+flagged `preview`, opened from the exam's "Preview" tab. Never graded, counted
+or queued for review, which is why an instructor is never enrolled in their own
+course.
+
 ## Spec
 
 Type: process
@@ -614,6 +639,14 @@ An account, holding a [Role](#role), a unique username, and external handles
 because it is the foreign key courses reference for the instructor and a path
 segment of every [Course URL](#course-url) that instructor owns.
 
+## Verdict
+
+Type: domain
+
+The score of the newest grading pass (`Feedback`) on a
+[Counting answer](#counting-answer). Regrades and rubric edits add passes; the
+last one wins.
+
 ## Version freeze
 
 Type: domain
@@ -621,6 +654,21 @@ Type: domain
 Pinning the latest version on every unpinned question of an [Exam](#exam), at
 its first attempt, its closing or its grade release. From then on a push keeps
 the pins. A PRACTICE exam never freezes.
+
+## Weight
+
+Type: domain
+
+A question's relative weight in an [Exam](#exam), from its mdq frontmatter
+(default 1). Students see it as points out of 100 ("25/100"); the instructor's
+question table shows the raw weight.
+
+## Will-not-grade
+
+Type: domain
+
+An instructor's decision that an answer gets no grade (`WILL_NOT_GRADE`). It
+counts as 0 in the total, shows as "Not graded" and is never pending.
 
 ## Worker
 
