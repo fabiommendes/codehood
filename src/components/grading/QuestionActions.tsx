@@ -91,7 +91,7 @@ export default function QuestionActions(props: Props): JSX.Element {
 	const typedGrade = () => Number(grade());
 
 	return (
-		<span class="flex shrink-0 items-center gap-1">
+		<span class="flex shrink-0 items-center gap-3">
 			<button
 				type="button"
 				class="btn btn-ghost btn-sm btn-square"
@@ -120,23 +120,19 @@ export default function QuestionActions(props: Props): JSX.Element {
 					}
 				>
 					{(adjustment) => (
-						<>
-							<span class="badge badge-error badge-sm">
-								{adjustment().label}
-							</span>
-							<AdjustmentActions
-								discipline={props.target.discipline}
-								course={props.target.course}
-								exam={props.target.exam}
-								adjustment={adjustment().publicId}
-								updatedAt={adjustment().updatedAt}
-								op="FACTOR"
-								value={adjustment().value}
-								reason={adjustment().reason}
-								notes={adjustment().notes}
-								onQuestion
-							/>
-						</>
+						<AdjustmentActions
+							discipline={props.target.discipline}
+							course={props.target.course}
+							exam={props.target.exam}
+							adjustment={adjustment().publicId}
+							updatedAt={adjustment().updatedAt}
+							op="FACTOR"
+							value={adjustment().value}
+							reason={adjustment().reason}
+							notes={adjustment().notes}
+							label={adjustment().label}
+							onQuestion
+						/>
 					)}
 				</Show>
 			</Show>

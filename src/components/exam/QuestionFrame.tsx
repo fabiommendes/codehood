@@ -19,6 +19,8 @@ export interface QuestionFrameProps {
 	side?: () => JSX.Element;
 	/// Shown at the end of the title tab, such as the save state.
 	status?: JSX.Element;
+	/// Buttons on the title line, outside the card, aligned to the right.
+	actions?: JSX.Element;
 	/// Handlers on the card body, which every control of the question bubbles to.
 	onFocusOut?: () => void;
 	onBeforeInput?: (event: InputEvent) => void;
@@ -60,33 +62,38 @@ export function QuestionFrame(props: QuestionFrameProps): JSX.Element {
 				</div>
 			</div>
 			{/* A file-folder tab: as wide as the title, its right edge slanted. */}
-			<header class="relative z-10 inline-flex min-w-1/3 max-w-[calc(100%-1.5rem)] items-baseline gap-3 justify-self-start sm:col-start-2 py-2 pr-6 pl-6">
-				<span
-					aria-hidden="true"
-					class="absolute inset-y-0 left-0 right-2 -z-10 rounded-tl-[18px_8px] bg-linear-to-b from-base-300 to-[color-mix(in_oklab,var(--color-base-300)_75%,var(--color-base-200))] shadow-[inset_0_1px_0_color-mix(in_oklab,var(--color-base-100)_70%,transparent)]"
-				/>
-				<span
-					aria-hidden="true"
-					class="absolute inset-y-0 -right-3 -z-10 w-9 origin-bottom skew-x-[18deg] rounded-tr-xl bg-linear-to-b from-base-300 to-[color-mix(in_oklab,var(--color-base-300)_75%,var(--color-base-200))] shadow-[inset_0_1px_0_color-mix(in_oklab,var(--color-base-100)_70%,transparent)]"
-				/>
-				<QuestionNumber
-					number={props.number}
-					tone={props.tone}
-					class="text-xl sm:hidden"
-				/>
-				<h3 class="min-w-0 truncate font-display text-base font-semibold text-shadow-[0_0_3px_var(--color-base-100),0_0_10px_var(--color-base-100),0_0_18px_var(--color-base-100)]">
-					{props.title ??
-						m.exams_attempt_question_label({ number: props.number })}
-				</h3>
-				<Show when={props.points}>
-					{(points) => (
-						<span class="whitespace-nowrap text-xs tabular-nums sm:hidden">
-							{m.exams_attempt_points({ points: points() })}
-						</span>
-					)}
+			<div class="flex min-w-0 items-end justify-between gap-2 sm:col-start-2">
+				<header class="relative z-10 inline-flex min-w-1/3 max-w-[calc(100%-1.5rem)] items-baseline gap-3 py-2 pr-6 pl-6">
+					<span
+						aria-hidden="true"
+						class="absolute inset-y-0 left-0 right-2 -z-10 rounded-tl-[18px_8px] bg-linear-to-b from-base-300 to-[color-mix(in_oklab,var(--color-base-300)_75%,var(--color-base-200))] shadow-[inset_0_1px_0_color-mix(in_oklab,var(--color-base-100)_70%,transparent)]"
+					/>
+					<span
+						aria-hidden="true"
+						class="absolute inset-y-0 -right-3 -z-10 w-9 origin-bottom skew-x-[18deg] rounded-tr-xl bg-linear-to-b from-base-300 to-[color-mix(in_oklab,var(--color-base-300)_75%,var(--color-base-200))] shadow-[inset_0_1px_0_color-mix(in_oklab,var(--color-base-100)_70%,transparent)]"
+					/>
+					<QuestionNumber
+						number={props.number}
+						tone={props.tone}
+						class="text-xl sm:hidden"
+					/>
+					<h3 class="min-w-0 truncate font-display text-base font-semibold text-shadow-[0_0_3px_var(--color-base-100),0_0_10px_var(--color-base-100),0_0_18px_var(--color-base-100)]">
+						{props.title ??
+							m.exams_attempt_question_label({ number: props.number })}
+					</h3>
+					<Show when={props.points}>
+						{(points) => (
+							<span class="whitespace-nowrap text-xs tabular-nums sm:hidden">
+								{m.exams_attempt_points({ points: points() })}
+							</span>
+						)}
+					</Show>
+					{props.status}
+				</header>
+				<Show when={props.actions}>
+					<div class="mb-1 flex shrink-0 items-center">{props.actions}</div>
 				</Show>
-				{props.status}
-			</header>
+			</div>
 			<div class="card card-border min-w-0 overflow-hidden rounded-tl-none! bg-base-200/25 shadow-sm sm:col-start-2">
 				{/* focusout bubbles, so leaving any control of the question reaches the handler. */}
 				<div

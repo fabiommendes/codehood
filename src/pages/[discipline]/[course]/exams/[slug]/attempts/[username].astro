@@ -429,8 +429,7 @@ const totalText = (total: number | null | undefined): string =>
       rows.map(({ label, number, points, outcome, mark, autoScore, adjustment, title, asked, attachmentUrl, counting, review, edits: editSummary }) => (
         <article id={counting ? `answer-${counting.publicId}` : undefined} aria-label={label}>
           <QuestionFrame number={number} title={title} tone={MARK_STYLE[mark].tone} points={points}>
-            <div class="flex flex-col gap-3">
-            <div class="flex flex-wrap items-center justify-end gap-2">
+            <div slot="actions">
               <QuestionActions
                 client:load
                 target={{ discipline: discipline!, course: courseSegment!, exam: exam.slug, question: outcome.question }}
@@ -450,6 +449,7 @@ const totalText = (total: number | null | undefined): string =>
                 }}
               />
             </div>
+            <div class="flex flex-col gap-3">
             <AttachmentList attachments={asked?.attachments} url={attachmentUrl} codeBlocks={attachmentBlocks} />
             {counting && deadline && answeredAfterDeadline(deadline, counting.createdAt) && (
               <span class="badge badge-warning badge-sm">{m.exams_attempt_answered_late({ seconds: Math.round((counting.createdAt.getTime() - deadline.getTime()) / 1000) })}</span>

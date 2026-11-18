@@ -32,6 +32,8 @@ export interface AdjustmentActionsProps {
 	notes: string | null;
 	/// Whether the adjustment hits a question, whose value is the share of the grade kept.
 	onQuestion?: boolean;
+	/// The adjustment as `adjustmentLabel` writes it; when given, it heads a button group with the two buttons.
+	label?: string;
 }
 
 /**
@@ -73,32 +75,44 @@ export default function AdjustmentActions(
 		window.location.reload();
 	}
 
+	/// The buttons' look: grouped with the label, or loose icons.
+	const item = props.label
+		? "join-item btn btn-sm btn-square btn-soft btn-error"
+		: "btn btn-square btn-ghost btn-sm";
+
 	return (
 		<div class="flex justify-end gap-1">
-			<button
-				type="button"
-				class="btn btn-square btn-ghost btn-sm"
-				aria-label={m.grades_adjustment_edit_button()}
-				title={m.grades_adjustment_edit_button()}
-				onClick={() => {
-					setError(undefined);
-					setEditing(true);
-				}}
-			>
-				<Icon name="pencil" />
-			</button>
-			<button
-				type="button"
-				class="btn btn-square btn-ghost btn-sm text-error"
-				aria-label={m.grades_adjustment_revoke_button()}
-				title={m.grades_adjustment_revoke_button()}
-				onClick={() => {
-					setError(undefined);
-					setRevoking(true);
-				}}
-			>
-				<Icon name="trash2" />
-			</button>
+			<div class={props.label ? "join" : "contents"}>
+				{props.label && (
+					<span class="join-item btn btn-sm btn-soft btn-error pointer-events-none">
+						{props.label}
+					</span>
+				)}
+				<button
+					type="button"
+					class={item}
+					aria-label={m.grades_adjustment_edit_button()}
+					title={m.grades_adjustment_edit_button()}
+					onClick={() => {
+						setError(undefined);
+						setEditing(true);
+					}}
+				>
+					<Icon name="pencil" />
+				</button>
+				<button
+					type="button"
+					class={props.label ? item : `${item} text-error`}
+					aria-label={m.grades_adjustment_revoke_button()}
+					title={m.grades_adjustment_revoke_button()}
+					onClick={() => {
+						setError(undefined);
+						setRevoking(true);
+					}}
+				>
+					<Icon name="trash2" />
+				</button>
+			</div>
 
 			<Dialog
 				id={`edit-${id}`}
