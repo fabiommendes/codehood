@@ -434,7 +434,6 @@
 	"grades_adjustment_col_target": "Target",
 	"grades_adjustment_col_reason": "Reason",
 	"grades_adjustment_col_notes": "Notes",
-	"grades_adjustment_col_date": "Date",
 	"grades_adjustment_col_actions": "Actions",
 	"grades_adjustment_col_adjustment": "Adjustment",
 	"grades_adjustment_notes_add": "Add private note",

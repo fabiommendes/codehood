@@ -86,7 +86,6 @@ const rows = adjustments.map((entry) => ({
               <th scope="col">{m.grades_adjustment_col_target()}</th>
               <th scope="col">{m.grades_adjustment_col_adjustment()}</th>
               <th scope="col">{m.grades_adjustment_col_reason()}</th>
-              <th scope="col">{m.grades_adjustment_col_date()}</th>
               <th scope="col"><span class="sr-only">{m.grades_adjustment_col_actions()}</span></th>
             </tr>
           </thead>
@@ -95,10 +94,13 @@ const rows = adjustments.map((entry) => ({
               <tr class:list={["align-top", !active && "text-base-content/60"]}>
                 <th scope="row" class="font-medium">
                   <a href={`${examHref}/attempts/${entry.author}`} class="link">{student}</a>
+                  <div class="whitespace-nowrap text-xs font-normal text-muted">{formatDateTime(entry.createdAt, { year: "numeric" })}</div>
+                  {by && <div class="text-xs font-normal text-muted">{m.grades_adjustment_by_line({ name: by })}</div>}
+                  {revokedBy && <div class="text-xs font-normal text-muted">{m.grades_adjustment_revoked_by_line({ name: revokedBy })}</div>}
                 </th>
                 <td>{target}</td>
                 <td>
-                  <div class="flex flex-wrap items-center gap-2">
+                  <div class="flex items-center gap-2 whitespace-nowrap">
                     <span class="font-medium">{label}</span>
                     <span class:list={["badge badge-sm", active ? "badge-success" : "badge-ghost"]}>
                       {active ? m.grades_adjustment_active() : m.grades_adjustment_revoked()}
@@ -110,11 +112,6 @@ const rows = adjustments.map((entry) => ({
                   {notes && (
                     <div class="mt-1 whitespace-pre-wrap text-xs text-muted"><span class="font-medium">{m.grades_adjustment_col_notes()}:</span> {notes}</div>
                   )}
-                </td>
-                <td class="whitespace-nowrap">
-                  {formatDateTime(entry.createdAt, { year: "numeric" })}
-                  {by && <div class="text-xs text-muted">{m.grades_adjustment_by_line({ name: by })}</div>}
-                  {revokedBy && <div class="text-xs text-muted">{m.grades_adjustment_revoked_by_line({ name: revokedBy })}</div>}
                 </td>
                 <td>
                   {active && (
