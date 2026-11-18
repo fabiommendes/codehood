@@ -609,33 +609,58 @@ test("student: ask for a regrade", async ({ page }) => {
 test("student: see the adjustments to my grade", async ({ page }) => {
 	const world = await gradedExam("adjust-stu");
 	const { ana, bia, caio, davi } = world;
-	const eli = await lateStudent(world, "adjust-stu-eli", true);
-	const fay = await lateStudent(world, "adjust-stu-fay", false);
+	const eli = await lateStudent(world, "adjust-stu-eli", BOTH_RIGHT);
+	const fay = await lateStudent(world, "adjust-stu-fay", null);
+	const ivy = await lateStudent(world, "adjust-stu-ivy", BOTH_RIGHT);
+	const jon = await lateStudent(world, "adjust-stu-jon", BOTH_RIGHT);
+	const lia = await lateStudent(world, "adjust-stu-lia", BOTH_RIGHT);
+	const gina = await lateStudent(world, "adjust-stu-gina", {
+		"q-first": "brasilia",
+		"q-second": "rio",
+	});
+	const hugo = await lateStudent(world, "adjust-stu-hugo", {
+		"q-first": "brasilia",
+	});
 	const adjust = (
 		student: { username: string },
 		adjustment: { op: "SET" | "FACTOR" | "OFFSET"; value: string },
 		reason: string,
 		question?: string,
 	) =>
-		db.examAdjustment.create(
-			{
-				course: world.course.id,
-				exam: world.exam.slug,
-				usernames: [student.username],
-				...adjustment,
-				...(question ? { question } : {}),
-				reason,
-				notes: NOTES,
-			},
+		db.examAdjustment
+			.create(
+				{
+					course: world.course.id,
+					exam: world.exam.slug,
+					usernames: [student.username],
+					...adjustment,
+					...(question ? { question } : {}),
+					reason,
+					notes: NOTES,
+				},
+				{ actor: world.teacher },
+			)
+			.then((rows) => rows[0]?.publicId ?? "");
+	const revoke = (publicId: string) =>
+		db.examAdjustment.revoke(
+			{ course: world.course.id, exam: world.exam.slug, publicId },
 			{ actor: world.teacher },
 		);
 	// Created out of the order they apply in: SET, then the factors, then the offsets.
-	await adjust(ana, { op: "OFFSET", value: "0.1" }, "Class participation");
+	const participation = await adjust(
+		ana,
+		{ op: "OFFSET", value: "0.1" },
+		"Class participation",
+	);
 	await adjust(ana, { op: "FACTOR", value: "0.5" }, "Late project");
 	await adjust(ana, { op: "SET", value: "0.8" }, "Make-up exam");
 	await adjust(ana, { op: "FACTOR", value: "0.9" }, "Missed lab");
 	await adjust(bia, { op: "OFFSET", value: "0.1" }, "Bonus on a full grade");
-	await adjust(caio, { op: "FACTOR", value: "0.5" }, "Copied a neighbour");
+	const copied = await adjust(
+		caio,
+		{ op: "FACTOR", value: "0.5" },
+		"Copied a neighbour",
+	);
 	await adjust(
 		davi,
 		{ op: "FACTOR", value: "0" },
@@ -649,6 +674,50 @@ test("student: see the adjustments to my grade", async ({ page }) => {
 		"q-second",
 	);
 	await adjust(fay, { op: "SET", value: "0.7" }, "Grade of the project");
+	await adjust(ivy, { op: "SET", value: "0.8" }, "Make-up grade");
+	await adjust(ivy, { op: "FACTOR", value: "0" }, "Cheated on the make-up");
+	await adjust(jon, { op: "SET", value: "0.145" }, "Weighted project grade");
+	await adjust(lia, { op: "FACTOR", value: "1.1" }, "Curve");
+	await adjust(lia, { op: "OFFSET", value: "-0.1" }, "Late submission");
+
+	// The instructor changes a grade by hand: on a real answer, and on a question the student left blank.
+	const second = (
+		await db.response.findMany(
+			{
+				course: world.course.id,
+				exam: world.exam.slug,
+				author: gina.username,
+			},
+			FULL_ACCESS,
+		)
+	)
+		.flatMap((response) => response.submissions)
+		.find((submission) => submission.question === "q-second");
+	await db.feedback.create(
+		{
+			submission: { publicId: second?.publicId ?? "" },
+			ref: "manual-1",
+			score: "1",
+			feedback: "Accepted in class",
+			grader: world.teacher.username,
+		},
+		FULL_ACCESS,
+	);
+	await prisma.feedback.updateMany({
+		where: { ref: "auto", submission: { publicId: second?.publicId ?? "" } },
+		data: { updatedAt: new Date(Date.now() - 24 * 60 * MINUTE) },
+	});
+	await db.manualGrade.gradeUnanswered(
+		{
+			course: world.course.id,
+			exam: world.exam.slug,
+			author: hugo.username,
+			question: "q-second",
+			score: "1",
+			comment: "Counted in class",
+		},
+		{ actor: world.teacher },
+	);
 
 	const adjustments = () =>
 		page.getByRole("region", { name: "Grade adjustments" });
@@ -680,6 +749,15 @@ test("student: see the adjustments to my grade", async ({ page }) => {
 		]) {
 			await expect(page.getByText(text)).toHaveCount(0);
 		}
+		await keepsNotesPrivate();
+	});
+
+	await test.step("before the release a student who did not take the exam reads so, with no grade", async () => {
+		await visit(fay);
+
+		await expect(page.getByText(/did not take this exam/i)).toBeVisible();
+		await expect(page.getByText(/results are not out yet/i)).toHaveCount(0);
+		await expect(page.getByText(/\d+%/)).toHaveCount(0);
 		await keepsNotesPrivate();
 	});
 
@@ -760,13 +838,113 @@ test("student: see the adjustments to my grade", async ({ page }) => {
 		await expect(requestRegrade()).toHaveCount(0);
 		await keepsNotesPrivate();
 	});
+
+	await test.step("a replacement and a zero together give 0%, and both lines are listed", async () => {
+		await visit(ivy);
+
+		await expect(adjustments()).toContainText(/Original total\s*100%/);
+		await expect(adjustments()).toContainText(/Final total\s*0%/);
+		const lines = adjustments().getByRole("listitem");
+		await expect(lines).toHaveCount(2);
+		await expect(lines).toContainText(["Grade replaced by 80%", "Zeroed"]);
+		await expect(lines.nth(0)).toContainText("Make-up grade");
+		await expect(lines.nth(1)).toContainText("Cheated on the make-up");
+		await keepsNotesPrivate();
+	});
+
+	await test.step("a replaced grade can still be contested, and the header card and the final total round alike", async () => {
+		await visit(jon);
+
+		await expect(requestRegrade().first()).toBeVisible();
+		await expect(adjustments()).toContainText("Grade replaced by 14.5%");
+		await expect(adjustments()).toContainText(/Final total\s*15%/);
+		// The header card and the final total: the same text, as `formatScore` writes it.
+		await expect(page.getByText("15%", { exact: true })).toHaveCount(2);
+		await expect(page.getByText("14%", { exact: true })).toHaveCount(0);
+	});
+
+	await test.step("a factor above 1 reads as a bonus and a negative offset as a penalty", async () => {
+		await visit(lia);
+
+		const lines = adjustments().getByRole("listitem");
+		await expect(lines).toContainText(["Bonus ×1.1", "Penalty −10"]);
+		await expect(adjustments()).toContainText(/Final total\s*100%/);
+	});
+
+	await test.step("a question graded by hand shows the new score and the comment on a real answer", async () => {
+		await visit(gina);
+
+		await expect(
+			page
+				.getByRole("region", { name: "Question 2" })
+				.getByLabel("Rio de Janeiro"),
+		).toBeChecked();
+		await expect(page.getByText(/Score\s*100%/)).toHaveCount(2);
+		await expect(page.getByText("Accepted in class")).toBeVisible();
+		await expect(page.getByText("100%", { exact: true }).first()).toBeVisible();
+		await expect(adjustments()).toHaveCount(0);
+		await keepsNotesPrivate();
+	});
+
+	await test.step("a blank question graded by hand shows the score and the comment, and no answer", async () => {
+		await visit(hugo);
+
+		await expect(page.getByRole("radio", { checked: true })).toHaveCount(1);
+		await expect(page.getByText(/Score\s*100%/)).toHaveCount(2);
+		await expect(page.getByText("Counted in class")).toBeVisible();
+		await expect(page.getByText(/did not take this exam/i)).toHaveCount(0);
+		await expect(page.getByText("100%", { exact: true }).first()).toBeVisible();
+		await keepsNotesPrivate();
+	});
+
+	await test.step("the adjusted total shows on the student's home and on the course's exams list", async () => {
+		await logInAs(page, fay);
+
+		await page.goto("/");
+		const results = section(page, "New results");
+		await expect(results.getByText("Honour exam")).toBeVisible();
+		await expect(results.getByText("70%", { exact: true })).toBeVisible();
+
+		await page.goto(`${world.href}/exams`);
+		const past = section(page, "Past exams and grades");
+		await expect(past.getByText("Honour exam")).toBeVisible();
+		await expect(past.getByText("70%", { exact: true })).toBeVisible();
+	});
+
+	await test.step("after the instructor revokes an adjustment its line goes away and the total comes back", async () => {
+		await revoke(participation);
+		await visit(ana);
+
+		const lines = adjustments().getByRole("listitem");
+		await expect(lines).toHaveCount(3);
+		await expect(lines).toContainText([
+			"Grade replaced by 80%",
+			"Penalty ×0.5",
+			"Penalty ×0.9",
+		]);
+		await expect(page.getByText("Class participation")).toHaveCount(0);
+		await expect(page.getByText("Bonus +10")).toHaveCount(0);
+		await expect(adjustments()).toContainText(/Final total\s*36%/);
+	});
+
+	await test.step("after the penalty on the whole exam is revoked the student can ask for a regrade again", async () => {
+		await revoke(copied);
+		await visit(caio);
+
+		await expect(adjustments()).toHaveCount(0);
+		await expect(page.getByText("Copied a neighbour")).toHaveCount(0);
+		await expect(requestRegrade().first()).toBeVisible();
+	});
 });
 
-/// Enrols a student of the closed exam of `gradedExam`, who answers both questions rightly when `answers` is set and never starts otherwise.
+/// The choice ids that answer both questions of `gradedExam` rightly.
+const BOTH_RIGHT = { "q-first": "brasilia", "q-second": "brasilia" };
+
+/// Enrols a student of the closed exam of `gradedExam`, who answers the questions of `answers` (slug to choice id) and never starts when it is `null`.
 async function lateStudent(
 	world: Awaited<ReturnType<typeof gradedExam>>,
 	username: string,
-	answers: boolean,
+	answers: Record<string, string> | null,
 ) {
 	const student = await seedUser({ role: "STUDENT", username });
 	await db.enrollment.create(
@@ -779,13 +957,13 @@ async function lateStudent(
 		where: { id: world.exam.id },
 		data: { status: "ONGOING" },
 	});
-	for (const question of ["q-first", "q-second"]) {
+	for (const [question, payload] of Object.entries(answers)) {
 		await db.response.submit(
 			{
 				course: world.course.id,
 				exam: world.exam.slug,
 				question,
-				payload: "brasilia",
+				payload,
 			},
 			{ actor: student },
 		);
