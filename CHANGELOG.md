@@ -62,6 +62,9 @@
 
 ### Fixed
 
+- `ch push` não publica mais `__pycache__/`, `*.pyc`, `elm-stuff/` e
+  `node_modules/` como recursos: são sempre excluídos (e protegidos do prune),
+  além do `[push].exclude`.
 - Segurança: o enunciado de uma questão de prova só sai para o aluno com um
   grant emitido a partir da tentativa dele. Quem faltou lê os enunciados depois
   da liberação das notas, sem revisão. Nova rota

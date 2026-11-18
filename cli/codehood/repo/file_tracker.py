@@ -10,6 +10,14 @@ from .diff import AddFile, Diff, FileType
 
 MDQ_SUFFIXES = (".md", ".mdq")
 
+# Generated artifacts that are never tracked, at any depth, besides `[push].exclude`.
+DEFAULT_EXCLUDE = (
+    "**/__pycache__",
+    "**/*.pyc",
+    "**/elm-stuff",
+    "**/node_modules",
+)
+
 
 #
 # File scanners
@@ -26,8 +34,11 @@ def scan_files(root: Path, exclude: Sequence[str] = ()) -> Iterable[File]:
     Files outside a Codehood tree are ignored. Files under `resources/` and
     `questions/` that match an `exclude` pattern (see `codehood.globs`) are
     still yielded, flagged `excluded`, so a caller can report them and
-    protect what the server holds for them.
+    protect what the server holds for them. `DEFAULT_EXCLUDE` (caches and
+    build output such as `__pycache__/` and `node_modules/`) always applies,
+    on top of `exclude`.
     """
+    exclude = (*DEFAULT_EXCLUDE, *exclude)
 
     def skipped(path: Path) -> bool:
         return is_excluded(path.relative_to(root).as_posix(), exclude)

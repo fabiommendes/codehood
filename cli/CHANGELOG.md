@@ -5,6 +5,10 @@ CLI shares the server's version and is released with it.
 
 ## Unreleased
 
+- `push` always excludes `__pycache__/`, `*.pyc`, `elm-stuff/` and
+  `node_modules/`, on top of `[push].exclude`, so generated artifacts are not
+  published as resources.
+
 ## 0.5.1 (2026-11-17)
 
 ## 0.5.0 (2026-11-16)
