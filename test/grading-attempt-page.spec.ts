@@ -279,7 +279,7 @@ test("attempt page: each answer shows its state, and the total waits while one i
 	await expect(detail(page, "Total")).toHaveText("50%");
 });
 
-test("attempt page: an unknown exam or username, and a student with no attempt, get 404", async ({
+test("attempt page: an unknown exam or username gets 404, and an enrolled student with no attempt opens", async ({
 	page,
 }) => {
 	const { teacher, course, href } = await setup("at3");
@@ -295,7 +295,8 @@ test("attempt page: an unknown exam or username, and a student with no attempt, 
 	expect(found?.status()).toBe(200);
 
 	const idle = await page.goto(`${href}/exams/midterm/attempts/at3-idle`);
-	expect(idle?.status()).toBe(404);
+	expect(idle?.status()).toBe(200);
+	await expect(titleHeading(page, "Idle Student")).toBeVisible();
 
 	const unknownUser = await page.goto(
 		`${href}/exams/midterm/attempts/at3-nobody`,
