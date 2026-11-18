@@ -46,6 +46,9 @@ import {
 	examTimingFromDb,
 	examTimingSelect,
 	freezeQuestionVersions,
+	grantedDocument,
+	grantViews,
+	issueExamGrant,
 	latestVersions,
 	loadExceptionTiming,
 	unsafePinnedDocument,
@@ -266,11 +269,18 @@ const buildExamService = (deps: Deps) =>
 				if (error) throw error;
 
 				const views = await attachmentViews(tx, [row], opts.actor);
+				const withQuestions = await questionsShown(
+					tx,
+					[row],
+					views,
+					opts.actor,
+				);
 				const weights = await loadWeights(tx, [row]);
 				return fromDb(
 					row,
 					views.get(row.id) ?? "hidden",
 					weights.get(row.id) ?? [],
+					withQuestions.has(row.id),
 				);
 			},
 		});
@@ -330,9 +340,15 @@ const buildExamService = (deps: Deps) =>
 				});
 
 				const views = await attachmentViews(tx, rows, opts.actor);
+				const withQuestions = await questionsShown(tx, rows, views, opts.actor);
 				const weights = await loadWeights(tx, rows);
 				return rows.map((row) =>
-					fromDb(row, views.get(row.id) ?? "hidden", weights.get(row.id) ?? []),
+					fromDb(
+						row,
+						views.get(row.id) ?? "hidden",
+						weights.get(row.id) ?? [],
+						withQuestions.has(row.id),
+					),
 				);
 			},
 		});
@@ -375,6 +391,7 @@ const buildExamService = (deps: Deps) =>
 				});
 
 				const views = await attachmentViews(tx, rows, opts.actor);
+				const withQuestions = await questionsShown(tx, rows, views, opts.actor);
 				const weights = await loadWeights(tx, rows);
 				const result: CourseExam[] = [];
 				for (const row of rows) {
@@ -394,6 +411,7 @@ const buildExamService = (deps: Deps) =>
 							row,
 							views.get(row.id) ?? "hidden",
 							weights.get(row.id) ?? [],
+							withQuestions.has(row.id),
 						),
 					});
 				}
@@ -800,30 +818,64 @@ const buildExamService = (deps: Deps) =>
 				name: string,
 				opts: ServiceOptsWithoutTx,
 			): Promise<DownloadedAttachment> => {
-				const row = await downloadableExam(tx, filter, opts.actor);
-				const pinned = row.questionsForExams.find(
-					(q) => q.questionRef.slug === questionSlug,
-				);
-				if (!pinned) throw new NotFound("attachment");
+				const row = await tx.exam.findFirst({
+					where: examWhere(filter),
+					include: examInclude(),
+				});
+				const access = row && examAccess(opts.actor, row);
+				if (!row || (access !== "write" && access !== "read")) {
+					throw new NotFound("attachment");
+				}
 
-				const version = await unsafePinnedDocument(
+				if (access === "write") {
+					const pinned = row.questionsForExams.find(
+						(q) => q.questionRef.slug === questionSlug,
+					);
+					if (!pinned) throw new NotFound("attachment");
+					const version = await unsafePinnedDocument(
+						tx,
+						{
+							id: pinned.questionRef.id,
+							latestId: pinned.questionRef.latestId,
+							version: pinned.version,
+						},
+						{ privatePayload: true, files: true },
+					);
+					if (!version) throw new NotFound("attachment");
+					const document = version.privatePayload as unknown as
+						| WithAttachments
+						| undefined;
+					return serveAttachmentFile(
+						deps.blob,
+						tx,
+						document?.attachments ?? null,
+						version.files as AttachmentFiles | null,
+						name,
+					);
+				}
+
+				const grant = await issueExamGrant(
 					tx,
-					{
-						id: pinned.questionRef.id,
-						latestId: pinned.questionRef.latestId,
-						version: pinned.version,
-					},
-					{ privatePayload: true, files: true },
+					{ course: row.courseId as CourseId, exam: row.slug },
+					opts.actor,
 				);
-				if (!version) throw new NotFound("attachment");
-				const document = version.privatePayload as unknown as
-					| WithAttachments
-					| undefined;
+				const granted = grant?.questions.find((q) => q.slug === questionSlug);
+				if (!grant || !granted) throw new NotFound("attachment");
+				const document = (await grantedDocument(
+					tx,
+					grant,
+					opts.actor,
+					questionSlug,
+				)) as WithAttachments;
+				const data = await tx.questionData.findUnique({
+					where: { id: granted.dataId },
+					select: { files: true },
+				});
 				return serveAttachmentFile(
 					deps.blob,
 					tx,
-					document?.attachments ?? null,
-					version.files as AttachmentFiles | null,
+					document.attachments ?? null,
+					(data?.files as AttachmentFiles | null) ?? null,
 					name,
 				);
 			},
@@ -1250,6 +1302,29 @@ async function attachmentViews(
 	return views;
 }
 
+/// The ids of the `rows` whose questions `actor` reads: all of them for whoever writes the course's contents, the exams the student holds a grant on otherwise.
+async function questionsShown(
+	tx: PrismaTx,
+	rows: DbExam[],
+	views: Map<number, AttachmentView>,
+	actor: Actor,
+): Promise<Set<number>> {
+	const shown = new Set<number>();
+	const students: DbExam[] = [];
+	for (const row of rows) {
+		if (views.get(row.id) === "full") shown.add(row.id);
+		else students.push(row);
+	}
+	if (students.length === 0) return shown;
+	const granted = await grantViews(
+		tx,
+		students.map((row) => row.id as ExamId),
+		actor,
+	);
+	for (const [id, view] of granted) if (view) shown.add(id);
+	return shown;
+}
+
 /**
  * The exam `filter` addresses, once `actor` may download its attachments.
  *
@@ -1392,11 +1467,12 @@ function publicAttachments(list: Attachment[]) {
 	return list.map(({ origin: _origin, ...rest }) => rest);
 }
 
-/** Converts a database row into the exam entity, showing its contents as `view` says: a `hidden` view has no attachments, no preamble and no questions. */
+/** Converts a database row into the exam entity, showing its contents as `view` says: a `hidden` view has no attachments and no preamble, and the questions come only with `withQuestions`. */
 function fromDb(
 	row: DbExam,
 	view: AttachmentView,
 	weights: readonly number[],
+	withQuestions: boolean = view === "full",
 ): Exam {
 	const list = (row.attachments as Attachment[] | null) ?? [];
 	const files = row.files as AttachmentFiles | null;
@@ -1419,15 +1495,14 @@ function fromDb(
 		questionsFrozenAt: row.questionsFrozenAt,
 		rev: row.rev,
 		tags: row.examTags.map((t) => t.tag),
-		questions:
-			view === "hidden"
-				? []
-				: row.questionsForExams.map((q, i) => ({
-						id: q.questionRef.id as Exam["questions"][number]["id"],
-						slug: q.questionRef.slug,
-						version: q.version,
-						weight: weights[i] ?? 1,
-					})),
+		questions: !withQuestions
+			? []
+			: row.questionsForExams.map((q, i) => ({
+					id: q.questionRef.id as Exam["questions"][number]["id"],
+					slug: q.questionRef.slug,
+					version: q.version,
+					weight: weights[i] ?? 1,
+				})),
 		createdAt: row.createdAt,
 		updatedAt: row.updatedAt,
 		attachments:
