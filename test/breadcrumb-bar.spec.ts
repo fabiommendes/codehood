@@ -119,12 +119,16 @@ test.describe("breadcrumb bar", () => {
 		await expect(nav).not.toBeInViewport();
 	});
 
-	test("course home: no breadcrumb", async ({ page }) => {
-		const { href } = await examPage(page, "home");
+	test("course home: the course alone, as the current crumb", async ({
+		page,
+	}) => {
+		const { course, href } = await examPage(page, "home");
 		await page.goto(href);
-		await expect(
-			page.getByRole("navigation", { name: "Breadcrumb" }),
-		).toHaveCount(0);
+		const nav = page.getByRole("navigation", { name: "Breadcrumb" });
+		await expect(nav.getByRole("link")).toHaveCount(0);
+		const current = nav.locator('[aria-current="page"]');
+		await expect(current).toContainText(course.discipline.slug);
+		await expect(current.locator("svg")).toBeVisible();
 	});
 });
 

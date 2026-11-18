@@ -12,8 +12,10 @@ import { gradingHref, wantsNames } from "./grading-urls";
 export interface Crumb {
 	label: string;
 	href?: string;
-	/// Seed of the course tile drawn in place of the label (the course root).
+	/// Seed of the course tile drawn before `code` (the course root).
 	tile?: string;
+	/// The discipline code shown beside the tile; `label` stays its accessible name.
+	code?: string;
 }
 
 /** Labels for the parts of the trail the URL alone cannot spell. */
@@ -50,14 +52,15 @@ interface Step {
 	path: string;
 	href?: string;
 	tile?: string;
+	code?: string;
 }
 
 /**
  * Builds the breadcrumb trail for `url`, upward from the current page.
  *
  * Steps whose label cannot be determined are dropped, and the last remaining
- * crumb is never linked. The course home has no trail, and the course root
- * carries the seed of its tile.
+ * crumb is never linked. The course root carries the seed of its tile and
+ * the discipline code, and is the whole trail of the course home.
  */
 export function breadcrumbs(url: URL, labels: CrumbLabels): Crumb[] {
 	const segments = url.pathname.split("/").filter(Boolean);
@@ -69,15 +72,12 @@ export function breadcrumbs(url: URL, labels: CrumbLabels): Crumb[] {
 	const known = steps.filter(
 		(step): step is Step & { label: string } => step.label !== undefined,
 	);
-	return known.map((step, i) =>
-		i < known.length - 1
-			? {
-					label: step.label,
-					href: step.href ?? step.path,
-					...(step.tile ? { tile: step.tile } : {}),
-				}
-			: { label: step.label },
-	);
+	return known.map((step, i) => ({
+		label: step.label,
+		...(i < known.length - 1 ? { href: step.href ?? step.path } : {}),
+		...(step.tile ? { tile: step.tile } : {}),
+		...(step.code ? { code: step.code } : {}),
+	}));
 }
 
 /// Steps of a course URL: course, then tab, then the tab's item.
@@ -93,11 +93,11 @@ function courseSteps(
 			label: `${discipline?.slug} \u00b7 ${edition?.slug}`,
 			path: home,
 			tile: home,
+			code: discipline?.slug,
 		},
 	];
 	const tab = segments[2];
-	// The course home is the root itself: it has no trail.
-	if (tab === undefined) return [];
+	if (tab === undefined) return steps;
 	if (!Object.hasOwn(COURSE_TAB_LABELS, tab)) return steps;
 	const tabPath = `${home}/${tab}`;
 	steps.push({

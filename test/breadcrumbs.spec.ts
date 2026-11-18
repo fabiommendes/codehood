@@ -8,16 +8,18 @@ const course: CrumbLabels["course"] = {
 };
 const courseLabel = "cs201 · 2026-1";
 const home = "/cs201/turing_2026-1";
-/// The linked course root, drawn as the course tile.
-const root = { label: courseLabel, href: home, tile: home };
+/// The linked course root, drawn as the course tile and the discipline code.
+const root = { label: courseLabel, href: home, tile: home, code: "cs201" };
 
 function trail(path: string, labels: CrumbLabels = { course }) {
 	return breadcrumbs(new URL(path, "http://localhost"), labels);
 }
 
 test.describe("course tabs and items", () => {
-	test("course home has no trail", () => {
-		expect(trail(home)).toEqual([]);
+	test("course home is the course root alone, unlinked", () => {
+		expect(trail(home)).toEqual([
+			{ label: courseLabel, tile: home, code: "cs201" },
+		]);
 	});
 
 	const tabs = [
@@ -220,6 +222,8 @@ test.describe("grading, attempts, admin and other pages", () => {
 	});
 
 	test("unknown tab segment drops its crumb and unlinks the course", () => {
-		expect(trail(`${home}/foo`)).toEqual([{ label: courseLabel }]);
+		expect(trail(`${home}/foo`)).toEqual([
+			{ label: courseLabel, tile: home, code: "cs201" },
+		]);
 	});
 });

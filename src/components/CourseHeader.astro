@@ -1,5 +1,5 @@
 ---
-// The only header a course page has: badge, title, instructor line, and the
+// The only header a course page has: title, instructor line, and the
 // tab strip, on every page under /<discipline>/<course>/. There is no
 // back-link and no "Instructor view" badge; the strip is the whole of the
 // page's navigation, and an instructor's extra tabs are the only thing that
@@ -20,10 +20,7 @@ const { course, tabs, active } = Astro.props;
 ---
 
 <div data-page-header>
-	<span class="badge badge-outline badge-sm font-mono"
-		>{course.discipline.slug}</span
-	>
-	<h1 class="mt-2 text-3xl font-bold">{course.discipline.name}</h1>
+	<h1 class="text-3xl font-bold">{course.discipline.name}</h1>
 	<p class="mt-1 text-muted">
 		{course.instructor.name} · {course.edition.slug}
 	</p>

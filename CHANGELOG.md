@@ -22,6 +22,10 @@
 
 ### Changed
 
+- Breadcrumb: a raiz do curso mostra o ícone e o código da disciplina, e a
+  home do curso também tem breadcrumb (só a raiz). O badge com o código acima
+  do título das páginas do curso saiu.
+
 - Transições de página: o navegador mantém a página antiga até a nova pintar
   e faz um fade curto entre as duas, sem o quadro em branco. Navbar e sidebar
   ficam paradas, o sublinhado da aba de links desliza para a aba nova, e as

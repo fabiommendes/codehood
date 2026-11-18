@@ -3,7 +3,7 @@
 // above the top bar: as the page scrolls it rises into the middle of the bar,
 // lined up with the page column, and stays there. On phones the bar's middle
 // holds the logo, so it scrolls away with the content. The course root is
-// drawn as the course tile.
+// drawn as the course tile and the discipline code.
 import CourseTile from "@/components/CourseTile.astro";
 import { m } from "@/i18n";
 import type { Crumb } from "@/utils/breadcrumbs";
@@ -27,23 +27,44 @@ const { trail, static: isStatic = false } = Astro.props;
       class="breadcrumbs flex h-9 min-w-0 items-center overflow-hidden py-0 text-sm text-muted"
     >
       <ul>
-        {trail.map((crumb) => (
-          <li>
-            {crumb.href ? (
-              crumb.tile ? (
-                <a href={crumb.href} aria-label={crumb.label} title={crumb.label}>
-                  <CourseTile seed={crumb.tile} size={18} class="ring-1 ring-edge" />
+        {trail.map((crumb) => {
+          // The course root shows its tile and code; its label (code and
+          // edition) is the name it is read by.
+          const tile = crumb.tile;
+          const course = tile !== undefined;
+          const content = course ? (
+            <>
+              <CourseTile seed={tile} size={18} class="shrink-0 ring-1 ring-edge" />
+              <span aria-hidden="true" class="font-mono">{crumb.code}</span>
+            </>
+          ) : (
+            crumb.label
+          );
+          return (
+            <li>
+              {crumb.href ? (
+                <a
+                  href={crumb.href}
+                  aria-label={course ? crumb.label : undefined}
+                  title={course ? crumb.label : undefined}
+                  data-crumb-course={course || undefined}
+                >
+                  {content}
                 </a>
               ) : (
-                <a href={crumb.href}>{crumb.label}</a>
-              )
-            ) : (
-              <span aria-current="page" class="text-base-content">
-                {crumb.label}
-              </span>
-            )}
-          </li>
-        ))}
+                <span
+                  aria-current="page"
+                  title={course ? crumb.label : undefined}
+                  data-crumb-course={course || undefined}
+                  class="text-base-content"
+                >
+                  {content}
+                  {course && <span class="sr-only">{crumb.label}</span>}
+                </span>
+              )}
+            </li>
+          );
+        })}
       </ul>
     </nav>
   )
@@ -109,6 +130,11 @@ const { trail, static: isStatic = false } = Astro.props;
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
+  }
+  [data-breadcrumbs] > ul > li > [data-crumb-course] {
+    display: flex;
+    align-items: center;
+    gap: 0.375rem;
   }
 </style>
 
