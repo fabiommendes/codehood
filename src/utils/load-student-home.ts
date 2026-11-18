@@ -94,25 +94,23 @@ export async function loadStudentHome(
 				};
 			});
 			const resolved = requests.filter((request) => request.status !== "OPEN");
-			const titles = new Map(
+			const titlesOf = new Map(
 				await Promise.all(
-					[...new Set(resolved.map((request) => request.question))].map(
-						async (slug) =>
+					[...new Set(resolved.map((request) => request.exam))].map(
+						async (examSlug) =>
 							[
-								slug,
-								(
-									await db.question.findOne(
-										{ course: course.id, slug, public: true },
-										{ actor },
-									)
-								)?.question.title,
+								examSlug,
+								await db.examQuestion.titles(
+									{ course: course.id, exam: examSlug },
+									{ actor },
+								),
 							] as const,
 					),
 				),
 			);
 			const regrades: HomeRegrade[] = resolved.flatMap((request) => {
 				const exam = exams.find((entry) => entry.slug === request.exam);
-				const questionTitle = titles.get(request.question);
+				const questionTitle = titlesOf.get(request.exam)?.[request.question];
 				return exam
 					? [
 							{

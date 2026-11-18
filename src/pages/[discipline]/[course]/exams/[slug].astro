@@ -84,12 +84,6 @@ const preambleHtml =
 		? await highlightCodeBlocks(renderMarkdown(exam.preamble))
 		: null;
 
-// Each question at the version the exam pins, in its public form. A slug that
-// no longer resolves is dropped rather than shown blank.
-const publicQuestions = canManage
-	? []
-	: await loadExamQuestions(course.id, exam, true, { actor });
-
 // A student sees the exam through their own attempt: what they may do now,
 // and, once they are in it, the questions with their latest saved answers.
 // Practice exams open a new attempt per session, so the newest one counts.
@@ -218,6 +212,14 @@ const meta = [
 	exam.tags.length > 0 ? exam.tags.join(", ") : null,
 ].filter((part): part is string => part !== null);
 
+// Each question at the version the exam pins, in its public form, once the
+// student's attempt grants it.
+const granted = canManage
+	? null
+	: await db.examQuestion.forAttempt(
+			{ course: course.id, exam: slug },
+			{ actor },
+		);
 const view = await loadAttemptView({
 	course: course.id,
 	exam,
@@ -225,7 +227,7 @@ const view = await loadAttemptView({
 	schedule,
 	attempt,
 	state,
-	publicQuestions,
+	granted,
 	now,
 });
 const examOutcome = view.result;

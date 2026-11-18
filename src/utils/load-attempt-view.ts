@@ -3,8 +3,9 @@ import type { AnswerPayload } from "@/components/exam/answer-payload";
 import { type CodeSends, sendsOf } from "@/components/exam/code-sends";
 import type { QuestionRegrade } from "@/components/exam/RegradeControls";
 import type { CourseId } from "@/core/schemas/base";
-import { db, type Exam, type QuestionPublic, type Response } from "@/db";
+import { db, type Exam, type Response } from "@/db";
 import { loadResultPolicy } from "@/db/result-policy";
+import type { AttemptQuestions } from "@/db/services/exam-question.service";
 import { shufflePool } from "@/mdq/shuffle";
 import { DEFAULT_CODE_PENALTY } from "@/services/code-grading";
 import {
@@ -22,7 +23,6 @@ import {
 	highlightQuestionCodeBlocks,
 } from "./highlight-code-blocks";
 import { highlightExamples } from "./highlight-examples";
-import { loadReviews } from "./load-review";
 import type { PretestSource } from "./pretest-sources";
 
 /// What `ExamAttempt` takes from the server besides the state: the questions as the attempt shows them, the saved answers and, once it may be seen, the review.
@@ -31,7 +31,7 @@ export interface AttemptView {
 	questions: {
 		slug: string;
 		weight: number;
-		question: QuestionPublic["question"];
+		question: AttemptQuestions["questions"][number]["question"];
 	}[];
 	/// The latest saved answer per question slug.
 	answers: Record<string, AnswerPayload>;
@@ -57,15 +57,15 @@ export interface AttemptViewInput {
 	/// The author's attempt, or `null` before they start.
 	attempt: Response | null;
 	state: AttemptState;
-	/// The exam's questions in their public form, at the pinned versions.
-	publicQuestions: Omit<QuestionPublic, "id">[];
+	/// What `db.examQuestion.forAttempt` granted the author, or `null` when it granted nothing.
+	granted: AttemptQuestions | null;
 	now: Date;
 }
 
 /**
  * Loads what the page of an attempt hands to `ExamAttempt`, for the student's attempt and for the instructor's simulation alike.
  *
- * The questions leave the server only once the author is in the attempt.
+ * The questions are the ones the author's grant covers; with no grant there are none.
  * A simulation has no regrade requests, so none are read for it.
  */
 export async function loadAttemptView(
@@ -101,7 +101,25 @@ export async function loadAttemptView(
 
 	const reviews =
 		result && attempt
-			? await loadReviews(course, exam.questions, result, attempt.submissions)
+			? await db.examQuestion.reviews(
+					{ course, exam: exam.slug },
+					result.questions.flatMap((outcome) =>
+						(outcome.status === "graded" ||
+							outcome.status === "pending" ||
+							outcome.status === "sanctioned") &&
+						outcome.submission
+							? [
+									{
+										question: outcome.question,
+										submission: outcome.submission,
+										score: outcome.score,
+										blanks: outcome.blanks ?? null,
+									},
+								]
+							: [],
+					),
+					{ actor },
+				)
 			: undefined;
 
 	const requests =
@@ -140,24 +158,14 @@ export async function loadAttemptView(
 		};
 	}
 
-	const weights = new Map(
-		exam.questions.map((entry) => [entry.slug, entry.weight]),
-	);
-	// Questions stay on the server until the author is in the attempt.
-	const showQuestions =
-		state.kind === "in-progress" ||
-		state.kind === "submitted" ||
-		state.kind === "results";
-	const questions = showQuestions
-		? input.publicQuestions.map(({ slug, question }) => ({
-				slug,
-				weight: weights.get(slug) ?? 1,
-				question: shufflePool(
-					question,
-					`${attempt?.publicId ?? author}:${slug}`,
-				),
-			}))
-		: [];
+	// A student who missed the exam reads no questions on this screen.
+	const granted =
+		state.kind === "missed" ? [] : (input.granted?.questions ?? []);
+	const questions = granted.map(({ slug, weight, question }) => ({
+		slug,
+		weight,
+		question: shufflePool(question, `${attempt?.publicId ?? author}:${slug}`),
+	}));
 
 	// The pretest sources of each code question, only while the author can answer.
 	const pretests: Record<string, PretestSource[]> = {};
@@ -168,17 +176,13 @@ export async function loadAttemptView(
 	const answering = state.kind === "in-progress";
 	if (answering || (state.kind === "results" && attempt)) {
 		await Promise.all(
-			input.publicQuestions.map(async ({ slug, version, question }) => {
-				if (question.type !== "code") return;
-				const context = await db.question.codeAnswer(
-					{ course, slug, version },
-					{ actor },
-				);
+			granted.map(async ({ slug, question, code }) => {
+				if (question.type !== "code" || !code) return;
 				if (answering) {
-					pretests[slug] = context.pretests;
+					pretests[slug] = code.pretests;
 					exampleHtml[slug] = await highlightExamples(question);
 				}
-				if (!context.sendable || !attempt) return;
+				if (!code.sendable || !attempt) return;
 				const sent = await db.gradingJob.forStudent(
 					{ response: attempt.publicId, question: slug },
 					{ actor },

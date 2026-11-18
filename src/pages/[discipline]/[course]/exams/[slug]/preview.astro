@@ -14,7 +14,6 @@ import { breadcrumbs } from "@/utils/breadcrumbs";
 import { examNav } from "@/utils/exam-nav";
 import { highlightQuestionCodeBlocks } from "@/utils/highlight-code-blocks";
 import { loadAttemptView } from "@/utils/load-attempt-view";
-import { loadExamQuestions } from "@/utils/load-exam-questions";
 import { loadExamStaff } from "@/utils/load-exam-staff";
 import { highlightCodeBlocks, renderMarkdown } from "@/utils/markdown";
 
@@ -45,7 +44,10 @@ const view = await loadAttemptView({
 	schedule,
 	attempt,
 	state,
-	publicQuestions: await loadExamQuestions(course.id, exam, true, { actor }),
+	granted: await db.examQuestion.forAttempt(
+		{ course: course.id, exam: exam.slug },
+		{ actor },
+	),
 	now,
 });
 
