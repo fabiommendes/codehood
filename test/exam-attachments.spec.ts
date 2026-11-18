@@ -721,6 +721,17 @@ test("B16: names with a literal percent, unicode and case come back with the exa
 	]);
 	await createExam(ctx, { questions: [{ slug: "q", version: null }] });
 
+	for (const { name } of files.made) {
+		await expect(
+			db.exam.questionAttachment(pk(ctx), "q", name, { actor: ctx.student }),
+		).rejects.toBeInstanceOf(NotFound);
+	}
+	await persistedResponseFactory.create({
+		course: ctx.course.id,
+		exam: "ex1",
+		author: ctx.student.username,
+	});
+
 	for (const { name, bytes } of files.made) {
 		const served = await db.exam.questionAttachment(pk(ctx), "q", name, {
 			actor: ctx.student,

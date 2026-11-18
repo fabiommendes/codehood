@@ -107,7 +107,17 @@ test("a student with a later scheduled exception sees nothing of the exam while 
 	}
 	for (const exam of await readsOf(w, w.classmate)) {
 		expect(exam?.preamble).toBe(PREAMBLE);
+		expect(exam?.questions).toEqual([]);
+	}
+
+	await attempt(w, w.classmate);
+
+	for (const exam of await readsOf(w, w.classmate)) {
+		expect(exam?.preamble).toBe(PREAMBLE);
 		expect(slugsOf(exam)).toEqual(w.slugs);
+	}
+	for (const exam of await readsOf(w, w.student)) {
+		expect(exam).toMatchObject({ preamble: null, questions: [] });
 	}
 });
 
