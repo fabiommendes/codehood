@@ -1066,6 +1066,23 @@ async function createDemoCoursesIfMissing(): Promise<void> {
 		},
 		FULL_ACCESS,
 	);
+	await db.question.upsert(
+		{
+			course: cs101.id,
+			slug: "factorial-of-five",
+			status: "PUBLISHED",
+			version: "v2",
+			question: {
+				type: "numeric",
+				title: "Factorial of five",
+				stem: "What is 5! (five factorial)? Give the value, not the expression.",
+				tags: ["recursion"],
+				answer: 120,
+				domain: "integer",
+			},
+		},
+		FULL_ACCESS,
+	);
 	await db.exam.create(
 		{
 			course: cs101.id,
@@ -1083,10 +1100,13 @@ async function createDemoCoursesIfMissing(): Promise<void> {
 			),
 			duration: { hours: 2 },
 			tags: ["midterm"],
+			// `loop-invariants` is not pinned yet: it follows the latest version until
+			// the first attempt freezes the exam. `factorial-of-five` is pinned to a
+			// version newer than the one `quiz-01` and `test-01` serve.
 			questions: [
 				{ slug: "recursion-basics", version: "v1" },
-				{ slug: "loop-invariants", version: "v1" },
-				{ slug: "factorial-of-five", version: "v1" },
+				{ slug: "loop-invariants" },
+				{ slug: "factorial-of-five", version: "v2" },
 			],
 		},
 		FULL_ACCESS,
@@ -1149,6 +1169,7 @@ async function createDemoCoursesIfMissing(): Promise<void> {
 		backus: cohort[3] as User,
 	});
 	await seedHistoryOffExam(cs101.id, hopper);
+	await seedLaterQuestionVersion(cs101.id);
 	await seedGradeColumns(cs101.id, { hopper, hamilton, liskov, dijkstra });
 	await seedRollCalls(cs101.id, {
 		hopper,
@@ -1337,8 +1358,8 @@ async function seedAttachments(course: Course["id"]): Promise<void> {
 		{
 			questions: [
 				{ slug: "recursion-basics", version: "v1" },
-				{ slug: "loop-invariants", version: "v1" },
-				{ slug: "factorial-of-five", version: "v1" },
+				{ slug: "loop-invariants" },
+				{ slug: "factorial-of-five", version: "v2" },
 				{ slug: "csv-attachments", version: "v1" },
 			],
 			attachments: [
@@ -2495,6 +2516,56 @@ async function seedOpenQuiz(course: Course["id"], knuth: User): Promise<void> {
 	});
 }
 
+/**
+ * Writes a `v2` of `js-double-it` after the first attempt of `test-03`, which left the exam pinned to `v1`.
+ *
+ * It then checks the states that other seeds leave for the missed exams: Wirth
+ * enrolled before `test-01` and `test-02` and answered neither, so he may read
+ * `test-01` (grades released) and not `test-02` (still in correction), and
+ * Backus has a makeup of `test-02` on a future date.
+ */
+async function seedLaterQuestionVersion(course: Course["id"]): Promise<void> {
+	await db.question.upsert(
+		{
+			course,
+			slug: "js-double-it",
+			status: "PUBLISHED",
+			version: "v2",
+			question: {
+				type: "essay",
+				title: "Double the number",
+				stem: "Read a number and print its double.\n\nStart from [the loop reference](https://developer.mozilla.org/docs/Web/JavaScript/Guide/Loops_and_iteration).",
+				epilogue:
+					"Print only the number, with no label. Anything else on the output is ignored.",
+				tags: ["javascript"],
+				content: "code",
+				highlight: "javascript",
+				weight: 2,
+			} as never,
+		},
+		FULL_ACCESS,
+	);
+
+	const missed = await prisma.response.findMany({
+		where: {
+			authorId: "wirth",
+			exam: { courseId: course, slug: { in: ["test-01", "test-02"] } },
+		},
+	});
+	const makeup = await prisma.examException.count({
+		where: {
+			username: "backus",
+			scheduledAt: { gt: new Date() },
+			exam: { courseId: course, slug: "test-02" },
+		},
+	});
+	if (missed.length > 0 || makeup !== 1) {
+		throw new Error(
+			"[seed] the missed-exam states of wirth and backus no longer hold.",
+		);
+	}
+}
+
 /// Has hopper type the JavaScript answer of `test-03` with the edit history on, then switches the history off for the exam.
 async function seedHistoryOffExam(
 	course: Course["id"],
@@ -3318,7 +3389,9 @@ async function seedExternalGradingExams(
 			tags: ["elm", "javascript"],
 			questions: [
 				{ slug: "elm-soma", version: "v1" },
-				{ slug: "js-double-it", version: "v1" },
+				// Not pinned: the first attempt below freezes it to `v1`, and
+				// `seedLaterQuestionVersion` writes a newer one afterwards.
+				{ slug: "js-double-it" },
 			],
 		},
 		FULL_ACCESS,
@@ -3942,10 +4015,11 @@ async function seedPracticeAndSimulations(
 			description:
 				"Send as many times as you like. Code runs in the browser by the practice default, and two Elm questions run their pretests there: an examples block and linked test modules.",
 			tags: ["practice", "javascript", "elm"],
+			// A practice never freezes: `recursion-basics` keeps following its latest version.
 			questions: [
 				{ slug: "js-double-it", version: "v1" },
 				{ slug: "ts-sum-of-squares", version: "v1" },
-				{ slug: "recursion-basics", version: "v1" },
+				{ slug: "recursion-basics" },
 				{ slug: "factorial-of-five", version: "v1" },
 				{ slug: "elm-soma", version: "v1" },
 				{ slug: "elm-sequences", version: "v1" },
