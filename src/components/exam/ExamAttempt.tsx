@@ -1084,7 +1084,7 @@ export default function ExamAttempt(props: ExamAttemptProps): JSX.Element {
 						kind() === "results"
 					}
 				>
-					<Show when={kind() === "results" && props.empty}>
+					<Show when={props.empty}>
 						<p role="status" class={NOTICE}>
 							{m.exams_attempt_empty()}
 						</p>
@@ -1132,7 +1132,7 @@ export default function ExamAttempt(props: ExamAttemptProps): JSX.Element {
 					<Show
 						when={kind() === "in-progress"}
 						fallback={
-							<Show when={kind() === "submitted"}>
+							<Show when={kind() === "submitted" && !props.empty}>
 								<p role="status" class={NOTICE}>
 									{m.exams_attempt_submitted_waiting()}
 								</p>
@@ -1870,7 +1870,5 @@ function Outcome(props: {
 
 /// An exam total as a whole percentage, or the waiting notice while it is not known.
 function totalText(total: number | null): string {
-	return total === null
-		? m.exams_attempt_waiting()
-		: `${Math.round(total * 100)}%`;
+	return total === null ? m.exams_attempt_waiting() : formatScore(total);
 }
