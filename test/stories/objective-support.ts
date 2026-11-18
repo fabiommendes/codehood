@@ -22,6 +22,7 @@ export type ObjectiveLabel =
 	| "edit_question"
 	| "give_grade"
 	| "mark_correct"
+	| "mark_wrong"
 	| "pending"
 	| "regrade"
 	| "review"

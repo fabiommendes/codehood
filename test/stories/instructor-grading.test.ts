@@ -1980,6 +1980,30 @@ test("instructor: review an automatically graded question", async ({
 		});
 	});
 
+	await test.step("a student already at 100% gets 'mark as wrong', and saving the same grade is disabled", async () => {
+		await row("Brasília").getByRole("button").click();
+		const dialog = page.getByRole("dialog");
+		await dialog
+			.getByRole("row")
+			.filter({ hasText: "Caio Nunes" })
+			.getByRole("button", { name: objectiveLabel("change_grade") })
+			.click();
+		await expect(
+			dialog.getByRole("button", { name: objectiveLabel("mark_wrong") }),
+		).toBeVisible();
+		await expect(
+			dialog.getByRole("button", { name: objectiveLabel("mark_correct") }),
+		).toHaveCount(0);
+		const save = dialog.getByRole("button", {
+			name: gradesMessage("grades_objective_save"),
+			exact: true,
+		});
+		await expect(save).toBeDisabled();
+		await dialog.getByRole("spinbutton").fill("90");
+		await expect(save).toBeEnabled();
+		await page.keyboard.press("Escape");
+	});
+
 	await test.step("undo takes the automatic grade back, keeps the history and empties the list at the end", async () => {
 		await overrides
 			.getByRole("row")

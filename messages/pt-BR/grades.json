@@ -305,6 +305,7 @@
 	"grades_objective_grade_label": "Nota (0 a 100)",
 	"grades_objective_comment_optional": "Comentário (opcional)",
 	"grades_objective_mark_correct": "Marcar como certa",
+	"grades_objective_mark_wrong": "Marcar como errada",
 	"grades_objective_regrade": "Revisão pedida",
 	"grades_objective_regrade_detail": "O aluno pediu a revisão desta resposta.",
 	"grades_objective_view_request": "Ver pedido",

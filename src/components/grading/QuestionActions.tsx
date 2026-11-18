@@ -49,7 +49,7 @@ export default function QuestionActions(props: Props): JSX.Element {
 	const [editing, setEditing] = createSignal(false);
 	const [sanctioning, setSanctioning] = createSignal(false);
 	const [grade, setGrade] = createSignal(
-		props.score === null ? "" : String(percentOf(props.score)),
+		props.unadjusted === null ? "" : String(percentOf(props.unadjusted)),
 	);
 	const [comment, setComment] = createSignal("");
 	const [error, setError] = createSignal<string>();
@@ -89,6 +89,13 @@ export default function QuestionActions(props: Props): JSX.Element {
 	const percentText = (score: number | null) =>
 		score === null ? m.grades_adjustment_no_answer() : `${percentOf(score)}%`;
 	const typedGrade = () => Number(grade());
+	/// The answer's grade before the adjustment, as a whole percentage, or `null` when it has none.
+	const current = () =>
+		props.unadjusted === null ? null : percentOf(props.unadjusted);
+	/// Whether the typed grade is the one the answer already has.
+	const unchanged = () =>
+		current() !== null && isPercentScore(grade()) && typedGrade() === current();
+	const full = () => current() === 100;
 
 	return (
 		<span class="flex shrink-0 items-center gap-3">
@@ -148,7 +155,7 @@ export default function QuestionActions(props: Props): JSX.Element {
 				action={{
 					label: m.grades_objective_save(),
 					tone: "btn-primary",
-					disabled: busy(),
+					disabled: busy() || unchanged(),
 					onClick: () => void save(grade()),
 				}}
 			>
@@ -169,18 +176,20 @@ export default function QuestionActions(props: Props): JSX.Element {
 							</label>
 							<Show when={isPercentScore(grade())}>
 								<Preview
-									from={percentText(props.score)}
+									from={percentText(props.unadjusted)}
 									to={`${typedGrade()}%`}
 									tone="text-success"
 								/>
 							</Show>
 							<button
 								type="button"
-								class="btn btn-success btn-soft btn-xs ml-auto"
+								class={`btn btn-soft btn-xs ml-auto ${full() ? "btn-error" : "btn-success"}`}
 								disabled={busy()}
-								onClick={() => void save("100")}
+								onClick={() => void save(full() ? "0" : "100")}
 							>
-								{m.grades_objective_mark_correct()}
+								{full()
+									? m.grades_objective_mark_wrong()
+									: m.grades_objective_mark_correct()}
 							</button>
 						</div>
 						<p class="label whitespace-normal">

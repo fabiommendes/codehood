@@ -305,6 +305,7 @@
 	"grades_objective_grade_label": "Grade (0 to 100)",
 	"grades_objective_comment_optional": "Comment (optional)",
 	"grades_objective_mark_correct": "Mark as correct",
+	"grades_objective_mark_wrong": "Mark as wrong",
 	"grades_objective_regrade": "Regrade requested",
 	"grades_objective_regrade_detail": "The student asked for a review of this answer.",
 	"grades_objective_view_request": "View request",
