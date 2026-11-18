@@ -2,8 +2,7 @@
 
 Reproduz uma prova com N alunos simultâneos e `chalk-worker`s corrigindo a
 fila, contra um build de produção do servidor, e mede latência, erros, atraso
-do event loop, memória, CPU e disco. Issue de origem:
-`dev/issues/teste-de-carga-da-prova.md`.
+do event loop, memória, CPU e disco.
 
 ```sh
 pnpm run load --students 100 --duration 10m --scenario all

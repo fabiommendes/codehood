@@ -31,8 +31,9 @@ a lista trocada, com alunos no meio da prova.
   remover questão do exame, nem mudar peso (pesos ainda não existem, ver
   `BACKLOG.md:120-124`).
 - Mudança neutra aceita avança o pin da questão no exame para a nova versão,
-  senão a correção do erro nunca chega a quem está fazendo a prova. Depende de
-  `dev/issues/versao-da-questao-fixada-ao-iniciar-o-exame.md`.
+  senão a correção do erro nunca chega a quem está fazendo a prova. Conflita
+  com o congelamento das versões (commit 1d41f7e): precisa da ação de trocar o
+  pin de uma prova congelada, prevista no spec do grant de leitura.
 - Campo congelado não faz o push falhar: o servidor aplica o resto e reporta
   o que ignorou. Rejeitar deixaria o curso impossível de enviar depois de um
   "começar agora" pela web. Ver

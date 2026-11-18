@@ -2,7 +2,7 @@
 type: issue
 status: todo
 tags: [performance, exam, grading-bot]
-relatedTo: [teste-de-carga-da-prova, metricas-de-performance-no-servidor, sqlite-em-modo-wal]
+relatedTo: [metricas-de-performance-no-servidor, sqlite-em-modo-wal]
 kind: enhancement
 priority: medium
 created: 2026-11-14

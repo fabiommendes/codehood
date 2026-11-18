@@ -2,7 +2,7 @@
 type: issue
 status: todo
 tags: [observability, performance, ops, grading-bot]
-relatedTo: [log-de-erros-no-servidor-e-no-cliente, fila-de-correcao-externa, teste-de-carga-da-prova]
+relatedTo: [log-de-erros-no-servidor-e-no-cliente, fila-de-correcao-externa]
 kind: feature
 priority: medium
 created: 2026-11-13
