@@ -13772,6 +13772,1229 @@
         }
       }
     },
+    "/api/course/{discipline}/{course}/exam/{slug}/questions": {
+      "get": {
+        "operationId": "examAttemptQuestions",
+        "summary": "Read the questions of the caller's own attempt at an exam.",
+        "description": "Answers the questions the exam grant lets the caller read, in exam order, at the version pinned for the attempt. A caller with no attempt to read through, such as a student who has not started, an exam that is not open or a classmate, gets 404.",
+        "tags": [
+          "Exams"
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string"
+            },
+            "required": true,
+            "name": "discipline",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": "string"
+            },
+            "required": true,
+            "name": "course",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": "string"
+            },
+            "required": true,
+            "name": "slug",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "view": {
+                      "type": "string",
+                      "enum": [
+                        "answer",
+                        "review"
+                      ]
+                    },
+                    "answering": {
+                      "type": "boolean"
+                    },
+                    "questions": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "slug": {
+                            "type": "string",
+                            "maxLength": 200,
+                            "pattern": "^[a-z0-9][a-z0-9._\\-]*$",
+                            "example": "intro-to-recursion"
+                          },
+                          "version": {
+                            "type": "string"
+                          },
+                          "weight": {
+                            "type": "number"
+                          },
+                          "question": {
+                            "oneOf": [
+                              {
+                                "type": "object",
+                                "properties": {
+                                  "attachments": {
+                                    "type": "array",
+                                    "items": {
+                                      "type": "object",
+                                      "properties": {
+                                        "name": {
+                                          "type": "string",
+                                          "minLength": 1
+                                        },
+                                        "format": {
+                                          "type": "string",
+                                          "minLength": 1
+                                        },
+                                        "text": {
+                                          "type": "string"
+                                        },
+                                        "label": {
+                                          "type": "string"
+                                        }
+                                      },
+                                      "required": [
+                                        "name",
+                                        "format"
+                                      ]
+                                    }
+                                  },
+                                  "id": {
+                                    "type": "string",
+                                    "minLength": 1
+                                  },
+                                  "uuid": {
+                                    "type": "string",
+                                    "pattern": "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$",
+                                    "example": "123e4567-e89b-12d3-a456-426614174000"
+                                  },
+                                  "title": {
+                                    "type": "string"
+                                  },
+                                  "stem": {
+                                    "type": "string"
+                                  },
+                                  "epilogue": {
+                                    "type": "string"
+                                  },
+                                  "locale": {
+                                    "type": "string"
+                                  },
+                                  "weight": {
+                                    "type": "number",
+                                    "minimum": 0
+                                  },
+                                  "type": {
+                                    "type": "string",
+                                    "enum": [
+                                      "multiple-choice"
+                                    ]
+                                  },
+                                  "shuffle": {
+                                    "anyOf": [
+                                      {
+                                        "type": "boolean"
+                                      },
+                                      {
+                                        "type": "string",
+                                        "enum": [
+                                          "inherit"
+                                        ]
+                                      }
+                                    ]
+                                  },
+                                  "grading": {
+                                    "type": "string",
+                                    "enum": [
+                                      "partial",
+                                      "symmetric",
+                                      "inherit"
+                                    ]
+                                  },
+                                  "choices": {
+                                    "type": "array",
+                                    "items": {
+                                      "type": "object",
+                                      "properties": {
+                                        "id": {
+                                          "type": "string"
+                                        },
+                                        "text": {
+                                          "type": "string"
+                                        }
+                                      },
+                                      "required": [
+                                        "id",
+                                        "text"
+                                      ]
+                                    }
+                                  }
+                                },
+                                "required": [
+                                  "stem",
+                                  "type",
+                                  "choices"
+                                ]
+                              },
+                              {
+                                "type": "object",
+                                "properties": {
+                                  "attachments": {
+                                    "type": "array",
+                                    "items": {
+                                      "type": "object",
+                                      "properties": {
+                                        "name": {
+                                          "type": "string",
+                                          "minLength": 1
+                                        },
+                                        "format": {
+                                          "type": "string",
+                                          "minLength": 1
+                                        },
+                                        "text": {
+                                          "type": "string"
+                                        },
+                                        "label": {
+                                          "type": "string"
+                                        }
+                                      },
+                                      "required": [
+                                        "name",
+                                        "format"
+                                      ]
+                                    }
+                                  },
+                                  "id": {
+                                    "type": "string",
+                                    "minLength": 1
+                                  },
+                                  "uuid": {
+                                    "type": "string",
+                                    "pattern": "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$",
+                                    "example": "123e4567-e89b-12d3-a456-426614174000"
+                                  },
+                                  "title": {
+                                    "type": "string"
+                                  },
+                                  "stem": {
+                                    "type": "string"
+                                  },
+                                  "epilogue": {
+                                    "type": "string"
+                                  },
+                                  "locale": {
+                                    "type": "string"
+                                  },
+                                  "weight": {
+                                    "type": "number",
+                                    "minimum": 0
+                                  },
+                                  "type": {
+                                    "type": "string",
+                                    "enum": [
+                                      "multiple-selection"
+                                    ]
+                                  },
+                                  "shuffle": {
+                                    "anyOf": [
+                                      {
+                                        "type": "boolean"
+                                      },
+                                      {
+                                        "type": "string",
+                                        "enum": [
+                                          "inherit"
+                                        ]
+                                      }
+                                    ]
+                                  },
+                                  "grading": {
+                                    "type": "string",
+                                    "enum": [
+                                      "partial",
+                                      "all-or-nothing",
+                                      "symmetric",
+                                      "inherit"
+                                    ]
+                                  },
+                                  "choices": {
+                                    "type": "array",
+                                    "items": {
+                                      "type": "object",
+                                      "properties": {
+                                        "id": {
+                                          "type": "string"
+                                        },
+                                        "text": {
+                                          "type": "string"
+                                        }
+                                      },
+                                      "required": [
+                                        "id",
+                                        "text"
+                                      ]
+                                    }
+                                  }
+                                },
+                                "required": [
+                                  "stem",
+                                  "type",
+                                  "choices"
+                                ]
+                              },
+                              {
+                                "type": "object",
+                                "properties": {
+                                  "attachments": {
+                                    "type": "array",
+                                    "items": {
+                                      "type": "object",
+                                      "properties": {
+                                        "name": {
+                                          "type": "string",
+                                          "minLength": 1
+                                        },
+                                        "format": {
+                                          "type": "string",
+                                          "minLength": 1
+                                        },
+                                        "text": {
+                                          "type": "string"
+                                        },
+                                        "label": {
+                                          "type": "string"
+                                        }
+                                      },
+                                      "required": [
+                                        "name",
+                                        "format"
+                                      ]
+                                    }
+                                  },
+                                  "id": {
+                                    "type": "string",
+                                    "minLength": 1
+                                  },
+                                  "uuid": {
+                                    "type": "string",
+                                    "pattern": "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$",
+                                    "example": "123e4567-e89b-12d3-a456-426614174000"
+                                  },
+                                  "title": {
+                                    "type": "string"
+                                  },
+                                  "stem": {
+                                    "type": "string"
+                                  },
+                                  "epilogue": {
+                                    "type": "string"
+                                  },
+                                  "locale": {
+                                    "type": "string"
+                                  },
+                                  "weight": {
+                                    "type": "number",
+                                    "minimum": 0
+                                  },
+                                  "type": {
+                                    "type": "string",
+                                    "enum": [
+                                      "true-false"
+                                    ]
+                                  },
+                                  "shuffle": {
+                                    "anyOf": [
+                                      {
+                                        "type": "boolean"
+                                      },
+                                      {
+                                        "type": "string",
+                                        "enum": [
+                                          "inherit"
+                                        ]
+                                      }
+                                    ]
+                                  },
+                                  "grading": {
+                                    "type": "string",
+                                    "enum": [
+                                      "partial",
+                                      "no-mistakes",
+                                      "all-or-nothing",
+                                      "symmetric",
+                                      "inherit"
+                                    ]
+                                  },
+                                  "choices": {
+                                    "type": "array",
+                                    "items": {
+                                      "type": "object",
+                                      "properties": {
+                                        "id": {
+                                          "type": "string"
+                                        },
+                                        "text": {
+                                          "type": "string"
+                                        }
+                                      },
+                                      "required": [
+                                        "id",
+                                        "text"
+                                      ]
+                                    }
+                                  }
+                                },
+                                "required": [
+                                  "stem",
+                                  "type",
+                                  "choices"
+                                ]
+                              },
+                              {
+                                "type": "object",
+                                "properties": {
+                                  "attachments": {
+                                    "type": "array",
+                                    "items": {
+                                      "type": "object",
+                                      "properties": {
+                                        "name": {
+                                          "type": "string",
+                                          "minLength": 1
+                                        },
+                                        "format": {
+                                          "type": "string",
+                                          "minLength": 1
+                                        },
+                                        "text": {
+                                          "type": "string"
+                                        },
+                                        "label": {
+                                          "type": "string"
+                                        }
+                                      },
+                                      "required": [
+                                        "name",
+                                        "format"
+                                      ]
+                                    }
+                                  },
+                                  "id": {
+                                    "type": "string",
+                                    "minLength": 1
+                                  },
+                                  "uuid": {
+                                    "type": "string",
+                                    "pattern": "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$",
+                                    "example": "123e4567-e89b-12d3-a456-426614174000"
+                                  },
+                                  "title": {
+                                    "type": "string"
+                                  },
+                                  "stem": {
+                                    "type": "string"
+                                  },
+                                  "epilogue": {
+                                    "type": "string"
+                                  },
+                                  "locale": {
+                                    "type": "string"
+                                  },
+                                  "weight": {
+                                    "type": "number",
+                                    "minimum": 0
+                                  },
+                                  "type": {
+                                    "type": "string",
+                                    "enum": [
+                                      "numeric"
+                                    ]
+                                  },
+                                  "unit": {
+                                    "type": "string",
+                                    "pattern": "^[^()\\[\\]\\t\\n\\v\\f\\r \\x85\\xa0\\u1680\\u2000-\\u200a\\u2028\\u2029\\u202f\\u205f\\u3000]+$",
+                                    "example": "m/s"
+                                  },
+                                  "domain": {
+                                    "type": "string",
+                                    "enum": [
+                                      "integer",
+                                      "decimal",
+                                      "fraction"
+                                    ]
+                                  },
+                                  "decimalPlaces": {
+                                    "type": "integer",
+                                    "minimum": 0
+                                  }
+                                },
+                                "required": [
+                                  "stem",
+                                  "type",
+                                  "domain"
+                                ]
+                              },
+                              {
+                                "type": "object",
+                                "properties": {
+                                  "attachments": {
+                                    "type": "array",
+                                    "items": {
+                                      "type": "object",
+                                      "properties": {
+                                        "name": {
+                                          "type": "string",
+                                          "minLength": 1
+                                        },
+                                        "format": {
+                                          "type": "string",
+                                          "minLength": 1
+                                        },
+                                        "text": {
+                                          "type": "string"
+                                        },
+                                        "label": {
+                                          "type": "string"
+                                        }
+                                      },
+                                      "required": [
+                                        "name",
+                                        "format"
+                                      ]
+                                    }
+                                  },
+                                  "id": {
+                                    "type": "string",
+                                    "minLength": 1
+                                  },
+                                  "uuid": {
+                                    "type": "string",
+                                    "pattern": "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$",
+                                    "example": "123e4567-e89b-12d3-a456-426614174000"
+                                  },
+                                  "title": {
+                                    "type": "string"
+                                  },
+                                  "stem": {
+                                    "type": "string"
+                                  },
+                                  "epilogue": {
+                                    "type": "string"
+                                  },
+                                  "locale": {
+                                    "type": "string"
+                                  },
+                                  "weight": {
+                                    "type": "number",
+                                    "minimum": 0
+                                  },
+                                  "type": {
+                                    "type": "string",
+                                    "enum": [
+                                      "short-answer"
+                                    ]
+                                  },
+                                  "diacritics": {
+                                    "type": "string",
+                                    "enum": [
+                                      "fold",
+                                      "keep"
+                                    ]
+                                  },
+                                  "unmatched": {
+                                    "type": "string",
+                                    "enum": [
+                                      "manual",
+                                      "incorrect"
+                                    ]
+                                  },
+                                  "preAccept": {
+                                    "type": "array",
+                                    "items": {
+                                      "anyOf": [
+                                        {
+                                          "type": "string"
+                                        },
+                                        {
+                                          "type": "object",
+                                          "properties": {
+                                            "pattern": {
+                                              "type": "string"
+                                            },
+                                            "feedback": {
+                                              "type": "string"
+                                            }
+                                          },
+                                          "required": [
+                                            "pattern"
+                                          ]
+                                        }
+                                      ]
+                                    }
+                                  },
+                                  "preReject": {
+                                    "type": "array",
+                                    "items": {
+                                      "anyOf": [
+                                        {
+                                          "type": "string"
+                                        },
+                                        {
+                                          "type": "object",
+                                          "properties": {
+                                            "pattern": {
+                                              "type": "string"
+                                            },
+                                            "feedback": {
+                                              "type": "string"
+                                            }
+                                          },
+                                          "required": [
+                                            "pattern"
+                                          ]
+                                        }
+                                      ]
+                                    }
+                                  }
+                                },
+                                "required": [
+                                  "stem",
+                                  "type",
+                                  "unmatched"
+                                ]
+                              },
+                              {
+                                "type": "object",
+                                "properties": {
+                                  "attachments": {
+                                    "type": "array",
+                                    "items": {
+                                      "type": "object",
+                                      "properties": {
+                                        "name": {
+                                          "type": "string",
+                                          "minLength": 1
+                                        },
+                                        "format": {
+                                          "type": "string",
+                                          "minLength": 1
+                                        },
+                                        "text": {
+                                          "type": "string"
+                                        },
+                                        "label": {
+                                          "type": "string"
+                                        }
+                                      },
+                                      "required": [
+                                        "name",
+                                        "format"
+                                      ]
+                                    }
+                                  },
+                                  "id": {
+                                    "type": "string",
+                                    "minLength": 1
+                                  },
+                                  "uuid": {
+                                    "type": "string",
+                                    "pattern": "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$",
+                                    "example": "123e4567-e89b-12d3-a456-426614174000"
+                                  },
+                                  "title": {
+                                    "type": "string"
+                                  },
+                                  "stem": {
+                                    "type": "string"
+                                  },
+                                  "epilogue": {
+                                    "type": "string"
+                                  },
+                                  "locale": {
+                                    "type": "string"
+                                  },
+                                  "weight": {
+                                    "type": "number",
+                                    "minimum": 0
+                                  },
+                                  "type": {
+                                    "type": "string",
+                                    "enum": [
+                                      "essay"
+                                    ]
+                                  },
+                                  "content": {
+                                    "type": "string",
+                                    "enum": [
+                                      "code",
+                                      "text",
+                                      "plain"
+                                    ]
+                                  },
+                                  "highlight": {
+                                    "type": "string"
+                                  }
+                                },
+                                "required": [
+                                  "stem",
+                                  "type"
+                                ]
+                              },
+                              {
+                                "type": "object",
+                                "properties": {
+                                  "attachments": {
+                                    "type": "array",
+                                    "items": {
+                                      "type": "object",
+                                      "properties": {
+                                        "name": {
+                                          "type": "string",
+                                          "minLength": 1
+                                        },
+                                        "format": {
+                                          "type": "string",
+                                          "minLength": 1
+                                        },
+                                        "text": {
+                                          "type": "string"
+                                        },
+                                        "label": {
+                                          "type": "string"
+                                        }
+                                      },
+                                      "required": [
+                                        "name",
+                                        "format"
+                                      ]
+                                    }
+                                  },
+                                  "id": {
+                                    "type": "string",
+                                    "minLength": 1
+                                  },
+                                  "uuid": {
+                                    "type": "string",
+                                    "pattern": "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$",
+                                    "example": "123e4567-e89b-12d3-a456-426614174000"
+                                  },
+                                  "title": {
+                                    "type": "string"
+                                  },
+                                  "stem": {
+                                    "type": "string"
+                                  },
+                                  "epilogue": {
+                                    "type": "string"
+                                  },
+                                  "locale": {
+                                    "type": "string"
+                                  },
+                                  "weight": {
+                                    "type": "number",
+                                    "minimum": 0
+                                  },
+                                  "type": {
+                                    "type": "string",
+                                    "enum": [
+                                      "fill-in"
+                                    ]
+                                  },
+                                  "shuffle": {
+                                    "anyOf": [
+                                      {
+                                        "type": "boolean"
+                                      },
+                                      {
+                                        "type": "string",
+                                        "enum": [
+                                          "inherit"
+                                        ]
+                                      }
+                                    ]
+                                  },
+                                  "grading": {
+                                    "type": "string",
+                                    "enum": [
+                                      "partial",
+                                      "no-mistakes",
+                                      "all-or-nothing",
+                                      "symmetric",
+                                      "inherit"
+                                    ]
+                                  },
+                                  "diacritics": {
+                                    "type": "string",
+                                    "enum": [
+                                      "fold",
+                                      "keep"
+                                    ]
+                                  },
+                                  "blanks": {
+                                    "type": "array",
+                                    "items": {
+                                      "oneOf": [
+                                        {
+                                          "type": "object",
+                                          "properties": {
+                                            "id": {
+                                              "type": "string",
+                                              "pattern": "^[a-zA-Z0-9]+(?:[-_][a-zA-Z0-9]+)*$",
+                                              "example": "berlin"
+                                            },
+                                            "type": {
+                                              "type": "string",
+                                              "enum": [
+                                                "multiple-choice"
+                                              ]
+                                            },
+                                            "choices": {
+                                              "type": "array",
+                                              "items": {
+                                                "type": "object",
+                                                "properties": {
+                                                  "id": {
+                                                    "type": "string"
+                                                  },
+                                                  "text": {
+                                                    "type": "string"
+                                                  }
+                                                },
+                                                "required": [
+                                                  "id",
+                                                  "text"
+                                                ]
+                                              }
+                                            }
+                                          },
+                                          "required": [
+                                            "id",
+                                            "type",
+                                            "choices"
+                                          ]
+                                        },
+                                        {
+                                          "type": "object",
+                                          "properties": {
+                                            "id": {
+                                              "type": "string",
+                                              "pattern": "^[a-zA-Z0-9]+(?:[-_][a-zA-Z0-9]+)*$",
+                                              "example": "berlin"
+                                            },
+                                            "type": {
+                                              "type": "string",
+                                              "enum": [
+                                                "short-answer"
+                                              ]
+                                            },
+                                            "unmatched": {
+                                              "type": "string",
+                                              "enum": [
+                                                "manual",
+                                                "incorrect"
+                                              ]
+                                            },
+                                            "preAccept": {
+                                              "type": "array",
+                                              "items": {
+                                                "anyOf": [
+                                                  {
+                                                    "type": "string"
+                                                  },
+                                                  {
+                                                    "type": "object",
+                                                    "properties": {
+                                                      "pattern": {
+                                                        "type": "string"
+                                                      },
+                                                      "feedback": {
+                                                        "type": "string"
+                                                      }
+                                                    },
+                                                    "required": [
+                                                      "pattern"
+                                                    ]
+                                                  }
+                                                ]
+                                              }
+                                            },
+                                            "preReject": {
+                                              "type": "array",
+                                              "items": {
+                                                "anyOf": [
+                                                  {
+                                                    "type": "string"
+                                                  },
+                                                  {
+                                                    "type": "object",
+                                                    "properties": {
+                                                      "pattern": {
+                                                        "type": "string"
+                                                      },
+                                                      "feedback": {
+                                                        "type": "string"
+                                                      }
+                                                    },
+                                                    "required": [
+                                                      "pattern"
+                                                    ]
+                                                  }
+                                                ]
+                                              }
+                                            }
+                                          },
+                                          "required": [
+                                            "id",
+                                            "type",
+                                            "unmatched"
+                                          ]
+                                        },
+                                        {
+                                          "type": "object",
+                                          "properties": {
+                                            "id": {
+                                              "type": "string",
+                                              "pattern": "^[a-zA-Z0-9]+(?:[-_][a-zA-Z0-9]+)*$",
+                                              "example": "berlin"
+                                            },
+                                            "type": {
+                                              "type": "string",
+                                              "enum": [
+                                                "numeric"
+                                              ]
+                                            },
+                                            "unit": {
+                                              "type": "string",
+                                              "pattern": "^[^()\\[\\]\\t\\n\\v\\f\\r \\x85\\xa0\\u1680\\u2000-\\u200a\\u2028\\u2029\\u202f\\u205f\\u3000]+$",
+                                              "example": "m/s"
+                                            },
+                                            "domain": {
+                                              "type": "string",
+                                              "enum": [
+                                                "integer",
+                                                "decimal",
+                                                "fraction"
+                                              ]
+                                            },
+                                            "decimalPlaces": {
+                                              "type": "integer",
+                                              "minimum": 0
+                                            }
+                                          },
+                                          "required": [
+                                            "id",
+                                            "type",
+                                            "domain"
+                                          ]
+                                        }
+                                      ]
+                                    }
+                                  }
+                                },
+                                "required": [
+                                  "stem",
+                                  "type",
+                                  "blanks"
+                                ]
+                              },
+                              {
+                                "type": "object",
+                                "properties": {
+                                  "attachments": {
+                                    "type": "array",
+                                    "items": {
+                                      "type": "object",
+                                      "properties": {
+                                        "name": {
+                                          "type": "string",
+                                          "minLength": 1
+                                        },
+                                        "format": {
+                                          "type": "string",
+                                          "minLength": 1
+                                        },
+                                        "text": {
+                                          "type": "string"
+                                        },
+                                        "label": {
+                                          "type": "string"
+                                        }
+                                      },
+                                      "required": [
+                                        "name",
+                                        "format"
+                                      ]
+                                    }
+                                  },
+                                  "id": {
+                                    "type": "string",
+                                    "minLength": 1
+                                  },
+                                  "uuid": {
+                                    "type": "string",
+                                    "pattern": "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$",
+                                    "example": "123e4567-e89b-12d3-a456-426614174000"
+                                  },
+                                  "title": {
+                                    "type": "string"
+                                  },
+                                  "stem": {
+                                    "type": "string"
+                                  },
+                                  "epilogue": {
+                                    "type": "string"
+                                  },
+                                  "locale": {
+                                    "type": "string"
+                                  },
+                                  "weight": {
+                                    "type": "number",
+                                    "minimum": 0
+                                  },
+                                  "type": {
+                                    "type": "string",
+                                    "enum": [
+                                      "ordering"
+                                    ]
+                                  },
+                                  "content": {
+                                    "type": "string",
+                                    "enum": [
+                                      "code",
+                                      "text"
+                                    ]
+                                  },
+                                  "highlight": {
+                                    "type": "string"
+                                  },
+                                  "indentation": {
+                                    "type": "string",
+                                    "enum": [
+                                      "fixed",
+                                      "lenient",
+                                      "strict"
+                                    ]
+                                  },
+                                  "unmatched": {
+                                    "type": "string",
+                                    "enum": [
+                                      "manual",
+                                      "incorrect"
+                                    ]
+                                  },
+                                  "normalizations": {
+                                    "type": "array",
+                                    "items": {
+                                      "type": "string",
+                                      "enum": [
+                                        "dedent",
+                                        "skip-blanks"
+                                      ]
+                                    }
+                                  },
+                                  "maxLevel": {
+                                    "type": "integer",
+                                    "minimum": 1
+                                  },
+                                  "pool": {
+                                    "type": "array",
+                                    "items": {
+                                      "type": "array",
+                                      "items": {
+                                        "anyOf": [
+                                          {
+                                            "type": "integer",
+                                            "minimum": 0
+                                          },
+                                          {
+                                            "type": "string",
+                                            "pattern": "^(?:[^ \\t\\r\\n](?:[^\\r\\n]*[^ \\t\\r\\n])?)?$",
+                                            "example": "Descobrimento do Brasil"
+                                          }
+                                        ]
+                                      },
+                                      "minItems": 2,
+                                      "maxItems": 2
+                                    }
+                                  }
+                                },
+                                "required": [
+                                  "stem",
+                                  "type",
+                                  "content",
+                                  "unmatched",
+                                  "pool"
+                                ]
+                              },
+                              {
+                                "type": "object",
+                                "properties": {
+                                  "attachments": {
+                                    "type": "array",
+                                    "items": {
+                                      "type": "object",
+                                      "properties": {
+                                        "name": {
+                                          "type": "string",
+                                          "minLength": 1
+                                        },
+                                        "format": {
+                                          "type": "string",
+                                          "minLength": 1
+                                        },
+                                        "text": {
+                                          "type": "string"
+                                        },
+                                        "label": {
+                                          "type": "string"
+                                        }
+                                      },
+                                      "required": [
+                                        "name",
+                                        "format"
+                                      ]
+                                    }
+                                  },
+                                  "id": {
+                                    "type": "string",
+                                    "minLength": 1
+                                  },
+                                  "uuid": {
+                                    "type": "string",
+                                    "pattern": "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$",
+                                    "example": "123e4567-e89b-12d3-a456-426614174000"
+                                  },
+                                  "title": {
+                                    "type": "string"
+                                  },
+                                  "stem": {
+                                    "type": "string"
+                                  },
+                                  "epilogue": {
+                                    "type": "string"
+                                  },
+                                  "locale": {
+                                    "type": "string"
+                                  },
+                                  "weight": {
+                                    "type": "number",
+                                    "minimum": 0
+                                  },
+                                  "type": {
+                                    "type": "string",
+                                    "enum": [
+                                      "code"
+                                    ]
+                                  },
+                                  "template": {
+                                    "type": "string"
+                                  },
+                                  "language": {
+                                    "type": "string"
+                                  },
+                                  "file": {
+                                    "type": "string"
+                                  },
+                                  "publicTests": {
+                                    "type": "array",
+                                    "items": {
+                                      "type": "object",
+                                      "properties": {
+                                        "format": {
+                                          "type": "string"
+                                        },
+                                        "text": {
+                                          "type": "string"
+                                        },
+                                        "firstLine": {
+                                          "type": "integer"
+                                        },
+                                        "example": {
+                                          "type": "boolean"
+                                        }
+                                      },
+                                      "required": [
+                                        "format",
+                                        "text",
+                                        "firstLine",
+                                        "example"
+                                      ]
+                                    }
+                                  }
+                                },
+                                "required": [
+                                  "stem",
+                                  "type"
+                                ]
+                              }
+                            ]
+                          },
+                          "code": {
+                            "type": "object",
+                            "properties": {
+                              "pretests": {
+                                "type": "array",
+                                "items": {
+                                  "type": "object",
+                                  "properties": {
+                                    "format": {
+                                      "type": "string"
+                                    },
+                                    "text": {
+                                      "type": "string"
+                                    }
+                                  },
+                                  "required": [
+                                    "format",
+                                    "text"
+                                  ]
+                                }
+                              },
+                              "sendable": {
+                                "type": "boolean"
+                              }
+                            },
+                            "required": [
+                              "pretests",
+                              "sendable"
+                            ]
+                          }
+                        },
+                        "required": [
+                          "slug",
+                          "version",
+                          "weight",
+                          "question"
+                        ]
+                      }
+                    }
+                  },
+                  "required": [
+                    "view",
+                    "answering",
+                    "questions"
+                  ]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/course/{discipline}/{course}/exam/{slug}/exception": {
       "post": {
         "operationId": "createExam-exception",
