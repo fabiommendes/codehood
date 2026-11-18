@@ -610,10 +610,10 @@ Componentes (renomeados de `Sanction*`, em `src/components/grading/`):
   `createdBy !== null`).
 - `ExamAttempt.tsx`: depois da liberação, bloco com total original, uma linha
   por ajuste (`adjustmentLabel` + motivo) e total final; com `empty`,
-  `exams_attempt_not_taken` ("Você não fez esta prova") no lugar das
+  `exams_attempt_empty` ("Você não fez esta prova") no lugar das
   respostas. Selo da questão com `adjustmentLabel` do ajuste dela.
-- `exams/[slug].astro` e `load-student-home.ts`: total final e marca de
-  ajustado.
+- `exams/[slug].astro` e `load-student-home.ts`: total final (já vem de
+  `examResult`); sem marca de ajustado, que nem a spec nem as histórias pedem.
 - Chaves `grades_sanction_*` usadas pelo aluno viram `grades_adjustment_*`.
 
 ## 3. Briefs
