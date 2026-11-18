@@ -36,17 +36,22 @@ export default function Overrides(props: Props): JSX.Element {
 	const nameOf = (item: OverrideItem) =>
 		props.names[item.author] ?? item.author;
 
-	async function undo(item: OverrideItem): Promise<void> {
+	/// What reverting the row takes, or `null` when there is nothing to revert.
+	function revocation(item: OverrideItem) {
+		if (item.kind === "grade")
+			return item.submission
+				? { kind: "grade" as const, submission: item.submission }
+				: null;
+		return item.adjustment
+			? { kind: "sanction" as const, adjustment: item.adjustment }
+			: null;
+	}
+
+	async function undo(
+		undoing: NonNullable<ReturnType<typeof revocation>>,
+	): Promise<void> {
 		setError(undefined);
-		const failure = await undoOverride(
-			props.target,
-			item.kind === "grade" && item.submission
-				? { kind: "grade", submission: item.submission }
-				: {
-						kind: "sanction",
-						adjustment: item.adjustment ?? { publicId: "", updatedAt: "" },
-					},
-		);
+		const failure = await undoOverride(props.target, undoing);
 		if (failure) setError(failure);
 		else window.location.reload();
 	}
@@ -132,15 +137,19 @@ export default function Overrides(props: Props): JSX.Element {
 										<Icon name="pencil" />
 									</button>
 								</Show>
-								<button
-									type="button"
-									class="btn btn-ghost btn-sm btn-square text-error"
-									aria-label={m.grades_objective_undo()}
-									title={m.grades_objective_undo()}
-									onClick={() => void undo(item)}
-								>
-									<Icon name="undo" />
-								</button>
+								<Show when={revocation(item)}>
+									{(undoing) => (
+										<button
+											type="button"
+											class="btn btn-ghost btn-sm btn-square text-error"
+											aria-label={m.grades_objective_undo()}
+											title={m.grades_objective_undo()}
+											onClick={() => void undo(undoing())}
+										>
+											<Icon name="undo" />
+										</button>
+									)}
+								</Show>
 							</span>
 						),
 					},

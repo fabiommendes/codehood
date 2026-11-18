@@ -441,7 +441,7 @@ sanction stays listed as revoked and the student gets the original total back.
 
 ### Review an automatically graded question
 
-    status: todo
+    status: implemented
     url: /<discipline>/<course>/exams/<exam>/grading/<question>
 
 Instructor checks that a question the server graded by itself was keyed right.

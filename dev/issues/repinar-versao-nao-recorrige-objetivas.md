@@ -34,11 +34,11 @@ Ao fixar outra versão da questão na prova, recorrigir as respostas:
 
 - A resposta cujo passe mais novo é humano (`graderId` preenchido e `botId`
   nulo) é **pulada**: a nota alterada à mão fica.
+- Um passe cujo `ref` começa com `revert-` (o "Desfazer" da página de correção)
+  **não conta como humano**. A resposta desfeita volta a ser recorrigida para a
+  nova versão.
 - As demais ganham um passe `auto` novo, sem apagar o histórico.
 
 A página de correção da questão objetiva avisa enquanto isto não existe: fixar
 uma nova versão não corrige de novo as respostas existentes, e "Alterar nota"
 é o caminho.
-
-Rota: `src/pages/[discipline]/[course]/exams/[slug]/grading/[question].astro`.
-Vale para toda questão com `isAutoGraded(doc)` (automática e não `code`).

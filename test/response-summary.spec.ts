@@ -12,7 +12,7 @@ import {
 	sumCode,
 	waterNumeric,
 } from "@/mdq/fixtures";
-import { responseSummary, summaryGroups } from "@/services/response-summary";
+import { responseSummary } from "@/services/response-summary";
 import { isAutoGraded } from "@/utils/question-display";
 import { expect, test } from "./fixtures";
 
@@ -122,15 +122,6 @@ test("an unanswered question is blank whatever its type", () => {
 	]) {
 		expect(text(question, null)).toBe("(blank)");
 	}
-});
-
-test("summaryGroups counts identical responses, the largest group first", () => {
-	const groups = summaryGroups(waterNumeric, [25, 120, 120, null, 120, 25]);
-	expect(groups.map((group) => [group.text, group.count])).toEqual([
-		["120", 3],
-		["25", 2],
-		["(blank)", 1],
-	]);
 });
 
 test("only a question the library grades by itself, other than code, is shown as a list", () => {

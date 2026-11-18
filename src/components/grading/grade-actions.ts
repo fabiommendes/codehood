@@ -5,12 +5,12 @@ import type { GradingTarget } from "./grading-target";
 /// Where the objective page sends its grades: the course's URL segments, the exam and the question.
 export type GradeTarget = GradingTarget;
 
-/// A score in [-1, 1] as a whole percentage.
+/** A score in [-1, 1] as a whole percentage. */
 export function percentOf(score: number): number {
 	return Math.round(score * 100);
 }
 
-/// A date as the objective page lists it, the same on the server and in the browser.
+/** A date as the objective page lists it, the same on the server and in the browser. */
 export function formatWhen(iso: string, locale: string): string {
 	return new Date(iso).toLocaleDateString(locale, {
 		year: "numeric",

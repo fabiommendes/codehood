@@ -357,10 +357,6 @@
 	"grades_objective_grade_label": "Grade (0 to 100)",
 	"grades_objective_comment_optional": "Comment (optional)",
 	"grades_objective_mark_correct": "Mark as right",
-	"grades_objective_give_grade": "Give grade",
-	"grades_objective_score_placeholder": "0 to 100",
-	"grades_objective_pending": "No grade",
-	"grades_objective_pending_detail": "This answer has no grading pass yet.",
 	"grades_objective_regrade": "Regrade requested",
 	"grades_objective_regrade_detail": "The student asked for a review of this answer.",
 	"grades_objective_view_request": "View request",
@@ -433,7 +429,6 @@
 	"grades_objective_summary_correct": "<strong>{percent}%</strong> right",
 	"grades_objective_summary_low_discrimination": "low discrimination ({value})",
 	"grades_objective_summary_low_discrimination_hint": "Students who do well on the exam miss this as often as those who do badly. Check the key.",
-	"grades_objective_summary_pending": "{count} without a grade",
 	"grades_objective_attention_title": "Needs attention",
 	"grades_objective_overrides_title": "Changed by hand",
 	"grades_objective_note": "Pinning a new version of the question in the exam does not grade the existing answers again. For now, use \"Change grade\".",
@@ -456,6 +451,5 @@
 	"grades_objective_header_blank": "Value",
 	"grades_objective_count_missed": "Missed",
 	"grades_objective_detail_marked": "Marked",
-	"grades_objective_detail_wrote": "Wrote",
-	"grades_objective_detail_blanks": "Blanks missed"
+	"grades_objective_detail_wrote": "Wrote"
 }

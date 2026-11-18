@@ -128,7 +128,7 @@ function Bar(props: { row: AnswerGroup; max: number }): JSX.Element {
 			}
 		>
 			{(marked) => {
-				const total = () => marked().true + marked().false;
+				const total = () => Math.max(1, marked().true + marked().false);
 				return (
 					<span class="mt-1 block w-full">
 						<span class="flex h-1.5 overflow-hidden rounded-full bg-base-200">

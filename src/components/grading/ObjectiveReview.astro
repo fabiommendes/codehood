@@ -28,6 +28,9 @@ interface Props {
 
 const { review, target, names, regradesHref, editHref } = Astro.props;
 const { summary, attention, sections, overrides } = review;
+const regradeRows = attention.flatMap((row) =>
+	row.kind === "regrade" ? [row] : [],
+);
 
 /// The heading, the column titles and the dialog's detail title of a grouped block.
 function labels(section: Extract<ReviewSection, { kind: "groups" }>) {
@@ -103,13 +106,12 @@ const overrideRows = overrides.map((row) => ({
       {m.grades_objective_summary_low_discrimination({ value: summary.lowDiscrimination.toFixed(2) })}
     </span>
   )}
-  {summary.pending > 0 && <a href="#attention" class="badge badge-warning">{m.grades_objective_summary_pending({ count: summary.pending })}</a>}
 </p>
 
-{attention.length > 0 && (
+{regradeRows.length > 0 && (
   <section id="attention" class="mt-6">
-    <h3 class="page-subsubheader">{m.grades_objective_attention_title()} ({attention.length})</h3>
-    <AttentionList client:load rows={attention} target={target} names={names} regradesHref={regradesHref} />
+    <h3 class="page-subsubheader">{m.grades_objective_attention_title()} ({regradeRows.length})</h3>
+    <AttentionList client:load rows={regradeRows} names={names} regradesHref={regradesHref} />
   </section>
 )}
 
@@ -150,11 +152,12 @@ const overrideRows = overrides.map((row) => ({
       </section>
     );
   }
+  if (section.members.length === 0) return null;
   return (
     <section class="mt-8">
       <h3 class="page-subsubheader">{m.grades_objective_section_missed({ count: section.members.length })}</h3>
       <div class="mt-3">
-        <Members client:load members={section.members} target={target} names={names} detailHeader={m.grades_objective_detail_blanks()} />
+        <Members client:load members={section.members} target={target} names={names} />
       </div>
     </section>
   );

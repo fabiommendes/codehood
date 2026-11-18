@@ -78,7 +78,7 @@ export default function Dialog(props: Props): JSX.Element {
 	);
 }
 
-/// Icon button that opens the students of a row.
+/** Icon button that opens the students of a row. */
 export function PeopleButton(props: {
 	label: string;
 	onClick: () => void;

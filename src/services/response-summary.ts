@@ -23,11 +23,6 @@ export interface ResponseSummary {
 	title?: string;
 }
 
-/// A group of identical summaries and how many answers produced it.
-export interface SummaryGroup extends ResponseSummary {
-	count: number;
-}
-
 /** Text with the inline markdown marks dropped and whitespace collapsed. */
 export function plain(markdown: string): string {
 	return markdown
@@ -183,24 +178,4 @@ export function responseSummary(
 				? truncated(payload.trim())
 				: { text: m.grades_summary_blank() };
 	}
-}
-
-/**
- * Groups the answers that summarize alike, the largest group first.
- *
- * Groups of the same size keep the order in which their first answer appears.
- */
-export function summaryGroups(
-	question: QuestionDocument,
-	payloads: readonly unknown[],
-): SummaryGroup[] {
-	const groups = new Map<string, SummaryGroup>();
-	for (const payload of payloads) {
-		const summary = responseSummary(question, payload);
-		const key = summary.title ?? summary.text;
-		const group = groups.get(key);
-		if (group) group.count += 1;
-		else groups.set(key, { ...summary, count: 1 });
-	}
-	return [...groups.values()].sort((a, b) => b.count - a.count);
 }

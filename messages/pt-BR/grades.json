@@ -357,10 +357,6 @@
 	"grades_objective_grade_label": "Nota (0 a 100)",
 	"grades_objective_comment_optional": "Comentário (opcional)",
 	"grades_objective_mark_correct": "Marcar como certa",
-	"grades_objective_give_grade": "Dar nota",
-	"grades_objective_score_placeholder": "0 a 100",
-	"grades_objective_pending": "Sem nota",
-	"grades_objective_pending_detail": "Esta resposta ainda não tem passe de correção.",
 	"grades_objective_regrade": "Revisão pedida",
 	"grades_objective_regrade_detail": "O aluno pediu a revisão desta resposta.",
 	"grades_objective_view_request": "Ver pedido",
@@ -433,7 +429,6 @@
 	"grades_objective_summary_correct": "<strong>{percent}%</strong> certas",
 	"grades_objective_summary_low_discrimination": "discriminação baixa ({value})",
 	"grades_objective_summary_low_discrimination_hint": "Quem vai bem na prova erra tanto quanto quem vai mal. Vale conferir o gabarito.",
-	"grades_objective_summary_pending": "{count} sem nota",
 	"grades_objective_attention_title": "Requer atenção",
 	"grades_objective_overrides_title": "Alteradas à mão",
 	"grades_objective_note": "Fixar uma nova versão da questão na prova não corrige de novo as respostas que já existem. Por enquanto, use \"Alterar nota\".",
@@ -456,6 +451,5 @@
 	"grades_objective_header_blank": "Valor",
 	"grades_objective_count_missed": "Erraram",
 	"grades_objective_detail_marked": "Marcou",
-	"grades_objective_detail_wrote": "Escreveu",
-	"grades_objective_detail_blanks": "Lacunas erradas"
+	"grades_objective_detail_wrote": "Escreveu"
 }
