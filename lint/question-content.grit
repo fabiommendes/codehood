@@ -1,0 +1,13 @@
+language js
+
+// Reading question content is the job of `src/db/services/exam-questions.ts`
+// (grants) and of `db.examQuestion`. `biome.json` lifts this rule for the few
+// files that own the question tables.
+or {
+	`$obj.questionData`,
+	`privatePayload`,
+	`publicPayload`,
+	`latest: true`
+} as $found where {
+	register_diagnostic(span=$found, message="Question content (`questionData`, `privatePayload`, `publicPayload`, `latest: true`) is read only through `db.examQuestion` or an `ExamGrant` from `src/db/services/exam-questions.ts`. Use one of them, or ask for the file to be listed in the `overrides` of `biome.json`.", severity="error")
+}
