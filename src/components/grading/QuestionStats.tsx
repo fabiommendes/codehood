@@ -140,18 +140,27 @@ export default function QuestionStats(props: Props): JSX.Element {
 			title: m.grades_stats_col_question(),
 			sortKey: "position",
 			render: (entry) => (
-				<>
+				<div class="flex items-center gap-3">
 					<QuestionNumber
 						number={entry.position}
-						points={props.points[entry.position - 1]}
-					/>{" "}
-					<a
-						href={`${props.href}/grading/${entry.question}?view=list`}
-						class="link"
-					>
-						{props.titles.get(entry.question) ?? entry.question}
-					</a>
-				</>
+						class="min-w-8 text-lg font-bold tabular-nums"
+					/>
+					<div class="min-w-0">
+						<a
+							href={`${props.href}/grading/${entry.question}?view=list`}
+							class="link"
+						>
+							{props.titles.get(entry.question) ?? entry.question}
+						</a>
+						<Show when={props.points[entry.position - 1]}>
+							{(points) => (
+								<p class="text-xs tabular-nums text-muted">
+									{m.exams_attempt_points({ points: points() })}
+								</p>
+							)}
+						</Show>
+					</div>
+				</div>
 			),
 		},
 		numeric(
