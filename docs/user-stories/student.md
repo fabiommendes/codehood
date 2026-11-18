@@ -331,18 +331,19 @@ instructor's reply, and each answer can be contested only once, within two
 weeks of the release.
 
 
-### See that my grade was sanctioned
+### See the adjustments to my grade
 
     status: implemented
     url: /<discipline>/<course>/exams/<exam>
 
-Student's grade on an exam was cancelled or reduced by the instructor. Before
-the grades are released the exam page shows no sign of it. Afterwards it says
-that the grade on the exam was zeroed, or reduced to a percentage, with the
-reason the instructor wrote, and marks each question that was zeroed. The
-instructor's private notes are never shown. A sanctioned grade cannot be
-contested with a regrade request, while a classmate's unsanctioned one still
-can.
+Student's grade on an exam was changed by the instructor: replaced, raised by
+a bonus or reduced by a penalty. Before the grades are released the exam page
+shows no sign of it. Afterwards it shows the original total, one line per
+adjustment with the reason the instructor wrote, and the final total, which
+never passes 100%; a question that was zeroed or reduced is marked. The
+instructor's private notes are never shown. A grade under a penalty cannot be
+contested with a regrade request, while one with only a bonus or a
+replacement still can.
 
 
 ### See a grade for an exam I did not take
