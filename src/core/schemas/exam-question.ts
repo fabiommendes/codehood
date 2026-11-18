@@ -1,17 +1,40 @@
 import { z } from "zod";
-import { publicQuestionSchema } from "@/mdq/public-schema";
+import {
+	publicCodeSchema,
+	publicEssaySchema,
+	publicFillInSchema,
+	publicMultipleChoiceSchema,
+	publicMultipleSelectionSchema,
+	publicNumericSchema,
+	publicOrderingSchema,
+	publicShortAnswerSchema,
+	publicTrueFalseSchema,
+} from "@/mdq/public-schema";
 import { publicId, slug } from "./base";
 import { courseRef } from "./course";
 
 /// Addresses the attempt of the acting user at one exam.
 export const examAttemptRef = z.object({ course: courseRef, exam: slug });
 
+/// The public form of a question with no `tags`, which stay out of the student's view.
+const studentQuestionSchema = z.discriminatedUnion("type", [
+	publicMultipleChoiceSchema.omit({ tags: true }),
+	publicMultipleSelectionSchema.omit({ tags: true }),
+	publicTrueFalseSchema.omit({ tags: true }),
+	publicNumericSchema.omit({ tags: true }),
+	publicShortAnswerSchema.omit({ tags: true }),
+	publicEssaySchema.omit({ tags: true }),
+	publicFillInSchema.omit({ tags: true }),
+	publicOrderingSchema.omit({ tags: true }),
+	publicCodeSchema.omit({ tags: true }),
+]);
+
 /// A question of the attempt, in the public form.
 export const attemptQuestionSchema = z.object({
 	slug,
 	version: z.string(),
 	weight: z.number(),
-	question: publicQuestionSchema,
+	question: studentQuestionSchema,
 	code: z
 		.object({
 			pretests: z.array(z.object({ format: z.string(), text: z.string() })),
