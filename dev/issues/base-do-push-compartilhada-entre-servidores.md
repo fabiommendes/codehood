@@ -1,6 +1,6 @@
 ---
 type: issue
-status: backlog
+status: todo
 tags: [cli, push, sync]
 kind: bug
 priority: high

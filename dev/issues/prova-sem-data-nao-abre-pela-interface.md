@@ -1,6 +1,6 @@
 ---
 type: issue
-status: backlog
+status: todo
 tags: [exams, instructor, ui, schedule]
 kind: defect
 priority: high

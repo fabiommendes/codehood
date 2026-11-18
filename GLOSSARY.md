@@ -216,8 +216,10 @@ A set of [Questions](#question) assigned to a course, of type PRACTICE, QUIZ,
 or EXAM, written in the course repository and pushed by the [CLI](#cli). Its
 stored status is DRAFT, SCHEDULED, ONGOING, COMPLETED, or ARCHIVED, and the
 clock decides the rest: an ONGOING exam, or a SCHEDULED one inside its window,
-is open and accepts submissions. A question may be pinned to a
-[Question version](#question-version); with no pin it follows the latest.
+is open and accepts submissions. Each question is pinned to a
+[Question version](#question-version) when the first attempt opens, the exam
+closes or grades are released ([Version freeze](#version-freeze)); until then
+it follows the latest.
 
 ## Exam exception
 

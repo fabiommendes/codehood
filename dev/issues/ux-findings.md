@@ -15,23 +15,6 @@ Encontrados percorrendo todas as páginas como aluno, professor e admin, em
 
 ## Correção
 
-### Questão de escolha repete enunciado e opções em cada resposta
-
-- Obtido: em `/exams/<slug>/grading/<question>`, a chave de resposta já mostra
-  enunciado e opções (`src/pages/[discipline]/[course]/exams/[slug]/grading/[question].astro:145`).
-  Cada resposta de escolha mostra a questão inteira de novo
-  (`:175`, `src/components/grading/answer-text.ts:34-35`).
-- Esperado: a resposta mostra só as opções marcadas, como já acontece com
-  respostas curtas, numéricas e dissertativas.
-
-### "Submitted" na página da tentativa é a data da última alteração
-
-- Obtido: o campo usa `attempt.updatedAt`
-  (`src/pages/[discipline]/[course]/exams/[slug]/attempts/[username].astro:137`).
-  `Response` não guarda o momento da entrega (`prisma/schema.prisma:846`),
-  então qualquer escrita posterior muda a data exibida.
-- Esperado: a hora real da entrega.
-
 ### Tabela de notas mostra "Pending" para prova sem questões
 
 - Obtido: `totalOf` devolve `null` quando não há questões

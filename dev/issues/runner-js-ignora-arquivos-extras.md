@@ -15,7 +15,7 @@ creator: claude
 `RunRequest.files` aceita vários arquivos, e os drivers de Python, Lua,
 Prolog e Elm gravam todos em `/work`, de onde o programa pode importá-los. O
 driver de JavaScript roda só `files[entry]` como corpo de uma função
-assíncrona (`runScript` em `src/runner/sandbox/drivers/javascript.ts`); os
+assíncrona (`runScript` em `src/runner/plugins/javascript/driver.ts`); os
 outros arquivos são descartados, como diz o comentário do módulo ("other
 files in `files` are ignored for now"). O de TypeScript compila o `entry` e
 repassa ao de JavaScript, então herda a limitação.
@@ -36,7 +36,7 @@ importar o do aluno.
   os `import` relativos entre eles por um mapa de nomes para URLs, e manter o
   `entry` com top-level `await`, `prompt()` e os stacks limpos que já tem.
 - O laço que grava `files` em `/work` está repetido em
-  `drivers/python.ts`, `drivers/prolog.ts` e `drivers/lua.ts`. Se a mudança
+  `src/runner/plugins/{python,prolog,lua}/driver.ts`. Se a mudança
   tocar esses drivers, extrair um `writeWorkFiles(fs, files)` comum.
 
 ## Critério de aceite

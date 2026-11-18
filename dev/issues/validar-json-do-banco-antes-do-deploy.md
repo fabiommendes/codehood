@@ -1,6 +1,6 @@
 ---
 type: issue
-status: backlog
+status: todo
 tags: [db, deploy, validation, ops]
 kind: feature
 priority: high

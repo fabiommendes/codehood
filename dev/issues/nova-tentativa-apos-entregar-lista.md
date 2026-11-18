@@ -1,6 +1,6 @@
 ---
 type: issue
-status: backlog
+status: todo
 tags: [exams, practice]
 kind: bug
 priority: medium

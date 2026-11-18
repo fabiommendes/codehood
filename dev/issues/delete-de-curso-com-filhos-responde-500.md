@@ -1,6 +1,6 @@
 ---
 type: issue
-status: backlog
+status: todo
 tags: [services, api, rest, course]
 kind: bug
 priority: low

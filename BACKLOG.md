@@ -23,15 +23,11 @@ Backlog items are categorized in sections, not on priority.
   and CI stayed green.
 * [x] Remove the generated openapi.json. Instead, we should generate once during 
   startup, cache it and serve this file
-* [ ] Remove the Nagibaba service worker. How did that landed there? Use a reputable lib instead.
 
 ## UI issues
 
 * [ ] In the /design/questions page, the floating navbar should float to the left
   of the main container. It should not share the same horizontal space as the content.
-* [ ] /courses and /getting-started use a different container than the other
-  pages and have more horizontal space than it should. Make it consistent and
-  make all pages share the same source of truth.
 * [ ] There are some title patterns that re-appear somewhat inconsistently
   across different pages. Standardize the title patterns to a single component.
   It has a subtitle above the main title. The main title and an optional subtitle below it.
@@ -45,9 +41,6 @@ Backlog items are categorized in sections, not on priority.
 
 * [ ] Make a mechanism to declare astro actions similar to the CRUD function 
   that register routes for RESTful APIs.
-* [ ] Add support for RPC since rest cant handle everything.
-* [ ] Check options for RPC UI. Use openapi? Is there a better alternative? 
-  Is gRPC too much trouble?
 * [ ] Extend the natural-key REST addressing to `passphrase`, which has no
   REST endpoint yet (`calendar-event`, `resource`, `exam` and `time-slot` are
   done). `passphraseCreate` and
@@ -62,10 +55,6 @@ Backlog items are categorized in sections, not on priority.
   content formatting. Investigate suitable rich text editor libraries and
   integrate it in the component. It should provide a user-friendly interface
   and a raw markdown mode for advanced users.
-* [ ] The Essay question should support a code editor textarea for code
-  questions. I lean towards using Monaco, but we should evaluate pros and cons
-  before making a final decision.
-
 
 ## Maintainability
 
@@ -107,13 +96,6 @@ Backlog items are categorized in sections, not on priority.
 
 ## Questions and exams
 
-* **Question weights.** `QuestionsForExam.weight
-  Float?` defaulting to 1, the `Σ(weight × score) / Σ(weight)` score, and the
-  rule that weights freeze while an exam is `ONGOING`. Cut from
-  `dev/specs/to-do/questions.md`: they live on the exam side of the join table
-  and mean nothing until an exam can be taken.
-* **Version pins.** An unset pin means `QuestionRef.latest` and must not be
-  user-settable. Decided: the server pins each question's version when the exam
-  starts (its first attempt is opened). Not built yet; see
-  `dev/issues/versao-da-questao-fixada-ao-iniciar-o-exame.md`.
-
+* **Question weights per exam.** Weights come from the question version
+  today; a per-exam override is in
+  `dev/issues/peso-da-questao-por-prova.md`.

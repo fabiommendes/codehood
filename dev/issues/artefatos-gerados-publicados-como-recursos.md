@@ -1,6 +1,6 @@
 ---
 type: issue
-status: backlog
+status: todo
 kind: bug
 priority: medium
 tags: [cli, push, resources, python, elm]
