@@ -235,27 +235,32 @@ export function UndoGrade(props: {
 	submission: string;
 }): JSX.Element {
 	const [busy, setBusy] = createSignal(false);
+	const [error, setError] = createSignal<string>();
 	return (
-		<button
-			type="button"
-			class="btn btn-ghost btn-sm btn-square text-error"
-			aria-label={m.grades_objective_undo()}
-			title={m.grades_objective_undo()}
-			disabled={busy()}
-			onClick={async () => {
-				setBusy(true);
-				const failure = await undoOverride(props.target, {
-					kind: "grade",
-					submission: props.submission,
-				});
-				if (failure) {
-					setBusy(false);
-					return;
-				}
-				window.location.reload();
-			}}
-		>
-			<Icon name="undo" />
-		</button>
+		<>
+			<button
+				type="button"
+				class="btn btn-ghost btn-sm btn-square text-error"
+				aria-label={m.grades_objective_undo()}
+				title={m.grades_objective_undo()}
+				disabled={busy()}
+				onClick={async () => {
+					setBusy(true);
+					const failure = await undoOverride(props.target, {
+						kind: "grade",
+						submission: props.submission,
+					});
+					if (failure) {
+						setError(failure);
+						setBusy(false);
+						return;
+					}
+					window.location.reload();
+				}}
+			>
+				<Icon name="undo" />
+			</button>
+			<DialogError message={error()} />
+		</>
 	);
 }

@@ -42,7 +42,7 @@ export const MARKS: readonly QuestionMark[] = [
 	"not-graded",
 ];
 
-/// The name of a state.
+/** The localized name of a question's state. */
 export function markLabel(mark: QuestionMark): string {
 	switch (mark) {
 		case "correct":

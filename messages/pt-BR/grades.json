@@ -429,6 +429,7 @@
 	"grades_adjustment_active": "Ativa",
 	"grades_adjustment_revoked": "Revogada",
 	"grades_adjustment_by_line": "por {name}",
+	"grades_adjustment_revoked_by_line": "revogada por {name}",
 	"grades_adjustment_col_student": "Aluno",
 	"grades_adjustment_col_target": "Alvo",
 	"grades_adjustment_col_reason": "Motivo",
@@ -461,6 +462,20 @@
 	"grades_adjustment_summary": "Ajustes de nota",
 	"grades_adjustment_original_total": "Total original",
 	"grades_adjustment_final_total": "Total final",
+	"grades_adjustment_total_detail": [
+		{
+			"declarations": [
+				"input count",
+				"input total",
+				"local countPlural = count: plural"
+			],
+			"selectors": ["countPlural"],
+			"match": {
+				"countPlural=one": "(automática {total}, {count} questão alterada)",
+				"countPlural=other": "(automática {total}, {count} questões alteradas)"
+			}
+		}
+	],
 	"grades_adjustment_total_pending": "pendente",
 	"grades_adjustment_changed_by_hand": "alterada à mão",
 	"grades_adjustment_no_answer": "sem resposta",
@@ -486,7 +501,7 @@
 	"grades_adjustment_roster_col_total": "Total",
 	"grades_adjustment_roster_col_status": "Situação",
 	"grades_adjustment_status_none": "sem tentativa",
-	"grades_adjustment_status_in_progress": "em andamento",
+	"grades_adjustment_status_in_progress": "respondendo",
 	"grades_adjustment_status_pending": "pendente",
 	"grades_adjustment_status_adjusted": "ajustada",
 	"grades_adjustment_status_submitted": "entregue",

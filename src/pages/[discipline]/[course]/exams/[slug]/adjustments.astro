@@ -51,6 +51,7 @@ const rows = adjustments.map((entry) => ({
 			: (titles.get(entry.question) ?? entry.question),
 	notes: "notes" in entry ? entry.notes : null,
 	by: "createdBy" in entry ? entry.createdBy : "",
+	revokedBy: "revokedBy" in entry ? (entry.revokedBy ?? "") : "",
 	active: entry.revokedAt === null,
 }));
 ---
@@ -90,7 +91,7 @@ const rows = adjustments.map((entry) => ({
             </tr>
           </thead>
           <tbody>
-            {rows.map(({ entry, student, label, target, notes, by, active }) => (
+            {rows.map(({ entry, student, label, target, notes, by, revokedBy, active }) => (
               <tr class:list={["align-top", !active && "text-base-content/60"]}>
                 <th scope="row" class="font-medium">
                   <a href={`${examHref}/attempts/${entry.author}`} class="link">{student}</a>
@@ -113,6 +114,7 @@ const rows = adjustments.map((entry) => ({
                 <td class="whitespace-nowrap">
                   {formatDateTime(entry.createdAt, { year: "numeric" })}
                   {by && <div class="text-xs text-muted">{m.grades_adjustment_by_line({ name: by })}</div>}
+                  {revokedBy && <div class="text-xs text-muted">{m.grades_adjustment_revoked_by_line({ name: revokedBy })}</div>}
                 </td>
                 <td>
                   {active && (

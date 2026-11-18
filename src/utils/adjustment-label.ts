@@ -27,3 +27,16 @@ export function adjustmentLabel(adjustment: {
 		? m.grades_adjustment_penalty_factor({ factor })
 		: m.grades_adjustment_bonus_factor({ factor });
 }
+
+/** The effect of one adjustment on the total as a short figure, e.g. "+15", "-10", "×0,5", "80%" or "0%". */
+export function adjustmentEffect(adjustment: {
+	op: AdjustmentOp;
+	value: number;
+}): string {
+	const { op, value } = adjustment;
+	if (op === "SET") return `${plain(value * 100, 1)}%`;
+	if (op === "OFFSET") {
+		return `${value < 0 ? "-" : "+"}${plain(Math.abs(value) * 100, 1)}`;
+	}
+	return `×${plain(value, 2)}`;
+}

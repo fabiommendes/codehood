@@ -250,7 +250,7 @@ export async function loadGrades(
  * The course card of an exam's grading pages: the same list every page of the exam shows.
  *
  * `context` replaces the exam's title when the page belongs to something else, a student's attempt.
- * A page that already loaded the exam's `sanctions` passes them to spare the query.
+ * A page that already loaded the exam's `adjustments` passes them to spare the query.
  */
 export async function gradingExamNav(
 	loaded: Pick<
@@ -259,7 +259,7 @@ export async function gradingExamNav(
 	>,
 	actor: UserActor,
 	context?: string,
-	sanctions?: readonly unknown[],
+	adjustments?: readonly unknown[],
 ): Promise<CourseNav> {
 	const { course, href, exam, answers } = loaded;
 	const [regrades, known] = await Promise.all([
@@ -269,7 +269,7 @@ export async function gradingExamNav(
 		),
 		exam.type === "PRACTICE"
 			? []
-			: (sanctions ??
+			: (adjustments ??
 				db.examAdjustment.findMany(
 					{ course: course.id, exam: exam.slug },
 					{ actor },

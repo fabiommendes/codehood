@@ -11,7 +11,7 @@ creator: claude
 # Respostas suspeitas na correção de questões objetivas
 
 O mockup da correção de objetivas
-(`src/pages/design/playground/correcao-objetivas/_Frame.astro`) tem, em
+(commit `adc0131`, `src/pages/design/playground/correcao-objetivas/_Frame.astro`) tem, em
 "Requer atenção", uma linha de **resposta suspeita** com dois botões de
 ícone: `eye-off` ("Ignorar") e `gavel` ("Aplicar sanção", que abre o diálogo
 de ajuste com alvo na questão). A spec

@@ -58,9 +58,9 @@ const adjustmentTitle = (cell: GradeCell): string | undefined => {
 };
 /// The color of an adjusted total: red when the adjustments lowered it, green when they raised it.
 const totalTone = (cell: GradeCell): string | undefined => {
-	if (cell.kind !== "total" || cell.original?.total == null) return undefined;
-	if (cell.total < cell.original.total) return "text-error";
-	return cell.total > cell.original.total ? "text-success" : undefined;
+	if (cell.kind !== "total" || cell.unadjusted == null) return undefined;
+	if (cell.total < cell.unadjusted) return "text-error";
+	return cell.total > cell.unadjusted ? "text-success" : undefined;
 };
 const hasAttempt = (cell: GradeCell): boolean =>
 	cell.kind === "total" ||
@@ -135,16 +135,16 @@ const hasAttempt = (cell: GradeCell): boolean =>
                       class="link"
                       title={adjustmentTitle(cell)}
                     >
-                      {cell.kind === "total" && cell.original?.total != null ? (
+                      {cell.kind === "total" && cell.unadjusted != null ? (
                         <>
                           <ins class:list={["font-semibold no-underline", totalTone(cell)]}>{label(cell)}</ins>{" "}
-                          <del class="text-muted">{formatScore(cell.original.total)}</del>
+                          <del class="text-muted">{formatScore(cell.unadjusted)}</del>
                         </>
                       ) : (
                         label(cell)
                       )}
                     </a>
-                    {cell.kind === "total" && cell.adjustments && (
+                    {cell.kind === "total" && cell.unadjusted !== undefined && (
                       <a
                         href={`${href}/exams/${table.columns[index]?.exam.slug}/adjustments`}
                         class="link ml-1 align-middle text-muted"

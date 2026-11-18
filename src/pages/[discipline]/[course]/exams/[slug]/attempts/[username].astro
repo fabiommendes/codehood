@@ -47,7 +47,7 @@ import {
 } from "@/services/grading";
 import { reviewResult } from "@/services/review";
 import { questionAttachmentUrl } from "@/urls";
-import { adjustmentLabel } from "@/utils/adjustment-label";
+import { adjustmentEffect, adjustmentLabel } from "@/utils/adjustment-label";
 import { breadcrumbs } from "@/utils/breadcrumbs";
 import { gradingHref } from "@/utils/grading-urls";
 import { highlightQuestionCodeBlocks } from "@/utils/highlight-code-blocks";
@@ -259,6 +259,26 @@ const lineTone = (entry: { op: string; value: string }): string => {
 		entry.op === "OFFSET" ? Number(entry.value) < 0 : Number(entry.value) < 1;
 	return lowers ? "text-error" : "text-success";
 };
+/// The total as the automatic grading alone would give it, and how many questions were changed by hand.
+const changedCount = rows.filter((entry) => entry.mark === "changed").length;
+const automaticTotal = ((): number | null => {
+	const weights = exam.questions.map((question) => question.weight);
+	const weightSum = weights.reduce((sum, weight) => sum + weight, 0);
+	if (outcomes.questions.some((outcome) => outcome.status === "pending")) {
+		return null;
+	}
+	if (weightSum === 0) return 0;
+	return (
+		rows.reduce(
+			(sum, entry, index) =>
+				sum +
+				((entry.mark === "changed" ? entry.autoScore : entry.outcome.score) ??
+					0) *
+					(weights[index] ?? 0),
+			0,
+		) / weightSum
+	);
+})();
 const totalText = (total: number | null | undefined): string =>
 	total == null ? m.grades_adjustment_total_pending() : formatScore(total);
 ---
@@ -313,7 +333,12 @@ const totalText = (total: number | null | undefined): string =>
     </div>
     <div>
       <dt class="text-sm text-muted">{m.exams_attempt_total()}</dt>
-      <dd class="mt-0.5 font-medium">{row ? attemptTotalLabel(row.total, row.state) : m.grades_adjustment_status_none()}</dd>
+      <dd class="mt-0.5 font-medium">
+        {row ? attemptTotalLabel(row.total, row.state) : m.grades_adjustment_status_none()}
+        {changedCount > 0 && automaticTotal !== null && (
+          <span class="text-sm font-normal text-muted">{m.grades_adjustment_total_detail({ total: formatScore(automaticTotal), count: changedCount })}</span>
+        )}
+      </dd>
     </div>
   </dl>
 
@@ -332,16 +357,18 @@ const totalText = (total: number | null | undefined): string =>
     onExam.length > 0 && (
       <section aria-label={m.grades_adjustment_summary()} class="mt-4 rounded-box border border-edge bg-base-100 p-4 text-sm">
         <h3 class="font-semibold">{m.grades_adjustment_summary()}</h3>
-        <dl class="mt-2 grid grid-cols-[1fr_auto] items-center gap-y-1 tabular-nums">
+        <dl class="mt-2 grid grid-cols-[1fr_auto_auto] items-center gap-y-1 tabular-nums">
           <dt class="text-muted">{m.grades_adjustment_original_total()}</dt>
           <dd class="px-3 text-right">{totalText(outcomes.original?.total)}</dd>
+          <span class="w-18"></span>
           {onExam.map((entry) => (
             <>
               <dt>
                 <span class:list={["font-medium", lineTone(entry)]}>{adjustmentLabel({ op: entry.op, value: Number(entry.value) })}</span>
                 {entry.reason && <span class="text-muted"> · {entry.reason}</span>}
               </dt>
-              <dd class="flex justify-end">
+              <dd class:list={["px-3 text-right", lineTone(entry)]}>{adjustmentEffect({ op: entry.op, value: Number(entry.value) })}</dd>
+              <span class="flex w-18 justify-end">
                 <AdjustmentActions
                   client:load
                   discipline={discipline!}
@@ -354,11 +381,12 @@ const totalText = (total: number | null | undefined): string =>
                   reason={entry.reason}
                   notes={notesOf(entry)}
                 />
-              </dd>
+              </span>
             </>
           ))}
           <dt class="border-t border-edge pt-1 font-semibold">{m.grades_adjustment_final_total()}</dt>
           <dd class="border-t border-edge px-3 pt-1 text-right font-semibold">{totalText(outcomes.total)}</dd>
+          <span class="w-18 pt-1"></span>
         </dl>
       </section>
     )

@@ -429,6 +429,7 @@
 	"grades_adjustment_active": "Active",
 	"grades_adjustment_revoked": "Revoked",
 	"grades_adjustment_by_line": "by {name}",
+	"grades_adjustment_revoked_by_line": "revoked by {name}",
 	"grades_adjustment_col_student": "Student",
 	"grades_adjustment_col_target": "Target",
 	"grades_adjustment_col_reason": "Reason",
@@ -461,6 +462,20 @@
 	"grades_adjustment_summary": "Grade adjustments",
 	"grades_adjustment_original_total": "Original total",
 	"grades_adjustment_final_total": "Final total",
+	"grades_adjustment_total_detail": [
+		{
+			"declarations": [
+				"input count",
+				"input total",
+				"local countPlural = count: plural"
+			],
+			"selectors": ["countPlural"],
+			"match": {
+				"countPlural=one": "(automatic {total}, {count} question changed)",
+				"countPlural=other": "(automatic {total}, {count} questions changed)"
+			}
+		}
+	],
 	"grades_adjustment_total_pending": "pending",
 	"grades_adjustment_changed_by_hand": "changed by hand",
 	"grades_adjustment_no_answer": "no answer",

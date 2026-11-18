@@ -487,8 +487,12 @@ export interface AttemptRow {
 	adjustments?: ExamResult["adjustments"];
 	/// The total before the adjustments of the exam, with `adjustments`.
 	original?: ExamResult["original"];
+	/// The total with no adjustment at all, question or exam, when the closed attempt has any active one.
+	unadjusted?: number | null;
 	/// When the student started the attempt.
 	startedAt: Date;
+	/// The instructor who created the attempt, `null` or absent when the student started it.
+	createdBy?: string | null;
 }
 
 /**
@@ -500,7 +504,7 @@ export interface AttemptRow {
  *
  * @params questions The exam's questions with their weights, in exam order.
  * @params feedback Every grading pass on the exam, released or not.
- * @params sanctions The active adjustments of each attempt, by the attempt's `publicId`.
+ * @params adjustments The active adjustments of each attempt, by the attempt's `publicId`.
  * @params students The course's students, dropped ones included.
  * @params exceptions The exam's exceptions, by username; each attempt is `in-progress` or `submitted` by its author's personal timing, as in {@link countingAnswers}.
  * @params policy How the exam discounts `code` submissions, as in `examResult`.
@@ -510,7 +514,7 @@ export function attemptRows(
 	questions: readonly WeightedQuestion[],
 	attempts: GradingAttempt[],
 	feedback: GradingFeedback[],
-	sanctions: ReadonlyMap<string, ResultAdjustment[]>,
+	adjustments: ReadonlyMap<string, ResultAdjustment[]>,
 	students: GradedStudent[],
 	now: Date,
 	exceptions: ReadonlyMap<string, ExceptionTiming> = new Map(),
@@ -531,15 +535,14 @@ export function attemptRows(
 				.map((submission) => submission.question)
 				.filter((slug) => slugs.includes(slug)),
 		).size;
+		const active = adjustments.get(attempt.publicId) ?? [];
 		const result = closed
-			? examResult(
-					questions,
-					attempt.submissions,
-					feedback,
-					sanctions.get(attempt.publicId) ?? [],
-					policy,
-				)
+			? examResult(questions, attempt.submissions, feedback, active, policy)
 			: null;
+		const unadjusted =
+			closed && active.length > 0
+				? examResult(questions, attempt.submissions, feedback, [], policy).total
+				: undefined;
 		return {
 			author: attempt.author,
 			name: student?.name ?? attempt.author,
@@ -552,7 +555,9 @@ export function attemptRows(
 			...(result?.adjustments
 				? { adjustments: result.adjustments, original: result.original }
 				: {}),
+			...(unadjusted !== undefined ? { unadjusted } : {}),
 			startedAt: attempt.createdAt,
+			...(attempt.createdBy ? { createdBy: attempt.createdBy } : {}),
 		};
 	});
 
@@ -599,7 +604,7 @@ export interface RosterRow {
 }
 
 /**
- * One row per active student, sorted by name: `none` without an attempt; `in-progress` while open; `pending` with a pending answer; `adjusted` with any active adjustment or manual change; else `submitted`.
+ * One row per active student, sorted by name: `none` without an attempt or with an empty one the instructor created; `in-progress` while open; `pending` with a pending answer; `adjusted` with any active adjustment or manual change; else `submitted`.
  *
  * @params adjusted The usernames with an active adjustment or a grade changed by hand.
  */
@@ -624,10 +629,11 @@ export function attemptRoster(
 			if (row.state === "in-progress")
 				return { ...base, status: "in-progress" };
 			if (row.pending > 0) return { ...base, status: "pending" };
-			return {
-				...base,
-				status: adjusted.has(student.username) ? "adjusted" : "submitted",
-			};
+			if (adjusted.has(student.username))
+				return { ...base, status: "adjusted" };
+			if (row.createdBy && row.answered === 0)
+				return { ...base, status: "none" };
+			return { ...base, status: "submitted" };
 		});
 }
 

@@ -79,7 +79,7 @@ export async function loadExamStaffData(
 	const [
 		attempts,
 		feedback,
-		sanctions,
+		adjustments,
 		students,
 		storedExceptions,
 		regrades,
@@ -101,13 +101,13 @@ export async function loadExamStaffData(
 	]);
 	const slugs = exam.questions.map((question) => question.slug);
 	const policy = policyOf(exam);
-	const sanctionsOf = adjustmentsByResponse(sanctions);
+	const adjustmentsOf = adjustmentsByResponse(adjustments);
 	const results = attempts.map((entry) =>
 		examResult(
 			exam.questions,
 			entry.submissions,
 			feedback,
-			sanctionsOf.get(entry.publicId) ?? [],
+			adjustmentsOf.get(entry.publicId) ?? [],
 			policy,
 		),
 	);
@@ -117,7 +117,7 @@ export async function loadExamStaffData(
 		exam.questions,
 		attempts,
 		feedback,
-		sanctionsOf,
+		adjustmentsOf,
 		students,
 		now,
 		exceptions,
@@ -139,15 +139,11 @@ export async function loadExamStaffData(
 		releaseBlocker: blockerOf(schedule, results, now),
 		pending: resultRows.reduce((sum, row) => sum + row.pending, 0),
 		openRegrades: regrades.length,
-		adjustments: sanctions.length,
+		adjustments: adjustments.length,
 		originalTotals: new Map(
-			attempts
-				.filter((entry) => sanctionsOf.has(entry.publicId))
-				.map((entry) => [
-					entry.author,
-					examResult(exam.questions, entry.submissions, feedback, [], policy)
-						.total,
-				]),
+			resultRows.flatMap((row) =>
+				row.unadjusted === undefined ? [] : [[row.author, row.unadjusted]],
+			),
 		),
 		inProgress: attempts.filter((entry) => entry.acceptingSubmissions).length,
 		openExceptions: [...exceptions].filter(([username, exception]) => {
