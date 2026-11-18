@@ -14,6 +14,7 @@ import { expect, test } from "../fixtures";
 import { logInAs, resetDatabase, seedUser } from "./helpers";
 import {
 	CHALLENGE_COMMENT,
+	gradesMessage,
 	objectiveExam,
 	objectiveLabel,
 	PARTIAL_COMMENT,
@@ -823,6 +824,21 @@ test("instructor: find the questions that need rework", async ({ page }) => {
 			page.getByRole("row").filter({ hasText: text });
 		await expect(row("Pear")).toContainText("4");
 		await expect(row("Pear")).toContainText(/50\s*%/);
+		// Only the key carries the in-the-key marker.
+		await expect(
+			row("Pear").getByLabel(gradesMessage("grades_objective_in_key"), {
+				exact: true,
+			}),
+		).toHaveCount(1);
+		await expect(
+			row("Apple").getByLabel(gradesMessage("grades_objective_in_key"), {
+				exact: true,
+			}),
+		).toHaveCount(0);
+		// Nobody left it blank, so there is no row for that.
+		await expect(
+			page.getByRole("row").filter({ hasText: "(blank)" }),
+		).toHaveCount(0);
 		await expect(row("Apple")).toContainText("2");
 		await expect(row("Apple")).toContainText(/25\s*%/);
 		await expect(row("Fig")).toContainText(/0\s*%/);
@@ -842,6 +858,14 @@ test("instructor: find the questions that need rework", async ({ page }) => {
 		await expect(row("First statement")).toContainText("F 3");
 		await expect(row("Second statement")).toContainText("T 2");
 		await expect(row("Second statement")).toContainText("F 5");
+		// Missed: the two who said true plus the one who left it unanswered.
+		await expect(
+			page.getByRole("columnheader", {
+				name: gradesMessage("grades_objective_count_missed"),
+			}),
+		).toBeVisible();
+		await expect(row("Second statement").locator("td").nth(1)).toHaveText(/^3/);
+		await expect(row("First statement").locator("td").nth(1)).toHaveText(/^3/);
 	});
 
 	await test.step("a typed question groups identical responses instead of choices", async () => {
@@ -876,6 +900,14 @@ test("instructor: find the questions that need rework", async ({ page }) => {
 
 		await page.goto(`${href}/exams/final/grading/fruit?view=list`);
 
+		// The grouped table still marks the pinned key, not the new version's.
+		const inKey = (text: string) =>
+			page
+				.getByRole("row")
+				.filter({ hasText: text })
+				.getByLabel(gradesMessage("grades_objective_in_key"), { exact: true });
+		await expect(inKey("Pear")).toHaveCount(1);
+		await expect(inKey("Apple")).toHaveCount(0);
 		await key().locator("summary").click();
 		await expect(key()).toContainText("Pick the best fruit.");
 		await expect(key()).not.toContainText(
