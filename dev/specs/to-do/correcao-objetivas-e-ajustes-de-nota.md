@@ -71,11 +71,10 @@ Vale para toda questão com `isAutoGraded(doc)` (automática e não `code`).
   corpo é `AnswerKey`. Por quê: o professor já conhece a questão; o gabarito
   é conferência, não leitura.
 - A3. Linha de resumo: número de respostas, % corretas, selo "discriminação
-  baixa" quando `questionStats` a marca, e "N sem nota" só se N > 0 (âncora
-  para "Requer atenção").
-- A4. "Requer atenção" só aparece quando não vazia. Dois tipos de linha:
-  - **Sem nota**: resposta sem passe de correção, com campo de nota 0 a 100,
-    "Marcar como certa" e "Dar nota" (como em `_Frame.astro`).
+  baixa" quando `questionStats` a marca.
+- A4. "Requer atenção" só aparece quando não vazia. Um tipo de linha (não há
+  "sem nota" numa objetiva: `settleExpired` corrige toda resposta de tentativa
+  encerrada antes da página carregar, e `objectiveScore` nunca devolve null):
   - **Revisão pedida**: pedido de revisão aberto (`RegradeRequest` OPEN), com
     botão `message-square-text` ("Ver pedido") que leva a `regrades.astro`.
   Botões de ícone, com `aria-label` e `title`. Detectar resposta suspeita e
@@ -385,7 +384,7 @@ Depois da liberação das notas (mesma regra de `feedback.read` da
     penalidade, `OFFSET` positivo e negativo);
   - uma tentativa vazia;
   - uma alteração de nota em questão em branco;
-  - os estados que a tela objetiva precisa (A4: sem nota, revisão pedida;
+  - os estados que a tela objetiva precisa (A4: revisão pedida;
     A7: alteradas à mão), numa prova encerrada com questões objetivas.
   Os exemplos atuais de sanção (linhas ~2082, ~3146, ~3156, ~3797 a ~3828)
   passam a `FACTOR < 1` ou `FACTOR 0`.
@@ -534,7 +533,7 @@ continua a de fator até T2).
 Pode começar depois de T1.
 
 - Testes primeiro: `test/stories/instructor-grading.test.ts` (história do
-  professor numa objetiva: resumo, requer atenção (sem nota e revisão
+  professor numa objetiva: resumo, requer atenção (revisão
   pedida), agrupadas, alterar nota
   pelo diálogo, desfazer); spec `unit` das funções puras que montam as linhas
   (agrupamento, média das outras questões, "–" abaixo de 3, "esperado" ou
