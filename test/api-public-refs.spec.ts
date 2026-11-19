@@ -362,6 +362,41 @@ test("response, submission and feedback carry the public references from the spe
 	expect(feedback).not.toHaveProperty("botId");
 });
 
+test("GET /response lists each attempt with the submissions that count, and with all of them under ?history=true", async ({
+	request,
+}) => {
+	const chain = await makeChain(request);
+	const { headers, courseUrl } = chain;
+	const again = () =>
+		persistedSubmissionFactory.create({
+			response: { publicId: chain.response.publicId },
+			question: chain.question.slug,
+		});
+	const second = await again();
+	const newest = await again();
+	const submissionsOf = async (query: string) => {
+		const res = await request.get(`${courseUrl}/response${query}`, { headers });
+		expect(res.status()).toBe(200);
+		const { items } = await res.json();
+		expect(items).toHaveLength(1);
+		return items[0].submissions.map((it: { publicId: string }) => it.publicId);
+	};
+
+	expect(await submissionsOf("")).toEqual([newest.publicId]);
+	expect(await submissionsOf("?history=false")).toEqual([newest.publicId]);
+	expect(await submissionsOf("?history=true")).toEqual([
+		chain.submission.publicId,
+		second.publicId,
+		newest.publicId,
+	]);
+
+	const one = await request.get(
+		`${courseUrl}/response/${chain.response.publicId}`,
+		{ headers },
+	);
+	expect((await one.json()).submissions).toHaveLength(3);
+});
+
 //
 // Submission list filter: { publicId }, never a raw id
 //

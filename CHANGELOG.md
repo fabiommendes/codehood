@@ -29,6 +29,16 @@
 
 ### Fixed
 
+- O servidor não cai mais por falta de memória quando o instrutor abre a home
+  ou a página do curso depois de uma prova. `response.findMany` (e
+  `GET /api/course/{discipline}/{course}/response`) devolve, por questão, só
+  as submissões que contam: os envios, a mais nova, a mais nova do aluno
+  quando a mais nova é do instrutor, e as que têm pedido de revisão. O filtro
+  `history: true` (`?history=true` na API) devolve o histórico inteiro, e a
+  leitura de uma tentativa só continua com tudo. A correção automática das
+  objetivas também deixou de carregar o histórico de cada tentativa, o que
+  segurava as telas de instrutor da prova. `Submission` ganhou o índice
+  `(responseId, questionId, kind, createdAt)`.
 - Testes: cada worker recebe uma cópia dos blobs do seed, e as páginas de
   repositório do seed deixam de dar 500 nos testes.
 

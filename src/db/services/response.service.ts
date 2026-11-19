@@ -125,6 +125,17 @@ function courseSelect(actor: Actor, ...authors: string[]) {
  */
 function responseInclude(actor: Actor) {
 	return {
+		...attemptInclude(actor),
+		submissions: {
+			orderBy: [{ createdAt: "asc" as const }, { id: "asc" as const }],
+			include: submissionInclude,
+		},
+	} satisfies Prisma.ResponseInclude;
+}
+
+/// What {@link responseInclude} reads besides the submissions, which grow with every autosave.
+function attemptInclude(actor: Actor) {
+	return {
 		exam: {
 			select: {
 				...examTimingSelect,
@@ -133,15 +144,14 @@ function responseInclude(actor: Actor) {
 				course: { select: courseSelect(actor) },
 			},
 		},
-		submissions: {
-			orderBy: { createdAt: "asc" as const },
-			include: {
-				question: { select: { slug: true } },
-				response: { select: { publicId: true } },
-			},
-		},
 	} satisfies Prisma.ResponseInclude;
 }
+
+/// The relations `submissionFromDb` needs on a submission row.
+const submissionInclude = {
+	question: { select: { slug: true } },
+	response: { select: { publicId: true } },
+} satisfies Prisma.SubmissionInclude;
 
 type DbResponse = Prisma.ResponseGetPayload<{
 	include: ReturnType<typeof responseInclude>;
@@ -253,6 +263,11 @@ export const makeResponseService = defineService<ResponseT>()(() => {
 	/**
 	 * Lists the attempts of one course, narrowed to what `actor` may see.
 	 *
+	 * Each attempt carries only the submissions that count for each question:
+	 * every send, the newest one, the student's newest when the instructor
+	 * created the newest, and those under a regrade request. `history: true`
+	 * lists them all, as `findOne` does for one attempt.
+	 *
 	 * A student is narrowed to their own attempts in the database query, not
 	 * after the fact. An `author` filter naming somebody else is refused rather
 	 * than quietly emptied.
@@ -283,32 +298,49 @@ export const makeResponseService = defineService<ResponseT>()(() => {
 			const owner = isCourseOwner(opts.actor, course);
 			const restrictTo = restrictToAuthor(opts.actor, owner, filter.author);
 
-			const rows = await tx.response.findMany({
-				where: {
-					exam: {
-						courseId: course.id,
-						...(filter.exam ? { slug: filter.exam } : {}),
-					},
-					...(filter.practice !== undefined
-						? filter.practice
-							? { slotKey: { not: 0 } }
-							: { slotKey: 0 }
-						: {}),
-					...(filter.acceptingSubmissions !== undefined
-						? { acceptingSubmissions: filter.acceptingSubmissions }
-						: {}),
-					preview: filter.preview ?? false,
-					...(restrictTo
-						? { authorId: restrictTo }
-						: filter.author
-							? { authorId: filter.author }
-							: {}),
+			const where: Prisma.ResponseWhereInput = {
+				exam: {
+					courseId: course.id,
+					...(filter.exam ? { slug: filter.exam } : {}),
 				},
-				include: responseInclude(opts.actor),
-				orderBy: { createdAt: "asc" },
-			});
+				...(filter.practice !== undefined
+					? filter.practice
+						? { slotKey: { not: 0 } }
+						: { slotKey: 0 }
+					: {}),
+				...(filter.acceptingSubmissions !== undefined
+					? { acceptingSubmissions: filter.acceptingSubmissions }
+					: {}),
+				preview: filter.preview ?? false,
+				...(restrictTo
+					? { authorId: restrictTo }
+					: filter.author
+						? { authorId: filter.author }
+						: {}),
+			};
+			const orderBy = { createdAt: "asc" as const };
 
-			return rows.map(fromDb);
+			if (filter.history) {
+				const rows = await tx.response.findMany({
+					where,
+					include: responseInclude(opts.actor),
+					orderBy,
+				});
+				return rows.map(fromDb);
+			}
+
+			const attempts = await tx.response.findMany({
+				where,
+				include: attemptInclude(opts.actor),
+				orderBy,
+			});
+			const counting = await countingSubmissions(
+				tx,
+				attempts.map((attempt) => attempt.id),
+			);
+			return attempts.map((attempt) =>
+				fromDb({ ...attempt, submissions: counting.get(attempt.id) ?? [] }),
+			);
 		},
 	});
 
@@ -898,6 +930,114 @@ async function appendSubmission(
 	// version. A student's save carries no expectation and never fails on one.
 	if (!duplicate) await touch(tx, "response", { id: row.id }, {});
 	return { row, duplicate };
+}
+
+/// How many ids one query takes, well under SQLite's limit of bound parameters.
+const ID_CHUNK = 5000;
+
+/// The newest submissions of each kind, and the student's newest of each kind, for every question of the attempts whose ids are in the JSON array bound to `?`.
+///
+/// The newest submission of a question is the newest of its kind, so it is among these. Rows come newest first within each question of each attempt. The `pairs` scan and the first subquery are answered by the index on `(responseId, questionId, kind, createdAt)`; only the rows picked are read.
+const NEWEST_PER_KIND_SQL = `
+	WITH pairs AS (
+		SELECT DISTINCT s.responseId AS r, s.questionId AS q, s.kind AS k
+		FROM json_each(?) a
+		CROSS JOIN Submission s ON s.responseId = a.value
+	),
+	picked AS (
+		SELECT (
+			SELECT t.id FROM Submission t
+			WHERE t.responseId = r AND t.questionId = q AND t.kind = k
+			ORDER BY t.createdAt DESC, t.id DESC LIMIT 1
+		) AS id FROM pairs
+		UNION
+		SELECT (
+			SELECT t.id FROM Submission t
+			WHERE t.responseId = r AND t.questionId = q AND t.kind = k
+				AND t.createdById IS NULL
+			ORDER BY t.createdAt DESC, t.id DESC LIMIT 1
+		) AS id FROM pairs
+	)
+	SELECT s.id AS id, s.responseId AS responseId, s.questionId AS questionId,
+		s.createdById IS NULL AS byStudent
+	FROM picked
+	JOIN Submission s ON s.id = picked.id
+	ORDER BY s.responseId, s.questionId, s.createdAt DESC, s.id DESC`;
+
+/// The sends, and the submissions under a regrade request, of the attempts whose ids are in the JSON arrays bound to the two `?`.
+const SENDS_AND_CONTESTED_SQL = `
+	SELECT s.id AS id
+	FROM json_each(?) a
+	CROSS JOIN Submission s ON s.responseId = a.value
+	WHERE s.kind IN ('SUBMIT', 'FINAL')
+	UNION
+	SELECT s.id AS id
+	FROM RegradeRequest g
+	CROSS JOIN Submission s ON s.id = g.submissionId
+	WHERE s.responseId IN (SELECT value FROM json_each(?))`;
+
+/**
+ * The submissions that count in a listing, by attempt, oldest first.
+ *
+ * For each question of an attempt: every `SUBMIT` and `FINAL`, the newest submission, the newest one the student made when the newest was created by the instructor, and any under a regrade request. The ids are chosen in SQL without reading a payload, so the autosaves left out never reach the process.
+ */
+async function countingSubmissions(
+	tx: PrismaTx,
+	attemptIds: number[],
+): Promise<Map<number, DbResponse["submissions"]>> {
+	const byAttempt = new Map<number, DbResponse["submissions"]>();
+	if (attemptIds.length === 0) return byAttempt;
+
+	const attempts = JSON.stringify(attemptIds);
+	const newest = await tx.$queryRawUnsafe<
+		{
+			id: number | bigint;
+			responseId: number | bigint;
+			questionId: number | bigint;
+			byStudent: number | bigint;
+		}[]
+	>(NEWEST_PER_KIND_SQL, attempts);
+	const sends = await tx.$queryRawUnsafe<{ id: number | bigint }[]>(
+		SENDS_AND_CONTESTED_SQL,
+		attempts,
+		attempts,
+	);
+
+	const ids = new Set(sends.map((row) => Number(row.id)));
+	let question = "";
+	let needsStudent = false;
+	for (const row of newest) {
+		const key = `${row.responseId}:${row.questionId}`;
+		const byStudent = Number(row.byStudent) === 1;
+		if (key !== question) {
+			// The first row of a question is its newest submission.
+			question = key;
+			needsStudent = !byStudent;
+			ids.add(Number(row.id));
+		} else if (needsStudent && byStudent) {
+			needsStudent = false;
+			ids.add(Number(row.id));
+		}
+	}
+
+	const wanted = [...ids];
+	for (let start = 0; start < wanted.length; start += ID_CHUNK) {
+		const rows = await tx.submission.findMany({
+			where: { id: { in: wanted.slice(start, start + ID_CHUNK) } },
+			include: submissionInclude,
+		});
+		for (const row of rows) {
+			const list = byAttempt.get(row.responseId);
+			if (list) list.push(row);
+			else byAttempt.set(row.responseId, [row]);
+		}
+	}
+	for (const list of byAttempt.values()) {
+		list.sort(
+			(a, b) => a.createdAt.getTime() - b.createdAt.getTime() || a.id - b.id,
+		);
+	}
+	return byAttempt;
 }
 
 /// The attempt as {@link promoteFinalSends} reads it. A simulation sends as a practice attempt does.

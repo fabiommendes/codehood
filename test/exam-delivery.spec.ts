@@ -409,7 +409,12 @@ test("opening a submitted attempt keeps a draft that differs from the saved answ
 /// Every payload the server holds for `question`, oldest first.
 async function history(s: Prepared, question = "text"): Promise<unknown[]> {
 	const [attempt] = await db.response.findMany(
-		{ course: s.course.id, exam: s.exam.slug, author: s.student.username },
+		{
+			course: s.course.id,
+			exam: s.exam.slug,
+			author: s.student.username,
+			history: true,
+		},
 		FULL_ACCESS,
 	);
 	return (

@@ -1142,8 +1142,11 @@ model Submission {
   gradingJob     GradingJob?
 
   /// Every read of an answer asks for the submissions of one question in one
-  /// attempt; SQLite indexes no foreign key by itself.
+  /// attempt; SQLite indexes no foreign key by itself. It also gives the
+  /// newest by `id`, which the wider index below cannot.
   @@index([responseId, questionId])
+  /// Lets a listing pick the submissions that count without reading a payload.
+  @@index([responseId, questionId, kind, createdAt])
   /// Deleting a question looks for the submissions that answer it.
   @@index([questionId])
 }

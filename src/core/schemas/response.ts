@@ -48,7 +48,7 @@ export const responseSchema = z.object({
 	/// When the attempt was closed, or `null` while it is open or when it was closed before the server recorded it. Server state: never written by a client.
 	closedAt: z.date().nullable(),
 
-	/// Every question answered in this attempt, oldest first.
+	/// The submissions of this attempt, oldest first. A listing holds only the ones that count for each question: every send, the newest one, the student's newest when the instructor created the newest, and those under a regrade request.
 	submissions: z.array(submissionSchema),
 
 	createdAt: z.date(),
@@ -103,6 +103,9 @@ export const responseFilterBase = z.object({
 
 	/// `true` keeps only the instructor's simulations, which are left out by default.
 	preview: z.boolean().optional(),
+
+	/// `true` lists each attempt with every submission it holds, instead of only the ones that count.
+	history: z.boolean().optional(),
 });
 
 export const responseFilter = responseFilterBase.extend({ course: courseRef });

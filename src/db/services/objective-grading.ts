@@ -33,41 +33,52 @@ export async function gradeObjectives(
 ): Promise<number> {
 	const response = await tx.response.findUnique({
 		where: { id: responseId },
-		select: {
-			examId: true,
-			submissions: {
-				orderBy: [{ createdAt: "desc" }, { id: "desc" }],
-				select: {
-					id: true,
-					status: true,
-					payload: true,
-					createdById: true,
-					question: { select: { id: true, latestId: true } },
-				},
-			},
-		},
+		select: { examId: true },
 	});
 	if (!response) return 0;
 
-	const counting = new Map<number, (typeof response.submissions)[number]>();
-	for (const submission of response.submissions) {
-		// The instructor's grade for an unanswered question is never scored by the library.
-		if (submission.createdById !== null) continue;
-		if (!counting.has(submission.question.id)) {
-			counting.set(submission.question.id, submission);
-		}
-	}
+	// Chosen in SQL through the index on `(responseId, questionId, kind, createdAt)`, so only the counting submissions are read. The instructor's grade for an unanswered question is never scored by the library.
+	const newest = await tx.$queryRawUnsafe<{ id: number | bigint }[]>(
+		`WITH pairs AS (
+			SELECT DISTINCT questionId AS q, kind AS k
+			FROM Submission WHERE responseId = ?
+		)
+		SELECT id FROM (
+			SELECT s.id AS id, ROW_NUMBER() OVER (
+				PARTITION BY s.questionId ORDER BY s.createdAt DESC, s.id DESC
+			) AS position
+			FROM pairs
+			JOIN Submission s ON s.id = (
+				SELECT t.id FROM Submission t
+				WHERE t.responseId = ? AND t.questionId = q AND t.kind = k
+					AND t.createdById IS NULL
+				ORDER BY t.createdAt DESC, t.id DESC LIMIT 1
+			)
+		) WHERE position = 1`,
+		responseId,
+		responseId,
+	);
+	const counting = await tx.submission.findMany({
+		where: { id: { in: newest.map((row) => Number(row.id)) } },
+		orderBy: [{ createdAt: "desc" }, { id: "desc" }],
+		select: {
+			id: true,
+			status: true,
+			payload: true,
+			question: { select: { id: true, latestId: true } },
+		},
+	});
 
 	// Read apart from the submissions: a `_count` of the relation makes Prisma
 	// aggregate the whole `Feedback` table before joining.
 	const passes = await tx.feedback.findMany({
-		where: { submissionId: { in: [...counting.values()].map((s) => s.id) } },
+		where: { submissionId: { in: counting.map((s) => s.id) } },
 		select: { submissionId: true },
 	});
 	const alreadyGraded = new Set(passes.map((pass) => pass.submissionId));
 
 	let graded = 0;
-	for (const submission of counting.values()) {
+	for (const submission of counting) {
 		if (alreadyGraded.has(submission.id)) continue;
 		if (submission.status === "WILL_NOT_GRADE") continue;
 

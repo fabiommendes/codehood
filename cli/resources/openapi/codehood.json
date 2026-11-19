@@ -38661,6 +38661,14 @@
             "required": false,
             "name": "preview",
             "in": "query"
+          },
+          {
+            "schema": {
+              "type": "boolean"
+            },
+            "required": false,
+            "name": "history",
+            "in": "query"
           }
         ],
         "responses": {
