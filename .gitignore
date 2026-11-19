@@ -30,6 +30,8 @@ pnpm-debug.log*
 # local SQLite database
 *.db
 *.db-journal
+*.db-wal
+*.db-shm
 
 # resource blobs (RESOURCE_ROOT, see src/constants.ts)
 /storage/

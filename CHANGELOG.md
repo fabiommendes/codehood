@@ -35,6 +35,12 @@
   aluno). Sair do campo, esconder a aba, fechar a página, o prazo e a entrega
   salvam na hora; as objetivas continuam salvando a cada clique. O intervalo
   é a chave nova `exam.autosaveIntervalMs` de `codehood.config.ts`.
+- O servidor abre o banco em WAL com `synchronous=NORMAL`: o commit deixa de
+  fazer `fsync` (5 a 6 ms de mediana na VPS, contra 0,1 ms em WAL). Dados
+  recentes passam a ficar em `<banco>-wal`, então o backup tem de usar
+  `.backup` ou `VACUUM INTO`, nunca copiar só o `.db`. A variável
+  `DATABASE_JOURNAL_MODE=delete` volta ao journal de rollback. Ver
+  "Environment variables" no `README.md`.
 
 ### Fixed
 

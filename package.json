@@ -32,7 +32,7 @@
 		"check:siblings": "tsx scripts/check-siblings.ts",
 		"check:versions": "tsx scripts/check-versions.ts",
 		"package": "tsx scripts/package.ts",
-		"db:reset": "rm -f dev.db && rm -rf \"${REPOSITORY_ROOT:-storage/repos}\" && prisma db push && prisma db seed",
+		"db:reset": "rm -f dev.db dev.db-wal dev.db-shm && rm -rf \"${REPOSITORY_ROOT:-storage/repos}\" && prisma db push && prisma db seed",
 		"db:seed:cli": "tsx scripts/seed-cli.ts",
 		"db:generate": "prisma generate && tsx scripts/brand-generated-types.ts",
 		"test": "tsx test/run.ts",

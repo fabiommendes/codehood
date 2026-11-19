@@ -9,6 +9,7 @@ import {
 import { createConnection } from "node:net";
 import { tmpdir } from "node:os";
 import path from "node:path";
+import { DatabaseSync } from "node:sqlite";
 import { DEFAULT_E2E_WORKERS, DEFAULT_TEST_PORT } from "./default-port";
 
 /**
@@ -149,6 +150,7 @@ process.env.TEST_PORT = String(
 const {
 	TEST_BASE_URL,
 	TEST_DATABASE_URL,
+	TEST_SEEDED_DB_PATH,
 	TEST_DB_DIR,
 	TEST_DIST_DIR,
 	TEST_REPOSITORY_ROOT,
@@ -215,6 +217,12 @@ if (process.env.TEST_FILL) {
 		{ env: process.env, stdio: "inherit" },
 	);
 }
+
+// The workers copy the database file alone, so what the seed left in its
+// `-wal` is folded into the file first.
+const seeded = new DatabaseSync(TEST_SEEDED_DB_PATH);
+seeded.exec("PRAGMA wal_checkpoint(TRUNCATE)");
+seeded.close();
 
 // `--rtk` and `--scope` are consumed here rather than forwarded: they select
 // how Playwright is launched, not how it runs.

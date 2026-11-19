@@ -59,13 +59,22 @@ fatores, mas sem métricas não foi possível confirmar.
 - Medir antes e depois, com as métricas da issue relacionada ou com um
   teste de carga simples de autosave e `claim`.
 
+## Estado em 2026-11-19
+
+Implementado em `src/db/client.ts`, com a variável `DATABASE_JOURNAL_MODE`
+para voltar ao journal de rollback. Este issue fica aberto até a conferência
+em produção, depois do deploy.
+
 ## Critérios de aceitação
 
-- [ ] Em produção, `PRAGMA journal_mode` responde `wal` e `PRAGMA synchronous`
-  responde `1` depois de reiniciar o servidor.
-- [ ] Os testes e o dev server continuam funcionando, e o `.gitignore` cobre
-  `*.db-wal` e `*.db-shm` (hoje só tem `*.db` e `*.db-journal`).
-- [ ] O backup da VPS usa `.backup` ou `VACUUM INTO`, e uma restauração foi
-  testada.
+- [ ] Em produção, `PRAGMA journal_mode` responde `wal` depois de reiniciar o
+  servidor. (`synchronous` é por conexão: quem o garante é o teste
+  `test/db-journal-mode.spec.ts`.)
+- [x] Os testes e o dev server continuam funcionando, e o `.gitignore` cobre
+  `*.db-wal` e `*.db-shm`.
+- [x] O backup da VPS usa `.backup` (`/usr/local/bin/codehood-backup`,
+  conferido em 2026-11-19).
+- [ ] Uma restauração do backup foi testada.
 - [ ] Existe uma medida, antes e depois, do tempo de commit ou do p95 de uma
-  rota de escrita (autosave).
+  rota de escrita (autosave): ver a rodada de carga `--wal both` no handoff
+  `dev/specs/to-do/autosave-e-quedas-na-prova.handoff.md`.

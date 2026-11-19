@@ -117,9 +117,21 @@ Only process settings and secrets stay in the environment.
 | :---------------- | :------- | :------------------- | :------------------------------------------------------------ |
 | `ENVIRONMENT`     | yes      | none                 | `dev`/`development` or `prod`/`production`. The server refuses to boot without it. |
 | `DATABASE_URL`    | yes      | `file:./dev.db`      | SQLite database to open.                                       |
+| `DATABASE_JOURNAL_MODE` | no | `wal`                | `wal` or `delete`, see below.                                  |
 | `CODEHOOD_CONFIG` | no       | `codehood.config.ts` | Configuration file, relative to the root.                     |
 | `DEBUG`           | no       | `false`              | Verbose error output.                                          |
 | `LOG_ENV`         | no       | `false`              | Echo the resolved settings at startup. Set by `pnpm run dev`. |
+
+The server opens the database in WAL with `synchronous=NORMAL`: a commit
+appends to `<database>-wal` and the fsync is left to the checkpoint, which
+takes a commit from milliseconds to a fraction of one. A power loss may drop
+the last commits, never corrupt the file; a crash of the process alone loses
+nothing. Recent data lives in the `-wal` file, so a backup must use SQLite's
+online backup (`sqlite3 <database> ".backup <copy>"`) or `VACUUM INTO`, never
+a plain copy of the `.db` file, and deleting a database means deleting its
+`-wal` and `-shm` files with it. `DATABASE_JOURNAL_MODE=delete` goes back to
+the rollback journal with an fsync per commit; the mode changes at the next
+start of the server.
 
 `ENVIRONMENT` deliberately has no default, and an empty value counts as
 unset. It decides two things a deployment cannot afford to get wrong by
