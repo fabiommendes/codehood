@@ -123,18 +123,18 @@ async function liveEdition(
 		);
 	}
 	if (!response.ok) fail(`GET ${url}/api/edition answered ${response.status}`);
-	const editions = (await response.json()) as {
-		slug: string;
-		startAt: string;
-		endAt: string;
-	}[];
+	const { items } = (await response.json()) as {
+		items: { slug: string; startDate: string; endDate: string }[];
+	};
 	const now = Date.now();
-	const live = editions.find(
-		(e) => Date.parse(e.startAt) <= now && now <= Date.parse(e.endAt),
+	const live = items.find(
+		(e) =>
+			Date.parse(e.startDate) <= now &&
+			now <= Date.parse(`${e.endDate}T23:59:59Z`),
 	);
 	if (!live)
 		fail("no live edition on the server; reseed with `pnpm run db:reset`.");
-	return { slug: live.slug, startAt: new Date(live.startAt) };
+	return { slug: live.slug, startAt: new Date(live.startDate) };
 }
 
 /// Every file under `dir`, recursively.
