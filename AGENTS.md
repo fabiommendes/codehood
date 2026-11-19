@@ -158,6 +158,7 @@ run `pnpm run typecheck` yourself rather than trusting a green Biome run.
 | `pnpm run test:e2e` | Run the specs that drive the server under test|
 | `pnpm run test`     | Run both scopes, `unit` first                 |
 | `pnpm run test:perf`| Run `e2e` on the seeded and on a full database, compare the routes |
+| `pnpm run test:tour`| Screenshot every screen as each role, check no route or component is left out |
 | `pnpm run lint`     | Run linter, typecheck, and story coverage     |
 | `pnpm run manage`   | Run management CLI commands                   |
 | `pnpm run db:seed`  | Seed the dev database                         |
@@ -242,6 +243,29 @@ rtk pnpm exec tsx test/run.ts --only-changed       # affected by the working tre
 rtk pnpm exec tsx test/run.ts --only-changed=main  # affected since main
 rtk pnpm run test:unit --only-changed              # the same, without building the server
 ```
+
+### Tour of the screens
+
+`pnpm run test:tour` (~3 min, outside `pnpm test`) signs in as a visitor, a
+student, an instructor and an admin on the seeded database and follows every
+link, opening up to 2 URLs per route (more for exams, see
+`test/tour/config.ts`). Each set of query parameter names (`?view=list`) is a
+variant of the route, with a budget of its own. Each page gets viewport-sized screenshots, an ARIA
+snapshot and its metadata in `tmp/tour/<time>/<role>/<route>/`, with
+`tmp/tour/latest` pointing at the last run. `summary.md` lists which roles
+reached each route.
+
+Routes are discovered from `src/pages/`, so a new screen is covered as soon as
+some page links to it. The tour fails when a page route is reached by no role:
+link to it, add a start URL to a role (`test/tour/starts.ts` mints tokens and
+codes), or list it in `TOUR_SKIPPED` with the reason. It also fails on a 5xx or
+an uncaught browser error. With source maps and V8 coverage on the server, it
+lists the `.astro` components that product code imports but no page rendered:
+usually a state the seed does not reach. `--no-coverage` skips that part.
+
+To review UI consistency, read the `aria.yml` files first (cheap, exact text
+and structure) and open the screenshots (~1.4k tokens each) only for the
+screens worth a closer look.
 
 ### Performance of the suite
 

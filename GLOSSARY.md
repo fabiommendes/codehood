@@ -670,6 +670,13 @@ an authored slug (stable when the hour moves) and an optional title for the
 syllabus line. Concrete dated meetings are its [Events](#event). A slot may
 have none: office hours are a titled slot with no events.
 
+## Tour
+
+Type: tooling
+
+Run of `pnpm run test:tour`: crawls every screen as each role and saves
+screenshots and ARIA snapshots in `tmp/tour/<time>/`.
+
 ## Trabalho de correção
 
 Also: grading job

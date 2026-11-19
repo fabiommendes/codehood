@@ -36,7 +36,11 @@ function engineProjects() {
 	});
 }
 
-const E2E_SPECS = e2eSpecs();
+/// `TEST_TOUR=1` runs the tour of every screen (`test/tour/`) and nothing
+/// else. The tour is slow, so the suite leaves it out otherwise.
+const E2E_SPECS = process.env.TEST_TOUR
+	? [path.resolve("test/tour/tour.tour.ts")]
+	: e2eSpecs();
 
 /// Spec files run side by side, each worker on its own database (see
 /// `test/env.ts`). Tests inside a file keep their order.
@@ -56,16 +60,27 @@ const PERF_LOG_DIR = process.env.TEST_PERF_LOG
 	? path.resolve(process.env.TEST_PERF_LOG)
 	: null;
 
+/// Under c8 (`NODE_V8_COVERAGE`), the server must exit by itself on SIGTERM
+/// for Node to write its coverage.
+const NODE = process.env.NODE_V8_COVERAGE
+	? "node --import ./test/coverage-exit.mjs"
+	: "node";
+
 const E2E_SERVERS = Array.from({ length: E2E_SERVER_COUNT }, (_, index) => {
 	const slot = e2eSlot(index);
 	prepareE2eSlot(slot);
 	return {
 		command: PERF_LOG_DIR
-			? `exec node ${TEST_DIST_DIR}/server/entry.mjs >> ${PERF_LOG_DIR}/server-${slot.port}.jsonl`
-			: `node ${TEST_DIST_DIR}/server/entry.mjs`,
+			? `exec ${NODE} ${TEST_DIST_DIR}/server/entry.mjs >> ${PERF_LOG_DIR}/server-${slot.port}.jsonl`
+			: `${NODE} ${TEST_DIST_DIR}/server/entry.mjs`,
 		url: slot.baseUrl,
 		reuseExistingServer: false,
 		timeout: 60_000,
+		// Playwright kills a web server with SIGKILL unless told otherwise,
+		// which loses its coverage.
+		...(process.env.NODE_V8_COVERAGE
+			? { gracefulShutdown: { signal: "SIGTERM" as const, timeout: 10_000 } }
+			: {}),
 		env: {
 			DATABASE_URL: `file:${slot.dbPath}`,
 			RESOURCE_ROOT: slot.resourceRoot,

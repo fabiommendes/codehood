@@ -21,6 +21,11 @@
   `storage.repositoryRoot`, `storage.assignment.maxRepoBytes` e
   `storage.assignment.maxFileBytes`. O servidor passa a exigir git 2.30 ou
   mais novo; ver "Deploying" no `README.md` para backup e proxy.
+- Tour das telas (`pnpm run test:tour`): percorre o app como visitante,
+  aluno, professor e admin seguindo os links, salva screenshots e snapshot ARIA
+  de cada página em `tmp/tour/<hora>/`, falha quando alguma rota de página
+  não foi visitada por nenhum papel e lista os componentes `.astro` que nenhuma
+  página renderizou (cobertura V8 do servidor mapeada pelos source maps).
 
 ### Fixed
 
