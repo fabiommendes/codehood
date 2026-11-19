@@ -48,7 +48,7 @@
 		"ui-report": "playwright show-report",
 		"lint:fix": "biome check --write .",
 		"lint": "biome ci . && tsx scripts/i18n-check.ts && pnpm run check:versions && pnpm run check:siblings && pnpm run typecheck && pnpm run stories --check",
-		"typecheck": "tsx scripts/compile-messages.ts && tsc --noEmit && astro sync && NODE_OPTIONS=--max-old-space-size=4096 tsx scripts/astro-check.ts",
+		"typecheck": "tsx scripts/compile-messages.ts && astro sync && tsc --noEmit && NODE_OPTIONS=--max-old-space-size=4096 tsx scripts/astro-check.ts",
 		"stories": "tsx scripts/story-coverage.ts",
 		"coverage": "COVERAGE=1 c8 --reporter=lcov --reporter=text-summary --exclude 'src/generated/**' --exclude 'test/**' --exclude 'prisma/**' --exclude 'scripts/**' --exclude '**/*.config.*' -- tsx test/run.ts",
 		"studio": "pnpm prisma studio --url file://./dev.db",

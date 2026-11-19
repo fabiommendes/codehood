@@ -17,3 +17,4 @@ export function courseHref(ref: CourseNaturalKey): string {
 }
 
 export * from "./attachments";
+export { type Href, type Route, type UrlPattern, urls } from "./routes";

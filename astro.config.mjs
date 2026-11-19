@@ -13,6 +13,7 @@ import { defineConfig, logHandlers } from "astro/config";
 import { dynamicRouterHook } from "@/api/registry/hook";
 import { codehoodConfig, loadConfig } from "@/config/integration";
 import { configPath } from "@/config/path";
+import { urlPatterns } from "@/urls/integration";
 import { localeDefine, paraglidePlugin } from "./scripts/lib/paraglide";
 
 const root = fileURLToPath(new URL(".", import.meta.url));
@@ -69,6 +70,7 @@ export default defineConfig({
 		solidJs(),
 		dynamicRouterHook(),
 		runnerBundle(config.runner.languages),
+		urlPatterns(),
 	],
 	vite: {
 		plugins: [tailwindcss(), paraglidePlugin(root)],

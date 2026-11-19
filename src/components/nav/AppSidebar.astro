@@ -5,6 +5,7 @@
 // current course (or follows the list when no course is current).
 import Sketch, { type SketchArt } from "@/components/brand/Sketch.astro";
 import { m } from "@/i18n";
+import { urls } from "@/urls";
 import CourseRow from "./CourseRow.astro";
 
 export interface SidebarCourse {
@@ -44,7 +45,7 @@ const nav = [
 		? [
 				{
 					label: m.nav_admin(),
-					href: "/admin",
+					href: urls.admin.index(),
 					icon: "M12 3.5 4.5 6.5v5c0 5 3.2 8.5 7.5 9.5 4.3-1 7.5-4.5 7.5-9.5v-5L12 3.5Z",
 				},
 			]
@@ -69,7 +70,7 @@ function sketch(): { art: SketchArt; seed?: string } {
 	if (course) return { art: "athos", seed: course.href };
 	if (isActive("/courses")) return { art: "loose" };
 	if (isActive("/calendar")) return { art: "construction" };
-	if (isActive("/admin")) return { art: "protractor" };
+	if (isActive(urls.admin.index())) return { art: "protractor" };
 	const [discipline, edition] = currentPath.split("/").filter(Boolean);
 	if (edition?.includes("_"))
 		return { art: "athos", seed: `/${discipline}/${edition}` };

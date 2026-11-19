@@ -6,6 +6,7 @@ import { db } from "@/db";
 import { startProcessMonitor } from "@/perf/process";
 import { measureRequest } from "@/perf/request";
 import { checkGitAtBoot } from "@/services/git/boot";
+import { urls } from "@/urls";
 import { SYSTEM } from "./auth/actor";
 import * as env from "./core/constants";
 import { RUNNER_ORIGIN, SESSION_COOKIE } from "./core/constants";
@@ -102,7 +103,8 @@ export const sessionMiddleware = defineMiddleware(async (context, next) => {
  */
 export const adminMiddleware = defineMiddleware((context, next) => {
 	const { pathname } = context.url;
-	if (pathname !== "/admin" && !pathname.startsWith("/admin/")) return next();
+	const root = urls.admin.index();
+	if (pathname !== root && !pathname.startsWith(`${root}/`)) return next();
 
 	if (!context.locals.actor) return context.redirect("/login");
 	if (!hasPerm(context.locals.actor, "system.manage"))

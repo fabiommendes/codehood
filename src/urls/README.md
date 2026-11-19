@@ -8,6 +8,33 @@ The grammar itself is not repeated here. `src/urls/constants.ts` holds the
 regexes and the reserved-name set; `src/urls/parsing.ts` holds the parsers.
 Those are the source of truth.
 
+## Building links: the route registry
+
+Code links to its own pages through `urls` (`src/urls/routes.ts`), one
+function per route, instead of writing the path:
+
+```ts
+import { urls } from "@/urls";
+<a href={urls.admin.users()}>
+```
+
+Each function returns an `Href`, a string marked so that a plain string is
+not one: a prop typed `Href` only takes a URL built here. Each function also
+carries its `pattern`, typed `UrlPattern`: the union of every route under
+`src/pages/`, which the `urlPatterns()` integration (`src/urls/integration.ts`)
+writes to `src/generated/url-patterns.ts` whenever Astro resolves the routes
+(`astro sync`, `astro dev`, `astro build`). A pattern no page serves, or a
+parameterized one given to `staticRoute`, fails the typecheck.
+
+`test/url-registry.spec.ts` covers what types cannot. For each prefix in its
+`MIGRATED_PREFIXES`, it checks that every page under the prefix is registered
+and that no code outside `src/urls/` writes the path as a string literal
+(comments are allowed).
+
+The migration goes one prefix at a time. So far: `/admin`. The decision, the
+`<Link>` component that comes next and the alternatives left out are in ADR 0022
+(`dev/adr/0022-rotas-tipadas-pelo-registro-urls.md`).
+
 ## The root namespace belongs to disciplines
 
 A course is addressed as `/<discipline-slug>/<username>_<edition>`:

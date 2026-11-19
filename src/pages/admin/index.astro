@@ -14,6 +14,7 @@ import { errorMessage } from "@/forms/field-errors";
 import { actionForm } from "@/forms/form-state";
 import { m, SLOT, splitAtSlot } from "@/i18n";
 import AppLayout from "@/layouts/AppLayout.astro";
+import { urls } from "@/urls";
 
 // adminMiddleware (src/middleware/admin.ts) already redirects anonymous/
 // non-admin visitors before this runs; the check below is here only so
@@ -325,7 +326,7 @@ const editionCreatedParts = editionResult?.data
       disciplineResult && !disciplineResult.error && (
         <div role="alert" class="alert alert-success mt-4">
           <span>
-            {disciplineCreatedParts[0]}<a href="/admin/disciplines" class="underline">{m.admin_overview_discipline_link()}</a>{disciplineCreatedParts[1]}
+            {disciplineCreatedParts[0]}<a href={urls.admin.disciplines()} class="underline">{m.admin_overview_discipline_link()}</a>{disciplineCreatedParts[1]}
           </span>
         </div>
       )
@@ -334,7 +335,7 @@ const editionCreatedParts = editionResult?.data
       editionResult && !editionResult.error && (
         <div role="alert" class="alert alert-success mt-4">
           <span>
-            {editionCreatedParts[0]}<a href="/admin/editions" class="underline">{m.admin_overview_edition_link()}</a>{editionCreatedParts[1]}
+            {editionCreatedParts[0]}<a href={urls.admin.editions()} class="underline">{m.admin_overview_edition_link()}</a>{editionCreatedParts[1]}
           </span>
         </div>
       )

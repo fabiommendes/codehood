@@ -11,6 +11,7 @@ import PencilFilter from "@/components/nav/PencilFilter.astro";
 import UserMenu from "@/components/nav/UserMenu.astro";
 import ThemeToggle from "@/components/ThemeToggle.astro";
 import DesignLayout from "@/layouts/DesignLayout.astro";
+import { urls } from "@/urls";
 import type { Crumb } from "@/utils/breadcrumbs";
 
 export const prerender = false;
@@ -65,7 +66,7 @@ const SIDEBAR_PAGES = [
 	["Home", "/"],
 	["My courses", "/courses"],
 	["A course", "/cs201/alan_2026-1/exams"],
-	["Admin", "/admin"],
+	["Admin", urls.admin.index()],
 ] as const;
 
 const layouts = [

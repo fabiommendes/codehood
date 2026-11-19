@@ -169,7 +169,9 @@ function examSteps(
 function adminSteps(segments: string[]): Step[] {
 	const root = ADMIN_TABS[0];
 	const steps: Step[] = [{ label: m.nav_admin(), path: root.href }];
-	const tab = ADMIN_TABS.find((t) => t.href === `/admin/${segments[1]}`);
+	const tab = ADMIN_TABS.find(
+		(t) => t !== root && t.href === `/${segments.slice(0, 2).join("/")}`,
+	);
 	if (tab) steps.push({ label: tab.label, path: tab.href });
 	return steps;
 }
