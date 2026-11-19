@@ -10,7 +10,8 @@ import { touch } from "@/db/conditional-write";
 import { NotAutoGradable, ResponseError, scoreResponse } from "@/mdq";
 import type { PrismaTx } from "../client";
 import { realAttempt } from "../preview-filter";
-import { examTimingSelect, loadExceptionTiming } from "./exam-questions";
+import { fromMs } from "../utils";
+import { examTimingSelect } from "./exam-questions";
 import { privateDocument, scoreText } from "./grading-job.service";
 import { attemptTimedOut } from "./submission.service";
 
@@ -36,27 +37,39 @@ export async function gradeObjectives(
 		select: { examId: true },
 	});
 	if (!response) return 0;
+	return gradeAttempts(tx, response.examId, [responseId], options);
+}
+
+/// Grades the attempts `responseIds` of one exam as {@link gradeObjectives} does, with the same statements whatever their number.
+async function gradeAttempts(
+	tx: PrismaTx,
+	examId: number,
+	responseIds: ResponseId[],
+	options: { dryRun?: boolean },
+): Promise<number> {
+	if (responseIds.length === 0) return 0;
 
 	// Chosen in SQL through the index on `(responseId, questionId, kind, createdAt)`, so only the counting submissions are read. The instructor's grade for an unanswered question is never scored by the library.
 	const newest = await tx.$queryRawUnsafe<{ id: number | bigint }[]>(
 		`WITH pairs AS (
-			SELECT DISTINCT questionId AS q, kind AS k
-			FROM Submission WHERE responseId = ?
+			SELECT DISTINCT s.responseId AS r, s.questionId AS q, s.kind AS k
+			FROM json_each(?) a
+			CROSS JOIN Submission s ON s.responseId = a.value
 		)
 		SELECT id FROM (
 			SELECT s.id AS id, ROW_NUMBER() OVER (
-				PARTITION BY s.questionId ORDER BY s.createdAt DESC, s.id DESC
+				PARTITION BY s.responseId, s.questionId
+				ORDER BY s.createdAt DESC, s.id DESC
 			) AS position
 			FROM pairs
 			JOIN Submission s ON s.id = (
 				SELECT t.id FROM Submission t
-				WHERE t.responseId = ? AND t.questionId = q AND t.kind = k
+				WHERE t.responseId = r AND t.questionId = q AND t.kind = k
 					AND t.createdById IS NULL
 				ORDER BY t.createdAt DESC, t.id DESC LIMIT 1
 			)
 		) WHERE position = 1`,
-		responseId,
-		responseId,
+		JSON.stringify(responseIds),
 	);
 	const counting = await tx.submission.findMany({
 		where: { id: { in: newest.map((row) => Number(row.id)) } },
@@ -65,6 +78,7 @@ export async function gradeObjectives(
 			id: true,
 			status: true,
 			payload: true,
+			responseId: true,
 			question: { select: { id: true, latestId: true } },
 		},
 	});
@@ -77,15 +91,23 @@ export async function gradeObjectives(
 	});
 	const alreadyGraded = new Set(passes.map((pass) => pass.submissionId));
 
+	// Every attempt answers the same questions: each document is read once.
+	const documents = new Map<
+		number,
+		Awaited<ReturnType<typeof privateDocument>>
+	>();
+	const touched = new Set<ResponseId>();
 	let graded = 0;
 	for (const submission of counting) {
 		if (alreadyGraded.has(submission.id)) continue;
 		if (submission.status === "WILL_NOT_GRADE") continue;
 
-		const score = objectiveScore(
-			await privateDocument(tx, response.examId, submission.question),
-			submission.payload,
-		);
+		let document = documents.get(submission.question.id);
+		if (!document) {
+			document = await privateDocument(tx, examId, submission.question);
+			documents.set(submission.question.id, document);
+		}
+		const score = objectiveScore(document, submission.payload);
 		if (score === null) continue;
 		graded += 1;
 		if (options.dryRun) continue;
@@ -101,9 +123,9 @@ export async function gradeObjectives(
 			where: { id: submission.id },
 			data: { status: "GRADED_AUTOMATICALLY" },
 		});
+		touched.add(submission.responseId);
 	}
-	if (graded > 0 && !options.dryRun)
-		await touch(tx, "response", { id: responseId }, {});
+	for (const id of touched) await touch(tx, "response", { id }, {});
 	return graded;
 }
 
@@ -145,25 +167,35 @@ export async function gradeExpiredObjectives(
 		orderBy: { id: "asc" },
 	});
 	const now = new Date();
-	let attempts = 0;
-	let graded = 0;
+	const exceptions = new Map(
+		(
+			await tx.examException.findMany({
+				where: { examId: exam.id },
+				select: { username: true, extraTimeMs: true, scheduledAt: true },
+			})
+		).map((row) => [
+			row.username,
+			{ extraTime: fromMs(row.extraTimeMs), scheduledAt: row.scheduledAt },
+		]),
+	);
+	const expired: ResponseId[] = [];
 	for (const response of responses) {
 		if (
 			response.acceptingSubmissions &&
 			!attemptTimedOut(
 				{ createdAt: response.createdAt, preview: response.preview, exam },
 				now,
-				await loadExceptionTiming(tx, exam.id, response.authorId),
+				exceptions.get(response.authorId) ?? null,
 			)
 		) {
 			continue;
 		}
-		attempts += 1;
-		graded += await gradeObjectives(tx, response.id, {
-			dryRun: options.dryRun,
-		});
+		expired.push(response.id);
 	}
-	return { attempts, graded };
+	const graded = await gradeAttempts(tx, exam.id, expired, {
+		dryRun: options.dryRun,
+	});
+	return { attempts: expired.length, graded };
 }
 
 /// The library's score of `payload`, 0 when it is blank or the library refuses it, or `null` when only an instructor can score it.

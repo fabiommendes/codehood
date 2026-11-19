@@ -922,21 +922,24 @@ async function toJob(tx: PrismaTx, row: DbJob, leaseUntil: Date): Promise<Job> {
 
 /// The jobs of one question of one exam in a course, as `FROM … WHERE`.
 ///
-/// Raw SQL that walks from the question down to its jobs: the relation filter
-/// of Prisma starts at `GradingJob` and reads the whole table.
-const QUEUE_JOBS_SQL = `FROM QuestionRef q
-	CROSS JOIN Submission s ON s.questionId = q.id
-	CROSS JOIN ResponseRef r ON r.id = s.responseId
-	CROSS JOIN Exam e ON e.id = r.examId
+/// Raw SQL that walks from the attempts of the exam down to their sends: the
+/// relation filter of Prisma starts at `GradingJob` and reads the whole table.
+/// Only a `SUBMIT` or a `FINAL` has a job, and naming the kinds keeps the walk
+/// on the index, away from the autosaves of the question.
+const QUEUE_JOBS_SQL = `FROM Exam e
+	CROSS JOIN QuestionRef q
+	CROSS JOIN ResponseRef r ON r.examId = e.id
+	CROSS JOIN Submission s ON s.responseId = r.id AND s.questionId = q.id
+		AND s.kind IN ('SUBMIT', 'FINAL')
 	CROSS JOIN GradingJob j ON j.submissionId = s.id
-	WHERE q.courseId = ? AND q.slug = ? AND e.courseId = ? AND e.slug = ?`;
+	WHERE e.courseId = ? AND e.slug = ? AND q.courseId = ? AND q.slug = ?`;
 
 /// The parameters of {@link QUEUE_JOBS_SQL}.
 function queueParams(
 	courseId: number,
 	input: { exam: string; question: string },
 ): (number | string)[] {
-	return [courseId, input.question, courseId, input.exam];
+	return [courseId, input.exam, courseId, input.question];
 }
 
 /// The ids of the failed jobs of one question of one exam in a course.

@@ -59,6 +59,13 @@
   `.backup` ou `VACUUM INTO`, nunca copiar só o `.db`. A variável
   `DATABASE_JOURNAL_MODE=delete` volta ao journal de rollback. Ver
   "Environment variables" no `README.md`.
+- Telas de instrutor da prova (visão geral, correção, exceções, resultados):
+  a contagem da fila de correção de uma questão `code` lê só os envios
+  (`SUBMIT` e `FINAL`) das tentativas da prova, em vez de todos os autosaves
+  da questão, e a correção das objetivas das tentativas encerradas roda em
+  lote, com o mesmo número de queries para qualquer número de alunos. Com 60
+  alunos e 160 mil autosaves no banco, cada tela caiu de 600 a 1100 queries
+  para 90 a 140, e de até 2,5 s para até 0,45 s.
 
 ### Fixed
 
