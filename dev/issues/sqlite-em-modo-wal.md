@@ -65,12 +65,8 @@ Implementado em `src/db/client.ts`, com a variável `DATABASE_JOURNAL_MODE`
 para voltar ao journal de rollback. Este issue fica aberto até a conferência
 em produção, depois do deploy.
 
-Em `journal_mode=delete`, um leitor lento de fora (uma consulta com
-`sqlite3`, o backup) faz um `COMMIT` do servidor falhar por banco ocupado, e
-o `@prisma/adapter-better-sqlite3` 7.9.1 não se recupera: toda escrita passa
-a falhar até reiniciar o serviço. Foi o que aconteceu em produção em
-2026-11-19, das 17:06 às 17:13. Em WAL o leitor não bloqueia o escritor.
-Quem voltar a `DATABASE_JOURNAL_MODE=delete` volta a ter esse risco.
+A decisão e o que ela resolve estão no ADR 0023
+(`dev/adr/0023-sqlite-em-wal-com-synchronous-normal.md`).
 
 ## Critérios de aceitação
 
