@@ -1,6 +1,6 @@
 ---
 type: spec
-status: to-do
+status: to-review
 tags: [assignments, teams, git, cli]
 relatedTo: [trabalhos-com-repositorio, reaproveitar-equipes-de-outro-trabalho]
 created: 2026-11-19

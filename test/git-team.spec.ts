@@ -16,8 +16,10 @@ import {
 	assignmentPk,
 	cleanupAssignmentScenarios,
 	dropStudent,
+	expireTempToken,
 	hoursFromNow,
 	reenroll,
+	tempTokenOf,
 } from "./assignment-scenario";
 import { TEST_BASE_URL } from "./env";
 import { expect, test } from "./fixtures";
@@ -122,6 +124,41 @@ test.describe("pushes", () => {
 			newSha: sha,
 			oldSha: null,
 		});
+	});
+
+	test("a push with the temporary token is recorded under its owner, and refused once it expires", async () => {
+		const { team, student, url } = await teamFor(fixture, 5);
+		await db.team.createTempToken({ id: team.id }, { actor: student });
+		const temp = (await tempTokenOf(team, student.username)) as string;
+		const tempUrl = teamGitUrl(temp, fixture.slug);
+
+		const dir = await cloneInto(tempUrl);
+		const first = await commitFiles(dir, { "README.md": "# Lab\n" });
+		await git(dir, ["push", "--quiet", "origin", "HEAD:main"]);
+
+		expect(await readMain(team.id)).toBe(first);
+		expect(await pushesOf(team.id)).toMatchObject([
+			{ username: student.username, newSha: first, oldSha: null },
+		]);
+
+		await expireTempToken(team, student.username);
+		await commitFiles(dir, { "late.txt": "left behind\n" });
+		const refused = await git(dir, ["push", "origin", "HEAD:main"], {
+			allowFail: true,
+		});
+
+		expect(refused.code).not.toBe(0);
+		await expectGone(tempUrl);
+		expect(await readMain(team.id)).toBe(first);
+		expect(await pushesOf(team.id)).toHaveLength(1);
+		expect((await advertise(url, UPLOAD_PACK)).status).toBe(200);
+
+		await db.team.createTempToken({ id: team.id }, { actor: student });
+		await db.team.revokeTempToken({ id: team.id }, { actor: student });
+		const revoked = (await tempTokenOf(team, student.username)) as
+			| string
+			| null;
+		expect(revoked).toBeNull();
 	});
 
 	test("two members push in turn, and a push without a pull is refused", async () => {

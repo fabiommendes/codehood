@@ -203,6 +203,9 @@ export const ASSIGNMENT_MAX_REPO_BYTES = parseByteSize(
 	config.storage.assignment.maxRepoBytes,
 );
 
+/// How long a temporary clone token of a team member lasts, counted from its creation.
+export const TEAM_TEMP_TOKEN_TTL_MS = 2 * 60 * 60 * 1000;
+
 /// The largest file a push to a team repository may add, in bytes.
 export const ASSIGNMENT_MAX_FILE_BYTES = parseByteSize(
 	config.storage.assignment.maxFileBytes,

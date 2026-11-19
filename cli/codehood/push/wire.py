@@ -177,7 +177,8 @@ def assignment_payload(file: AssignmentFile) -> Payload:
     The body of an assignment's `PUT`, without its `rev`.
 
     Every key is always there: a key left out would keep the server's value,
-    so a date or limit removed from the file must travel as `null`. The
+    so a date or limit removed from the file must travel as `null` and
+    checkpoints removed from it as an empty list. The
     deadline of a team is never part of it.
     """
     return {
@@ -192,6 +193,7 @@ def assignment_payload(file: AssignmentFile) -> Payload:
         "teamsLockAt": file.teams_lock_at,
         "template": file.template,
         "restrictions": file.restrictions,
+        "checkpoints": [dict(item) for item in file.checkpoints],
     }
 
 

@@ -34,6 +34,9 @@ const delivery = (
 	push: { newSha: string; createdAt: Date } | null,
 ): ManagedDelivery | null =>
 	push ? { sha: push.newSha, at: push.createdAt.toISOString() } : null;
+const now = new Date();
+const passed = assignment.checkpoints.filter(({ at }) => at <= now);
+const reached = new Set(passed.map(({ slug }) => slug));
 const managed = teams.map((team) => ({
 	id: team.publicId,
 	name: team.name,
@@ -43,12 +46,18 @@ const managed = teams.map((team) => ({
 	sizeException: team.sizeException,
 	onTime: delivery(team.delivery.onTime),
 	late: delivery(team.delivery.late),
+	checkpoints: Object.fromEntries(
+		team.checkpoints
+			.filter(({ slug }) => reached.has(slug))
+			.map(({ slug, push }) => [slug, push?.newSha ?? null]),
+	),
 }));
 const data: ManagerData = {
 	params: { ...params, slug: assignment.slug },
 	teamMin: assignment.teamMin,
 	teamMax: assignment.teamMax,
 	students: students.map(({ username, name }) => ({ username, name })),
+	checkpoints: passed.map(({ slug, title }) => ({ slug, title })),
 	teams: managed,
 	repositories: individual
 		? students.map(({ username, name }) => {
@@ -61,13 +70,14 @@ const data: ManagerData = {
 					dueAt: own?.dueAt ?? null,
 					onTime: own?.onTime ?? null,
 					late: own?.late ?? null,
+					checkpoints: own?.checkpoints ?? {},
 				};
 			})
 		: [],
 };
 
 const enrolled = m.assignments_count_of_enrolled({ count: students.length });
-const counts = individual
+const counts: { label: string; value: number; hint: string }[] = individual
 	? [
 			{
 				label: m.assignments_count_repositories(),
@@ -115,6 +125,17 @@ const counts = individual
 			},
 		];
 
+const titles = new Map(passed.map(({ slug, title }) => [slug, title]));
+counts.push(
+	...summary.checkpoints.map(({ slug, teams: count }) => ({
+		label: titles.get(slug) ?? slug,
+		value: count,
+		hint: individual
+			? m.assignments_checkpoint_of_repositories({ count: summary.teams })
+			: m.assignments_checkpoint_of_teams({ count: summary.teams }),
+	})),
+);
+
 const commands = [
 	{
 		command: `codehood assignment status ${assignment.slug}`,
@@ -130,7 +151,12 @@ const commands = [
 	},
 ];
 
-const dated: { label: string; at: Date | null; strong?: boolean }[] = [
+const dated: {
+	label: string;
+	at: Date | null;
+	strong?: boolean;
+	checkpoint?: boolean;
+}[] = [
 	{ label: m.assignments_deadline_opens(), at: assignment.opensAt },
 	{
 		label: individual
@@ -138,6 +164,11 @@ const dated: { label: string; at: Date | null; strong?: boolean }[] = [
 			: m.assignments_deadline_teams(),
 		at: assignment.teamsLockAt,
 	},
+	...assignment.checkpoints.map(({ title, at }) => ({
+		label: title,
+		at,
+		checkpoint: true,
+	})),
 	{ label: m.assignments_deadline_due(), at: assignment.dueAt, strong: true },
 	{ label: m.assignments_deadline_pushes(), at: assignment.closesAt },
 ];
@@ -161,7 +192,7 @@ const deadlines = dated.flatMap(({ at, ...rest }) =>
   <section aria-label={m.assignments_summary()}>
     <dl class="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
       {counts.map((count) => (
-        <div class="rounded-box border border-base-content/15 bg-base-200/50 px-4 py-3">
+        <div class="rounded-box border border-base-content/15 bg-base-200/50 px-4 py-3" data-count>
           <dt class="text-xs uppercase tracking-wide text-muted">{count.label}</dt>
           <dd class="mt-1 text-3xl font-bold">{count.value}</dd>
           <dd class="text-sm text-muted">{count.hint}</dd>
@@ -181,7 +212,10 @@ const deadlines = dated.flatMap(({ at, ...rest }) =>
         <div class:list={["rounded-box border px-4 py-3", entry.strong ? "border-base-content/40" : "border-base-content/15"]}>
           <dt class="text-xs uppercase tracking-wide text-muted">{entry.label}</dt>
           <dd class="mt-1 font-medium">{formatWhen(entry.at)}</dd>
-          <dd class="text-sm text-muted">{formatRelative(entry.at)}</dd>
+          <dd class="text-sm text-muted">
+            {formatRelative(entry.at)}
+            {entry.checkpoint && ` · ${m.assignments_checkpoint_kind()}`}
+          </dd>
         </div>
       ))}
     </dl>

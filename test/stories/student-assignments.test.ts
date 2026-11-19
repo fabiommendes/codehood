@@ -13,6 +13,7 @@ import {
 	shortSha,
 	stopDelivering,
 	student,
+	tempTokenOf,
 	tokenOf,
 } from "./assignment-support";
 import { logInAs, resetDatabase } from "./helpers";
@@ -57,7 +58,11 @@ import { logInAs, resetDatabase } from "./helpers";
  *         heading "First push" while there are no pushes; a region "Push
  *         history" with one list item per push (short sha, message, pusher's
  *         name, badge "Late" after the due date); a button "Generate new
- *         clone URL" that replaces the token at once; a button "Leave team"
+ *         clone URL" that replaces the token at once; a button "Generate
+ *         temporary clone URL" beside a note on shared computers and "2
+ *         hours", which adds a region "Temporary clone URL" (the command with
+ *         another token, a button "Copy", the text "stops working on <date>")
+ *         and a button "Revoke temporary URL"; a button "Leave team"
  *         (disabled, next to a note containing "last member", for the last
  *         member of a team with pushes; absent on individual assignments).
  *   - Region "Deadlines" with the due date labelled "Due date" ("Your team's
@@ -65,6 +70,12 @@ import { logInAs, resetDatabase } from "./helpers";
  *     and, when extended, the words "extended" and "original".
  *   - Region "Statement" with the rendered markdown of the body.
  *   - On an individual assignment nothing on the page (`main`) says "team".
+ *   - Checkpoints: the region "Deadlines" names each one by its title, with
+ *     the word "checkpoint". The panel has a region "Checkpoints" with one
+ *     list item per checkpoint: "Not reached yet" before its date; the short
+ *     sha and the pusher's name once it has passed; "Passed with no push"
+ *     when nothing had been pushed by then. In "Push history" the push that
+ *     counts for a checkpoint holds its title.
  */
 
 test.beforeEach(resetDatabase);
@@ -256,6 +267,45 @@ test("student: Form a team and follow the delivery", async ({ page }) => {
 		const after = await tokenOf(team, ana.username);
 		await expect(clone).toContainText(`/git/${after}/`);
 		await expect(clone).not.toContainText(`${before}`);
+	});
+
+	await test.step("a temporary clone URL for a shared computer comes and goes", async () => {
+		const permanent = await tokenOf(team, ana.username);
+		const clone = page.getByRole("region", { name: "Clone the repository" });
+		const temporary = page.getByRole("region", { name: "Temporary clone URL" });
+		const generate = page.getByRole("button", {
+			name: "Generate temporary clone URL",
+		});
+		const revoke = page.getByRole("button", { name: "Revoke temporary URL" });
+		await expect(temporary).toHaveCount(0);
+		await expect(revoke).toHaveCount(0);
+		await expect(panel.getByText(/shared computer.*2 hours/)).toBeVisible();
+
+		await generate.click();
+		await expect(temporary).toBeVisible();
+		const first = await tempTokenOf(team, ana.username);
+		expect(first).not.toBeNull();
+		expect(first).not.toBe(permanent);
+		await expect(temporary).toContainText(
+			`git clone ${new URL(page.url()).origin}/git/${first}/sa-calc.git`,
+		);
+		await expect(temporary).toContainText("stops working on");
+		await expect(temporary.getByRole("button", { name: "Copy" })).toBeVisible();
+		await expect(clone).toContainText(`/git/${permanent}/`);
+		expect(await tokenOf(team, ana.username)).toBe(permanent);
+
+		await generate.click();
+		await expect.poll(() => tempTokenOf(team, ana.username)).not.toBe(first);
+		const second = await tempTokenOf(team, ana.username);
+		await expect(temporary).toContainText(`/git/${second}/`);
+		await expect(temporary).not.toContainText(`${first}`);
+
+		await revoke.click();
+		await expect(temporary).toHaveCount(0);
+		await expect(revoke).toHaveCount(0);
+		expect(await tempTokenOf(team, ana.username)).toBeNull();
+		await expect(clone).toContainText(`/git/${permanent}/`);
+		await expect(generate).toBeVisible();
 	});
 
 	await test.step("a member may leave, but not the last one of a team with pushes", async () => {
@@ -543,5 +593,74 @@ test("student: See where I stand after the deadline", async ({ page }) => {
 		const response = await page.goto(at("sd-hidden"));
 
 		expect(response?.status()).toBe(404);
+	});
+});
+
+test("student: Follow the checkpoints of an assignment", async ({ page }) => {
+	const world = await seedWorld("sk", ["Kim Okafor"]);
+	const kim = student(world, 1);
+	const work = await seedAssignment(world, "sk-compiler", {
+		title: "Compiler",
+		checkpoints: [
+			{ slug: "lexer", title: "Lexer done", at: daysFromNow(-6) },
+			{ slug: "parser", title: "Parser done", at: daysFromNow(-2) },
+			{ slug: "typer", title: "Typer done", at: daysFromNow(-1) },
+			{ slug: "codegen", title: "Codegen done", at: daysFromNow(2) },
+		],
+	});
+	const team = await createTeamAs(work, kim, "kim");
+	const early = await deliver(team, { "a.txt": "1\n" }, "Parser works", {
+		by: kim,
+		at: daysFromNow(-4),
+	});
+	const recent = await deliver(team, { "b.txt": "2\n" }, "Start codegen", {
+		by: kim,
+		at: hoursFromNow(-1),
+	});
+	await logInAs(page, kim);
+	await page.goto(`${world.href}/assignments/sk-compiler`);
+
+	await test.step("the deadlines name each checkpoint before the due date", async () => {
+		const deadlines = page.getByRole("region", { name: "Deadlines" });
+
+		for (const title of ["Lexer", "Parser", "Typer", "Codegen"]) {
+			await expect(deadlines).toContainText(`${title} done`);
+		}
+		await expect(deadlines.getByText("checkpoint")).toHaveCount(4);
+	});
+
+	const checkpoint = (title: string) =>
+		page
+			.getByRole("region", { name: "Checkpoints" })
+			.getByRole("listitem")
+			.filter({ hasText: title });
+
+	await test.step("a checkpoint still ahead says it has not been reached", async () => {
+		await expect(checkpoint("Codegen done")).toContainText("Not reached yet");
+		await expect(checkpoint("Codegen done")).not.toContainText(
+			shortSha(recent),
+		);
+	});
+
+	await test.step("a checkpoint that has passed shows the commit main had at that instant", async () => {
+		await expect(checkpoint("Parser done")).toContainText(shortSha(early));
+		await expect(checkpoint("Parser done")).toContainText(kim.name);
+		await expect(checkpoint("Typer done")).toContainText(shortSha(early));
+	});
+
+	await test.step("a checkpoint that passed before the first push says nothing was pushed", async () => {
+		await expect(checkpoint("Lexer done")).toContainText("Passed with no push");
+	});
+
+	await test.step("the push that counts carries the titles of its checkpoints in the history", async () => {
+		const pushes = page
+			.getByRole("region", { name: "Push history" })
+			.getByRole("listitem");
+		const counted = pushes.filter({ hasText: shortSha(early) });
+		const latest = pushes.filter({ hasText: shortSha(recent) });
+
+		await expect(counted).toContainText("Parser done");
+		await expect(counted).toContainText("Typer done");
+		await expect(latest).not.toContainText("done");
 	});
 });

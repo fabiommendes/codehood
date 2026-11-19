@@ -381,6 +381,57 @@ test.describe("upsert", () => {
 		expect(byId.get(plain.publicId)?.extended).toBe(false);
 	});
 
+	test("checkpoints travel in the PUT, come back in the GET and fix a push per team", async ({
+		playwright,
+	}) => {
+		const fixture = await assignmentFixture();
+		const api = await apiAs(playwright, fixture.instructor);
+		const team = await seedTeam(fixture);
+		const sha = "a".repeat(40);
+		await prisma.teamPush.create({
+			data: { teamId: team.id, newSha: sha, createdAt: hoursFromNow(-3) },
+		});
+		const checkpoints = [
+			{ slug: "typer", title: "Typer", at: daysFromNow(2).toISOString() },
+			{ slug: "parser", title: "Parser", at: hoursFromNow(-1).toISOString() },
+		];
+
+		const put = await api.put(assignmentUrl(fixture), {
+			data: assignmentBody({ checkpoints }),
+		});
+		const read = await (await api.get(assignmentUrl(fixture))).json();
+		const listed = await (await api.get(teamsUrl(fixture))).json();
+		const cleared = await api.put(assignmentUrl(fixture), {
+			data: assignmentBody({ checkpoints: null }),
+		});
+
+		expect(put.status()).toBe(200);
+		expect(read.checkpoints).toEqual([checkpoints[1], checkpoints[0]]);
+		expect(listed.items[0].checkpoints).toEqual([
+			{ slug: "parser", push: expect.objectContaining({ newSha: sha }) },
+			{ slug: "typer", push: expect.objectContaining({ newSha: sha }) },
+		]);
+		expect((await cleared.json()).checkpoints).toEqual([]);
+	});
+
+	test("a checkpoint at or after the due date is a 400 on checkpoints", async ({
+		playwright,
+	}) => {
+		const fixture = await assignmentFixture();
+		const api = await apiAs(playwright, fixture.instructor);
+		const dueAt = daysFromNow(7).toISOString();
+
+		const put = await api.put(assignmentUrl(fixture), {
+			data: assignmentBody({
+				dueAt,
+				checkpoints: [{ slug: "parser", title: "Parser", at: dueAt }],
+			}),
+		});
+
+		expect(put.status()).toBe(400);
+		expect(JSON.stringify(await put.json())).toContain("checkpoints");
+	});
+
 	test("a team deadline in the body of the PUT writes nothing to the team", async ({
 		playwright,
 	}) => {

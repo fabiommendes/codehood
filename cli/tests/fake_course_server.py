@@ -35,6 +35,7 @@ def team_json(
     size_exception: str | None = None,
     due_at: str = "2026-12-10T21:00:00.000Z",
     author: str | None = None,
+    checkpoints: dict[str, str | None] | None = None,
 ) -> dict:
     """
     A team as `GET .../team` lists it: `on_time` and `late` are the shas of
@@ -61,6 +62,10 @@ def team_json(
         ],
         "delivery": {"onTime": delivery(on_time), "late": delivery(late)},
         "sizeException": size_exception,
+        "checkpoints": [
+            {"slug": slug, "push": delivery(sha)}
+            for slug, sha in (checkpoints or {}).items()
+        ],
     }
 
 
@@ -117,6 +122,7 @@ class FakeCourseServer:
             "teamsLockAt": None,
             "template": None,
             "restrictions": None,
+            "checkpoints": [],
             "rev": "web",
             "createdAt": "2026-01-01T00:00:00.000Z",
             "updatedAt": self.tick(),

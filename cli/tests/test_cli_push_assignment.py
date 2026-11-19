@@ -155,6 +155,28 @@ def test_a_removed_date_is_sent_as_null(course, monkeypatch):
     assert server.assignments["lab"]["closesAt"] is None
 
 
+def test_checkpoints_are_always_sent_and_removed_with_the_file_entry(
+    course, monkeypatch
+):
+    write_assignment(course)
+    server = FakeCourseServer()
+    push(course, monkeypatch, server)
+    (put,) = assignment_writes(server, "PUT")
+    assert json.loads(put.content)["checkpoints"] == []
+
+    write_assignment(
+        course,
+        front="checkpoints:\n  - { slug: p1, title: Parser, at: 2026-12-05 12:00 }\n",
+    )
+    assert push(course, monkeypatch, server).exit_code == 0
+    assert server.assignments["lab"]["checkpoints"] == [
+        {"slug": "p1", "title": "Parser", "at": "2026-12-05T12:00:00.000Z"}
+    ]
+    write_assignment(course)
+    assert push(course, monkeypatch, server).exit_code == 0
+    assert server.assignments["lab"]["checkpoints"] == []
+
+
 def test_underscore_files_and_other_files_are_not_pushed(course, monkeypatch):
     write_assignment(course)
     write_assignment(course, "_rascunho")

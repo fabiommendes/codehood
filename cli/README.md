@@ -211,6 +211,10 @@ restrictions:
   maxFileBytes: 2mb
   deny: ["*.exe", "node_modules/**"]
   require: [README.md]
+checkpoints:                      # intermediate dates (optional)
+  - slug: parser
+    title: Parser working
+    at: 2026-12-05 12:00          # needs a time; after opens, before due
 ---
 
 # Calculator
@@ -221,6 +225,9 @@ Build a calculator. Push to your team's repository before the deadline.
 - Dates are written as in exam files. A time without an offset is UTC.
   `due`, `closes` and `team.lock` refuse a date without a time, since
   `2026-12-20` would silently mean midnight UTC.
+- `checkpoints` lists intermediate dates, each with `slug`, `title` and `at`
+  (all required). Slugs are unique within the assignment. A checkpoint
+  removed from the file is removed from the server on the next push.
 - No `team` means an individual assignment (`min = max = 1`).
 - A file whose name starts with `_`, a file that is not `.md` and anything in
   a subfolder is not pushed.
@@ -242,6 +249,7 @@ Build a calculator. Push to your team's repository before the deadline.
 codehood assignment status lab                        # teams, deliveries, notes
 codehood assignment clone lab                         # submissions/lab/<team>/
 codehood assignment clone lab --late --dest ~/grading # the late delivery instead
+codehood assignment clone lab --checkpoint parser     # each team's commit at that checkpoint
 codehood assignment extend lab "Team A" "2026-12-12 18:00"
 codehood assignment move lab bob "Team A"
 ```
@@ -250,7 +258,10 @@ codehood assignment move lab bob "Team A"
 sanitized team name, or the username for an individual assignment) and parks it
 on the delivered commit with no local branch. Run it again to update. A folder
 whose tracked files you edited is left alone with a warning. Teams with no
-delivery get no folder and are listed at the end. Your API key goes to git
+delivery get no folder and are listed at the end. With `--checkpoint <slug>`,
+each folder is parked on the commit the team had pushed by that checkpoint;
+teams with none are skipped and listed. It cannot be combined with `--late`.
+`status` shows one column per checkpoint with the short commit. Your API key goes to git
 through its environment only; it is never written to `.git/config` or the
 remote URL. Add `submissions/` to your course `.gitignore`.
 

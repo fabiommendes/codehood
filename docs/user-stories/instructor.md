@@ -645,6 +645,18 @@ actions are offered. An assignment that has not opened yet is visible to the
 instructor and hidden from students.
 
 
+### See which teams met a checkpoint
+
+    status: implemented
+    url: /[discipline]/[course]/assignments/[slug]
+
+Instructor opens an assignment that has checkpoints. The deadlines list every
+checkpoint by its title and date. For each checkpoint that has passed, the
+summary says how many of the teams had pushed by then, and the table gains a
+column with the commit each team had at that instant, or a dash. A checkpoint
+that is still ahead has no column and no count.
+
+
 ## Attendance
 
 ### Take the roll call in class

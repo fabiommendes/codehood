@@ -41,6 +41,8 @@ export interface ManagedTeam {
 	sizeException: SizeException | null;
 	onTime: ManagedDelivery | null;
 	late: ManagedDelivery | null;
+	/// The commit at each checkpoint that has passed, by its slug.
+	checkpoints: Record<string, string | null>;
 }
 
 /// One row of an individual assignment: a student and their own repository.
@@ -51,6 +53,7 @@ export interface ManagedRepository {
 	dueAt: string | null;
 	onTime: ManagedDelivery | null;
 	late: ManagedDelivery | null;
+	checkpoints: Record<string, string | null>;
 }
 
 export interface ManagerData {
@@ -59,6 +62,8 @@ export interface ManagerData {
 	teamMin: number;
 	teamMax: number;
 	students: ManagedStudent[];
+	/// The checkpoints that have passed, in order.
+	checkpoints: { slug: string; title: string }[];
 	teams: ManagedTeam[];
 	repositories: ManagedRepository[];
 }
@@ -317,6 +322,28 @@ export default function TeamsManager(props: Props): JSX.Element {
 		else window.location.reload();
 	}
 
+	/// One narrow column per checkpoint that has passed: the commit, or a dash.
+	const checkpointColumns = <
+		T extends { checkpoints: Record<string, string | null> },
+	>(): ColumnConfig<T>[] =>
+		props.data.checkpoints.map(({ slug, title }) => ({
+			title,
+			class: "px-2",
+			headerClass: "px-2 whitespace-nowrap",
+			render: (row) => (
+				<Show
+					when={row.checkpoints[slug]}
+					fallback={<span class="text-muted">—</span>}
+				>
+					{(sha) => (
+						<code class="rounded bg-base-300 px-1 font-mono text-xs">
+							{sha().slice(0, 7)}
+						</code>
+					)}
+				</Show>
+			),
+		}));
+
 	const teamColumns: ColumnConfig<ManagedTeam>[] = [
 		{
 			title: m.assignments_col_team(),
@@ -381,6 +408,7 @@ export default function TeamsManager(props: Props): JSX.Element {
 				/>
 			),
 		},
+		...checkpointColumns<ManagedTeam>(),
 		{
 			title: m.assignments_col_deliveries(),
 			class: "px-2",
@@ -459,6 +487,7 @@ export default function TeamsManager(props: Props): JSX.Element {
 				</Show>
 			),
 		},
+		...checkpointColumns<ManagedRepository>(),
 		{
 			title: m.assignments_col_deliveries(),
 			render: (row) => (

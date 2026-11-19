@@ -10,6 +10,8 @@ import {
 	assignmentTeamJoin,
 	assignmentTeamLeave,
 	assignmentTeamRotate,
+	assignmentTeamTempCreate,
+	assignmentTeamTempRevoke,
 } from "@/core/schemas/assignment-actions";
 import { db } from "@/db";
 import { parseCourseParams } from "@/urls";
@@ -70,6 +72,26 @@ export const assignment = {
 		handler: withServiceErrors(async (input, context) => {
 			const actor = requireUser(context);
 			await db.team.rotateToken({ publicId: input.team }, { actor });
+		}),
+	}),
+
+	/** A student makes a temporary clone URL of their own, replacing the one before. */
+	createTempToken: defineAction({
+		accept: "form",
+		input: assignmentTeamTempCreate,
+		handler: withServiceErrors(async (input, context) => {
+			const actor = requireUser(context);
+			await db.team.createTempToken({ publicId: input.team }, { actor });
+		}),
+	}),
+
+	/** A student turns their temporary clone URL off. */
+	revokeTempToken: defineAction({
+		accept: "form",
+		input: assignmentTeamTempRevoke,
+		handler: withServiceErrors(async (input, context) => {
+			const actor = requireUser(context);
+			await db.team.revokeTempToken({ publicId: input.team }, { actor });
 		}),
 	}),
 

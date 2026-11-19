@@ -8715,6 +8715,29 @@
               }
             }
           },
+          "checkpoints": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "slug": {
+                  "type": "string"
+                },
+                "title": {
+                  "type": "string"
+                },
+                "at": {
+                  "type": "string",
+                  "format": "date-time"
+                }
+              },
+              "required": [
+                "slug",
+                "title",
+                "at"
+              ]
+            }
+          },
           "rev": {
             "type": "string",
             "nullable": true
@@ -8740,6 +8763,7 @@
           "teamsLockAt",
           "template",
           "restrictions",
+          "checkpoints",
           "rev",
           "createdAt",
           "updatedAt"
@@ -8821,6 +8845,36 @@
                 }
               }
             }
+          },
+          "checkpoints": {
+            "type": "array",
+            "nullable": true,
+            "items": {
+              "type": "object",
+              "properties": {
+                "slug": {
+                  "type": "string",
+                  "maxLength": 200,
+                  "pattern": "^[a-z0-9][a-z0-9._\\-]*$",
+                  "example": "intro-to-recursion"
+                },
+                "title": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 200
+                },
+                "at": {
+                  "type": "string",
+                  "format": "date-time"
+                }
+              },
+              "required": [
+                "slug",
+                "title",
+                "at"
+              ]
+            },
+            "maxItems": 20
           },
           "rev": {
             "type": "string",
@@ -8936,6 +8990,43 @@
               "late"
             ]
           },
+          "checkpoints": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "slug": {
+                  "type": "string"
+                },
+                "push": {
+                  "type": "object",
+                  "nullable": true,
+                  "properties": {
+                    "newSha": {
+                      "type": "string"
+                    },
+                    "createdAt": {
+                      "type": "string",
+                      "format": "date-time"
+                    },
+                    "username": {
+                      "type": "string",
+                      "nullable": true
+                    }
+                  },
+                  "required": [
+                    "newSha",
+                    "createdAt",
+                    "username"
+                  ]
+                }
+              },
+              "required": [
+                "slug",
+                "push"
+              ]
+            }
+          },
           "sizeException": {
             "type": "string",
             "nullable": true,
@@ -8955,6 +9046,7 @@
           "createdAt",
           "members",
           "delivery",
+          "checkpoints",
           "sizeException"
         ]
       },

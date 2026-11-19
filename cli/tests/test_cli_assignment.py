@@ -47,6 +47,7 @@ class World:
         *,
         on_time: bool = True,
         late: bool = False,
+        at: dict[str, str | None] | None = None,
         **extra,
     ) -> TeamRepo:
         """
@@ -62,6 +63,7 @@ class World:
             else None
         )
         repo.first, repo.tip = first, tip or first  # type: ignore[attr-defined]
+        shas = {"first": first, "tip": tip or first, None: None}
         self.rest.teams.setdefault("lab", []).append(
             team_json(
                 public_id,
@@ -69,6 +71,7 @@ class World:
                 members,
                 on_time=first if on_time else None,
                 late=tip if late else None,
+                checkpoints={slug: shas[ref] for slug, ref in (at or {}).items()},
                 **extra,
             )
         )
@@ -147,6 +150,31 @@ def test_status_shows_every_state_of_a_team(world):
     assert "no members" in golf
 
 
+def test_status_has_a_column_per_checkpoint(world):
+    world.rest.create_assignment(
+        "lab",
+        teamMin=2,
+        teamMax=3,
+        checkpoints=[
+            {"slug": "p1", "title": "Parser", "at": "2026-12-05T12:00:00.000Z"},
+            {"slug": "p2", "title": "Tests", "at": "2026-12-08T12:00:00.000Z"},
+        ],
+    )
+    a = world.team("a", "Alpha", late=True, at={"p1": "first", "p2": "tip"})
+    world.team("b", "Bravo", at={"p1": None, "p2": "first"})
+    result = world.run("status", "lab")
+    assert result.exit_code == 0, result.output
+    header = next(x for x in result.output.splitlines() if "On time" in x)
+    assert "p1" in header and "p2" in header
+    cells = [c.strip() for c in row(result.output, "Alpha").split("\u2502")]
+    assert a.first[:7] in cells and a.tip[:7] in cells
+    bravo = [c.strip() for c in row(result.output, "Bravo").split("\u2502")]
+    p1 = header.split("\u2502").index(
+        next(c for c in header.split("\u2502") if "p1" in c)
+    )
+    assert bravo[p1] == ""
+
+
 def test_status_of_an_individual_assignment_lists_students(world):
     world.rest.create_assignment("lab", title="Lab", teamMin=1, teamMax=1)
     world.team("a", "ana-team", ("ana",))
@@ -211,6 +239,57 @@ def test_late_checks_out_the_late_delivery_or_falls_back_to_the_one_on_time(worl
     assert result.exit_code == 0, result.output
     assert head(world.folder("Alpha")) == a.tip
     assert head(world.folder("Bravo")) == b.first
+
+
+def checkpointed(world):
+    world.rest.create_assignment(
+        "lab",
+        teamMin=2,
+        teamMax=3,
+        checkpoints=[
+            {"slug": "p1", "title": "Parser", "at": "2026-12-05T12:00:00.000Z"}
+        ],
+    )
+
+
+def test_checkpoint_checks_out_the_commit_of_that_checkpoint(world):
+    checkpointed(world)
+    a = world.team("a", "Alpha", late=True, at={"p1": "first"})
+    b = world.team("b", "Bravo", late=True, at={"p1": "tip"})
+    result = world.run("clone", "lab", "--checkpoint", "p1")
+    assert result.exit_code == 0, result.output
+    assert head(world.folder("Alpha")) == a.first != a.tip
+    assert head(world.folder("Bravo")) == b.tip
+
+
+def test_checkpoint_skips_a_team_without_a_commit_and_lists_it(world):
+    checkpointed(world)
+    world.team("a", "Alpha", at={"p1": "first"})
+    world.team("b", "Bravo", at={"p1": None})
+    world.team("c", "Charlie")
+    result = world.run("clone", "lab", "--checkpoint", "p1")
+    assert result.exit_code == 0, result.output
+    assert world.folder("Alpha").exists()
+    assert not world.folder("Bravo").exists()
+    assert "no commit at checkpoint p1: Bravo, Charlie" in result.output
+
+
+def test_checkpoint_with_late_is_an_error(world):
+    checkpointed(world)
+    world.team("a", "Alpha", at={"p1": "first"})
+    result = world.run("clone", "lab", "--checkpoint", "p1", "--late")
+    assert result.exit_code == 1
+    assert "--checkpoint" in result.output and "--late" in result.output
+    assert not world.folder("Alpha").exists()
+
+
+def test_an_unknown_checkpoint_is_an_error(world):
+    checkpointed(world)
+    world.team("a", "Alpha", at={"p1": "first"})
+    result = world.run("clone", "lab", "--checkpoint", "nope")
+    assert result.exit_code == 1
+    assert "no checkpoint 'nope'" in result.output
+    assert not world.folder("Alpha").exists()
 
 
 def test_running_again_updates_the_same_repository(world):

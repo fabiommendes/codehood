@@ -89,11 +89,19 @@ export function etagFor(updatedAt: string): string {
 }
 
 /// The key a REST route must never put in a body or a schema.
-const SECRET_KEYS = ["token", "joinCode", "baseSha"];
+const SECRET_KEYS = [
+	"token",
+	"tempToken",
+	"tempTokenExpiresAt",
+	"cloneUrl",
+	"tempCloneUrl",
+	"joinCode",
+	"baseSha",
+];
 
 /**
- * Fails when any object nested in `value` has a key that carries a secret:
- * `token`, `joinCode` or `baseSha`.
+ * Fails when any object nested in `value` has a key that carries a secret: a
+ * token, a clone URL, `joinCode` or `baseSha`.
  */
 export function assertNoSecrets(value: unknown, where = "$"): void {
 	if (Array.isArray(value)) {

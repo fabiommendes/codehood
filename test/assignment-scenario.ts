@@ -257,6 +257,29 @@ export async function tokenOf(
 	return row?.token ?? null;
 }
 
+/// The stored temporary token of a member, expired or not, straight from the database.
+export async function tempTokenOf(
+	team: { id: number },
+	username: string,
+): Promise<string | null> {
+	const row = await prisma.teamMember.findUnique({
+		where: { teamId_username: { teamId: team.id, username } },
+		select: { tempToken: true },
+	});
+	return row?.tempToken ?? null;
+}
+
+/// Moves the expiry of a member's temporary token to a minute ago.
+export async function expireTempToken(
+	team: { id: number },
+	username: string,
+): Promise<void> {
+	await prisma.teamMember.update({
+		where: { teamId_username: { teamId: team.id, username } },
+		data: { tempTokenExpiresAt: new Date(Date.now() - 60_000) },
+	});
+}
+
 export type PushSeed = { sha: string; createdAt: Date; username?: string };
 
 /// Writes `TeamPush` rows straight into the database, in the order given, each

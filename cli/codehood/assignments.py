@@ -119,11 +119,21 @@ def plan_folders(
     return folders
 
 
-def target_sha(team: generated.TeamListed, *, late: bool) -> str | None:
+def target_sha(
+    team: generated.TeamListed, *, late: bool, checkpoint: str | None = None
+) -> str | None:
     """
     The commit to check out: the delivery on time, or with `late` the late
     one when there is one, else the one on time. `None` without a delivery.
+
+    With `checkpoint`, the commit the team had pushed by that checkpoint
+    instead, `None` when it had none.
     """
+    if checkpoint is not None:
+        for item in team.checkpoints:
+            if item.slug == checkpoint:
+                return item.push.new_sha if item.push is not None else None
+        return None
     on_time = team.delivery.on_time
     if late and team.delivery.late is not None:
         return team.delivery.late.new_sha

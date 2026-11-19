@@ -27,6 +27,12 @@ class AssignmentDeleted(Model):
     deleted: bool
 
 
+class AssignmentPutCheckpointsItem(Model):
+    slug: str
+    title: str
+    at: str
+
+
 class BlobMissingInput(Model):
     hashes: list[str]
 
@@ -602,6 +608,7 @@ class Assignment(Model):
     teams_lock_at: str | None = Field(alias="teamsLockAt")
     template: str | None
     restrictions: Restrictions | None
+    checkpoints: list[AssignmentPutCheckpointsItem]
     rev: str | None
     created_at: str = Field(alias="createdAt")
     updated_at: str = Field(alias="updatedAt")
@@ -620,6 +627,7 @@ class AssignmentPut(Model):
     teams_lock_at: str | None = Field(default=None, alias="teamsLockAt")
     template: str | None = None
     restrictions: Restrictions | None = None
+    checkpoints: list[AssignmentPutCheckpointsItem] | None = None
     rev: str | None = None
 
 
@@ -1258,6 +1266,11 @@ class Team(Model):
     members: list[User]
 
 
+class TeamListedCheckpointsItem(Model):
+    slug: str
+    push: Late | None
+
+
 class TimeSlot(Model):
     model_config = ConfigDict(populate_by_name=True)
 
@@ -1491,6 +1504,7 @@ class TeamListed(Model):
     created_at: str = Field(alias="createdAt")
     members: list[User]
     delivery: Delivery
+    checkpoints: list[TeamListedCheckpointsItem]
     size_exception: Literal["above", "below", "empty", None] | None = Field(
         alias="sizeException"
     )

@@ -13,7 +13,7 @@ import type { z } from "zod";
 import { type Actor, SYSTEM, type UserActor } from "@/auth/actor";
 import { type CourseWithEnrollment, hasPerm } from "@/auth/permissions";
 import { generateToken } from "@/auth/token";
-import { PUBLIC_URL } from "@/core/constants";
+import { PUBLIC_URL, TEAM_TEMP_TOKEN_TTL_MS } from "@/core/constants";
 import { InvalidData, NotAllowed, NotFound } from "@/core/error";
 import {
 	type AssignmentPK,
@@ -45,11 +45,15 @@ import type { ServiceOpts, ServiceOptsWithoutTx } from "@/db/base-service";
 import { rejectExpectedUpdatedAt } from "@/db/conditional-write";
 import { defineService, inTx, op } from "@/db/define-service";
 import { m } from "@/i18n";
-import { teamDelivery } from "@/services/assignment-delivery";
+import {
+	checkpointDeliveries,
+	teamDelivery,
+} from "@/services/assignment-delivery";
 import * as bare from "@/services/git/bare";
 import { type GitObjectKind, parseTree } from "@/services/git/objects";
 import {
 	assignmentInclude,
+	checkpointsOf,
 	type DbAssignment,
 	findAssignment,
 	isEnrolledStudent,
@@ -362,7 +366,7 @@ export function makeTeamService(
 
 	/**
 	 * Replaces the token of the actor's own membership, so the old clone URL
-	 * stops resolving. It works after teams lock.
+	 * stops resolving, and drops their temporary token. It works after teams lock.
 	 *
 	 * @throws {@link NotFound} If the actor is not a member of the team.
 	 */
@@ -378,7 +382,64 @@ export function makeTeamService(
 			const { team, student } = await ownTeam(tx, pk, opts.actor);
 			await tx.teamMember.update({
 				where: { teamId_username: { teamId: team.id, username: student } },
-				data: { token: generateToken(24) },
+				data: {
+					token: generateToken(24),
+					tempToken: null,
+					tempTokenExpiresAt: null,
+				},
+			});
+			const row = await findTeam(tx, { id: team.id as TeamId }, opts.actor);
+			return toMine(tx, row, student, publicUrl);
+		},
+	});
+
+	/**
+	 * Gives the actor's own membership a temporary token, valid for
+	 * {@link TEAM_TEMP_TOKEN_TTL_MS} and not renewed by use, so the one before
+	 * stops resolving. It works after teams lock.
+	 *
+	 * @throws {@link NotFound} If the actor is not a member of the team.
+	 */
+	const createTempToken = op({
+		returns: teamMineSchema,
+		args: [teamPK],
+		run: async (
+			tx: PrismaTx,
+			pk: TeamPK,
+			opts: ServiceOptsWithoutTx,
+		): Promise<TeamMine> => {
+			rejectExpectedUpdatedAt(opts);
+			const { team, student } = await ownTeam(tx, pk, opts.actor);
+			await tx.teamMember.update({
+				where: { teamId_username: { teamId: team.id, username: student } },
+				data: {
+					tempToken: generateToken(24),
+					tempTokenExpiresAt: new Date(Date.now() + TEAM_TEMP_TOKEN_TTL_MS),
+				},
+			});
+			const row = await findTeam(tx, { id: team.id as TeamId }, opts.actor);
+			return toMine(tx, row, student, publicUrl);
+		},
+	});
+
+	/**
+	 * Drops the temporary token of the actor's own membership, if there is one.
+	 *
+	 * @throws {@link NotFound} If the actor is not a member of the team.
+	 */
+	const revokeTempToken = op({
+		returns: teamMineSchema,
+		args: [teamPK],
+		run: async (
+			tx: PrismaTx,
+			pk: TeamPK,
+			opts: ServiceOptsWithoutTx,
+		): Promise<TeamMine> => {
+			rejectExpectedUpdatedAt(opts);
+			const { team, student } = await ownTeam(tx, pk, opts.actor);
+			await tx.teamMember.update({
+				where: { teamId_username: { teamId: team.id, username: student } },
+				data: { tempToken: null, tempTokenExpiresAt: null },
 			});
 			const row = await findTeam(tx, { id: team.id as TeamId }, opts.actor);
 			return toMine(tx, row, student, publicUrl);
@@ -387,7 +448,7 @@ export function makeTeamService(
 
 	/**
 	 * The team of the actor in the assignment, with the join code (until teams
-	 * lock) and the actor's own token; `null` when they have none.
+	 * lock) and the actor's own tokens; `null` when they have none.
 	 *
 	 * @throws {@link NotFound} If the assignment is not visible to the actor.
 	 */
@@ -673,11 +734,14 @@ export function makeTeamService(
 				orderBy: [{ name: "asc" }, { id: "asc" }],
 			});
 			const pushes = await pushesOf(tx, { assignmentId: assignment.id });
+			const checkpoints = checkpointsOf(assignment);
 			return rows.map((row) => {
 				const team = toTeam({ ...row, assignment });
+				const own = pushes.get(row.id) ?? [];
 				return {
 					...team,
-					delivery: teamDelivery(pushes.get(row.id) ?? [], team.dueAt),
+					delivery: teamDelivery(own, team.dueAt),
+					checkpoints: checkpointDeliveries(own, checkpoints),
 					sizeException: sizeException(row.members.length, assignment),
 				};
 			});
@@ -686,7 +750,8 @@ export function makeTeamService(
 
 	/**
 	 * Counts the teams, the active students with no team, the teams with an
-	 * on-time delivery and the teams with only a late one.
+	 * on-time delivery, the teams with only a late one and the teams with a
+	 * push at each checkpoint that has passed.
 	 *
 	 * @throws {@link NotFound} If the assignment does not exist.
 	 * @throws {@link NotAllowed} `team.read` if the actor lacks `enrollment.manage`.
@@ -715,17 +780,32 @@ export function makeTeamService(
 				},
 			});
 			const pushes = await pushesOf(tx, { assignmentId: assignment.id });
+			const now = new Date();
+			const passed = checkpointsOf(assignment).filter(
+				(checkpoint) => checkpoint.at <= now,
+			);
+			const reached = new Map(passed.map(({ slug }) => [slug, 0]));
 			let onTime = 0;
 			let lateOnly = 0;
 			for (const team of teams) {
-				const delivery = teamDelivery(
-					pushes.get(team.id) ?? [],
-					team.dueAt ?? assignment.dueAt,
-				);
+				const own = pushes.get(team.id) ?? [];
+				const delivery = teamDelivery(own, team.dueAt ?? assignment.dueAt);
 				if (delivery.onTime) onTime++;
 				else if (delivery.late) lateOnly++;
+				for (const { slug, push } of checkpointDeliveries(own, passed)) {
+					if (push) reached.set(slug, (reached.get(slug) ?? 0) + 1);
+				}
 			}
-			return { teams: teams.length, studentsWithoutTeam, onTime, lateOnly };
+			return {
+				teams: teams.length,
+				studentsWithoutTeam,
+				onTime,
+				lateOnly,
+				checkpoints: passed.map(({ slug }) => ({
+					slug,
+					teams: reached.get(slug) ?? 0,
+				})),
+			};
 		},
 	});
 
@@ -909,9 +989,11 @@ export function makeTeamService(
 	 * Resolves the token and slug of a clone URL, with no actor: the token is
 	 * the credential.
 	 *
-	 * Returns `null` when the token matches no member, belongs to a team of an
-	 * assignment with another slug, or either is malformed. A member whose
-	 * enrollment is not active still resolves, with `enrolled` false.
+	 * Takes the permanent token of a member or their temporary one. Returns
+	 * `null` when the token matches no member, is a temporary one that has
+	 * expired, belongs to a team of an assignment with another slug, or either
+	 * is malformed. A member whose enrollment is not active still resolves,
+	 * with `enrolled` false.
 	 */
 	async function findByToken(
 		token: string,
@@ -920,8 +1002,13 @@ export function makeTeamService(
 	): Promise<TeamAccess | null> {
 		if (!TOKEN_PATTERN.test(token) || !slug) return null;
 		const reader = opts.tx ?? client;
-		const row = await reader.teamMember.findUnique({
-			where: { token },
+		const row = await reader.teamMember.findFirst({
+			where: {
+				OR: [
+					{ token },
+					{ tempToken: token, tempTokenExpiresAt: { gt: new Date() } },
+				],
+			},
 			select: {
 				username: true,
 				user: { select: { name: true } },
@@ -1050,6 +1137,8 @@ export function makeTeamService(
 	const crud = defineService()(() => ({
 		join,
 		rotateToken,
+		createTempToken,
+		revokeTempToken,
 		findMine,
 		addMember,
 		removeMember,
@@ -1355,7 +1444,7 @@ async function pushesOf(
 	return byTeam;
 }
 
-/// The team as its member `student` sees it: their own token and the join code.
+/// The team as its member `student` sees it: their own tokens and the join code.
 async function toMine(
 	tx: PrismaTx,
 	row: DbTeam,
@@ -1366,13 +1455,24 @@ async function toMine(
 	if (!member) throw new NotFound("team");
 	const pushes = (await pushesOf(tx, { teamId: row.id })).get(row.id) ?? [];
 	const team = toTeam(row);
+	const cloneUrl = (token: string) =>
+		`${publicUrl}/git/${token}/${row.assignment.slug}.git`;
+	const temp =
+		member.tempToken &&
+		member.tempTokenExpiresAt &&
+		member.tempTokenExpiresAt > new Date()
+			? { token: member.tempToken, expiresAt: member.tempTokenExpiresAt }
+			: null;
 	return {
 		...team,
 		joinCode: teamsAreLocked(row.assignment) ? null : row.joinCode,
 		token: member.token,
-		cloneUrl: `${publicUrl}/git/${member.token}/${row.assignment.slug}.git`,
+		cloneUrl: cloneUrl(member.token),
+		tempCloneUrl: temp ? cloneUrl(temp.token) : null,
+		tempTokenExpiresAt: temp?.expiresAt ?? null,
 		pushes,
 		delivery: teamDelivery(pushes, team.dueAt),
+		checkpoints: checkpointDeliveries(pushes, checkpointsOf(row.assignment)),
 	};
 }
 

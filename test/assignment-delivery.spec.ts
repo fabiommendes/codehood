@@ -1,5 +1,9 @@
 import { expect, test } from "@playwright/test";
-import { pushRules, teamDelivery } from "@/services/assignment-delivery";
+import {
+	checkpointDeliveries,
+	pushRules,
+	teamDelivery,
+} from "@/services/assignment-delivery";
 
 /// Which push counts as a team's delivery, and the rules a push is held to.
 
@@ -16,6 +20,67 @@ function push(id: number, createdAt: Date) {
 		createdAt,
 	};
 }
+
+test.describe("checkpointDeliveries", () => {
+	const parser = { slug: "parser", at: at(-48) };
+	const typer = { slug: "typer", at: at(-24) };
+	const ids = (pushes: ReturnType<typeof push>[]) =>
+		checkpointDeliveries(pushes, [parser, typer]).map((entry) => [
+			entry.slug,
+			entry.push?.id ?? null,
+		]);
+
+	test("has no push for any checkpoint when the team never pushed", () => {
+		expect(ids([])).toEqual([
+			["parser", null],
+			["typer", null],
+		]);
+	});
+
+	test("takes the last push at or before each date", () => {
+		const pushes = [push(1, at(-60)), push(2, at(-50)), push(3, at(-30))];
+
+		expect(ids(pushes)).toEqual([
+			["parser", 2],
+			["typer", 3],
+		]);
+	});
+
+	test("a push exactly at the date counts, one a millisecond later does not", () => {
+		const onTheDot = push(1, parser.at);
+		const justAfter = push(2, new Date(parser.at.getTime() + 1));
+
+		const [first] = checkpointDeliveries([onTheDot, justAfter], [parser]);
+
+		expect(first?.push?.id).toBe(1);
+	});
+
+	test("a team whose first push came after the date has none for it", () => {
+		expect(ids([push(1, at(-40))])).toEqual([
+			["parser", null],
+			["typer", 1],
+		]);
+	});
+
+	test("one push counts for two checkpoints when nothing came between them", () => {
+		expect(ids([push(1, at(-70)), push(2, at(-1))])).toEqual([
+			["parser", 1],
+			["typer", 1],
+		]);
+	});
+
+	test("two pushes at the same instant resolve to the larger id", () => {
+		const pushes = [push(7, at(-50)), push(9, at(-50)), push(8, at(-50))];
+
+		expect(ids(pushes)[0]).toEqual(["parser", 9]);
+	});
+
+	test("follows the order of the checkpoints given", () => {
+		const result = checkpointDeliveries([], [typer, parser]);
+
+		expect(result.map((entry) => entry.slug)).toEqual(["typer", "parser"]);
+	});
+});
 
 test.describe("teamDelivery", () => {
 	test("has neither delivery without a push", () => {

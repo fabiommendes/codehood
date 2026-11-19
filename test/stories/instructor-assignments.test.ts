@@ -76,6 +76,13 @@ import { logInAs, resetDatabase } from "./helpers";
  *     A refused action keeps its dialog open and shows the error in it.
  */
 
+/*
+ * Checkpoints: the region "Deadlines" names each one by its title. For each
+ * one that has passed, the region "Summary" has a count named by its title
+ * with the hint "of <n> teams", and the teams table has a column named by its
+ * title holding the short sha of the team's commit at that instant, or "—".
+ */
+
 test.beforeEach(resetDatabase);
 test.afterAll(stopDelivering);
 
@@ -453,5 +460,75 @@ test("instructor: Follow an individual assignment", async ({ page }) => {
 		).toHaveCount(0);
 		const response = await page.goto(`${world.href}/assignments/ii-secret`);
 		expect(response?.status()).toBe(404);
+	});
+});
+
+test("instructor: See which teams met a checkpoint", async ({ page }) => {
+	const world = await seedWorld("ic", ["Ana Souza", "Bia Rocha", "Caio Lima"]);
+	const [ana, bia, caio] = [1, 2, 3].map((n) => student(world, n)) as [
+		UserActor,
+		UserActor,
+		UserActor,
+	];
+	const work = await seedAssignment(world, "ic-compiler", {
+		title: "Compiler",
+		teamMin: 1,
+		teamMax: 2,
+		checkpoints: [
+			{ slug: "parser", title: "Parser done", at: daysFromNow(-2) },
+			{ slug: "codegen", title: "Codegen done", at: daysFromNow(2) },
+		],
+	});
+	const alpha = await createStaffTeam(world, work, "Alpha", [ana]);
+	const beta = await createStaffTeam(world, work, "Beta", [bia]);
+	await createStaffTeam(world, work, "Gamma", [caio]);
+	const atCheckpoint = await deliver(alpha, { "a.txt": "1\n" }, "Parser", {
+		by: ana,
+		at: daysFromNow(-4),
+	});
+	const afterwards = await deliver(alpha, { "b.txt": "2\n" }, "Codegen", {
+		by: ana,
+		at: hoursFromNow(-2),
+	});
+	const tooLate = await deliver(beta, { "a.txt": "1\n" }, "Parser, late", {
+		by: bia,
+		at: hoursFromNow(-3),
+	});
+	await logInAs(page, world.instructor);
+	await page.goto(`${world.href}/assignments/ic-compiler`);
+
+	const table = page.getByRole("table", { name: "Assignment teams" });
+	const row = (name: string) => rowOf(page, "Assignment teams", name);
+
+	await test.step("the deadlines name every checkpoint", async () => {
+		const deadlines = page.getByRole("region", { name: "Deadlines" });
+
+		await expect(deadlines).toContainText("Parser done");
+		await expect(deadlines).toContainText("Codegen done");
+	});
+
+	await test.step("the summary counts the teams that had pushed by a checkpoint that passed", async () => {
+		const summary = page.getByRole("region", { name: "Summary" });
+
+		await expect(count(summary, "Parser done")).toHaveText("1");
+		await expect(summary).toContainText("of 3 teams");
+		await expect(summary).not.toContainText("Codegen done");
+	});
+
+	await test.step("the table has a column for the checkpoint that passed and none for the one ahead", async () => {
+		await expect(
+			table.getByRole("columnheader", { name: "Parser done" }),
+		).toBeVisible();
+		await expect(
+			table.getByRole("columnheader", { name: "Codegen done" }),
+		).toHaveCount(0);
+	});
+
+	await test.step("each team shows the commit it had at that instant, or a dash", async () => {
+		await expect(row("Alpha")).toContainText(shortSha(atCheckpoint));
+		await expect(row("Alpha")).toContainText(shortSha(afterwards));
+		await expect(row("Beta")).toContainText(shortSha(tooLate));
+		await expect(row("Beta").getByText("—", { exact: true })).toBeVisible();
+		await expect(row("Gamma").getByText("—", { exact: true })).toBeVisible();
 	});
 });

@@ -20,7 +20,7 @@ import {
 import { seedUser } from "./helpers";
 import { hrefOf } from "./repository-support";
 
-export { tokenOf } from "../assignment-scenario";
+export { tempTokenOf, tokenOf } from "../assignment-scenario";
 export { daysFromNow, hoursFromNow };
 
 /// A course with its instructor and enrolled students, for the stories of assignments.

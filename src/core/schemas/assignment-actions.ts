@@ -20,6 +20,12 @@ export const assignmentTeamLeave = ofTeam;
 /// A student replaces the token of their own clone URL.
 export const assignmentTeamRotate = ofTeam;
 
+/// A student makes a temporary clone URL of their own, replacing the one before.
+export const assignmentTeamTempCreate = ofTeam;
+
+/// A student turns their temporary clone URL off.
+export const assignmentTeamTempRevoke = ofTeam;
+
 /// The instructor creates an empty team.
 export const assignmentStaffCreate = assignmentParams.extend({
 	name: teamName,

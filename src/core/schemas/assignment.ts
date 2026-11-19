@@ -22,6 +22,14 @@ export const assignmentRestrictions = z.object({
 });
 export type AssignmentRestrictions = z.infer<typeof assignmentRestrictions>;
 
+/// One intermediate date of an assignment.
+export const assignmentCheckpoint = z.object({
+	slug: slug,
+	title: z.string().trim().min(1).max(200),
+	at: instant,
+});
+export type AssignmentCheckpoint = z.infer<typeof assignmentCheckpoint>;
+
 /// The dates and team sizes of an assignment, each one optional.
 export type AssignmentRuleFields = {
 	teamMin?: number | null;
@@ -30,16 +38,17 @@ export type AssignmentRuleFields = {
 	dueAt: Date;
 	closesAt?: Date | null;
 	teamsLockAt?: Date | null;
+	checkpoints?: readonly { slug: string; at: Date }[] | null;
 };
 
 /// A rule an assignment breaks: the field to blame and why.
 export type AssignmentRuleIssue = {
-	path: "teamMax" | "closesAt" | "opensAt" | "teamsLockAt";
+	path: "teamMax" | "closesAt" | "opensAt" | "teamsLockAt" | "checkpoints";
 	message: string;
 };
 
 /**
- * Lists the order rules the sizes and dates of an assignment break.
+ * Lists the rules the sizes, dates and checkpoints of an assignment break.
  *
  * @example
  * assignmentRuleIssues({ teamMin: 3, teamMax: 2, dueAt: new Date() }); // [{ path: "teamMax", ... }]
@@ -49,6 +58,7 @@ export function assignmentRuleIssues(
 ): AssignmentRuleIssue[] {
 	const issues: AssignmentRuleIssue[] = [];
 	const { teamMin, teamMax, opensAt, dueAt, closesAt, teamsLockAt } = fields;
+	const checkpoints = fields.checkpoints ?? [];
 	if (teamMin != null && teamMax != null && teamMin > teamMax) {
 		issues.push({
 			path: "teamMax",
@@ -73,6 +83,24 @@ export function assignmentRuleIssues(
 			message: m.forms_schema_assignment_lock_after_due(),
 		});
 	}
+	if (new Set(checkpoints.map((c) => c.slug)).size < checkpoints.length) {
+		issues.push({
+			path: "checkpoints",
+			message: m.forms_schema_assignment_checkpoint_duplicate(),
+		});
+	}
+	if (checkpoints.some((c) => c.at >= dueAt)) {
+		issues.push({
+			path: "checkpoints",
+			message: m.forms_schema_assignment_checkpoint_after_due(),
+		});
+	}
+	if (opensAt && checkpoints.some((c) => c.at < opensAt)) {
+		issues.push({
+			path: "checkpoints",
+			message: m.forms_schema_assignment_checkpoint_before_opens(),
+		});
+	}
 	return issues;
 }
 
@@ -92,6 +120,10 @@ export const assignmentSchema = z.object({
 	/// Slug of the course repository the team repositories start from.
 	template: z.string().nullable(),
 	restrictions: assignmentRestrictions.nullable(),
+	/// Ordered by `at`; empty when the assignment has none.
+	checkpoints: z.array(
+		z.object({ slug: z.string(), title: z.string(), at: z.date() }),
+	),
 	rev: z.string().nullable(),
 	createdAt: z.date(),
 	updatedAt: z.date(),
@@ -110,6 +142,7 @@ const assignmentFields = z.object({
 	teamsLockAt: instant.nullish(),
 	template: slug.nullish(),
 	restrictions: assignmentRestrictions.nullish(),
+	checkpoints: z.array(assignmentCheckpoint).max(20).nullish(),
 	rev: rev.nullish(),
 });
 

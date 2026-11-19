@@ -96,5 +96,8 @@
 	"forms_schema_assignment_team_range": "O tamanho mínimo da equipe não pode passar do máximo.",
 	"forms_schema_assignment_closes_before_due": "Os pushes não podem encerrar antes do prazo.",
 	"forms_schema_assignment_opens_after_due": "O trabalho não pode abrir depois do prazo.",
-	"forms_schema_assignment_lock_after_due": "As equipes não podem trancar depois do prazo."
+	"forms_schema_assignment_lock_after_due": "As equipes não podem trancar depois do prazo.",
+	"forms_schema_assignment_checkpoint_duplicate": "Um slug de ponto de controle aparece mais de uma vez.",
+	"forms_schema_assignment_checkpoint_after_due": "O ponto de controle precisa vir antes do prazo.",
+	"forms_schema_assignment_checkpoint_before_opens": "O ponto de controle não pode vir antes da abertura do trabalho."
 }

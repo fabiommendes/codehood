@@ -203,6 +203,10 @@ def project_assignment(assignment: generated.Assignment) -> Payload:
         "teamsLockAt": _optional_instant(assignment.teams_lock_at),
         "template": assignment.template,
         "restrictions": limits or None,
+        "checkpoints": [
+            {"slug": item.slug, "title": item.title, "at": _instant(item.at)}
+            for item in assignment.checkpoints
+        ],
     }
 
 

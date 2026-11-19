@@ -90,6 +90,75 @@ test.describe("assignmentUpsert: dates", () => {
 	});
 });
 
+test.describe("assignmentUpsert: checkpoints", () => {
+	const checkpoint = (slug: string, at: Date) => ({
+		slug,
+		title: "Parser",
+		at,
+	});
+
+	test("may be absent, null or empty", () => {
+		expect(accepts({})).toBe(true);
+		expect(accepts({ checkpoints: null })).toBe(true);
+		expect(accepts({ checkpoints: [] })).toBe(true);
+	});
+
+	test("a repeated slug is refused", () => {
+		const twice = [
+			checkpoint("parser", before(5)),
+			checkpoint("parser", before(3)),
+		];
+
+		expect(accepts({ checkpoints: twice })).toBe(false);
+	});
+
+	test("a date at or after dueAt is refused, earlier is accepted", () => {
+		expect(accepts({ checkpoints: [checkpoint("parser", after(1))] })).toBe(
+			false,
+		);
+		expect(accepts({ checkpoints: [checkpoint("parser", DUE)] })).toBe(false);
+		expect(accepts({ checkpoints: [checkpoint("parser", before(1))] })).toBe(
+			true,
+		);
+	});
+
+	test("a date before opensAt is refused, equal or later is accepted", () => {
+		const opensAt = before(10);
+
+		expect(
+			accepts({ opensAt, checkpoints: [checkpoint("parser", before(11))] }),
+		).toBe(false);
+		expect(
+			accepts({ opensAt, checkpoints: [checkpoint("parser", opensAt)] }),
+		).toBe(true);
+		expect(
+			accepts({ opensAt, checkpoints: [checkpoint("parser", before(9))] }),
+		).toBe(true);
+	});
+
+	test("slug, title and at are all required, and the slug follows the slug rule", () => {
+		const at = before(1);
+
+		expect(accepts({ checkpoints: [{ slug: "parser", at }] })).toBe(false);
+		expect(accepts({ checkpoints: [{ title: "Parser", at }] })).toBe(false);
+		expect(
+			accepts({ checkpoints: [{ slug: "parser", title: "Parser" }] }),
+		).toBe(false);
+		expect(
+			accepts({ checkpoints: [{ slug: "Not a slug", title: "Parser", at }] }),
+		).toBe(false);
+	});
+
+	test("more than 20 are refused", () => {
+		const many = Array.from({ length: 21 }, (_, i) =>
+			checkpoint(`point-${i}`, before(i + 1)),
+		);
+
+		expect(accepts({ checkpoints: many.slice(0, 20) })).toBe(true);
+		expect(accepts({ checkpoints: many })).toBe(false);
+	});
+});
+
 test.describe("assignmentUpsert: identity", () => {
 	test("the slug follows the rule of a repository slug", () => {
 		expect(accepts({ slug: "Bad Slug" })).toBe(false);

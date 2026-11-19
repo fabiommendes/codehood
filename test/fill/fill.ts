@@ -568,6 +568,7 @@ export async function fillDatabase(
 			"teamsLockAt",
 			"templateId",
 			"restrictions",
+			"checkpoints",
 			"rev",
 			"createdAt",
 			"updatedAt",
@@ -1541,6 +1542,15 @@ export async function fillDatabase(
 						deny: ["*.zip"],
 						require: ["README.md"],
 					}),
+				),
+				maybe(0.5, () =>
+					json(
+						[3, 1].map((weeks) => ({
+							slug: `checkpoint-${weeks}`,
+							title: sentence(rng, 2).slice(0, -1),
+							at: new Date(dueAt - weeks * WEEK).toISOString(),
+						})),
+					),
 				),
 				rev(),
 				iso(input.createdAt),

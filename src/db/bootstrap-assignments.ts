@@ -162,9 +162,14 @@ Ainda não foi liberado para os alunos.
  *   and lacks the report; `knuth` is alone and has not pushed; `hamilton`,
  *   `ritchie`, `thompson` and `backus` are 4 in a team placed by the
  *   instructor, above the maximum, next to an empty team; the dev account `student` has no team.
+ *   Its checkpoint `parser` has passed: `bob`'s team met it and `liskov`'s
+ *   first push came after it. Its checkpoint `potencia` is still ahead.
+ *   `bob` has an active temporary clone URL, which the seed keeps alive for a
+ *   month so the state outlives the day the database was seeded.
  * - `lab-git` (individual, due date passed, still open): `bob` delivered on
  *   time and late; `hopper` only late; `hamilton` has an extension and so
- *   delivers on time; everyone else has no repository.
+ *   delivers on time; everyone else has no repository. Only `bob` had
+ *   pushed by its checkpoint `primeiro-commit`.
  * - `trabalho-zero` (individual, closed): `bob` and `hopper` have a repository
  *   with a delivery; pushes are refused and cloning still works.
  * - `projeto-surpresa` (opens in the future): hidden from students.
@@ -192,6 +197,14 @@ export async function seedAssignments(
 			teamMax: 3,
 			template: "lab-calculadora",
 			restrictions: { require: ["RELATORIO.md"] },
+			checkpoints: [
+				{ slug: "parser", title: "Parser funcionando", at: at(-4 * DAY_MS) },
+				{
+					slug: "potencia",
+					title: "Potência e parênteses",
+					at: at(2 * DAY_MS),
+				},
+			],
 		},
 		FULL_ACCESS,
 	);
@@ -230,6 +243,17 @@ export async function seedAssignments(
 			files: { "RELATORIO.md": REPORT },
 		},
 	]);
+
+	await db.team.createTempToken(
+		{ id: compiladores.id },
+		{ actor: actorOf(bob) },
+	);
+	await prisma.teamMember.update({
+		where: {
+			teamId_username: { teamId: compiladores.id, username: bob.username },
+		},
+		data: { tempTokenExpiresAt: at(30 * DAY_MS) },
+	});
 
 	const semRelatorio = await db.team.create(
 		pk,
@@ -273,6 +297,13 @@ export async function seedAssignments(
 		dueAt: at(10 * DAY_MS),
 		teamMin: 1,
 		teamMax: 1,
+		checkpoints: [
+			{
+				slug: "primeiro-commit",
+				title: "Primeiro commit",
+				at: at(-4 * DAY_MS),
+			},
+		],
 	};
 	const lab = await db.assignment.upsert(labInput, FULL_ACCESS);
 	const labPk = { id: lab.id };

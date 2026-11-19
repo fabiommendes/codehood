@@ -37,6 +37,24 @@ export function teamDelivery<P extends TimedPush>(
 	return delivery;
 }
 
+/**
+ * Picks the push each checkpoint fixes: the last one at or before its date.
+ *
+ * The order of `pushes` does not matter; the result follows `checkpoints`.
+ *
+ * @example
+ * checkpointDeliveries([], [{ slug: "parser", at: new Date() }]); // [{ slug: "parser", push: null }]
+ */
+export function checkpointDeliveries<P extends TimedPush>(
+	pushes: readonly P[],
+	checkpoints: readonly { slug: string; at: Date }[],
+): { slug: string; push: P | null }[] {
+	return checkpoints.map(({ slug, at }) => ({
+		slug,
+		push: teamDelivery(pushes, at).onTime,
+	}));
+}
+
 /// What `pushRules` reads from an assignment.
 export type PushRuleSource = {
 	closesAt: Date | null;

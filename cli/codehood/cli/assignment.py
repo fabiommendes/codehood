@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import os
 import sys
+from collections.abc import Sequence
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Annotated, NoReturn
@@ -85,7 +86,13 @@ def status(
     individual = is_individual(work)
     typer.echo(f"{work.title} ({slug}), due {local_time(work.due_at)}")
     console = Console(width=None if sys.stdout.isatty() else 240, highlight=False)
-    console.print(render_status(teams, individual=individual))
+    console.print(
+        render_status(
+            teams,
+            individual=individual,
+            checkpoints=[c.slug for c in work.checkpoints],
+        )
+    )
 
 
 @assignment.command()
@@ -98,6 +105,13 @@ def clone(
             help="Check out the late delivery (the tip of main) when there is one.",
         ),
     ] = False,
+    checkpoint: Annotated[
+        str | None,
+        typer.Option(
+            "--checkpoint",
+            help="Check out each team's commit at this checkpoint (its slug).",
+        ),
+    ] = None,
     dest: Annotated[
         Path | None,
         typer.Option(
@@ -115,10 +129,16 @@ def clone(
     whose tracked files you edited is left alone.
 
     Raises:
-        typer.Exit: With code 1 when a team could not be downloaded.
+        typer.Exit: With code 1 when a team could not be downloaded, or when
+            `--checkpoint` is combined with `--late` or names no checkpoint.
     """
+    if checkpoint is not None and late:
+        fail("--checkpoint and --late cannot be used together")
     course = open_course(path)
     work = read_assignment(course, slug)
+    if checkpoint is not None and checkpoint not in {c.slug for c in work.checkpoints}:
+        known = ", ".join(c.slug for c in work.checkpoints) or "none"
+        fail(f"{slug!r} has no checkpoint {checkpoint!r} (checkpoints: {known})")
     teams = read_teams(course, slug)
     if not teams:
         typer.echo(f"{slug}: no teams yet")
@@ -137,7 +157,7 @@ def clone(
     failures: list[str] = []
     for team in sorted(teams, key=lambda item: folders[item.public_id].casefold()):
         folder = folders[team.public_id]
-        sha = target_sha(team, late=late)
+        sha = target_sha(team, late=late, checkpoint=checkpoint)
         if sha is None:
             without.append(folder)
             continue
@@ -159,7 +179,13 @@ def clone(
             failures.append(folder)
 
     if without:
-        what = "late delivery or delivery" if late else "delivery on time"
+        what = (
+            f"commit at checkpoint {checkpoint}"
+            if checkpoint is not None
+            else "late delivery or delivery"
+            if late
+            else "delivery on time"
+        )
         typer.echo(f"no {what}: {', '.join(without)}")
     typer.echo(
         "summary: "
@@ -361,10 +387,16 @@ def is_individual(work: generated.Assignment) -> bool:
     return work.team_min == 1 and work.team_max == 1
 
 
-def render_status(teams: list[generated.TeamListed], *, individual: bool) -> Table:
+def render_status(
+    teams: list[generated.TeamListed],
+    *,
+    individual: bool,
+    checkpoints: Sequence[str] = (),
+) -> Table:
     """
-    The teams as a table: members, delivery on time, late delivery, and a
-    mark for an extended deadline or a team of the wrong size.
+    The teams as a table: members, delivery on time, late delivery, the commit
+    at each checkpoint, and a mark for an extended deadline or a team of the
+    wrong size.
     """
     table = Table()
     table.add_column("Student" if individual else "Team", no_wrap=True)
@@ -372,6 +404,8 @@ def render_status(teams: list[generated.TeamListed], *, individual: bool) -> Tab
         table.add_column("Members")
     table.add_column("On time", no_wrap=True)
     table.add_column("Late", no_wrap=True)
+    for checkpoint in checkpoints:
+        table.add_column(checkpoint, no_wrap=True)
     table.add_column("Notes")
     for team in sorted(teams, key=lambda item: (item.name.casefold(), item.public_id)):
         name = team_members(team) if individual else team.name
@@ -381,6 +415,7 @@ def render_status(teams: list[generated.TeamListed], *, individual: bool) -> Tab
         cells += [
             Text(delivery_text(team.delivery.on_time)),
             Text(delivery_text(team.delivery.late)),
+            *(Text(checkpoint_text(team, slug)) for slug in checkpoints),
             Text(notes_text(team)),
         ]
         table.add_row(*cells)
@@ -395,6 +430,16 @@ def delivery_text(delivery: generated.Late | None) -> str:
         return "-"
     author = f" {delivery.username}" if delivery.username else ""
     return f"{delivery.new_sha[:7]} {local_time(delivery.created_at)}{author}"
+
+
+def checkpoint_text(team: generated.TeamListed, slug: str) -> str:
+    """
+    The short commit a team had at the checkpoint `slug`, empty for none.
+    """
+    for item in team.checkpoints:
+        if item.slug == slug and item.push is not None:
+            return item.push.new_sha[:7]
+    return ""
 
 
 def notes_text(team: generated.TeamListed) -> str:

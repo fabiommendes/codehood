@@ -410,8 +410,11 @@ away by a full team.
 After the first push the page says the work was delivered on time, with the
 commit, who pushed it and when, lists every push, and warns about required
 files still missing from `main`. The student can ask for a new clone URL, which
-replaces the old one. Leaving the team is possible until teams lock, except for
-the last member of a team that already has a push.
+replaces the old one. For a shared computer they generate a temporary clone
+URL, shown next to the permanent one with the time it stops working: asking
+again replaces it, and revoking it takes it off the page. Leaving the team is
+possible until teams lock, except for the last member of a team that already
+has a push.
 
 
 ### Do an individual assignment
@@ -440,6 +443,20 @@ Once pushes close, the page says so and the clone stays available.
 A student who never joined a team before teams locked is told to look for the
 instructor. An assignment that has not opened yet is missing from the list, and
 its address answers "not found".
+
+
+### Follow the checkpoints of an assignment
+
+    status: implemented
+    url: /[discipline]/[course]/assignments/[slug]
+
+Student opens an assignment that has checkpoints, the intermediate dates the
+instructor set. The deadlines list each one by its title and date, before the
+due date. The team panel shows one line per checkpoint: one that is still ahead
+says so, one that has passed shows the commit that was the tip of `main` at
+that instant, with who pushed it and when, and one that passed before the first
+push says that nothing was pushed. In the push history, the push that counts
+for a checkpoint carries its title, and one push may count for more than one.
 
 
 ## Managing my account

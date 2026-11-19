@@ -90,6 +90,7 @@ def test_a_full_file_becomes_a_payload_with_every_field(tmp_path):
             "deny": ["*.exe"],
             "require": ["README.md"],
         },
+        "checkpoints": [],
     }
     assert "---" not in payload["body"]
 
@@ -108,6 +109,7 @@ def test_defaults_are_individual_without_optional_fields(tmp_path):
         "teamsLockAt": None,
         "template": None,
         "restrictions": None,
+        "checkpoints": [],
     }
 
 
@@ -183,6 +185,10 @@ def test_opens_accepts_a_date_without_time(tmp_path):
 BASE_FM = "title: T\ndue: 2026-12-10 18:00\n"
 
 
+CP = "checkpoints:\n  - { slug: p1, title: Parser, at: 2026-12-05 12:00 }\n"
+CP_FM = BASE_FM + CP
+
+
 @pytest.mark.parametrize(
     ("front", "field"),
     [
@@ -201,6 +207,20 @@ BASE_FM = "title: T\ndue: 2026-12-10 18:00\n"
             "restrictions.maxRepoBytes",
         ),
         ("title: T\n", "due"),
+        (CP_FM + "  - { slug: p1, title: Again, at: 2026-12-07 12:00 }\n", "repeated"),
+        (CP_FM.replace("12-05 12:00", "12-10 18:00"), "checkpoints[0].at"),
+        (CP_FM.replace("12-05 12:00", "12-11 18:00"), "checkpoints[0].at"),
+        (CP_FM.replace("12-05 12:00", "12-05"), "no time of day"),
+        (BASE_FM + "opens: 2026-12-06 08:00\n" + CP, "is before opens"),
+        (
+            BASE_FM
+            + "checkpoints:\n  - { slug: p1, title: A, at: 2026-12-05 12:00, note: x }\n",
+            "checkpoints[0].note",
+        ),
+        (BASE_FM + "checkpoints:\n  - { title: A, at: 2026-12-05 12:00 }\n", "slug"),
+        (BASE_FM + "checkpoints:\n  - { slug: p1, at: 2026-12-05 12:00 }\n", "title"),
+        (BASE_FM + "checkpoints:\n  - { slug: p1, title: A }\n", "checkpoints[0].at"),
+        (BASE_FM + "checkpoints: p1\n", "checkpoints"),
     ],
 )
 def test_a_file_with_a_local_error_names_the_field(tmp_path, front, field):
@@ -265,3 +285,14 @@ def test_sizes_convert_to_bytes(text, expected):
 def test_bad_sizes_are_refused(text):
     with pytest.raises(ValueError):
         parse_size(text)
+
+
+def test_checkpoints_go_in_the_payload_as_given(tmp_path):
+    item = valid(
+        tmp_path,
+        f"---\n{CP_FM}  - {{ slug: p2, title: Tests, at: 2026-12-08 12:00 }}\n---\n",
+    )
+    assert assignment_payload(item)["checkpoints"] == [
+        {"slug": "p1", "title": "Parser", "at": "2026-12-05T12:00:00.000Z"},
+        {"slug": "p2", "title": "Tests", "at": "2026-12-08T12:00:00.000Z"},
+    ]

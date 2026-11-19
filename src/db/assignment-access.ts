@@ -3,8 +3,10 @@ import { type Actor, SYSTEM } from "@/auth/actor";
 import { hasPerm } from "@/auth/permissions";
 import { NotFound } from "@/core/error";
 import {
+	type AssignmentCheckpoint,
 	type AssignmentPK,
 	type AssignmentRestrictions,
+	assignmentCheckpoint,
 	assignmentRestrictions,
 	type assignmentSchema,
 } from "@/core/schemas/assignment";
@@ -132,6 +134,15 @@ export function restrictionsOf(
 		: assignmentRestrictions.parse(row.restrictions);
 }
 
+/// The checkpoints stored in `row`, ordered by `at`; empty when it has none.
+export function checkpointsOf(
+	row: Pick<DbAssignment, "checkpoints">,
+): AssignmentCheckpoint[] {
+	return row.checkpoints === null
+		? []
+		: assignmentCheckpoint.array().parse(row.checkpoints);
+}
+
 /// The read model of an assignment row.
 export function toAssignment(row: DbAssignment): Assignment {
 	return {
@@ -148,6 +159,7 @@ export function toAssignment(row: DbAssignment): Assignment {
 		teamsLockAt: row.teamsLockAt,
 		template: row.template?.slug ?? null,
 		restrictions: restrictionsOf(row),
+		checkpoints: checkpointsOf(row),
 		rev: row.rev,
 		createdAt: row.createdAt,
 		updatedAt: row.updatedAt,

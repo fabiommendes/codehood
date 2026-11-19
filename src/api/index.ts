@@ -1071,16 +1071,21 @@ const teamFields = schema.teamSchema
 		),
 	});
 const teamEntity = teamFields.openapi("Team");
+/// A push as the listing of teams carries it.
+const teamPushFields = schema.teamPushSchema.pick({
+	newSha: true,
+	createdAt: true,
+	username: true,
+});
 const teamListedEntity = teamFields
 	.extend({
 		delivery: z.object({
-			onTime: schema.teamPushSchema
-				.pick({ newSha: true, createdAt: true, username: true })
-				.nullable(),
-			late: schema.teamPushSchema
-				.pick({ newSha: true, createdAt: true, username: true })
-				.nullable(),
+			onTime: teamPushFields.nullable(),
+			late: teamPushFields.nullable(),
 		}),
+		checkpoints: z.array(
+			z.object({ slug: z.string(), push: teamPushFields.nullable() }),
+		),
 		sizeException: schema.teamSizeException.nullable(),
 	})
 	.openapi("TeamListed");

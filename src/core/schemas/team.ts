@@ -47,6 +47,13 @@ export const teamDeliverySchema = z.object({
 	late: teamPushSchema.nullable(),
 });
 
+/// The push that counts for one checkpoint of the assignment: the tip of
+/// `main` at its date, null when the team had pushed nothing by then.
+export const teamCheckpointSchema = z.object({
+	slug: z.string(),
+	push: teamPushSchema.nullable(),
+});
+
 /// How a team's size is outside the range its assignment asks for.
 export const teamSizeException = z.enum(["above", "below", "empty"]);
 export type TeamSizeException = z.infer<typeof teamSizeException>;
@@ -70,18 +77,26 @@ export const teamSchema = z.object({
 /// One team in the instructor's listing.
 export const teamListedSchema = teamSchema.extend({
 	delivery: teamDeliverySchema,
+	/// One per checkpoint of the assignment, in its order.
+	checkpoints: z.array(teamCheckpointSchema),
 	sizeException: teamSizeException.nullable(),
 });
 
 /// A team as one of its members sees it: with the join code (until teams
-/// lock) and the reader's own token, nobody else's.
+/// lock) and the reader's own tokens, nobody else's.
 export const teamMineSchema = teamSchema.extend({
 	joinCode: z.string().nullable(),
 	token: z.string(),
 	cloneUrl: z.url(),
+	/// The clone URL of the reader's temporary token; null with none, or once it expires.
+	tempCloneUrl: z.url().nullable(),
+	/// When `tempCloneUrl` stops working; null exactly when it is.
+	tempTokenExpiresAt: z.date().nullable(),
 	/// Newest first.
 	pushes: z.array(teamPushSchema),
 	delivery: teamDeliverySchema,
+	/// One per checkpoint of the assignment, in its order.
+	checkpoints: z.array(teamCheckpointSchema),
 });
 
 export const teamSummarySchema = z.object({
@@ -89,6 +104,8 @@ export const teamSummarySchema = z.object({
 	studentsWithoutTeam: z.number().int(),
 	onTime: z.number().int(),
 	lateOnly: z.number().int(),
+	/// How many teams have a push at each checkpoint whose date has passed.
+	checkpoints: z.array(z.object({ slug: z.string(), teams: z.number().int() })),
 });
 
 /// What `recordPush` takes: the push as the git route saw it.

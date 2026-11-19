@@ -96,5 +96,8 @@
 	"forms_schema_assignment_team_range": "The minimum team size must not exceed the maximum.",
 	"forms_schema_assignment_closes_before_due": "Pushes cannot close before the due date.",
 	"forms_schema_assignment_opens_after_due": "The assignment cannot open after the due date.",
-	"forms_schema_assignment_lock_after_due": "Teams cannot lock after the due date."
+	"forms_schema_assignment_lock_after_due": "Teams cannot lock after the due date.",
+	"forms_schema_assignment_checkpoint_duplicate": "A checkpoint slug appears more than once.",
+	"forms_schema_assignment_checkpoint_after_due": "A checkpoint must come before the due date.",
+	"forms_schema_assignment_checkpoint_before_opens": "A checkpoint cannot come before the assignment opens."
 }

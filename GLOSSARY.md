@@ -102,6 +102,14 @@ meetings and exams its owner sees on `/calendar`, for calendar apps to
 subscribe to. One per user; regenerating it kills the previous URL. Not an
 [API key](#api-key): it opens the feed and nothing else.
 
+## Checkpoint
+
+Type: domain
+
+pt-BR "ponto de controle". An intermediate date of an
+[Assignment](#assignment). The commit that counts for it is the tip of `main`
+of the [Team](#team) at that instant.
+
 ## Classroom invite
 
 Type: domain
@@ -126,7 +134,9 @@ Type: domain
 
 Unguessable secret in a [Repository](#repository)'s clone URL. Knowing it
 grants `git clone` and `git pull` without logging in, like a [Blob](#blob)
-hash. One per repository, so it can be rotated alone.
+hash. One per repository, so it can be rotated alone. A team member also has
+one of their own, which pushes too, and may add a temporary one that expires
+after 2 hours, for a shared computer.
 
 ## Counting answer
 

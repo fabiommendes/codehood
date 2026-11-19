@@ -21,6 +21,24 @@
   `storage.repositoryRoot`, `storage.assignment.maxRepoBytes` e
   `storage.assignment.maxFileBytes`. O servidor passa a exigir git 2.30 ou
   mais novo; ver "Deploying" no `README.md` para backup e proxy.
+- Pontos de controle em trabalhos: datas intermediárias com nome
+  (`Assignment.checkpoints`), antes do prazo. O commit que conta para cada
+  ponto é a ponta da `main` da equipe naquele instante, calculado dos pushes
+  já registrados; nada é recusado nem penalizado por causa dele, e mudar a
+  data recalcula o commit. O aluno vê os pontos da própria equipe na página
+  do trabalho e no histórico de pushes; o professor vê uma coluna por ponto
+  que já passou e quantas equipes tinham push em cada um. No REST, o `PUT` do
+  trabalho aceita `checkpoints` e a listagem de equipes devolve o push de
+  cada ponto. Na CLI, `checkpoints:` no frontmatter de
+  `assignments/<slug>.md`, `codehood assignment clone --checkpoint <slug>` e
+  uma coluna por ponto em `codehood assignment status`.
+- URL de clone temporária em trabalhos, para computador compartilhado. Além
+  da URL permanente, o aluno gera na página do trabalho uma URL que vale por
+  2 horas, sem renovação pelo uso, e pode revogá-la antes. Há no máximo uma
+  por aluno: gerar outra, ou gerar uma nova URL permanente, desliga a
+  anterior na hora. Um push feito com ela é registrado no nome do aluno, como
+  qualquer outro, e uma URL vencida ou revogada responde 404 como um token
+  desconhecido.
 - Tour das telas (`pnpm run test:tour`): percorre o app como visitante,
   aluno, professor e admin seguindo os links, salva screenshots e snapshot ARIA
   de cada página em `tmp/tour/<hora>/`, falha quando alguma rota de página

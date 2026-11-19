@@ -8,9 +8,11 @@ interface Props {
 	/// The push that is the on-time delivery is marked.
 	onTimeId?: number | null;
 	dueAt: Date;
+	/// Titles of the checkpoints each push counts for, by push id.
+	checkpoints?: ReadonlyMap<number, readonly string[]>;
 }
 
-const { pushes, onTimeId = null, dueAt } = Astro.props;
+const { pushes, onTimeId = null, dueAt, checkpoints } = Astro.props;
 ---
 
 <section aria-label={m.assignments_history()}>
@@ -26,6 +28,9 @@ const { pushes, onTimeId = null, dueAt } = Astro.props;
           <span class="text-sm text-muted">
             {push.author ?? m.assignments_delivery_unknown_author()} · {formatWhen(push.at)}
           </span>
+          {checkpoints?.get(push.id)?.map((title) => (
+            <span class="badge badge-info badge-soft badge-sm" data-checkpoint-tag>{title}</span>
+          ))}
           {push.at > dueAt ? (
             <span class="badge badge-warning badge-soft badge-sm">{m.assignments_history_late()}</span>
           ) : push.id === onTimeId ? (

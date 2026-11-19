@@ -1,5 +1,6 @@
 import { expect, test } from "@playwright/test";
 import { SYSTEM, type UserActor } from "@/auth/actor";
+import { TEAM_TEMP_TOKEN_TTL_MS } from "@/core/constants";
 import { InvalidData, NotAllowed, NotFound } from "@/core/error";
 import { db } from "@/db";
 import { prisma } from "@/db/client";
@@ -14,7 +15,9 @@ import {
 	cleanupAssignmentScenarios,
 	commitToRepository,
 	createTeam,
+	daysFromNow,
 	dropStudent,
+	expireTempToken,
 	fakeSha,
 	folderExists,
 	hoursFromNow,
@@ -26,6 +29,7 @@ import {
 	stopRealPush,
 	tag,
 	teamPk,
+	tempTokenOf,
 	tokenOf,
 } from "./assignment-scenario";
 
@@ -502,6 +506,181 @@ test.describe("rotateToken", () => {
 //
 // The instructor
 //
+
+//
+// Temporary tokens
+//
+
+test.describe("createTempToken and revokeTempToken", () => {
+	test("a temporary token resolves to its owner for two hours, next to the permanent one", async () => {
+		const s = await assignmentScenario();
+		const ana = student(s, 0);
+		const team = await createTeam(s, ana);
+		expect(team.tempCloneUrl).toBeNull();
+		expect(team.tempTokenExpiresAt).toBeNull();
+
+		const before = Date.now();
+		const mine = await db.team.createTempToken(teamPk(team), { actor: ana });
+
+		const temp = (await tempTokenOf(team, ana.username)) as string;
+		expect(temp).not.toBe(team.token);
+		expect(mine.token).toBe(team.token);
+		expect(mine.cloneUrl).toBe(team.cloneUrl);
+		expect(mine.tempCloneUrl).toBe(team.cloneUrl.replace(team.token, temp));
+		const lifetime = (mine.tempTokenExpiresAt?.getTime() ?? 0) - before;
+		expect(lifetime).toBeGreaterThanOrEqual(TEAM_TEMP_TOKEN_TTL_MS);
+		expect(lifetime).toBeLessThan(TEAM_TEMP_TOKEN_TTL_MS + 60_000);
+		expect(TEAM_TEMP_TOKEN_TTL_MS).toBe(2 * 60 * 60 * 1000);
+
+		const found = await db.team.findByToken(temp, s.assignment.slug);
+		expect(found?.member.username).toBe(ana.username);
+		expect(found?.team.id).toBe(team.id);
+		expect(
+			(await db.team.findByToken(team.token, s.assignment.slug))?.member
+				.username,
+		).toBe(ana.username);
+		expect(await db.team.findMine(assignmentPk(s), { actor: ana })).toEqual(
+			mine,
+		);
+	});
+
+	test("an expired one resolves to nothing and leaves the read model, with no renewal on use", async () => {
+		const s = await assignmentScenario();
+		const ana = student(s, 0);
+		const team = await createTeam(s, ana);
+		const created = await db.team.createTempToken(teamPk(team), { actor: ana });
+		const temp = (await tempTokenOf(team, ana.username)) as string;
+
+		await db.team.findByToken(temp, s.assignment.slug);
+		const used = await db.team.findMine(assignmentPk(s), { actor: ana });
+		expect(used?.tempTokenExpiresAt).toEqual(created.tempTokenExpiresAt);
+
+		await expireTempToken(team, ana.username);
+
+		expect(await db.team.findByToken(temp, s.assignment.slug)).toBeNull();
+		expect(await db.team.findByToken(temp, "no-such-slug")).toBeNull();
+		const mine = await db.team.findMine(assignmentPk(s), { actor: ana });
+		expect(mine?.tempCloneUrl).toBeNull();
+		expect(mine?.tempTokenExpiresAt).toBeNull();
+		expect(JSON.stringify(mine)).not.toContain(temp);
+		expect(
+			(await db.team.findByToken(team.token, s.assignment.slug))?.member
+				.username,
+		).toBe(ana.username);
+	});
+
+	test("a second one replaces the first, also when the first had expired", async () => {
+		const s = await assignmentScenario();
+		const ana = student(s, 0);
+		const team = await createTeam(s, ana);
+		await db.team.createTempToken(teamPk(team), { actor: ana });
+		const first = (await tempTokenOf(team, ana.username)) as string;
+
+		await db.team.createTempToken(teamPk(team), { actor: ana });
+		const second = (await tempTokenOf(team, ana.username)) as string;
+
+		expect(second).not.toBe(first);
+		expect(await db.team.findByToken(first, s.assignment.slug)).toBeNull();
+		expect(
+			(await db.team.findByToken(second, s.assignment.slug))?.member.username,
+		).toBe(ana.username);
+
+		await expireTempToken(team, ana.username);
+		const again = await db.team.createTempToken(teamPk(team), { actor: ana });
+		const third = (await tempTokenOf(team, ana.username)) as string;
+		expect(again.tempCloneUrl).toContain(third);
+		expect(await db.team.findByToken(second, s.assignment.slug)).toBeNull();
+		expect(
+			(await db.team.findByToken(third, s.assignment.slug))?.member.username,
+		).toBe(ana.username);
+	});
+
+	test("revoking turns it off at once and keeps the permanent token", async () => {
+		const s = await assignmentScenario();
+		const ana = student(s, 0);
+		const team = await createTeam(s, ana);
+		await db.team.createTempToken(teamPk(team), { actor: ana });
+		const temp = (await tempTokenOf(team, ana.username)) as string;
+
+		const mine = await db.team.revokeTempToken(teamPk(team), { actor: ana });
+
+		expect(mine.tempCloneUrl).toBeNull();
+		expect(mine.tempTokenExpiresAt).toBeNull();
+		expect(mine.token).toBe(team.token);
+		expect(await tempTokenOf(team, ana.username)).toBeNull();
+		expect(await db.team.findByToken(temp, s.assignment.slug)).toBeNull();
+		expect(
+			await db.team.findByToken(team.token, s.assignment.slug),
+		).not.toBeNull();
+		await expect(
+			db.team.revokeTempToken(teamPk(team), { actor: ana }),
+		).resolves.toMatchObject({ tempCloneUrl: null });
+	});
+
+	test("rotating the permanent token clears the temporary one", async () => {
+		const s = await assignmentScenario();
+		const ana = student(s, 0);
+		const team = await createTeam(s, ana);
+		await db.team.createTempToken(teamPk(team), { actor: ana });
+		const temp = (await tempTokenOf(team, ana.username)) as string;
+
+		const rotated = await db.team.rotateToken(teamPk(team), { actor: ana });
+
+		expect(rotated.tempCloneUrl).toBeNull();
+		expect(rotated.tempTokenExpiresAt).toBeNull();
+		expect(await tempTokenOf(team, ana.username)).toBeNull();
+		expect(await db.team.findByToken(temp, s.assignment.slug)).toBeNull();
+	});
+
+	test("only the owner creates and revokes, and a teammate's is untouched and unseen", async () => {
+		const s = await assignmentScenario();
+		const [ana, bia, caio] = [student(s, 0), student(s, 1), student(s, 2)];
+		const team = await createTeam(s, ana);
+		await join(s, team.joinCode, bia);
+		await db.team.createTempToken(teamPk(team), { actor: ana });
+		const temp = (await tempTokenOf(team, ana.username)) as string;
+
+		for (const actor of [caio, s.outsider, s.instructor]) {
+			await expect(
+				db.team.createTempToken(teamPk(team), { actor }),
+			).rejects.toBeInstanceOf(NotFound);
+			await expect(
+				db.team.revokeTempToken(teamPk(team), { actor }),
+			).rejects.toBeInstanceOf(NotFound);
+		}
+		expect(await tempTokenOf(team, ana.username)).toBe(temp);
+
+		const hers = await db.team.createTempToken(teamPk(team), { actor: bia });
+		expect(await tempTokenOf(team, ana.username)).toBe(temp);
+		expect(JSON.stringify(hers)).not.toContain(temp);
+		await db.team.revokeTempToken(teamPk(team), { actor: bia });
+		expect(await tempTokenOf(team, bia.username)).toBeNull();
+		expect(
+			(await db.team.findByToken(temp, s.assignment.slug))?.member.username,
+		).toBe(ana.username);
+	});
+
+	test("it stops resolving when the student leaves or is moved to another team", async () => {
+		const s = await assignmentScenario();
+		const [ana, bia, caio] = [student(s, 0), student(s, 1), student(s, 2)];
+		const origin = await staffTeam(s, [ana, bia, caio]);
+		const target = await staffTeam(s, []);
+		await db.team.createTempToken(teamPk(origin), { actor: bia });
+		await db.team.createTempToken(teamPk(origin), { actor: caio });
+		const moved = (await tempTokenOf(origin, bia.username)) as string;
+		const left = (await tempTokenOf(origin, caio.username)) as string;
+
+		await db.team.addMember(teamPk(target), bia.username, asInstructor(s));
+		await db.team.leave(teamPk(origin), { actor: caio });
+
+		expect(await db.team.findByToken(moved, s.assignment.slug)).toBeNull();
+		expect(await db.team.findByToken(left, s.assignment.slug)).toBeNull();
+		expect(await tempTokenOf(target, bia.username)).toBeNull();
+		const mine = await db.team.findMine(assignmentPk(s), { actor: bia });
+		expect(mine?.id).toBe(target.id);
+		expect(mine?.tempCloneUrl).toBeNull();
+	});
+});
 
 test.describe("instructor: createFor", () => {
 	test("makes a team with no members and its repository", async () => {
@@ -1103,7 +1282,35 @@ test.describe("summary", () => {
 			studentsWithoutTeam: 1,
 			onTime: 2,
 			lateOnly: 1,
+			checkpoints: [],
 		});
+	});
+
+	test("counts the teams with a push at each checkpoint that has passed", async () => {
+		const s = await assignmentScenario({ students: 3 });
+		await changeAssignment(s, {
+			checkpoints: [
+				{ slug: "parser", title: "Parser", at: hoursFromNow(-10) },
+				{ slug: "typer", title: "Typer", at: hoursFromNow(-5) },
+				{ slug: "codegen", title: "Codegen", at: hoursFromNow(5) },
+			],
+		});
+		const early = await staffTeam(s, [student(s, 0)]);
+		const middle = await staffTeam(s, [student(s, 1)]);
+		await staffTeam(s, [student(s, 2)]);
+		await seedPushes(early, [
+			{ sha: fakeSha("1"), createdAt: hoursFromNow(-12) },
+		]);
+		await seedPushes(middle, [
+			{ sha: fakeSha("2"), createdAt: hoursFromNow(-7) },
+		]);
+
+		const summary = await db.team.summary(assignmentPk(s), asInstructor(s));
+
+		expect(summary.checkpoints).toEqual([
+			{ slug: "parser", teams: 1 },
+			{ slug: "typer", teams: 2 },
+		]);
 	});
 
 	test("is for the instructor", async () => {
@@ -1175,6 +1382,65 @@ test.describe("listWithDeliveries", () => {
 		expect(get(extended.id)?.delivery.late).toBeNull();
 	});
 
+	test("brings the push each checkpoint fixes, whatever the team's own deadline", async () => {
+		const s = await assignmentScenario();
+		await changeAssignment(s, {
+			checkpoints: [
+				{ slug: "parser", title: "Parser", at: hoursFromNow(-10) },
+				{ slug: "typer", title: "Typer", at: hoursFromNow(-5) },
+			],
+		});
+		const team = await staffTeam(s, [student(s, 0)]);
+		const silent = await staffTeam(s, [student(s, 1)]);
+		await seedPushes(team, [
+			{ sha: fakeSha("1"), createdAt: hoursFromNow(-7) },
+			{ sha: fakeSha("2"), createdAt: hoursFromNow(-1) },
+		]);
+		await db.team.setDueAt(teamPk(team), daysFromNow(30), asInstructor(s));
+
+		const listing = await db.team.listWithDeliveries(
+			assignmentPk(s),
+			asInstructor(s),
+		);
+
+		const shas = (id: number) =>
+			listing
+				.find((t) => t.id === id)
+				?.checkpoints.map((c) => [c.slug, c.push?.newSha ?? null]);
+		expect(shas(team.id)).toEqual([
+			["parser", null],
+			["typer", fakeSha("1")],
+		]);
+		expect(shas(silent.id)).toEqual([
+			["parser", null],
+			["typer", null],
+		]);
+	});
+
+	test("moving the date of a checkpoint that has passed changes the push it fixes", async () => {
+		const s = await assignmentScenario();
+		const checkpoint = { slug: "parser", title: "Parser" };
+		await changeAssignment(s, {
+			checkpoints: [{ ...checkpoint, at: hoursFromNow(-10) }],
+		});
+		const team = await staffTeam(s, [student(s, 0)]);
+		await seedPushes(team, [
+			{ sha: fakeSha("1"), createdAt: hoursFromNow(-7) },
+		]);
+		const fixed = async () =>
+			(await db.team.listWithDeliveries(assignmentPk(s), asInstructor(s)))[0]
+				?.checkpoints[0]?.push?.newSha ?? null;
+
+		const before = await fixed();
+		await changeAssignment(s, {
+			checkpoints: [{ ...checkpoint, at: hoursFromNow(-5) }],
+		});
+		const after = await fixed();
+
+		expect(before).toBeNull();
+		expect(after).toBe(fakeSha("1"));
+	});
+
 	test("never carries a token or a join code, at any depth", async () => {
 		const s = await assignmentScenario();
 		const team = await createTeam(s, student(s, 0));
@@ -1187,17 +1453,40 @@ test.describe("listWithDeliveries", () => {
 			},
 		]);
 
+		await db.team.createTempToken(teamPk(team), { actor: student(s, 0) });
+		const temp = (await tempTokenOf(team, student(s, 0).username)) as string;
+
 		const listing = await db.team.listWithDeliveries(
 			assignmentPk(s),
 			asInstructor(s),
 		);
+		const moved = await db.team.addMember(
+			teamPk(team),
+			student(s, 2).username,
+			asInstructor(s),
+		);
 
-		const keys = keysDeep(listing);
-		expect(keys.has("token")).toBe(false);
-		expect(keys.has("joinCode")).toBe(false);
-		const text = JSON.stringify(listing);
-		for (const secret of [team.token, joined.token, team.joinCode as string]) {
-			expect(text).not.toContain(secret);
+		for (const value of [listing, moved]) {
+			const keys = keysDeep(value);
+			for (const key of [
+				"token",
+				"tempToken",
+				"tempTokenExpiresAt",
+				"cloneUrl",
+				"tempCloneUrl",
+				"joinCode",
+			]) {
+				expect(keys.has(key), key).toBe(false);
+			}
+			const text = JSON.stringify(value);
+			for (const secret of [
+				team.token,
+				joined.token,
+				temp,
+				team.joinCode as string,
+			]) {
+				expect(text).not.toContain(secret);
+			}
 		}
 		expect(listing).toHaveLength(1);
 		expect(usernames(listing[0]?.members ?? [])).toEqual(
@@ -1228,6 +1517,48 @@ test.describe("findMine and visibility", () => {
 		expect(keysDeep(mine?.members).has("token")).toBe(false);
 		expect(hers?.token).toBe(joined.token);
 		expect(JSON.stringify(hers)).not.toContain(team.token);
+	});
+
+	test("brings the checkpoints of the reader's own team only", async () => {
+		const s = await assignmentScenario();
+		await changeAssignment(s, {
+			checkpoints: [{ slug: "parser", title: "Parser", at: hoursFromNow(-5) }],
+		});
+		const mineTeam = await staffTeam(s, [student(s, 0)]);
+		const other = await staffTeam(s, [student(s, 1)]);
+		await seedPushes(mineTeam, [
+			{ sha: fakeSha("1"), createdAt: hoursFromNow(-7) },
+		]);
+		await seedPushes(other, [
+			{ sha: fakeSha("2"), createdAt: hoursFromNow(-7) },
+		]);
+
+		const mine = await db.team.findMine(assignmentPk(s), {
+			actor: student(s, 0),
+		});
+
+		expect(mine?.checkpoints).toMatchObject([
+			{ slug: "parser", push: { newSha: fakeSha("1") } },
+		]);
+		expect(JSON.stringify(mine)).not.toContain(fakeSha("2"));
+		await expect(
+			db.team.listWithDeliveries(assignmentPk(s), { actor: student(s, 0) }),
+		).rejects.toBeInstanceOf(NotAllowed);
+	});
+
+	test("a team that only has the commit of its template has no push at a checkpoint", async () => {
+		const s = await assignmentScenario({ template: { "README.md": "start" } });
+		await changeAssignment(s, {
+			checkpoints: [{ slug: "parser", title: "Parser", at: hoursFromNow(-1) }],
+		});
+		const team = await createTeam(s, student(s, 0));
+
+		const mine = await db.team.findMine(assignmentPk(s), {
+			actor: student(s, 0),
+		});
+
+		expect(team.baseSha).not.toBeNull();
+		expect(mine?.checkpoints).toEqual([{ slug: "parser", push: null }]);
 	});
 
 	test("is null for a student with no team", async () => {

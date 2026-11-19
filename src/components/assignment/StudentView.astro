@@ -25,10 +25,13 @@ interface Props {
 		name: string;
 		joinCode: string | null;
 		cloneUrl: string;
+		tempCloneUrl: string | null;
+		tempTokenExpiresAt: Date | null;
 		dueAt: Date;
 		extended: boolean;
 		members: readonly { username: string; name: string }[];
 		delivery: { onTime: { id: number } | null; late: { id: number } | null };
+		checkpoints: readonly { slug: string; push: { id: number } | null }[];
 	} | null;
 	/// The team's pushes, newest first.
 	pushes: readonly PushView[];
@@ -60,11 +63,24 @@ const badge = statusBadge(
 const byId = new Map(pushes.map((push) => [push.id, push]));
 const onTime = (team && byId.get(team.delivery.onTime?.id ?? -1)) ?? null;
 const late = (team && byId.get(team.delivery.late?.id ?? -1)) ?? null;
+const fixed = new Map(
+	team?.checkpoints.map(({ slug, push }) => [slug, push]) ?? [],
+);
+const checkpoints = assignment.checkpoints.map((checkpoint) => ({
+	...checkpoint,
+	push: byId.get(fixed.get(checkpoint.slug)?.id ?? -1) ?? null,
+}));
 const delivered = individual
 	? m.assignments_delivery_note_own({ due: formatWhen(due) })
 	: m.assignments_delivery_note_team({ due: formatWhen(due) });
 
-const deadlines = [
+const dated: {
+	label: string;
+	at: Date | null;
+	show: boolean;
+	strong?: boolean;
+	checkpoint?: boolean;
+}[] = [
 	{
 		label: individual
 			? m.assignments_deadline_repository()
@@ -72,6 +88,12 @@ const deadlines = [
 		at: lockAt,
 		show: !individual,
 	},
+	...assignment.checkpoints.map(({ title, at }) => ({
+		label: title,
+		at,
+		show: true,
+		checkpoint: true,
+	})),
 	{
 		label: individual
 			? m.assignments_deadline_own_due()
@@ -87,7 +109,8 @@ const deadlines = [
 		at: assignment.closesAt,
 		show: assignment.closesAt !== null,
 	},
-].filter((entry) => entry.show);
+];
+const deadlines = dated.filter((entry) => entry.show);
 ---
 
 <div class="mt-8 flex flex-col gap-8">
@@ -157,6 +180,7 @@ const deadlines = [
       reader={reader}
       pushes={pushes}
       missingFiles={missingFiles}
+      checkpoints={checkpoints}
       lockAt={lockAt}
     />
   ) : (
@@ -177,6 +201,7 @@ const deadlines = [
           <dd class="mt-1 font-medium">{formatWhen(entry.at as Date)}</dd>
           <dd class="text-sm text-muted">
             {formatRelative(entry.at as Date)}
+            {entry.checkpoint && ` · ${m.assignments_checkpoint_kind()}`}
             {entry.strong && team?.extended && ` · ${m.assignments_deadline_extended({ original: formatWhen(assignment.dueAt) })}`}
           </dd>
         </div>

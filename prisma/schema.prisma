@@ -752,6 +752,10 @@ model Assignment {
   /// Limits a push must respect. Null takes the instance defaults.
   restrictions Json?
 
+  /// Intermediate dates before dueAt, each naming the tip of main at that
+  /// instant: `[{ slug, title, at }]`, ordered by `at`. Null means none.
+  checkpoints Json?
+
   /// Revision marker supplied by the writer, opaque to the server.
   rev String?
 
@@ -805,6 +809,11 @@ model TeamMember {
 
   /// Unguessable secret in this member's clone and push URL.
   token String @unique
+
+  /// A second secret for a shared computer, replaced whenever a new one is made.
+  tempToken          String?   @unique
+  /// When `tempToken` stops resolving. Past this instant the token is ignored, not cleared.
+  tempTokenExpiresAt DateTime?
 
   joinedAt DateTime @default(now())
 

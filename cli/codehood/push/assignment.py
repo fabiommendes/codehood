@@ -45,8 +45,18 @@ MAX_TEAM_SIZE = 10
 
 #: Front matter keys, at the top level and inside `team` and `restrictions`.
 _KEYS = frozenset(
-    {"title", "due", "closes", "opens", "team", "template", "restrictions"}
+    {
+        "title",
+        "due",
+        "closes",
+        "opens",
+        "team",
+        "template",
+        "restrictions",
+        "checkpoints",
+    }
 )
+_CHECKPOINT_KEYS = frozenset({"slug", "title", "at"})
 _TEAM_KEYS = frozenset({"min", "max", "lock"})
 _RESTRICTION_KEYS = frozenset({"maxRepoBytes", "maxFileBytes", "deny", "require"})
 
@@ -84,6 +94,8 @@ class AssignmentFile:
     template: str | None = None
     #: Only the limits the file sets, `None` when it sets none.
     restrictions: dict[str, JsonValue] | None = None
+    #: Intermediate dates, as `{slug, title, at}`; empty when the file has none.
+    checkpoints: tuple[dict[str, str], ...] = ()
 
     @property
     def rev(self) -> str:
@@ -260,6 +272,7 @@ def _read(
             errors.append(f"template: no folder {template!r} under {REPOSITORIES_DIR}/")
 
     limits = _restrictions(restrictions, errors)
+    checkpoints = _checkpoints(front.get("checkpoints"), due, opens, errors)
     if errors:
         return refuse("; ".join(errors))
     assert due is not None and isinstance(title, str)
@@ -276,6 +289,7 @@ def _read(
         team_max=maximum,
         template=template if isinstance(template, str) else None,
         restrictions=limits or None,
+        checkpoints=checkpoints,
     )
 
 
@@ -421,3 +435,57 @@ def _restrictions(
             continue
         limits[key] = [*value]
     return limits
+
+
+def _checkpoints(
+    value: object, due: str | None, opens: str | None, errors: list[str]
+) -> tuple[dict[str, str], ...]:
+    """
+    The checkpoints the file lists, each as `{slug, title, at}`, by `at` as the
+    server lists them.
+    """
+    if value is None:
+        return ()
+    if not isinstance(value, list):
+        errors.append("checkpoints: must be a list")
+        return ()
+    found: list[dict[str, str]] = []
+    seen: set[str] = set()
+    for index, item in enumerate(value):
+        where = f"checkpoints[{index}]"
+        if not isinstance(item, dict):
+            errors.append(f"{where}: must be a mapping with slug, title and at")
+            continue
+        for name in item:
+            if name not in _CHECKPOINT_KEYS:
+                errors.append(
+                    f"{where}.{name}: unknown field "
+                    f"(known: {', '.join(sorted(_CHECKPOINT_KEYS))})"
+                )
+        slug = item.get("slug")
+        if slug is None:
+            errors.append(f"{where}.slug: is required")
+        elif not isinstance(slug, str) or not SLUG_RE.match(slug):
+            errors.append(f"{where}.slug: {slug!r} is not a valid slug")
+        elif slug in seen:
+            errors.append(f"{where}.slug: {slug!r} is repeated")
+        else:
+            seen.add(slug)
+        title = item.get("title")
+        if title is None:
+            errors.append(f"{where}.title: is required")
+        elif not isinstance(title, str) or not title.strip():
+            errors.append(f"{where}.title: must be text")
+        at = _instant(item, "at", f"{where}.at", errors, required=True, needs_time=True)
+        if at is not None and due is not None and at >= due:
+            errors.append(f"{where}.at: is not before due")
+        if at is not None and opens is not None and at < opens:
+            errors.append(f"{where}.at: is before opens")
+        if (
+            at is not None
+            and isinstance(slug, str)
+            and isinstance(title, str)
+            and title.strip()
+        ):
+            found.append({"slug": slug, "title": title.strip(), "at": at})
+    return tuple(sorted(found, key=lambda item: item["at"]))

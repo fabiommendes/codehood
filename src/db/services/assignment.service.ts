@@ -36,6 +36,7 @@ import {
 	type Assignment,
 	assignmentInclude,
 	canSeeAssignment,
+	checkpointsOf,
 	findAssignment,
 	isIndividual,
 	toAssignment,
@@ -139,7 +140,7 @@ export function makeAssignmentService(
 	 * `course.update-contents`.
 	 * @throws {@link InvalidData} If the template is no repository of the
 	 * course, a restriction exceeds the limits of the instance, the merged
-	 * sizes and dates break an order rule, or the switch above is attempted.
+	 * sizes, dates and checkpoints break a rule, or the switch above is attempted.
 	 */
 	const upsert = op({
 		returns: assignmentSchema,
@@ -158,6 +159,12 @@ export function makeAssignmentService(
 				include: assignmentInclude(opts.actor),
 			});
 
+			const checkpoints =
+				input.checkpoints === undefined
+					? undefined
+					: [...(input.checkpoints ?? [])].sort(
+							(a, b) => a.at.getTime() - b.at.getTime(),
+						);
 			const merged = {
 				teamMin: input.teamMin ?? existing?.teamMin ?? 1,
 				teamMax: input.teamMax ?? existing?.teamMax ?? 1,
@@ -165,6 +172,7 @@ export function makeAssignmentService(
 				dueAt: input.dueAt,
 				closesAt: pick(input.closesAt, existing?.closesAt),
 				teamsLockAt: pick(input.teamsLockAt, existing?.teamsLockAt),
+				checkpoints: checkpoints ?? (existing ? checkpointsOf(existing) : []),
 			};
 			InvalidData.ensureNoError(
 				Object.fromEntries(
@@ -207,6 +215,12 @@ export function makeAssignmentService(
 				teamsLockAt: input.teamsLockAt,
 				templateId,
 				restrictions,
+				checkpoints:
+					checkpoints === undefined
+						? undefined
+						: checkpoints.length === 0
+							? DbNull
+							: checkpoints.map((c) => ({ ...c, at: c.at.toISOString() })),
 				rev: input.rev,
 			};
 			const include = assignmentInclude(opts.actor);

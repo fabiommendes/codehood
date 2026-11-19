@@ -191,6 +191,60 @@ test.describe("upsert", () => {
 		expect(accepted.restrictions?.deny).toEqual(["*.zip"]);
 	});
 
+	test("stores the checkpoints ordered by date, and an empty list clears them", async () => {
+		const s = await assignmentScenario();
+		const late = { slug: "typer", title: "Typer", at: daysFromNow(4) };
+		const early = { slug: "parser", title: "Parser", at: daysFromNow(2) };
+
+		const stored = await changeAssignment(s, { checkpoints: [late, early] });
+		const kept = await changeAssignment(s, { title: "Renamed" });
+		const cleared = await changeAssignment(s, { checkpoints: [] });
+		const row = await prisma.assignment.findUniqueOrThrow({
+			where: { id: s.assignment.id },
+		});
+
+		expect(stored.checkpoints).toEqual([early, late]);
+		expect(kept.checkpoints).toEqual([early, late]);
+		expect(cleared.checkpoints).toEqual([]);
+		expect(row.checkpoints).toBeNull();
+	});
+
+	test("refuses a checkpoint that breaks a rule against the stored dates", async () => {
+		const s = await assignmentScenario({ opensAt: hoursFromNow(-5) });
+		const checkpoint = (slug: string, at: Date) => ({ slug, title: slug, at });
+
+		await expect(
+			changeAssignment(s, {
+				opensAt: undefined,
+				checkpoints: [checkpoint("early", hoursFromNow(-6))],
+			}),
+		).rejects.toBeInstanceOf(InvalidData);
+		await expect(
+			changeAssignment(s, {
+				checkpoints: [checkpoint("late", daysFromNow(8))],
+			}),
+		).rejects.toBeInstanceOf(InvalidData);
+		await expect(
+			changeAssignment(s, {
+				checkpoints: [
+					checkpoint("twice", daysFromNow(1)),
+					checkpoint("twice", daysFromNow(2)),
+				],
+			}),
+		).rejects.toBeInstanceOf(InvalidData);
+	});
+
+	test("refuses a new deadline that falls at or before a stored checkpoint", async () => {
+		const s = await assignmentScenario();
+		await changeAssignment(s, {
+			checkpoints: [{ slug: "parser", title: "Parser", at: daysFromNow(3) }],
+		});
+
+		await expect(
+			changeAssignment(s, { dueAt: daysFromNow(2) }),
+		).rejects.toBeInstanceOf(InvalidData);
+	});
+
 	test("a key about a team in the body never reaches the team", async () => {
 		const s = await assignmentScenario();
 		const team = await createTeam(s, s.students[0] as never);

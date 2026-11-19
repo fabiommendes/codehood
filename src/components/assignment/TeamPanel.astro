@@ -5,9 +5,15 @@ import { actions } from "astro:actions";
 import FormAlert from "@/components/form/FormAlert";
 import CloneBox from "@/components/repository/CloneBox.astro";
 import Alert from "@/components/ui/Alert";
+import { TEAM_TEMP_TOKEN_TTL_MS } from "@/core/constants";
 import { escapeHtml, m } from "@/i18n";
 import { teamDelivery } from "@/services/assignment-delivery";
-import { formatWhen, type PushView } from "@/utils/assignment-view";
+import {
+	formatRelative,
+	formatWhen,
+	type PushView,
+	shortSha,
+} from "@/utils/assignment-view";
 import PushHistory from "./PushHistory.astro";
 
 interface Props {
@@ -24,6 +30,9 @@ interface Props {
 		name: string;
 		joinCode: string | null;
 		cloneUrl: string;
+		/// The reader's temporary clone URL, while one is active.
+		tempCloneUrl: string | null;
+		tempTokenExpiresAt: Date | null;
 		/// The team's deadline: its own extension, or the assignment's.
 		dueAt: Date;
 		members: readonly { username: string; name: string }[];
@@ -33,12 +42,27 @@ interface Props {
 	/// Newest first.
 	pushes: readonly PushView[];
 	missingFiles: readonly string[];
+	/// The checkpoints of the assignment, each with the push it fixes for this team.
+	checkpoints: readonly {
+		slug: string;
+		title: string;
+		at: Date;
+		push: PushView | null;
+	}[];
 	/// When students stop changing teams.
 	lockAt: Date;
 }
 
-const { params, assignment, team, reader, pushes, missingFiles, lockAt } =
-	Astro.props;
+const {
+	params,
+	assignment,
+	team,
+	reader,
+	pushes,
+	missingFiles,
+	checkpoints,
+	lockAt,
+} = Astro.props;
 const now = new Date();
 const individual = assignment.teamMax === 1;
 const closed = assignment.closesAt !== null && assignment.closesAt <= now;
@@ -49,6 +73,15 @@ const { onTime } = teamDelivery(
 );
 const incomplete = !individual && team.members.length < assignment.teamMin;
 const hasPush = pushes.length > 0;
+const checkpointTags = new Map<number, string[]>();
+for (const { title, at, push } of checkpoints) {
+	if (push && at <= now) {
+		checkpointTags.set(push.id, [
+			...(checkpointTags.get(push.id) ?? []),
+			title,
+		]);
+	}
+}
 const lastWithPush = hasPush && team.members.length === 1;
 const heading = individual
 	? m.assignments_panel_repository()
@@ -56,6 +89,9 @@ const heading = individual
 
 const rotated = Astro.getActionResult(actions.assignment.rotateToken);
 const left = Astro.getActionResult(actions.assignment.leaveTeam);
+const tempCreated = Astro.getActionResult(actions.assignment.createTempToken);
+const tempRevoked = Astro.getActionResult(actions.assignment.revokeTempToken);
+const tempHours = TEAM_TEMP_TOKEN_TTL_MS / 3_600_000;
 const gitCommand = (text: string) =>
 	`<code class="font-mono">${escapeHtml(text)}</code>`;
 ---
@@ -110,11 +146,52 @@ const gitCommand = (text: string) =>
     </Alert>
   )}
 
+  {checkpoints.length > 0 && (
+    <section aria-label={m.assignments_checkpoints()}>
+      <h3 class="page-subheader">{m.assignments_checkpoints()}</h3>
+      <ul class="mt-2 divide-y divide-base-content/10 rounded-box border border-base-content/15 bg-base-200/50">
+        {checkpoints.map(({ slug, title, at, push }) => (
+          <li
+            class="flex flex-wrap items-baseline gap-x-3 gap-y-1 px-4 py-3"
+            data-checkpoint={slug}
+            data-state={at > now ? "upcoming" : push ? "met" : "missed"}
+          >
+            <span class="font-medium">{title}</span>
+            <span class="min-w-0 flex-1 basis-40 text-sm text-muted">{formatWhen(at)}</span>
+            {at > now ? (
+              <span class="text-sm text-muted">{m.assignments_checkpoint_upcoming()} · {formatRelative(at)}</span>
+            ) : push ? (
+              <>
+                <code class="rounded bg-base-300 px-1.5 py-0.5 font-mono text-sm">{shortSha(push.sha)}</code>
+                <span class="text-sm text-muted">
+                  {push.author ?? m.assignments_delivery_unknown_author()} · {formatWhen(push.at)}
+                </span>
+              </>
+            ) : (
+              <span class="text-sm text-muted">{m.assignments_checkpoint_missed()}</span>
+            )}
+          </li>
+        ))}
+      </ul>
+    </section>
+  )}
+
   <CloneBox
     cloneUrl={team.cloneUrl}
     label={m.assignments_clone_label()}
     note={closed ? m.assignments_clone_note_closed() : m.assignments_clone_note()}
   />
+
+  {team.tempCloneUrl && team.tempTokenExpiresAt && (
+    <div class="flex flex-col gap-2">
+      <h3 class="page-subheader">{m.assignments_temp_label()}</h3>
+      <CloneBox
+        cloneUrl={team.tempCloneUrl}
+        label={m.assignments_temp_label()}
+        note={m.assignments_temp_note({ when: formatWhen(team.tempTokenExpiresAt) })}
+      />
+    </div>
+  )}
 
   {!hasPush && !closed && (
     <div class="card card-border bg-base-100">
@@ -139,7 +216,7 @@ git push -u origin main</code></pre>
   )}
 
   {hasPush && (
-    <PushHistory pushes={pushes} onTimeId={onTime?.id ?? null} dueAt={team.dueAt} />
+    <PushHistory pushes={pushes} onTimeId={onTime?.id ?? null} dueAt={team.dueAt} checkpoints={checkpointTags} />
   )}
 
   <div class="flex flex-wrap items-start gap-x-6 gap-y-3 border-t border-base-content/10 pt-4">
@@ -152,6 +229,32 @@ git push -u origin main</code></pre>
       <button type="submit" class="btn btn-outline btn-sm">{m.assignments_rotate()}</button>
       <p class="mt-1 text-xs text-muted" set:html={m.assignments_rotate_note({ command: gitCommand("git remote set-url") })} />
     </form>
+    <div class="flex max-w-xs flex-col gap-2">
+      <FormAlert error={tempCreated?.error?.message ?? tempRevoked?.error?.message} />
+      <div class="flex flex-wrap gap-2">
+        <form method="POST" action={actions.assignment.createTempToken}>
+          <input type="hidden" name="discipline" value={params.discipline} />
+          <input type="hidden" name="course" value={params.course} />
+          <input type="hidden" name="slug" value={params.slug} />
+          <input type="hidden" name="team" value={team.publicId} />
+          <button type="submit" class="btn btn-outline btn-sm">{m.assignments_temp_create()}</button>
+        </form>
+        {team.tempCloneUrl && (
+          <form method="POST" action={actions.assignment.revokeTempToken}>
+            <input type="hidden" name="discipline" value={params.discipline} />
+            <input type="hidden" name="course" value={params.course} />
+            <input type="hidden" name="slug" value={params.slug} />
+            <input type="hidden" name="team" value={team.publicId} />
+            <button type="submit" class="btn btn-ghost btn-sm text-error">{m.assignments_temp_revoke()}</button>
+          </form>
+        )}
+      </div>
+      <p class="text-xs text-muted">
+        {team.tempCloneUrl
+          ? m.assignments_temp_revoke_note({ hours: tempHours })
+          : m.assignments_temp_create_note({ hours: tempHours })}
+      </p>
+    </div>
     {!individual && (
       <div class="max-w-xs">
         {locked ? (

@@ -14,6 +14,10 @@ CLI shares the server's version and is released with it.
   `submissions/<slug>/<team>/` (the API key goes to git through the
   environment only), give a team its own deadline, and move a student between
   teams.
+- Assignments take `checkpoints` (`slug`, `title`, `at`) in the front matter,
+  always sent on push so removing one from the file removes it on the server.
+  `codehood assignment clone --checkpoint <slug>` checks out each team's commit
+  at that checkpoint, and `status` gains one column per checkpoint.
 
 ## 0.6.0 (2026-11-18)
 
