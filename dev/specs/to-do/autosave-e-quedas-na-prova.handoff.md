@@ -1,8 +1,9 @@
 # Handoff: autosave e quedas do servidor na prova
 
 Escrito em 2026-11-19. Continua a investigação da prova de 2026-11-18. O
-diagnóstico está fechado; os itens 1 a 3 estão implementados e falta o item 4,
-na ordem abaixo. Nada foi commitado.
+diagnóstico está fechado; os itens 1 a 3 estão implementados e commitados
+(`24d22b7a`, `9c18ff34`, `56f725dc`, `73e8ca0f`). Para a próxima sessão ficam a fila de saves no fim
+da prova (seção "Em aberto") e o item 4. Nada disso está em produção.
 
 ## Onde está o quê
 
@@ -109,9 +110,19 @@ alunos, instrutor a cada minuto), `exam.answer`:
 - O teste de carga não reproduz o que a página faz no prazo (a 10 s do fim
   ela salva a cada segundo): os alunos sintéticos que sobram entregam todos
   no mesmo instante.
-- Ideias, nada decidido: espalhar o primeiro save final de cada aluno ao
-  longo do último minuto; baratear as telas de instrutor da prova
-  (`failedJobIds` em `gradingJob.summary` levou até 335 ms por consulta).
+
+Próximos passos, na ordem recomendada (o humano ainda não escolheu a ordem):
+
+1. Baratear as telas de instrutor da prova. Foi o que mais pesou na rodada e
+   vale durante a prova inteira. Começar por `failedJobIds` em
+   `gradingJob.summary` (até 335 ms por consulta) e medir com
+   `pnpm exec tsx test/perf/routes.ts <log> --user loadteacher`.
+2. Espalhar o save final: cada página sorteia um momento no último minuto
+   para mandar o que está pendente, em vez de todas mandarem a 10 s do fim
+   (`DRAFT_SAVE_LEAD_SECONDS` em `src/components/exam/ExamAttempt.tsx`).
+   Antes, fazer o aluno sintético seguir o prazo como a página real
+   (`test/load/page.ts`), senão a rodada de carga não mostra o efeito.
+3. Repetir a rodada numa máquina sem outras suítes rodando.
 
 ### 4. Não inserir autosave idêntico ao anterior
 
