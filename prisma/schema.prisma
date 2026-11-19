@@ -83,6 +83,8 @@ model User {
   adjustmentsRevoked ExamAdjustment[]   @relation("AdjustmentRevokedBy")
   submissionsCreated Submission[]       @relation("SubmissionCreatedBy")
   responsesCreated   Response[]         @relation("ResponseCreatedBy")
+  teamMemberships    TeamMember[]
+  teamPushes         TeamPush[]
 
   @@index([role])
 }
@@ -323,6 +325,7 @@ model Course {
   gradeColumns       GradeColumn[]
   reports            Report[]
   repositories       Repository[]
+  assignments        Assignment[]
 
   @@unique([disciplineSlug, instructorId, editionSlug])
 }
@@ -664,8 +667,9 @@ model Repository {
   /// and cleared on every commit.
   zipHash String?
 
-  objects GitObject[]
-  events  CalendarEventRepository[]
+  objects     GitObject[]
+  events      CalendarEventRepository[]
+  assignments Assignment[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -708,6 +712,125 @@ model CalendarEventRepository {
 
   @@id([eventId, repositoryId])
   @@index([repositoryId])
+}
+
+// =============================================================================
+// Assignment Models
+// =============================================================================
+
+/// A long-running piece of work a course asks of its students, delivered by
+/// pushing to a git repository the server hosts for each team.
+model Assignment {
+  id Int @id @default(autoincrement())
+
+  courseId Int
+  course   Course @relation(fields: [courseId], references: [id], onDelete: Cascade)
+
+  /// Natural key: the file name under `assignments/`.
+  slug  String
+  title String
+
+  /// The statement, in markdown.
+  body String
+
+  /// When students start seeing it. Null shows it as soon as it is pushed.
+  opensAt  DateTime?
+  /// The tip of main at this instant is the on-time delivery.
+  dueAt    DateTime
+  /// Pushes are refused from this instant on. Null never refuses.
+  closesAt DateTime?
+
+  teamMin     Int       @default(1)
+  teamMax     Int       @default(1)
+  /// Students form and leave teams until this instant. Null means dueAt.
+  teamsLockAt DateTime?
+
+  /// The course repository whose head commit each team repository starts from.
+  templateId Int?
+  template   Repository? @relation(fields: [templateId], references: [id], onDelete: SetNull)
+
+  /// Limits a push must respect. Null takes the instance defaults.
+  restrictions Json?
+
+  /// Revision marker supplied by the writer, opaque to the server.
+  rev String?
+
+  teams Team[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([courseId, slug])
+}
+
+/// The students who deliver one assignment together, and the owner of its
+/// repository. An individual assignment has teams of one.
+model Team {
+  id       Int    @id @default(autoincrement())
+  publicId String @unique
+
+  assignmentId Int
+  assignment   Assignment @relation(fields: [assignmentId], references: [id], onDelete: Cascade)
+
+  name String
+
+  /// Code a student types to join. Null on a team of an individual assignment.
+  joinCode String? @unique
+
+  /// Commit the repository was created with, taken from the template. It is
+  /// not a push. Null when the repository started empty.
+  baseSha String?
+
+  /// Replaces the assignment's dueAt for this team. Server-side state the
+  /// course repository must not set.
+  dueAt DateTime?
+
+  members TeamMember[]
+  pushes  TeamPush[]
+
+  createdAt DateTime @default(now())
+
+  @@unique([id, assignmentId])
+  @@unique([assignmentId, name])
+}
+
+/// One student's place in a team, with the secret of their own clone URL.
+model TeamMember {
+  assignmentId Int
+  teamId       Int
+  team         Team @relation(fields: [teamId, assignmentId], references: [id, assignmentId], onDelete: Cascade)
+
+  username String
+  user     User   @relation(fields: [username], references: [username], onDelete: Cascade)
+
+  /// Unguessable secret in this member's clone and push URL.
+  token String @unique
+
+  joinedAt DateTime @default(now())
+
+  @@id([teamId, username])
+  /// A student belongs to one team per assignment.
+  @@unique([assignmentId, username])
+}
+
+/// One accepted push to a team's main branch.
+model TeamPush {
+  id Int @id @default(autoincrement())
+
+  teamId Int
+  team   Team @relation(fields: [teamId], references: [id], onDelete: Cascade)
+
+  /// Who pushed. Null once the user is deleted, and on a reconciled push.
+  username String?
+  user     User?   @relation(fields: [username], references: [username], onDelete: SetNull)
+
+  /// Tip of main before the push. Null on the first one.
+  oldSha String?
+  newSha String
+
+  createdAt DateTime @default(now())
+
+  @@index([teamId, createdAt])
 }
 
 // =============================================================================

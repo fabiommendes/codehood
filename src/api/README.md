@@ -61,9 +61,11 @@ Outside this directory:
 
 [^decl]: `CRUD(path, opts)` for a service-backed resource, `GET`/`POST`/`PATCH`
     for a one-off. Nothing registers routes except this file, `auth.ts` and
-    `health.ts`. The one hand-written route outside the registry is
-    `src/pages/api/report/[publicId]/attachment/[filename].ts`, which is not
-    in the OpenAPI document.
+    `health.ts`. The hand-written routes outside the registry are
+    `src/pages/api/report/[publicId]/attachment/[filename].ts` and
+    `src/pages/api/course/[discipline]/[course]/assignment/[slug]/team/[team]/git/[...rest].ts`
+    (the read-only smart git protocol of a team repository, which a Bearer key
+    opens and a git client speaks), neither in the OpenAPI document.
 
 [^auth]: `POST /api/auth/login` and `POST /api/auth/logout`. Hand-written
     because no service CRUD sits behind them.

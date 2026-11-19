@@ -1,0 +1,38 @@
+---
+// The accepted pushes of a team, newest first.
+import { m } from "@/i18n";
+import { formatWhen, type PushView, shortSha } from "@/utils/assignment-view";
+
+interface Props {
+	pushes: readonly PushView[];
+	/// The push that is the on-time delivery is marked.
+	onTimeId?: number | null;
+	dueAt: Date;
+}
+
+const { pushes, onTimeId = null, dueAt } = Astro.props;
+---
+
+<section aria-label={m.assignments_history()}>
+  <h3 class="page-subheader">{m.assignments_history()}</h3>
+  {pushes.length === 0 ? (
+    <p class="mt-2 text-sm text-muted">{m.assignments_history_empty()}</p>
+  ) : (
+    <ul class="mt-2 divide-y divide-base-content/10 rounded-box border border-base-content/15 bg-base-200/50">
+      {pushes.map((push) => (
+        <li class="flex flex-wrap items-baseline gap-x-3 gap-y-1 px-4 py-3">
+          <code class="rounded bg-base-300 px-1.5 py-0.5 font-mono text-sm">{shortSha(push.sha)}</code>
+          <span class="min-w-0 flex-1 basis-48">{push.message}</span>
+          <span class="text-sm text-muted">
+            {push.author ?? m.assignments_delivery_unknown_author()} · {formatWhen(push.at)}
+          </span>
+          {push.at > dueAt ? (
+            <span class="badge badge-warning badge-soft badge-sm">{m.assignments_history_late()}</span>
+          ) : push.id === onTimeId ? (
+            <span class="badge badge-success badge-soft badge-sm">{m.assignments_history_on_time()}</span>
+          ) : null}
+        </li>
+      ))}
+    </ul>
+  )}
+</section>

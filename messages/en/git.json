@@ -1,0 +1,8 @@
+{
+	"git_push_wrong_ref": "Only the main branch is accepted.",
+	"git_push_closed": "This assignment is closed for pushes.",
+	"git_push_not_enrolled": "You have no active enrollment in this course.",
+	"git_push_file_too_large": "{path} is larger than {limit}.",
+	"git_push_path_denied": "{path} is not allowed in this assignment.",
+	"git_push_repository_full": "The repository has no room left."
+}

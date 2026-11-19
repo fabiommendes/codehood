@@ -17,6 +17,7 @@ from codehood.cli.push import (
 )
 from codehood.push.plan import (
     DeleteResource,
+    KeptAssignment,
     KeptDraftPublished,
     KeptForRollCall,
     KeptPinnedSlot,
@@ -94,6 +95,7 @@ def test_only_a_rejection_is_printed_as_invalid():
 
 def test_notice_texts_keep_naming_the_flag_that_resolves_them():
     assert "--drop-repositories" in describe_notice(KEPT)
+    assert "--drop-assignments" in describe_notice(KeptAssignment("lab"))
     assert "--drop-roll-calls" in describe_notice(KeptForRollCall(5, "mon", 32))
     assert "5/mon" in describe_notice(KeptForRollCall(5, "mon", 32))
 

@@ -5,7 +5,7 @@
  */
 
 import { m } from "@/i18n";
-import type { CourseNav, NavEntry, NavLink } from "./course-nav";
+import type { CourseNav, NavEntry, NavLink, NavSection } from "./course-nav";
 import { examTypeLabels } from "./exam-display";
 
 /** The id of the section of the resources page that holds one kind of resource. */
@@ -167,9 +167,20 @@ export function studentsNav(href: string): CourseNav {
 
 const EXAM_TYPE_ORDER = ["EXAM", "QUIZ", "PRACTICE"] as const;
 
+/// The entry of the assignments list in the card of the exams tab.
+function assignmentsEntry(href: string, count: number): NavEntry {
+	const base = `${href}/assignments`;
+	return {
+		label: m.assignments_nav_label(),
+		href: base,
+		meta: count,
+		under: [base],
+	};
+}
+
 /**
  * Links to the exams the actor sees, one section per exam type that has at
- * least one of them.
+ * least one of them, and to the assignments when the actor sees any.
  */
 export function examsNav(
 	href: string,
@@ -178,20 +189,40 @@ export function examsNav(
 		title: string;
 		type: keyof typeof examTypeLabels;
 	}[],
+	assignments = 0,
 ): CourseNav {
+	const sections: NavSection[] = EXAM_TYPE_ORDER.flatMap((type) => {
+		const ofType = exams.filter((exam) => exam.type === type);
+		if (ofType.length === 0) return [];
+		return [
+			{
+				label: examTypeLabels[type],
+				entries: ofType.map((exam) => ({
+					label: exam.title,
+					href: `${href}/exams/${exam.slug}`,
+				})),
+			},
+		];
+	});
+	if (assignments > 0) {
+		sections.push({ entries: [assignmentsEntry(href, assignments)] });
+	}
+	return { sections };
+}
+
+/**
+ * Links to the pages of the exams tab an assignment page can show: the exams
+ * and the assignments, which hold the page being read.
+ */
+export function assignmentsNav(href: string, assignments: number): CourseNav {
 	return {
-		sections: EXAM_TYPE_ORDER.flatMap((type) => {
-			const ofType = exams.filter((exam) => exam.type === type);
-			if (ofType.length === 0) return [];
-			return [
-				{
-					label: examTypeLabels[type],
-					entries: ofType.map((exam) => ({
-						label: exam.title,
-						href: `${href}/exams/${exam.slug}`,
-					})),
-				},
-			];
-		}),
+		sections: [
+			{
+				entries: [
+					{ label: m.nav_course_tab_exams(), href: `${href}/exams` },
+					assignmentsEntry(href, assignments),
+				],
+			},
+		],
 	};
 }

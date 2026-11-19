@@ -122,7 +122,7 @@ the same commit**, and checking that no existing discipline already claims it.
 | `/rpc/docs`              | public | RPC API reference                                     |
 | `/openrpc.json`          | public | the OpenRPC document                                  |
 | `/files/<hash>[/<name>]` | none   | resource blobs — no auth check by design (ADR 0010)    |
-| `/git/<token>/<slug>.git/...` | token | read-only git protocol of a course repository; the token is the credential, any failure is 404 |
+| `/git/<token>/<slug>.git/...` | token | read-only git protocol of a course repository, and smart git protocol (clone and push) of a team repository; the token is the credential, any failure is 404 |
 | `/<course>/repositories/<slug>.zip` | user | zip of a repository head, needs `course.read-contents` |
 | `/403`, `/404`, `/500`   | public | error pages                                           |
 

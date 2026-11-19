@@ -1,0 +1,178 @@
+---
+// The team panel of an assignment page, for a reader who has a team: members,
+// code, clone URL, first-push instructions, history and the team's actions.
+import { actions } from "astro:actions";
+import FormAlert from "@/components/form/FormAlert";
+import CloneBox from "@/components/repository/CloneBox.astro";
+import Alert from "@/components/ui/Alert";
+import { escapeHtml, m } from "@/i18n";
+import { teamDelivery } from "@/services/assignment-delivery";
+import { formatWhen, type PushView } from "@/utils/assignment-view";
+import PushHistory from "./PushHistory.astro";
+
+interface Props {
+	/// The course segments and the slug the actions take.
+	params: { discipline: string; course: string; slug: string };
+	assignment: {
+		slug: string;
+		teamMin: number;
+		teamMax: number;
+		closesAt: Date | null;
+	};
+	team: {
+		publicId: string;
+		name: string;
+		joinCode: string | null;
+		cloneUrl: string;
+		/// The team's deadline: its own extension, or the assignment's.
+		dueAt: Date;
+		members: readonly { username: string; name: string }[];
+	};
+	/// The reader's username, marked among the members.
+	reader: string;
+	/// Newest first.
+	pushes: readonly PushView[];
+	missingFiles: readonly string[];
+	/// When students stop changing teams.
+	lockAt: Date;
+}
+
+const { params, assignment, team, reader, pushes, missingFiles, lockAt } =
+	Astro.props;
+const now = new Date();
+const individual = assignment.teamMax === 1;
+const closed = assignment.closesAt !== null && assignment.closesAt <= now;
+const locked = lockAt <= now;
+const { onTime } = teamDelivery(
+	pushes.map((push) => ({ id: push.id, createdAt: push.at })),
+	team.dueAt,
+);
+const incomplete = !individual && team.members.length < assignment.teamMin;
+const hasPush = pushes.length > 0;
+const lastWithPush = hasPush && team.members.length === 1;
+const heading = individual
+	? m.assignments_panel_repository()
+	: m.assignments_panel_team();
+
+const rotated = Astro.getActionResult(actions.assignment.rotateToken);
+const left = Astro.getActionResult(actions.assignment.leaveTeam);
+const gitCommand = (text: string) =>
+	`<code class="font-mono">${escapeHtml(text)}</code>`;
+---
+
+<section class="flex flex-col gap-5" aria-label={heading}>
+  <div class="flex flex-wrap items-baseline justify-between gap-2">
+    <h2 class="text-xl font-bold">
+      {individual ? heading : <>{m.assignments_team_title()} <span class="text-primary">{team.name}</span></>}
+    </h2>
+    <p class="text-sm text-muted">
+      {individual ? m.assignments_individual_label() : m.assignments_members_count({ count: team.members.length })}
+    </p>
+  </div>
+
+  {!individual && (
+    <div class="flex flex-wrap items-center gap-x-6 gap-y-3">
+      <ul class="flex flex-wrap gap-2">
+        {team.members.map((member) => (
+          <li class="badge badge-lg badge-outline gap-2">
+            {member.name}
+            {member.username === reader && <span class="text-muted">{m.assignments_you()}</span>}
+          </li>
+        ))}
+      </ul>
+      {team.joinCode && !locked && (
+        <p class="text-sm">
+          {m.assignments_join_code()}{" "}<code class="rounded bg-base-300 px-2 py-1 font-mono">{team.joinCode}</code>
+        </p>
+      )}
+    </div>
+  )}
+
+  {incomplete && (
+    <Alert variant="warning">
+      <span>
+        {locked
+          ? m.assignments_incomplete_locked({ min: assignment.teamMin, count: team.members.length })
+          : m.assignments_incomplete_open({ min: assignment.teamMin, count: team.members.length, lock: formatWhen(lockAt) })}
+      </span>
+    </Alert>
+  )}
+
+  {hasPush && missingFiles.length > 0 && (
+    <Alert variant="warning">
+      <div>
+        <p class="font-medium">{m.assignments_missing_title()}</p>
+        <ul class="mt-1 list-disc pl-5 text-sm">
+          {missingFiles.map((path) => <li><code class="font-mono">{path}</code></li>)}
+        </ul>
+        <p class="mt-1 text-sm">{m.assignments_missing_note()}</p>
+      </div>
+    </Alert>
+  )}
+
+  <CloneBox
+    cloneUrl={team.cloneUrl}
+    label={m.assignments_clone_label()}
+    note={closed ? m.assignments_clone_note_closed() : m.assignments_clone_note()}
+  />
+
+  {!hasPush && !closed && (
+    <div class="card card-border bg-base-100">
+      <div class="card-body gap-4 p-5">
+        <h3 class="page-subheader">{m.assignments_first_push()}</h3>
+        <div>
+          <p class="text-sm">{m.assignments_first_push_scratch()}</p>
+          <pre class="mt-2 overflow-x-auto rounded-field bg-base-300 p-3 font-mono text-sm"><code>git clone {team.cloneUrl}
+cd {assignment.slug}
+# {m.assignments_first_push_edit()}
+git add . &amp;&amp; git commit -m "{m.assignments_first_push_message()}"
+git push</code></pre>
+        </div>
+        <div>
+          <p class="text-sm">{m.assignments_first_push_existing()}</p>
+          <pre class="mt-2 overflow-x-auto rounded-field bg-base-300 p-3 font-mono text-sm"><code>git remote add origin {team.cloneUrl}
+git push -u origin main</code></pre>
+        </div>
+        <p class="text-sm text-muted">{m.assignments_first_push_rules()}</p>
+      </div>
+    </div>
+  )}
+
+  {hasPush && (
+    <PushHistory pushes={pushes} onTimeId={onTime?.id ?? null} dueAt={team.dueAt} />
+  )}
+
+  <div class="flex flex-wrap items-start gap-x-6 gap-y-3 border-t border-base-content/10 pt-4">
+    <form method="POST" action={actions.assignment.rotateToken} class="max-w-xs">
+      <input type="hidden" name="discipline" value={params.discipline} />
+      <input type="hidden" name="course" value={params.course} />
+      <input type="hidden" name="slug" value={params.slug} />
+      <input type="hidden" name="team" value={team.publicId} />
+      <FormAlert error={rotated?.error?.message} class="mb-2" />
+      <button type="submit" class="btn btn-outline btn-sm">{m.assignments_rotate()}</button>
+      <p class="mt-1 text-xs text-muted" set:html={m.assignments_rotate_note({ command: gitCommand("git remote set-url") })} />
+    </form>
+    {!individual && (
+      <div class="max-w-xs">
+        {locked ? (
+          <p class="text-xs text-muted">{m.assignments_leave_locked({ when: formatWhen(lockAt) })}</p>
+        ) : lastWithPush ? (
+          <>
+            <button type="button" class="btn btn-ghost btn-sm" disabled>{m.assignments_leave()}</button>
+            <p class="mt-1 text-xs text-muted">{m.assignments_leave_last()}</p>
+          </>
+        ) : (
+          <form method="POST" action={actions.assignment.leaveTeam}>
+            <input type="hidden" name="discipline" value={params.discipline} />
+            <input type="hidden" name="course" value={params.course} />
+            <input type="hidden" name="slug" value={params.slug} />
+            <input type="hidden" name="team" value={team.publicId} />
+            <FormAlert error={left?.error?.message} class="mb-2" />
+            <button type="submit" class="btn btn-ghost btn-sm text-error">{m.assignments_leave()}</button>
+            <p class="mt-1 text-xs text-muted">{m.assignments_leave_until({ when: formatWhen(lockAt) })}</p>
+          </form>
+        )}
+      </div>
+    )}
+  </div>
+</section>

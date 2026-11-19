@@ -18,6 +18,7 @@ from .plan import (
     EntityKind,
     IgnoredExamPolicy,
     Keep,
+    KeptAssignment,
     KeptCancelled,
     KeptDraftPublished,
     KeptExamLive,
@@ -53,6 +54,7 @@ KIND_LABELS: dict[EntityKind, str] = {
     "resource": "resource",
     "question": "question",
     "exam": "exam",
+    "assignment": "assignment",
     "time_slot": "time slot",
     "calendar_event": "calendar event",
     "grade_column": "grade column",
@@ -168,6 +170,7 @@ def describe_notice_drift(notice: Notice) -> str | None:
             | KeptPinnedSlot()
             | KeptForRollCall()
             | KeptRepository()
+            | KeptAssignment()
             | KeptCancelled()
         ):
             return None

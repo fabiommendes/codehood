@@ -7,6 +7,7 @@ import { createUserCommand } from "./create-user";
 import { gradeObjectivesCommand } from "./grade-objectives";
 import { importCalendarCommand } from "./import-calendar";
 import { importResourcesCommand } from "./import-resources";
+import { pruneTeamRepositoriesCommand } from "./prune-team-repositories";
 import { recomputeEventTimesCommand } from "./recompute-event-times";
 import { resetPasswordCommand } from "./reset-password";
 import { upgradeQuestionsCommand } from "./upgrade-questions";
@@ -26,5 +27,6 @@ manage.addCommand(upgradeQuestionsCommand);
 manage.addCommand(answerHistoryStatsCommand);
 manage.addCommand(checkInstructorEnrollmentsCommand);
 manage.addCommand(gradeObjectivesCommand);
+manage.addCommand(pruneTeamRepositoriesCommand);
 
 await manage.parseAsync(process.argv);

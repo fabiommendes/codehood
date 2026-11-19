@@ -98,6 +98,8 @@ const KEYED = [
 	"RollCall",
 	"Resource",
 	"Repository",
+	"Assignment",
+	"Team",
 	"QuestionRef",
 	"QuestionData",
 	"ResponseRef",
@@ -551,6 +553,48 @@ export async function fillDatabase(
 			"zipHash",
 			"createdAt",
 			"updatedAt",
+		]);
+		const insertAssignment = insert("Assignment", [
+			"id",
+			"courseId",
+			"slug",
+			"title",
+			"body",
+			"opensAt",
+			"dueAt",
+			"closesAt",
+			"teamMin",
+			"teamMax",
+			"teamsLockAt",
+			"templateId",
+			"restrictions",
+			"rev",
+			"createdAt",
+			"updatedAt",
+		]);
+		const insertTeam = insert("Team", [
+			"id",
+			"publicId",
+			"assignmentId",
+			"name",
+			"joinCode",
+			"baseSha",
+			"dueAt",
+			"createdAt",
+		]);
+		const insertTeamMember = insert("TeamMember", [
+			"assignmentId",
+			"teamId",
+			"username",
+			"token",
+			"joinedAt",
+		]);
+		const insertTeamPush = insert("TeamPush", [
+			"teamId",
+			"username",
+			"oldSha",
+			"newSha",
+			"createdAt",
 		]);
 		const insertGitObject = insert("GitObject", [
 			"repositoryId",
@@ -1129,8 +1173,34 @@ export async function fillDatabase(
 				[1, 0.45],
 				[2, 0.2],
 			]);
+			const repositoryIds: number[] = [];
 			for (let j = 0; j < repositories; j++)
-				addRepository(courseId, j, createdAt, events);
+				repositoryIds.push(addRepository(courseId, j, createdAt, events));
+
+			// Assignments, with their teams and pushes
+			addAssignment({
+				courseId,
+				index: 1,
+				individual: true,
+				createdAt,
+				startAt,
+				horizon,
+				active,
+				templateId: null,
+			});
+			addAssignment({
+				courseId,
+				index: 2,
+				individual: false,
+				createdAt,
+				startAt,
+				horizon,
+				active,
+				templateId:
+					repositoryIds.length > 0
+						? maybe(0.6, () => rng.pick(repositoryIds))
+						: null,
+			});
 
 			// Invites and passphrases
 			const invites = rng.range(1, 3);
@@ -1338,7 +1408,7 @@ export async function fillDatabase(
 			index: number,
 			createdAt: number,
 			events: { id: number; startAt: number }[],
-		): void {
+		): number {
 			const id = nextId("Repository");
 			const slug = `lab-${pad(index + 1, 2)}`;
 			const token = `bulk${rng.token(28)}`;
@@ -1431,9 +1501,108 @@ export async function fillDatabase(
 			);
 			for (const [sha, type, body] of objects)
 				insertGitObject(id, sha, type, body);
-			if (!head) return;
-			for (const event of rng.sample(events, rng.range(0, 3)))
-				insertEventRepository(courseId, event.id, id);
+			if (head)
+				for (const event of rng.sample(events, rng.range(0, 3)))
+					insertEventRepository(courseId, event.id, id);
+			return id;
+		}
+
+		/// An assignment with teams of its active students and the pushes they made. Database rows only: no repository folders.
+		function addAssignment(input: {
+			courseId: number;
+			index: number;
+			individual: boolean;
+			createdAt: number;
+			startAt: number;
+			horizon: number;
+			active: string[];
+			templateId: number | null;
+		}): void {
+			const { courseId, individual, active, horizon } = input;
+			const id = nextId("Assignment");
+			const dueAt = input.startAt + rng.range(4, 14) * WEEK;
+			const opened = Math.max(input.createdAt, input.startAt - 2 * DAY);
+			insertAssignment(
+				id,
+				courseId,
+				`work-${pad(input.index, 2)}`,
+				sentence(rng, rng.range(2, 4)).slice(0, -1),
+				`# ${sentence(rng, 3)}\n\n${paragraph(rng, 20, 120)}\n`,
+				isoOrNull(maybe(0.3, () => opened)),
+				iso(dueAt),
+				isoOrNull(maybe(0.4, () => dueAt + rng.range(1, 7) * DAY)),
+				individual ? 1 : 2,
+				individual ? 1 : 3,
+				isoOrNull(maybe(0.3, () => dueAt - rng.range(1, 5) * DAY)),
+				input.templateId,
+				maybe(0.4, () =>
+					json({
+						maxFileBytes: 1_000_000,
+						deny: ["*.zip"],
+						require: ["README.md"],
+					}),
+				),
+				rev(),
+				iso(input.createdAt),
+				iso(input.createdAt + rng.int(5 * DAY)),
+			);
+
+			const groups: string[][] = [];
+			const members = rng.sample(
+				active,
+				Math.max(0, active.length - rng.range(0, 6)),
+			);
+			if (individual) for (const username of members) groups.push([username]);
+			else
+				for (let from = 0; from < members.length; ) {
+					const size = rng.range(1, 3);
+					groups.push(members.slice(from, from + size));
+					from += size;
+				}
+
+			for (const group of groups) {
+				const teamId = nextId("Team");
+				const joinedAt = Math.min(opened + rng.int(5 * DAY), now);
+				insertTeam(
+					teamId,
+					publicId(),
+					id,
+					individual ? (group[0] as string) : `team-${pad(teamId, 6)}`,
+					individual
+						? null
+						: `J${(serial++).toString(36).toUpperCase().padStart(7, "0")}`,
+					null,
+					isoOrNull(maybe(0.05, () => dueAt + rng.range(1, 5) * DAY)),
+					iso(joinedAt),
+				);
+				for (const username of group)
+					insertTeamMember(
+						id,
+						teamId,
+						username,
+						`bulk${rng.token(28)}`,
+						iso(joinedAt),
+					);
+				let previous: string | null = null;
+				const pushes = rng.chance(0.25) ? 0 : rng.range(1, 4);
+				for (let k = 0; k < pushes; k++) {
+					const sha = rng.hex(40);
+					const at = past(
+						joinedAt +
+							rng.int(
+								Math.max(DAY, Math.min(horizon, dueAt + 3 * DAY) - joinedAt),
+							),
+					);
+					insertTeamPush(
+						teamId,
+						maybe(0.9, () => rng.pick(group)),
+						previous,
+						sha,
+						iso(at),
+					);
+					previous = sha;
+				}
+			}
 		}
 
 		function addExam(input: {

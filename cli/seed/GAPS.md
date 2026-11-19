@@ -55,7 +55,7 @@ não são Markdown (agora com extensão) e as aulas que os citam; a aula 5 sobe
 
 | G | W | Onde | Arquivos | Esperado | Observado | Estado |
 | :-- | :-- | :-- | :-- | :-- | :-- | :-- |
-| G21 | W5 | server | `repositories/lab*/`, `solutions/*/` (`tests_ocultos/`, `autograde.toml`, formato proposto) | Aluno entrega por git; testes ocultos rodam e dão nota | `solutions/` não é consumido; o Codehood não recebe entrega por git nem roda testes | issue `dev/issues/entrega-por-git.md`; a fila de correção externa (`dev/rfc/fila-de-correcao-externa.md`) cobre só questões mdq |
+| G21 | W5 | server | `repositories/lab*/`, `solutions/*/` (`tests_ocultos/`, `autograde.toml`, formato proposto) | Aluno entrega por git; testes ocultos rodam e dão nota | `solutions/` não é consumido; o Codehood não recebe entrega por git nem roda testes | sem issue: o trabalho com repositório hospedado no servidor está em desenho; a fila de correção externa (`dev/rfc/fila-de-correcao-externa.md`) cobre só questões mdq |
 | G22 | W5 | server | `README.md` (nota máxima de 70% após o prazo) | Entrega atrasada com desconto | Entrega fora do prazo é recusada | issue `dev/issues/politica-de-atraso.md` |
 | G23 | W9 | server | `repositories/projeto-final/`, `RUBRICA.md` (formato proposto) | Projeto em grupo: repositório por grupo, rubrica, banca agendada | Só existe repositório da turma; sem grupos nem rubrica | aberta |
 | G24 | W12 | cli | `grades.py` | `student.attendance` vem do roll call do servidor; `labs` vem da correção automática | `codehood.grades.Student` não expõe presença, embora o servidor tenha `Attendance`; `grades.py` lê a frequência de uma coluna do CSV | aberta |

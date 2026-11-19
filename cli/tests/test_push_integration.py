@@ -793,3 +793,65 @@ def test_a_rebuilt_base_of_a_full_course_syncs_without_a_decision_or_a_write(
     assert decisions == []
     assert write_requests == []
     assert (synced / MACHINE_DIR / "base" / "questions.json").exists()
+
+
+#
+# Assignments
+#
+def _assignment_slugs(client: httpx.Client) -> set[str]:
+    return {
+        a.slug
+        for a in read_all(
+            generated.assignment_list,
+            discipline=DISCIPLINE,
+            course=SCRATCH,
+            client=client,
+        )
+    }
+
+
+def test_an_assignment_is_pushed_converges_and_is_dropped_on_request(
+    synced: Path, client: httpx.Client, write_requests: list[str]
+):
+    slug = "cli-lab"
+    (synced / "assignments").mkdir(exist_ok=True)
+    source = synced / "assignments" / f"{slug}.md"
+    source.write_text(
+        "---\ntitle: CLI lab\ndue: 2031-03-10T18:00:00-03:00\n"
+        "team: { min: 2, max: 3 }\nrestrictions: { maxRepoBytes: 5mb }\n---\n\n"
+        "Do it.\n",
+        encoding="utf-8",
+    )
+    try:
+        first = _push(synced)
+        assert first.exit_code == 0, first.output
+        stored = generated.assignment_read(
+            discipline=DISCIPLINE, course=SCRATCH, slug=slug, client=client
+        )
+        assert (stored.team_min, stored.team_max) == (2, 3)
+        assert stored.restrictions is not None
+        assert stored.restrictions.max_repo_bytes == 5_000_000
+
+        write_requests.clear()
+        second = _push(synced)
+        assert second.exit_code == 0, second.output
+        assert write_requests == []
+
+        source.unlink()
+        kept = _push(synced)
+        assert kept.exit_code == 0, kept.output
+        assert slug in _assignment_slugs(client)
+        assert "--drop-assignments" in kept.output
+
+        dropped = _push(synced, "--drop-assignments")
+        assert dropped.exit_code == 0, dropped.output
+        assert slug not in _assignment_slugs(client)
+    finally:
+        if slug in _assignment_slugs(client):
+            generated.assignment_delete(
+                discipline=DISCIPLINE,
+                course=SCRATCH,
+                slug=slug,
+                force=True,
+                client=client,
+            )

@@ -7,6 +7,8 @@
 export * from "./answer";
 export * from "./answer-edit";
 export * from "./api-key";
+export * from "./assignment";
+export * from "./assignment-actions";
 export * from "./attachment";
 // Branded id schemas, `slug` and `buffer` stay internal to the sub-modules.
 export {
@@ -15,6 +17,7 @@ export {
 	type AnswerEditGapId,
 	type AnswerEditHistoryId,
 	type ApiKeyId,
+	type AssignmentId,
 	type AttachmentId,
 	type BlobId,
 	type CalendarEventId,
@@ -49,6 +52,7 @@ export {
 	type SlugHash,
 	type SubmissionId,
 	slugHash,
+	type TeamId,
 	type TimeSlotId,
 	type UserId,
 	username,
@@ -80,5 +84,6 @@ export * from "./roll-call";
 export * from "./rubric";
 export * from "./session";
 export * from "./submission";
+export * from "./team";
 export * from "./time-slot";
 export * from "./user";

@@ -246,6 +246,7 @@ function serverEnv(dir: string): NodeJS.ProcessEnv {
 	return {
 		DATABASE_URL: `file:${path.join(dir, "load.db")}`,
 		RESOURCE_ROOT: path.join(dir, "resources"),
+		REPOSITORY_ROOT: path.join(dir, "repos"),
 		PUBLIC_URL: BASE,
 		HOST: "127.0.0.1",
 		PORT: String(PORT),

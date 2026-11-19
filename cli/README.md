@@ -190,6 +190,74 @@ A student who commits in their clone should update with `git pull
 and the server's branches diverge.
 
 
+### Assignments with a repository
+
+An assignment is one Markdown file, `assignments/<slug>.md`: the front matter
+sets the rules and the body is the statement students read.
+
+```markdown
+---
+title: Calculator lab
+due: 2026-12-10T23:59:00-03:00   # deadline; needs a time of day
+closes: 2026-12-12 23:59          # last push the server takes (optional)
+opens: 2026-12-01                 # visible from here (optional, a date is enough)
+team:
+  min: 2                          # default 1; max defaults to min
+  max: 3                          # at most 10
+  lock: 2026-12-05 12:00          # teams frozen from here (optional)
+template: lab-calculadora         # a folder of repositories/ (optional)
+restrictions:
+  maxRepoBytes: 10mb              # a number of bytes or 10kb, 10mb, 1gb (powers of 1024)
+  maxFileBytes: 2mb
+  deny: ["*.exe", "node_modules/**"]
+  require: [README.md]
+---
+
+# Calculator
+
+Build a calculator. Push to your team's repository before the deadline.
+```
+
+- Dates are written as in exam files. A time without an offset is UTC.
+  `due`, `closes` and `team.lock` refuse a date without a time, since
+  `2026-12-20` would silently mean midnight UTC.
+- No `team` means an individual assignment (`min = max = 1`).
+- A file whose name starts with `_`, a file that is not `.md` and anything in
+  a subfolder is not pushed.
+- A problem in one file (unknown key, bad date, `min` above `max`, `due`
+  after `closes`, a `template` that is not a folder of `repositories/`, a
+  name that is not a slug) fails that file and the push, and leaves the
+  assignment on the server as it is.
+- Repositories are pushed before assignments. Like everything else, an
+  assignment is synced in three ways: a second push of an unchanged file
+  writes nothing.
+- An assignment whose file is gone stays on the server. `codehood push
+  --drop-assignments` deletes it; when it has teams, the push shows how many
+  and asks before deleting them and their repositories too. Without a
+  terminal, or on any answer but `y`, it stays.
+
+`codehood assignment` works with the teams:
+
+```bash
+codehood assignment status lab                        # teams, deliveries, notes
+codehood assignment clone lab                         # submissions/lab/<team>/
+codehood assignment clone lab --late --dest ~/grading # the late delivery instead
+codehood assignment extend lab "Team A" "2026-12-12 18:00"
+codehood assignment move lab bob "Team A"
+```
+
+`clone` makes one git repository per team in `<dest>/<slug>/<team>/` (a
+sanitized team name, or the username for an individual assignment) and parks it
+on the delivered commit with no local branch. Run it again to update. A folder
+whose tracked files you edited is left alone with a warning. Teams with no
+delivery get no folder and are listed at the end. Your API key goes to git
+through its environment only; it is never written to `.git/config` or the
+remote URL. Add `submissions/` to your course `.gitignore`.
+
+`extend` and `move` take the team by name or, when no name matches, by the
+username of a member.
+
+
 ### Final grades
 
 Codehood does not compute a course's final grade. You compute it on your

@@ -7,13 +7,17 @@ interface Props {
 	cloneUrl: string;
 	/// Absent while the repository has no commit, which leaves nothing to zip.
 	zipHref?: string;
+	/// Replaces the note on updating a clone, for a URL that is not a repository's.
+	note?: string;
+	/// Replaces the accessible name of the box.
+	label?: string;
 }
 
-const { cloneUrl, zipHref } = Astro.props;
+const { cloneUrl, zipHref, note, label } = Astro.props;
 const command = `git clone ${cloneUrl}`;
 ---
 
-<section aria-label={m.repositories_clone_label()} class="card card-border bg-base-200">
+<section aria-label={label ?? m.repositories_clone_label()} class="card card-border bg-base-200">
   <div class="card-body gap-3 p-4">
     <div class="flex flex-wrap items-center gap-2">
       <code
@@ -27,12 +31,16 @@ const command = `git clone ${cloneUrl}`;
       >{m.repositories_copy()}</button>
       {zipHref && <a href={zipHref} class="btn btn-sm btn-primary">{m.repositories_download_zip()}</a>}
     </div>
-    <p
-      class="text-sm text-muted"
-      set:html={m.repositories_pull_note({
-        command: `<code class="rounded bg-base-300 px-1.5 py-0.5 font-mono">${escapeHtml("git pull --no-rebase")}</code>`,
-      })}
-    />
+    {note !== undefined ? (
+      <p class="text-sm text-muted">{note}</p>
+    ) : (
+      <p
+        class="text-sm text-muted"
+        set:html={m.repositories_pull_note({
+          command: `<code class="rounded bg-base-300 px-1.5 py-0.5 font-mono">${escapeHtml("git pull --no-rebase")}</code>`,
+        })}
+      />
+    )}
   </div>
 </section>
 

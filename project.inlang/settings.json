@@ -11,6 +11,7 @@
 	"plugin.inlang.messageFormat": {
 		"pathPattern": [
 			"./messages/{locale}/admin.json",
+			"./messages/{locale}/assignments.json",
 			"./messages/{locale}/attendance.json",
 			"./messages/{locale}/auth.json",
 			"./messages/{locale}/code.json",
@@ -20,6 +21,7 @@
 			"./messages/{locale}/errors.json",
 			"./messages/{locale}/exams.json",
 			"./messages/{locale}/forms.json",
+			"./messages/{locale}/git.json",
 			"./messages/{locale}/grades.json",
 			"./messages/{locale}/nav.json",
 			"./messages/{locale}/profile.json",

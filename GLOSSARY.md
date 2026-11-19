@@ -52,6 +52,14 @@ once at creation and stored only as a SHA-256 hash, revocable individually, and
 sent as `Authorization: Bearer <key>`. A request authenticated by one acts as
 the key's owner.
 
+## Assignment
+
+Type: domain
+
+pt-BR "trabalho". A long-running piece of work of a [Course](#course),
+delivered by pushing to a git repository the server hosts for each
+[Team](#team). It is not an [Exam](#exam) and is never graded automatically.
+
 ## Attachment
 
 Type: domain
@@ -158,6 +166,14 @@ A [REST API](#rest-api) endpoint nested under a course's
 [Course URL](#course-url), e.g. `/api/course/cs101/ada_2026-1/resource/syllabus`.
 The path names the course, so the body and query never carry it. A course the
 actor may not see returns 403, including in list operations.
+
+## Delivery
+
+Type: domain
+
+pt-BR "entrega". The commit of a [Team](#team) that counts for an
+[Assignment](#assignment). The on-time delivery is the tip of `main` at the
+team's deadline; the late delivery is the tip of `main` after it.
 
 ## Discipline
 
@@ -623,6 +639,19 @@ Type: domain
 One attempt at a single question inside a [Response](#response), carrying the
 answer payload plus grade, feedback, and status. Attempts accumulate rather than
 overwrite, so a response keeps its full history.
+
+## Team
+
+Type: domain
+
+pt-BR "equipe". The students who deliver an [Assignment](#assignment)
+together, owners of one repository. An individual assignment has teams of one.
+
+## Team push
+
+Type: domain
+
+One push accepted on the `main` of a [Team](#team), with who made it and when.
 
 ## Tentativa vazia
 

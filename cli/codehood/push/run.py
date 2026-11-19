@@ -14,7 +14,7 @@ from __future__ import annotations
 
 import json
 import warnings
-from collections.abc import Iterable, Iterator, Mapping, Sequence
+from collections.abc import Callable, Iterable, Iterator, Mapping, Sequence
 from dataclasses import dataclass, field, replace
 from pathlib import Path
 from typing import Protocol, cast
@@ -26,6 +26,7 @@ from pydantic import JsonValue
 from ..api import generated
 from ..api.base import CodehoodAPIError, auth_headers, query_params
 from ..api.pages import read_all
+from ..api.teams import list_teams
 from ..grades import ExamResult, ExamState
 from ..models.base import Model
 from .base import BaseEntry, BaseState
@@ -33,6 +34,7 @@ from .exam import ExamStatus
 from .grades import ServerStudent
 from .plan import (
     BaseUpdate,
+    DeleteAssignment,
     DeleteCalendarEvent,
     DeleteExam,
     DeleteGradeColumn,
@@ -47,6 +49,7 @@ from .plan import (
     ServerExam,
     ServerQuestion,
     ServerState,
+    UpsertAssignment,
     UpsertCalendarEvent,
     UpsertCourse,
     UpsertExam,
@@ -59,6 +62,7 @@ from .plan import (
 )
 from .project import (
     RemoteEntry,
+    project_assignment,
     project_calendar_event,
     project_course,
     project_exam,
@@ -78,6 +82,7 @@ from .wire import (
 )
 
 __all__ = [
+    "ConfirmForce",
     "HttpRepositoryApi",
     "OpResult",
     "RepositoryApi",
@@ -99,6 +104,10 @@ type RequestData = (
     | generated.ResourceCreateDataFile
     | generated.DataLink
 )
+
+#: Whether to delete an assignment with its teams, given its slug and how many
+#: teams it has.
+type ConfirmForce = Callable[[str, int], bool]
 
 #: What each cell of the server's grades table is called in `ExamResult`.
 EXAM_STATES: dict[str, ExamState] = {
@@ -126,6 +135,9 @@ class OpResult:
     #: answered with the stored entity.
     rev: str | None = None
     updated_at: str | None = None
+    #: A delete the user declined: nothing failed and nothing changed, so the
+    #: base keeps its entry.
+    kept: bool = False
 
 
 class RepositoryApi(Protocol):
@@ -337,6 +349,9 @@ def fetch_server_state(
     grade_columns = read_all(
         generated.list_grade_column, discipline=discipline, course=course, client=client
     )
+    assignments = read_all(
+        generated.assignment_list, discipline=discipline, course=course, client=client
+    )
     # A roll call hangs off a calendar event, so none can exist without one.
     roll_calls = (
         {
@@ -401,6 +416,14 @@ def fetch_server_state(
             for column in grade_columns
         },
         repositories=dict(repositories.list_trees()) if repositories else {},
+        assignments={
+            assignment.slug: RemoteEntry(
+                project_assignment(assignment),
+                rev=assignment.rev,
+                updated_at=assignment.updated_at,
+            )
+            for assignment in assignments
+        },
     )
 
 
@@ -432,6 +455,7 @@ def run_plan(
     course: str,
     client: httpx.Client,
     repositories: RepositoryApi | None = None,
+    confirm_force: ConfirmForce | None = None,
 ) -> Iterator[OpResult]:
     """
     Execute a plan, yielding one result per operation.
@@ -443,7 +467,9 @@ def run_plan(
     it fails the rest come back as skipped results, never attempted.
 
     Repository ops go through `repositories`, `HttpRepositoryApi` over
-    `client` by default.
+    `client` by default. `confirm_force` answers whether to delete an
+    assignment together with its teams, given its slug and the number of
+    teams; without it the assignment is never forced.
     """
     api = repositories or HttpRepositoryApi(client, discipline, course)
     ops = list(ops)
@@ -465,6 +491,7 @@ def run_plan(
             client=client,
             repositories=api,
             blobs=blobs,
+            confirm_force=confirm_force,
         )
         yield result
         course_failed = isinstance(op, UpsertCourse) and not result.ok
@@ -482,7 +509,7 @@ def apply(base: BaseState, plan: Plan, results: Sequence[OpResult]) -> BaseState
     collections: dict[EntityKind, dict[str, BaseEntry]] = {
         kind: dict(getattr(base, name)) for kind, name in COLLECTION_OF.items()
     }
-    succeeded = [result for result in results if result.ok]
+    succeeded = [result for result in results if result.ok and not result.kept]
 
     def store(update: BaseUpdate, stamp: OpResult | None = None) -> None:
         entries = collections[update.kind]
@@ -506,6 +533,7 @@ def apply(base: BaseState, plan: Plan, results: Sequence[OpResult]) -> BaseState
         resources=collections["resource"],
         questions=collections["question"],
         exams=collections["exam"],
+        assignments=collections["assignment"],
         time_slots=collections["time_slot"],
         calendar_events=collections["calendar_event"],
         grade_columns=collections["grade_column"],
@@ -521,6 +549,7 @@ COLLECTION_OF: dict[EntityKind, str] = {
     "resource": "resources",
     "question": "questions",
     "exam": "exams",
+    "assignment": "assignments",
     "time_slot": "time_slots",
     "calendar_event": "calendar_events",
     "grade_column": "grade_columns",
@@ -592,6 +621,7 @@ def _run_op(
     client: httpx.Client,
     repositories: RepositoryApi,
     blobs: _AttachmentBlobs,
+    confirm_force: ConfirmForce | None = None,
 ) -> OpResult:
     match op:
         case UpsertCourse():
@@ -600,6 +630,18 @@ def _run_op(
             return run_upsert_repository(op, repositories)
         case DeleteRepository():
             return run_delete_repository(op, repositories)
+        case UpsertAssignment():
+            return _run_upsert_assignment(
+                op, discipline=discipline, course=course, client=client
+            )
+        case DeleteAssignment():
+            return _run_delete_assignment(
+                op,
+                discipline=discipline,
+                course=course,
+                client=client,
+                confirm_force=confirm_force,
+            )
         case UpsertResource():
             return _run_upsert_resource(
                 op, discipline=discipline, course=course, client=client
@@ -998,6 +1040,87 @@ def _run_delete_question(
         generated.delete_question(
             discipline=discipline, course=course, slug=op.slug, client=client
         )
+    except (CodehoodAPIError, httpx.HTTPStatusError) as exc:
+        return OpResult(op=op, ok=False, message=f"failed: {describe_failure(exc)}")
+    return OpResult(op=op, ok=True, message=f"deleted {op.slug}")
+
+
+def _run_upsert_assignment(
+    op: UpsertAssignment, *, discipline: str, course: str, client: httpx.Client
+) -> OpResult:
+    # Sent as plain JSON, every key of the payload: the generated body would
+    # drop none of them either, but the generated function reads its answer
+    # as the wrong model.
+    body = {key: value for key, value in op.payload.items() if key != "slug"}
+    body["rev"] = op.rev
+    condition = (
+        {"If-Match": f'"{op.expected_updated_at}"'}
+        if op.expected_updated_at is not None
+        else {"If-None-Match": "*"}
+    )
+    try:
+        response = client.put(
+            f"/api/course/{discipline}/{course}/assignment/{quote(op.slug, safe='')}",
+            json=body,
+            headers={**auth_headers(client), **condition},
+        )
+        response.raise_for_status()
+    except (CodehoodAPIError, httpx.HTTPStatusError) as exc:
+        return OpResult(op=op, ok=False, message=f"failed: {describe_failure(exc)}")
+    stored = _Stored.of(response)
+    return OpResult(
+        op=op,
+        ok=True,
+        message=f"upserted {op.slug}",
+        rev=stored.rev,
+        updated_at=stored.updated_at,
+    )
+
+
+def _run_delete_assignment(
+    op: DeleteAssignment,
+    *,
+    discipline: str,
+    course: str,
+    client: httpx.Client,
+    confirm_force: ConfirmForce | None,
+) -> OpResult:
+    """
+    Delete an assignment; when the server refuses because it has teams, ask
+    `confirm_force` before deleting them along.
+    """
+
+    def delete(force: bool | None) -> None:
+        generated.assignment_delete(
+            discipline=discipline,
+            course=course,
+            slug=op.slug,
+            force=force,
+            client=client,
+        )
+
+    try:
+        try:
+            delete(None)
+        except httpx.HTTPStatusError as exc:
+            if exc.response.status_code != 409:
+                raise
+            teams = len(
+                list_teams(
+                    discipline=discipline, course=course, slug=op.slug, client=client
+                )
+            )
+            if confirm_force is None or not confirm_force(op.slug, teams):
+                return OpResult(
+                    op=op,
+                    ok=True,
+                    kept=True,
+                    message=(
+                        f"kept {op.slug}: it has {teams} team(s) and their "
+                        "repositories, and deleting them was not confirmed"
+                    ),
+                )
+            delete(True)
     except (CodehoodAPIError, httpx.HTTPStatusError) as exc:
         return OpResult(op=op, ok=False, message=f"failed: {describe_failure(exc)}")
     return OpResult(op=op, ok=True, message=f"deleted {op.slug}")

@@ -393,6 +393,55 @@ instructor has not released yet is not mentioned, and one with no value for
 the student reads "No grade".
 
 
+## Assignments
+
+### Form a team and follow the delivery
+
+    status: implemented
+    url: /[discipline]/[course]/assignments/[slug]
+
+Student opens an assignment done in teams and sees from the list that they have
+no team yet. They create one by name, and a name that is empty or already taken
+is refused. The page then shows the team's code, their personal clone URL and
+a warning while the team is below the minimum size. A classmate who types a
+wrong code is told so and joins with the right one; a third classmate is turned
+away by a full team.
+
+After the first push the page says the work was delivered on time, with the
+commit, who pushed it and when, lists every push, and warns about required
+files still missing from `main`. The student can ask for a new clone URL, which
+replaces the old one. Leaving the team is possible until teams lock, except for
+the last member of a team that already has a push.
+
+
+### Do an individual assignment
+
+    status: implemented
+    url: /[discipline]/[course]/assignments/[slug]
+
+Student opens an assignment that is done alone. The list says they have no
+repository yet, and the page offers one button to create it; nothing on the
+page talks about teams, members, codes or leaving. After creating the
+repository they find their clone URL and the commands for a first push, and
+once they push, the page reads "your delivery".
+
+
+### See where I stand after the deadline
+
+    status: implemented
+    url: /[discipline]/[course]/assignments/[slug]
+
+Student opens assignments whose due date has passed. A delivery made in time
+stays pinned, with a later push shown beside it as a late delivery; with only
+late pushes the page says nothing was delivered on time. A deadline the
+instructor extended appears marked as extended with the original beside it.
+Once pushes close, the page says so and the clone stays available.
+
+A student who never joined a team before teams locked is told to look for the
+instructor. An assignment that has not opened yet is missing from the list, and
+its address answers "not found".
+
+
 ## Managing my account
 
 ### Update my profile

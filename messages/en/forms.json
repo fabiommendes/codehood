@@ -92,5 +92,9 @@
 	"forms_schema_adjustment_question_op": "A question only takes a multiplier.",
 	"forms_schema_adjustment_question_factor": "A question can only be reduced: the multiplier must be below 1.",
 	"forms_schema_adjustment_text_max": "The text must have at most {max} characters.",
-	"forms_schema_adjustment_usernames_required": "Choose at least one student."
+	"forms_schema_adjustment_usernames_required": "Choose at least one student.",
+	"forms_schema_assignment_team_range": "The minimum team size must not exceed the maximum.",
+	"forms_schema_assignment_closes_before_due": "Pushes cannot close before the due date.",
+	"forms_schema_assignment_opens_after_due": "The assignment cannot open after the due date.",
+	"forms_schema_assignment_lock_after_due": "Teams cannot lock after the due date."
 }

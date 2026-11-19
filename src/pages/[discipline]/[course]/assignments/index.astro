@@ -1,0 +1,116 @@
+---
+import { hasPerm } from "@/auth/permissions";
+import CliSetupLink from "@/components/CliSetupLink.astro";
+import CourseHeader from "@/components/CourseHeader.astro";
+import ListRow from "@/components/ListRow.astro";
+import Badge from "@/components/ui/Badge";
+import { db } from "@/db";
+import { escapeHtml, m } from "@/i18n";
+import AppLayout from "@/layouts/AppLayout.astro";
+import { readerStatus } from "@/services/assignment-status";
+import {
+	formatRelative,
+	formatWhen,
+	statusBadge,
+} from "@/utils/assignment-view";
+import { breadcrumbs } from "@/utils/breadcrumbs";
+import { assignmentsNav } from "@/utils/course-tabs-nav";
+import { loadCourse } from "@/utils/load-course";
+
+export const prerender = false;
+
+const { discipline, course: courseSegment } = Astro.params;
+const result = await loadCourse(Astro, discipline, courseSegment);
+if ("redirect" in result) return result.redirect;
+const { course, href, tabs } = result;
+
+// biome-ignore lint/style/noNonNullAssertion: every course page runs through loadCourse, which already required Astro.locals.user.
+const actor = Astro.locals.actor!;
+const canWrite = hasPerm(actor, "course.update-contents", course);
+const manages = hasPerm(actor, "enrollment.manage", course);
+const now = new Date();
+
+const assignments = await db.assignment.findMany(
+	{ course: course.id },
+	{ actor },
+);
+
+// A reader who manages the course has no status; a student's comes from their team.
+const rows = await Promise.all(
+	assignments.map(async (assignment) => {
+		const team = manages
+			? null
+			: await db.team.findMine({ id: assignment.id }, { actor });
+		const badge = manages
+			? null
+			: statusBadge(
+					readerStatus({
+						individual: assignment.teamMax === 1,
+						closesAt: assignment.closesAt,
+						team,
+						now,
+					}),
+				);
+		return {
+			assignment,
+			badge,
+			due: team?.dueAt ?? assignment.dueAt,
+			unopened:
+				canWrite && assignment.opensAt !== null && assignment.opensAt > now,
+		};
+	}),
+);
+
+/// Inline code markup, for the messages that quote a folder or a command.
+function code(text: string): string {
+	return `<code class="rounded bg-base-200 px-1.5 py-0.5 font-mono text-sm">${escapeHtml(text)}</code>`;
+}
+---
+
+<AppLayout
+  title={m.assignments_page_title()}
+  trail={breadcrumbs(Astro.url, { course })}
+  nav={assignmentsNav(href, assignments.length)}
+>
+  <CourseHeader course={course} tabs={tabs} active="exams" />
+
+  <h2 class="mt-6 page-subheader">{m.assignments_heading()}</h2>
+
+  {rows.length === 0 ? (
+    <p class="mt-4 text-sm text-muted">
+      {canWrite ? (
+        <>
+          <span set:html={m.assignments_list_empty_instructor({
+            folder: code("assignments/"),
+            command: code("ch push"),
+          })} />{" "}
+          <CliSetupLink />
+        </>
+      ) : (
+        m.assignments_list_empty_student()
+      )}
+    </p>
+  ) : (
+    <ul class="mt-4 flex flex-col gap-3">
+      {rows.map(({ assignment, badge, due, unopened }) => (
+        <li>
+          <ListRow href={`${href}/assignments/${assignment.slug}`} muted={unopened}>
+            <p class="font-medium">{assignment.title}</p>
+            <p class="text-sm text-muted">
+              {assignment.teamMax === 1
+                ? m.assignments_kind_individual()
+                : m.assignments_kind_teams({ min: assignment.teamMin, max: assignment.teamMax })}
+              {" · "}{m.assignments_due_line({ when: formatWhen(due), relative: formatRelative(due) })}
+            </p>
+            <span slot="trailing">
+              {badge && <Badge variant={badge.variant} style="soft">{badge.label}</Badge>}
+              {unopened && assignment.opensAt && (
+                <Badge variant="neutral" style="soft">{m.assignments_not_open({ when: formatWhen(assignment.opensAt) })}</Badge>
+              )}
+            </span>
+          </ListRow>
+        </li>
+      ))}
+    </ul>
+  )}
+</AppLayout>

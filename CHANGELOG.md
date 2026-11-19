@@ -2,6 +2,31 @@
 
 ## Unreleased
 
+### Added
+
+- Trabalhos entregues por repositório git. Um trabalho (`Assignment`) é uma
+  entidade do curso, fora das provas: cada equipe (`Team`) ganha um
+  repositório git hospedado no servidor, criado do zero ou a partir de um
+  repositório do curso, e a entrega é a ponta da `main` no prazo. Pushes
+  depois do prazo contam como entrega atrasada, até o encerramento. O servidor
+  recebe os pushes com o binário git (ADR 0021) e recusa, com mensagem no
+  terminal do aluno, outra branch, force-push, arquivo grande, caminho
+  proibido e push depois do encerramento. O aluno forma a equipe, pega a URL
+  de clone pessoal e acompanha a entrega em
+  `/{discipline}/{course}/assignments`; o professor compõe as equipes na
+  mesma página. REST em `/api/course/{discipline}/{course}/assignment`. Na
+  CLI, `codehood push` lê `assignments/<slug>.md`, e
+  `codehood assignment status|clone|extend|move` lista as entregas, baixa os
+  repositórios e prorroga prazos. Configuração nova:
+  `storage.repositoryRoot`, `storage.assignment.maxRepoBytes` e
+  `storage.assignment.maxFileBytes`. O servidor passa a exigir git 2.30 ou
+  mais novo; ver "Deploying" no `README.md` para backup e proxy.
+
+### Fixed
+
+- Testes: cada worker recebe uma cópia dos blobs do seed, e as páginas de
+  repositório do seed deixam de dar 500 nos testes.
+
 ## 0.6.0 (2026-11-18)
 
 ### Added

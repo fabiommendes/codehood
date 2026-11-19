@@ -8,6 +8,7 @@ export * as schema from "@/core/schemas/all";
 import { nameServices } from "./define-service";
 import { makeAnswerEditService } from "./services/answer-edit.service";
 import { makeApiKeyService } from "./services/api-key.service";
+import { makeAssignmentService } from "./services/assignment.service";
 import { makeAttachmentService } from "./services/attachment.service";
 import { makeBlobService } from "./services/blob.service";
 import { makeCalendarEventService } from "./services/calendar-event.service";
@@ -64,6 +65,7 @@ import {
 	validateSession,
 } from "./services/session.service";
 import { makeSubmissionService } from "./services/submission.service";
+import { makeTeamService } from "./services/team.service";
 import { makeTimeSlotService } from "./services/time-slot.service";
 import { makeUserService } from "./services/user.service";
 
@@ -86,6 +88,13 @@ export type {
 	ApiKeyFilter,
 	ApiKeyPK,
 } from "./services/api-key.service";
+export type {
+	Assignment,
+	AssignmentFilter,
+	AssignmentPK,
+	AssignmentRemove,
+	AssignmentUpsert,
+} from "./services/assignment.service";
 export type {
 	Attachment,
 	AttachmentAttach,
@@ -273,6 +282,19 @@ export type {
 	SubmissionUpdate,
 } from "./services/submission.service";
 export type {
+	Team,
+	TeamAccess,
+	TeamCreate,
+	TeamCreateFor,
+	TeamJoin,
+	TeamListed,
+	TeamMine,
+	TeamPK,
+	TeamPush,
+	TeamPushInput,
+	TeamSummary,
+} from "./services/team.service";
+export type {
 	TimeSlot,
 	TimeSlotCreate,
 	TimeSlotFilter,
@@ -301,6 +323,7 @@ const feedbackService = makeFeedbackService();
 export const db = {
 	answerEdit: makeAnswerEditService(),
 	apiKey: makeApiKeyService(),
+	assignment: makeAssignmentService(),
 	attachment: attachmentService,
 	blob: blobService,
 	calendarEvent: makeCalendarEventService(),
@@ -329,6 +352,7 @@ export const db = {
 	rubric: makeRubricService(),
 	session: { ...makeSessionService(), validate: validateSession },
 	submission: makeSubmissionService(),
+	team: makeTeamService(undefined, blobService),
 	timeSlot: makeTimeSlotService(),
 	user: makeUserService(),
 } as const;

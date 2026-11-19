@@ -185,5 +185,16 @@
 	"errors_empty_attempt_in_progress": "The attempt of \"{username}\" is still in progress",
 	"errors_manual_grade_answered": "\"{username}\" answered this question: grade the answer instead",
 	"errors_manual_grade_score": "The score must be a number from 0 to 1",
-	"errors_manual_change_not_changed": "This answer was not changed by hand"
+	"errors_manual_change_not_changed": "This answer was not changed by hand",
+	"errors_assignment_template_unknown": "This course has no repository with this slug.",
+	"errors_assignment_restriction_over_limit": "Above the limit of this instance ({limit} bytes).",
+	"errors_assignment_mode_locked": "An assignment that has teams cannot switch between individual and team work.",
+	"errors_assignment_has_teams": "The assignment has teams. Delete it with force to remove them too.",
+	"errors_team_name_taken": "Another team of this assignment has this name.",
+	"errors_team_already_member": "This student is already in a team of this assignment.",
+	"errors_team_full": "The team is full.",
+	"errors_team_join_code_unknown": "No team of this assignment has this code.",
+	"errors_team_individual": "This does not apply to an individual assignment.",
+	"errors_team_last_member_pushed": "The last member cannot leave a team that has pushes. Ask the instructor.",
+	"errors_team_student_not_enrolled": "This user has no active enrollment in the course."
 }

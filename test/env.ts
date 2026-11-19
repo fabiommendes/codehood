@@ -1,5 +1,5 @@
 import { createHash } from "node:crypto";
-import { copyFileSync, existsSync, mkdirSync } from "node:fs";
+import { copyFileSync, cpSync, existsSync, mkdirSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { DEFAULT_E2E_WORKERS, DEFAULT_TEST_PORT } from "./default-port";
@@ -63,6 +63,7 @@ export interface E2eSlot {
 	runnerOrigin: string;
 	dbPath: string;
 	resourceRoot: string;
+	repositoryRoot: string;
 }
 
 /** The server address, database and blob directory of the `e2e` worker `index`. */
@@ -74,6 +75,7 @@ export function e2eSlot(index: number): E2eSlot {
 		runnerOrigin: `http://127.0.0.1:${port}`,
 		dbPath: path.join(TEST_DB_DIR, `e2e-${index}.db`),
 		resourceRoot: path.join(TEST_TMP_DIR, `resources-e2e-${index}`),
+		repositoryRoot: path.join(TEST_TMP_DIR, `repos-e2e-${index}`),
 	};
 }
 
@@ -114,6 +116,9 @@ export const TEST_DB_PATH = UNIT_WORKER
 		: TEST_SEEDED_DB_PATH;
 export const TEST_DATABASE_URL = `file:${TEST_DB_PATH}`;
 
+/// Where `test/run.ts` seeds the blobs every worker starts from.
+const SEEDED_RESOURCE_ROOT = path.join(TEST_TMP_DIR, "resources");
+
 /**
  * Where test blobs get written — kept out of the real `storage/resources` a
  * dev checkout uses, and wiped by `test/run.ts` on every run.
@@ -122,12 +127,46 @@ export const TEST_RESOURCE_ROOT = UNIT_WORKER
 	? path.join(TEST_TMP_DIR, `resources-worker-${WORKER_INDEX}`)
 	: E2E_WORKER
 		? SLOT.resourceRoot
-		: path.join(TEST_TMP_DIR, "resources");
+		: SEEDED_RESOURCE_ROOT;
+
+/// Where `test/run.ts` seeds the team repositories every worker starts from.
+const SEEDED_REPOSITORY_ROOT = path.join(TEST_TMP_DIR, "repos");
+
+/**
+ * Where the bare repositories of teams get written — kept out of the real
+ * `storage/repos` a dev checkout uses, and wiped by `test/run.ts` on every run.
+ */
+export const TEST_REPOSITORY_ROOT = UNIT_WORKER
+	? path.join(TEST_TMP_DIR, `repos-worker-${WORKER_INDEX}`)
+	: E2E_WORKER
+		? SLOT.repositoryRoot
+		: SEEDED_REPOSITORY_ROOT;
+
+/// Gives a worker the files the seed wrote under `seeded`, which its copy of
+/// the seeded database points at.
+function copySeeded(seeded: string, target: string): void {
+	if (existsSync(target)) return;
+	if (existsSync(seeded)) {
+		cpSync(seeded, target, { recursive: true });
+	}
+	mkdirSync(target, { recursive: true });
+}
+
+/// Blobs of repository files and attachments.
+function copySeededBlobs(target: string): void {
+	copySeeded(SEEDED_RESOURCE_ROOT, target);
+}
+
+/// Bare repositories of the seeded teams.
+function copySeededRepositories(target: string): void {
+	copySeeded(SEEDED_REPOSITORY_ROOT, target);
+}
 
 /** Creates the database and the blob directory of `slot`, unless they exist. */
 export function prepareE2eSlot(slot: E2eSlot): void {
 	if (!existsSync(slot.dbPath)) copyFileSync(TEST_SEEDED_DB_PATH, slot.dbPath);
-	mkdirSync(slot.resourceRoot, { recursive: true });
+	copySeededBlobs(slot.resourceRoot);
+	copySeededRepositories(slot.repositoryRoot);
 }
 
 // `playwright.config.ts` imports this module, and a worker loads the config
@@ -137,13 +176,16 @@ if (UNIT_WORKER) {
 	if (!existsSync(TEST_DB_PATH)) {
 		copyFileSync(TEST_SEEDED_DB_PATH, TEST_DB_PATH);
 	}
-	mkdirSync(TEST_RESOURCE_ROOT, { recursive: true });
+	copySeededBlobs(TEST_RESOURCE_ROOT);
+	copySeededRepositories(TEST_REPOSITORY_ROOT);
 	process.env.DATABASE_URL = TEST_DATABASE_URL;
 	process.env.RESOURCE_ROOT = TEST_RESOURCE_ROOT;
+	process.env.REPOSITORY_ROOT = TEST_REPOSITORY_ROOT;
 }
 if (E2E_WORKER) {
 	process.env.DATABASE_URL = TEST_DATABASE_URL;
 	process.env.RESOURCE_ROOT = TEST_RESOURCE_ROOT;
+	process.env.REPOSITORY_ROOT = TEST_REPOSITORY_ROOT;
 	// Clone URLs built in the worker must match the ones its server builds.
 	process.env.PUBLIC_URL = TEST_BASE_URL;
 }

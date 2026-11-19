@@ -29,6 +29,7 @@ from pathlib import Path
 from typing import Literal
 
 from ..models.repo import CourseKey
+from .assignment import AssignmentFile, InvalidAssignment
 from .base import BaseEntry, BaseState
 from .calendar import Event, EventKey, TimeSlot
 from .exam import (
@@ -66,6 +67,7 @@ __all__ = [
     "Conflict",
     "ConflictReason",
     "Decision",
+    "DeleteAssignment",
     "DeleteCalendarEvent",
     "DeleteExam",
     "DeleteGradeColumn",
@@ -77,6 +79,7 @@ __all__ = [
     "EntityKind",
     "IgnoredExamPolicy",
     "Keep",
+    "KeptAssignment",
     "KeptCancelled",
     "KeptDraftPublished",
     "KeptExamLive",
@@ -97,6 +100,7 @@ __all__ = [
     "ServerQuestion",
     "ServerState",
     "Skip",
+    "UpsertAssignment",
     "UpsertCalendarEvent",
     "UpsertCourse",
     "UpsertExam",
@@ -156,6 +160,8 @@ class LocalState:
     exams: tuple[ExamFile | InvalidExam, ...] = ()
     grade_columns: tuple[GradeColumn, ...] | None = ()
     repositories: tuple[RepositoryTree, ...] = ()
+    #: The files under `assignments/`.
+    assignments: tuple[AssignmentFile | InvalidAssignment, ...] = ()
     #: Files left out by `[push] exclude`: never written, never pruned.
     excluded: tuple[ExcludedFile, ...] = ()
     #: Versionable files no push stage read, sorted. Reported, never pushed.
@@ -237,6 +243,7 @@ class ServerState:
     #: Slug -> sha1 of the head commit's root tree, `None` before the first
     #: commit.
     repositories: Mapping[str, str | None] = field(default_factory=dict)
+    assignments: Mapping[str, RemoteEntry] = field(default_factory=dict)
 
 
 #
@@ -438,10 +445,40 @@ class DeleteRepository:
     slug: str
 
 
+@dataclass(frozen=True)
+class UpsertAssignment:
+    """
+    One assignment to `PUT`: its payload, plus the `rev` that stays out of it.
+
+    `expected_updated_at` is the version the server held when the plan was
+    made, sent as `If-Match`; `None` means the assignment is new and the
+    `PUT` creates it only (`If-None-Match: *`).
+    """
+
+    slug: str
+    payload: Payload
+    rev: str
+    path: Path
+    expected_updated_at: str | None = None
+
+
+@dataclass(frozen=True)
+class DeleteAssignment:
+    """
+    An assignment to delete by slug: its file is gone and the push ran with
+    `--drop-assignments`. The server refuses while it has teams; the shell
+    then asks before forcing it.
+    """
+
+    slug: str
+
+
 Write = (
     UpsertCourse
     | UpsertRepository
     | DeleteRepository
+    | UpsertAssignment
+    | DeleteAssignment
     | UpsertResource
     | DeleteResource
     | UpsertQuestion
@@ -472,7 +509,7 @@ class Rejected:
     path: Path
     reason: str
     #: What the refused file holds.
-    kind: Literal["question", "exam"] = "question"
+    kind: Literal["question", "exam", "assignment"] = "question"
 
 
 @dataclass(frozen=True)
@@ -541,6 +578,16 @@ class KeptRepository:
 
 
 @dataclass(frozen=True)
+class KeptAssignment:
+    """
+    An assignment the server has and `assignments/` no longer does, kept
+    because deleting it takes its teams and their repositories along.
+    """
+
+    slug: str
+
+
+@dataclass(frozen=True)
 class KeptCancelled:
     """
     A calendar event the server reports as `CANCELLED`, left alone whatever
@@ -576,6 +623,7 @@ Notice = (
     | KeptPinnedSlot
     | KeptForRollCall
     | KeptRepository
+    | KeptAssignment
     | KeptCancelled
 )
 
@@ -679,6 +727,7 @@ type EntityKind = Literal[
     "resource",
     "question",
     "exam",
+    "assignment",
     "time_slot",
     "calendar_event",
     "grade_column",
@@ -1097,6 +1146,7 @@ def plan_sync(
     *,
     drop_roll_calls: bool = False,
     drop_repositories: bool = False,
+    drop_assignments: bool = False,
     message: str | None = None,
     ours: Sequence[str] = (),
 ) -> Plan:
@@ -1114,7 +1164,8 @@ def plan_sync(
     plan keeps the order: course, repositories, calendar, resources,
     questions, exams, grade columns. Repositories and grade columns stay one-way:
     the repository overwrites, and a grade column the server holds in a form
-    other than the base's gets a `ServerDrifted` notice.
+    other than the base's gets a `ServerDrifted` notice. Assignments come right
+    after the repositories, since one may start from a repository.
 
     The course row is never pulled for removal: a course missing on the
     server is written back.
@@ -1126,6 +1177,7 @@ def plan_sync(
         + plan_repositories(
             local, remote, drop_repositories=drop_repositories, message=message
         )
+        + _sync_assignments(local, base, remote, drop_assignments=drop_assignments)
         + _sync_calendar(
             local,
             base,
@@ -1496,6 +1548,81 @@ def _sync_exams(local: LocalState, base: BaseState, remote: ServerState) -> Plan
     return Plan.of(decisions) + Plan(notices=ignored)
 
 
+def _sync_assignments(
+    local: LocalState,
+    base: BaseState,
+    remote: ServerState,
+    *,
+    drop_assignments: bool = False,
+) -> Plan:
+    files = {file.slug: file for file in local.assignments}
+
+    def decide(
+        key: str,
+        payload: Payload | None,
+        entry: BaseEntry | None,
+        server: RemoteEntry | None,
+    ) -> Decision:
+        file = files.get(key)
+        if isinstance(file, InvalidAssignment):
+            return Keep(
+                Rejected(
+                    slug=file.slug,
+                    path=file.path,
+                    reason=file.reason,
+                    kind="assignment",
+                )
+            )
+
+        def put() -> Put:
+            assert isinstance(file, AssignmentFile)
+            return Put(
+                UpsertAssignment(
+                    slug=key,
+                    payload=file.payload,
+                    rev=file.rev,
+                    path=file.path,
+                    expected_updated_at=server.updated_at if server else None,
+                )
+            )
+
+        def prune() -> Decision:
+            if drop_assignments:
+                return Prune(DeleteAssignment(slug=key))
+            return Keep(KeptAssignment(slug=key))
+
+        return three_way(
+            "assignment",
+            key,
+            payload,
+            entry,
+            server,
+            local_ref=file.rev if isinstance(file, AssignmentFile) else None,
+            server_ref=server.rev if server else None,
+            put=put,
+            prune=prune,
+        )
+
+    return Plan.of(
+        _sync_kind(
+            "assignment",
+            {
+                slug: file.payload
+                for slug, file in files.items()
+                if isinstance(file, AssignmentFile)
+            },
+            base.assignments,
+            remote.assignments,
+            decide,
+            extra=[
+                file.slug
+                for file in local.assignments
+                if isinstance(file, InvalidAssignment)
+            ],
+        )
+    )
+
+
 def _carry_server_set(payload: Payload, entry: BaseEntry | None) -> Payload:
     """
     `payload` with the `duration` and `scheduledAt` it omits taken from the
@@ -1857,6 +1984,7 @@ def _without_prunes(ours: tuple[Put | Prune, ...]) -> tuple[Put | Prune, ...]:
 _WRITE_ORDER: tuple[tuple[type, ...], ...] = (
     (UpsertCourse,),
     (UpsertRepository, DeleteRepository),
+    (UpsertAssignment, DeleteAssignment),
     (DeleteRollCall, DeleteCalendarEvent),
     (DeleteTimeSlot,),
     (UpsertTimeSlot,),

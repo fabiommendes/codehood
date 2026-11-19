@@ -1,0 +1,84 @@
+---
+// One delivery of a team: the commit that counts, who pushed it and when.
+// `on-time` is the strongest element of the page; `late` and `none` are
+// quieter and read as separate things beside it.
+import { m } from "@/i18n";
+import {
+	formatRelative,
+	formatWhen,
+	type PushView,
+	shortSha,
+} from "@/utils/assignment-view";
+
+interface Props {
+	kind: "on-time" | "late" | "none";
+	push?: PushView | null;
+	/// The delivery is fixed: later pushes no longer change it.
+	pinned?: boolean;
+	/// Line under the commit, e.g. the reminder about new pushes.
+	note?: string;
+}
+
+const { kind, push, pinned = false, note } = Astro.props;
+
+const style = {
+	"on-time": "border-2 border-success bg-success/10",
+	late: "border border-warning bg-warning/10",
+	none: "border border-error bg-error/10",
+}[kind];
+const heading = {
+	"on-time": m.assignments_delivery_on_time(),
+	late: m.assignments_delivery_late(),
+	none: m.assignments_delivery_none(),
+}[kind];
+const strong = kind === "on-time";
+const headingId = `delivery-${kind}`;
+---
+
+<section class={`card ${style}`} aria-labelledby={headingId} data-delivery={kind}>
+  <div class:list={["card-body gap-3", strong ? "p-6" : "p-5"]}>
+    <div class="flex items-center gap-3">
+      <span
+        class:list={[
+          "flex shrink-0 items-center justify-center rounded-full",
+          strong ? "size-11 bg-success text-success-content" : "size-8",
+          kind === "late" && "bg-warning text-warning-content",
+          kind === "none" && "bg-error text-error-content",
+        ]}
+        aria-hidden="true"
+      >
+        {kind === "none" ? (
+          <svg viewBox="0 0 24 24" class="size-4" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18" /></svg>
+        ) : kind === "late" ? (
+          <svg viewBox="0 0 24 24" class="size-4" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9" /><path d="M12 7v5l3 2" /></svg>
+        ) : (
+          <svg viewBox="0 0 24 24" class="size-6" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12.5l4.5 4.5L19 7.5" /></svg>
+        )}
+      </span>
+      <h2 id={headingId} class:list={["font-bold", strong ? "text-2xl" : "text-lg"]}>{heading}</h2>
+      {pinned && (
+        <span class="badge badge-success badge-soft ml-auto">{m.assignments_delivery_pinned()}</span>
+      )}
+    </div>
+
+    {push ? (
+      <div class="flex flex-col gap-1">
+        <p class:list={["font-medium", strong && "text-lg"]}>
+          <code class="rounded bg-base-300 px-1.5 py-0.5 font-mono text-sm">{shortSha(push.sha)}</code>
+          <span class="ml-2">{push.message}</span>
+        </p>
+        <p class="text-sm text-muted">
+          {m.assignments_delivery_commit_meta({
+            author: push.author ?? m.assignments_delivery_unknown_author(),
+            when: formatWhen(push.at),
+            relative: formatRelative(push.at),
+          })}
+        </p>
+      </div>
+    ) : (
+      <p class="text-sm text-muted">{m.assignments_delivery_none_text()}</p>
+    )}
+
+    {note && <p class="text-sm text-muted">{note}</p>}
+  </div>
+</section>

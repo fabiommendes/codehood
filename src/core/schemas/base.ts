@@ -14,6 +14,9 @@ extendZodWithOpenApi(z);
 export const apiKeyId = z.number().int().brand("ApiKeyId");
 export type ApiKeyId = z.infer<typeof apiKeyId>;
 
+export const assignmentId = z.number().int().brand("AssignmentId");
+export type AssignmentId = z.infer<typeof assignmentId>;
+
 export const attachmentId = z.number().int().brand("AttachmentId");
 export type AttachmentId = z.infer<typeof attachmentId>;
 
@@ -88,6 +91,9 @@ export type RollCallId = z.infer<typeof rollCallId>;
 
 export const sessionId = z.number().int().brand("SessionId");
 export type SessionId = z.infer<typeof sessionId>;
+
+export const teamId = z.number().int().brand("TeamId");
+export type TeamId = z.infer<typeof teamId>;
 
 export const timeSlotId = z.number().int().brand("TimeSlotId");
 export type TimeSlotId = z.infer<typeof timeSlotId>;

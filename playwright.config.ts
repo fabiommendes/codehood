@@ -69,6 +69,7 @@ const E2E_SERVERS = Array.from({ length: E2E_SERVER_COUNT }, (_, index) => {
 		env: {
 			DATABASE_URL: `file:${slot.dbPath}`,
 			RESOURCE_ROOT: slot.resourceRoot,
+			REPOSITORY_ROOT: slot.repositoryRoot,
 			NODE_ENV: "test",
 			// Required, no default. The test server is a dev instance: it runs
 			// over plain HTTP, so a Secure session cookie would never come back.

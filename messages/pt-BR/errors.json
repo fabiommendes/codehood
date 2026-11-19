@@ -185,5 +185,16 @@
 	"errors_empty_attempt_in_progress": "A tentativa de \"{username}\" ainda está em andamento",
 	"errors_manual_grade_answered": "\"{username}\" respondeu esta questão: corrija a resposta",
 	"errors_manual_grade_score": "A nota deve ser um número de 0 a 1",
-	"errors_manual_change_not_changed": "Esta resposta não foi alterada à mão"
+	"errors_manual_change_not_changed": "Esta resposta não foi alterada à mão",
+	"errors_assignment_template_unknown": "O curso não tem repositório com este slug.",
+	"errors_assignment_restriction_over_limit": "Acima do limite desta instância ({limit} bytes).",
+	"errors_assignment_mode_locked": "Um trabalho que já tem equipes não pode passar de individual para em equipe, nem o contrário.",
+	"errors_assignment_has_teams": "O trabalho tem equipes. Apague com force para removê-las também.",
+	"errors_team_name_taken": "Outra equipe deste trabalho tem este nome.",
+	"errors_team_already_member": "Este aluno já está numa equipe deste trabalho.",
+	"errors_team_full": "A equipe está cheia.",
+	"errors_team_join_code_unknown": "Nenhuma equipe deste trabalho tem este código.",
+	"errors_team_individual": "Isto não vale para um trabalho individual.",
+	"errors_team_last_member_pushed": "O último membro não pode sair de uma equipe que já fez push. Fale com o professor.",
+	"errors_team_student_not_enrolled": "Este usuário não tem matrícula ativa no curso."
 }

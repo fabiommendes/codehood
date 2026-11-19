@@ -74,6 +74,16 @@ export const codehoodConfig = z.object({
 					student: z.string().default("200mb"),
 				})
 				.prefault({}),
+			/// Where the bare git repositories of teams are kept.
+			repositoryRoot: z.string().min(1).default("./storage/repos"),
+			/// Limits of a team repository, as byte sizes. An assignment may
+			/// lower them, never raise them.
+			assignment: z
+				.object({
+					maxRepoBytes: z.string().default("50mb"),
+					maxFileBytes: z.string().default("10mb"),
+				})
+				.prefault({}),
 		})
 		.prefault({}),
 	runner: z

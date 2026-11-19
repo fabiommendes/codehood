@@ -27,11 +27,13 @@ from .grades import GradeColumn
 from .question import QuestionFile
 
 if TYPE_CHECKING:
+    from .assignment import AssignmentFile
     from .exam import ExamFile
 from .resource import CodeData, FileData, LinkData, MdData, ResourceFile
 
 __all__ = [
     "Payload",
+    "assignment_payload",
     "canonical_question",
     "course_payload",
     "event_payload",
@@ -168,6 +170,29 @@ def exam_payload(file: ExamFile) -> Payload:
     if file.scheduled_at is not None:
         payload["scheduledAt"] = file.scheduled_at
     return payload
+
+
+def assignment_payload(file: AssignmentFile) -> Payload:
+    """
+    The body of an assignment's `PUT`, without its `rev`.
+
+    Every key is always there: a key left out would keep the server's value,
+    so a date or limit removed from the file must travel as `null`. The
+    deadline of a team is never part of it.
+    """
+    return {
+        "slug": file.slug,
+        "title": file.title,
+        "body": file.body,
+        "opensAt": file.opens_at,
+        "dueAt": file.due_at,
+        "closesAt": file.closes_at,
+        "teamMin": file.team_min,
+        "teamMax": file.team_max,
+        "teamsLockAt": file.teams_lock_at,
+        "template": file.template,
+        "restrictions": file.restrictions,
+    }
 
 
 def time_slot_payload(slot: TimeSlot) -> Payload:

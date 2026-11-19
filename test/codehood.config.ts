@@ -23,6 +23,11 @@ export default defineConfig({
 			instructor: env("BLOB_QUOTA_INSTRUCTOR"),
 			student: env("BLOB_QUOTA_STUDENT"),
 		},
+		repositoryRoot: env("REPOSITORY_ROOT"),
+		assignment: {
+			maxRepoBytes: env("ASSIGNMENT_MAX_REPO"),
+			maxFileBytes: env("ASSIGNMENT_MAX_FILE"),
+		},
 	},
 	runner: {
 		origin: env("RUNNER_ORIGIN") ?? null,

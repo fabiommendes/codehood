@@ -8637,6 +8637,425 @@
           }
         ]
       },
+      "Assignment": {
+        "type": "object",
+        "properties": {
+          "slug": {
+            "type": "string",
+            "maxLength": 200,
+            "pattern": "^[a-z0-9][a-z0-9._\\-]*$",
+            "example": "intro-to-recursion"
+          },
+          "title": {
+            "type": "string",
+            "minLength": 1
+          },
+          "body": {
+            "type": "string"
+          },
+          "opensAt": {
+            "type": "string",
+            "nullable": true,
+            "format": "date-time"
+          },
+          "dueAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "closesAt": {
+            "type": "string",
+            "nullable": true,
+            "format": "date-time"
+          },
+          "teamMin": {
+            "type": "integer"
+          },
+          "teamMax": {
+            "type": "integer"
+          },
+          "teamsLockAt": {
+            "type": "string",
+            "nullable": true,
+            "format": "date-time"
+          },
+          "template": {
+            "type": "string",
+            "nullable": true
+          },
+          "restrictions": {
+            "type": "object",
+            "nullable": true,
+            "properties": {
+              "maxRepoBytes": {
+                "type": "integer",
+                "minimum": 0,
+                "exclusiveMinimum": true
+              },
+              "maxFileBytes": {
+                "type": "integer",
+                "minimum": 0,
+                "exclusiveMinimum": true
+              },
+              "deny": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 200
+                }
+              },
+              "require": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 255,
+                  "example": "src/main.py"
+                }
+              }
+            }
+          },
+          "rev": {
+            "type": "string",
+            "nullable": true
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "required": [
+          "slug",
+          "title",
+          "body",
+          "opensAt",
+          "dueAt",
+          "closesAt",
+          "teamMin",
+          "teamMax",
+          "teamsLockAt",
+          "template",
+          "restrictions",
+          "rev",
+          "createdAt",
+          "updatedAt"
+        ]
+      },
+      "AssignmentPut": {
+        "type": "object",
+        "properties": {
+          "title": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 200
+          },
+          "body": {
+            "type": "string"
+          },
+          "opensAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "dueAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "closesAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "teamMin": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 10
+          },
+          "teamMax": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 10
+          },
+          "teamsLockAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "template": {
+            "type": "string",
+            "nullable": true,
+            "maxLength": 200,
+            "pattern": "^[a-z0-9][a-z0-9._\\-]*$",
+            "example": "intro-to-recursion"
+          },
+          "restrictions": {
+            "type": "object",
+            "nullable": true,
+            "properties": {
+              "maxRepoBytes": {
+                "type": "integer",
+                "minimum": 0,
+                "exclusiveMinimum": true
+              },
+              "maxFileBytes": {
+                "type": "integer",
+                "minimum": 0,
+                "exclusiveMinimum": true
+              },
+              "deny": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 200
+                }
+              },
+              "require": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 255,
+                  "example": "src/main.py"
+                }
+              }
+            }
+          },
+          "rev": {
+            "type": "string",
+            "nullable": true,
+            "minLength": 1
+          }
+        },
+        "required": [
+          "title",
+          "body",
+          "dueAt"
+        ]
+      },
+      "AssignmentDeleted": {
+        "type": "object",
+        "properties": {
+          "deleted": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "deleted"
+        ]
+      },
+      "TeamListed": {
+        "type": "object",
+        "properties": {
+          "publicId": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "dueAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "extended": {
+            "type": "boolean"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "members": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "username": {
+                  "type": "string"
+                },
+                "name": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "username",
+                "name"
+              ]
+            }
+          },
+          "delivery": {
+            "type": "object",
+            "properties": {
+              "onTime": {
+                "type": "object",
+                "nullable": true,
+                "properties": {
+                  "newSha": {
+                    "type": "string"
+                  },
+                  "createdAt": {
+                    "type": "string",
+                    "format": "date-time"
+                  },
+                  "username": {
+                    "type": "string",
+                    "nullable": true
+                  }
+                },
+                "required": [
+                  "newSha",
+                  "createdAt",
+                  "username"
+                ]
+              },
+              "late": {
+                "type": "object",
+                "nullable": true,
+                "properties": {
+                  "newSha": {
+                    "type": "string"
+                  },
+                  "createdAt": {
+                    "type": "string",
+                    "format": "date-time"
+                  },
+                  "username": {
+                    "type": "string",
+                    "nullable": true
+                  }
+                },
+                "required": [
+                  "newSha",
+                  "createdAt",
+                  "username"
+                ]
+              }
+            },
+            "required": [
+              "onTime",
+              "late"
+            ]
+          },
+          "sizeException": {
+            "type": "string",
+            "nullable": true,
+            "enum": [
+              "above",
+              "below",
+              "empty",
+              null
+            ]
+          }
+        },
+        "required": [
+          "publicId",
+          "name",
+          "dueAt",
+          "extended",
+          "createdAt",
+          "members",
+          "delivery",
+          "sizeException"
+        ]
+      },
+      "Team": {
+        "type": "object",
+        "properties": {
+          "publicId": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "dueAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "extended": {
+            "type": "boolean"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "members": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "username": {
+                  "type": "string"
+                },
+                "name": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "username",
+                "name"
+              ]
+            }
+          }
+        },
+        "required": [
+          "publicId",
+          "name",
+          "dueAt",
+          "extended",
+          "createdAt",
+          "members"
+        ]
+      },
+      "TeamCreate": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 60,
+            "example": "Alpha"
+          },
+          "members": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "pattern": "^[A-Za-z0-9][A-Za-z0-9_\\-]{1,30}$",
+              "example": "ada"
+            },
+            "maxItems": 50
+          }
+        },
+        "required": [
+          "name",
+          "members"
+        ]
+      },
+      "TeamPatch": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 60,
+            "example": "Alpha"
+          },
+          "dueAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "TeamDeleted": {
+        "type": "object",
+        "properties": {
+          "deleted": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "deleted"
+        ]
+      },
       "LogoutResponse": {
         "type": "object",
         "properties": {
@@ -43556,6 +43975,661 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/RubricPreview"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/course/{discipline}/{course}/assignment": {
+      "get": {
+        "operationId": "assignmentList",
+        "summary": "Find multiple Assignments.",
+        "tags": [
+          "Assignments"
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string"
+            },
+            "required": true,
+            "name": "discipline",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": "string"
+            },
+            "required": true,
+            "name": "course",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "items": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/Assignment"
+                      }
+                    },
+                    "next": {
+                      "type": "string",
+                      "nullable": true
+                    },
+                    "prev": {
+                      "type": "string",
+                      "nullable": true
+                    }
+                  },
+                  "required": [
+                    "items",
+                    "next",
+                    "prev"
+                  ]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/course/{discipline}/{course}/assignment/{slug}": {
+      "get": {
+        "operationId": "assignmentRead",
+        "summary": "Find a single Assignment.",
+        "tags": [
+          "Assignments"
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string"
+            },
+            "required": true,
+            "name": "discipline",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": "string"
+            },
+            "required": true,
+            "name": "course",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": "string"
+            },
+            "required": true,
+            "name": "slug",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "headers": {
+              "ETag": {
+                "schema": {
+                  "type": "string",
+                  "description": "The row's `updatedAt`, in quotes. Send it back as If-Match."
+                },
+                "required": true,
+                "description": "The row's `updatedAt`, in quotes. Send it back as If-Match."
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Assignment"
+                }
+              }
+            }
+          }
+        }
+      },
+      "put": {
+        "operationId": "assignmentUpsert",
+        "summary": "Create or update an Assignment.",
+        "description": "A field left out keeps its stored value; null clears it. The deadline of a team is never touched.",
+        "tags": [
+          "Assignments"
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string"
+            },
+            "required": true,
+            "name": "discipline",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": "string"
+            },
+            "required": true,
+            "name": "course",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": "string"
+            },
+            "required": true,
+            "name": "slug",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "description": "Write only if the row is at this version: its `updatedAt` in quotes, e.g. `\"2026-01-01T12:00:00.000Z\"`. A stale version answers 412."
+            },
+            "required": false,
+            "description": "Write only if the row is at this version: its `updatedAt` in quotes, e.g. `\"2026-01-01T12:00:00.000Z\"`. A stale version answers 412.",
+            "name": "If-Match",
+            "in": "header"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "enum": [
+                "*"
+              ],
+              "description": "`*`: create only. A row that already exists answers 412."
+            },
+            "required": false,
+            "description": "`*`: create only. A row that already exists answers 412.",
+            "name": "If-None-Match",
+            "in": "header"
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AssignmentPut"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Success",
+            "headers": {
+              "ETag": {
+                "schema": {
+                  "type": "string",
+                  "description": "The row's `updatedAt`, in quotes. Send it back as If-Match."
+                },
+                "required": true,
+                "description": "The row's `updatedAt`, in quotes. Send it back as If-Match."
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Assignment"
+                }
+              }
+            }
+          },
+          "412": {
+            "description": "The row is not at the version the request expected.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PreconditionFailed"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "operationId": "assignmentDelete",
+        "summary": "Delete an Assignment.",
+        "description": "Answers 409 while the assignment has teams, unless `force` is true: then its teams and their repositories go too.",
+        "tags": [
+          "Assignments"
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string"
+            },
+            "required": true,
+            "name": "discipline",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": "string"
+            },
+            "required": true,
+            "name": "course",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": "string"
+            },
+            "required": true,
+            "name": "slug",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": "boolean"
+            },
+            "required": false,
+            "name": "force",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "description": "Write only if the row is at this version: its `updatedAt` in quotes, e.g. `\"2026-01-01T12:00:00.000Z\"`. A stale version answers 412."
+            },
+            "required": false,
+            "description": "Write only if the row is at this version: its `updatedAt` in quotes, e.g. `\"2026-01-01T12:00:00.000Z\"`. A stale version answers 412.",
+            "name": "If-Match",
+            "in": "header"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AssignmentDeleted"
+                }
+              }
+            }
+          },
+          "412": {
+            "description": "The row is not at the version the request expected.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PreconditionFailed"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/course/{discipline}/{course}/assignment/{slug}/team": {
+      "get": {
+        "operationId": "teamList",
+        "summary": "List the teams of an Assignment with their deliveries.",
+        "tags": [
+          "Assignments"
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string"
+            },
+            "required": true,
+            "name": "discipline",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": "string"
+            },
+            "required": true,
+            "name": "course",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": "string"
+            },
+            "required": true,
+            "name": "slug",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "items": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/TeamListed"
+                      }
+                    },
+                    "next": {
+                      "type": "string",
+                      "nullable": true
+                    },
+                    "prev": {
+                      "type": "string",
+                      "nullable": true
+                    }
+                  },
+                  "required": [
+                    "items",
+                    "next",
+                    "prev"
+                  ]
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "operationId": "teamCreate",
+        "summary": "Make a team with the given students.",
+        "tags": [
+          "Assignments"
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string"
+            },
+            "required": true,
+            "name": "discipline",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": "string"
+            },
+            "required": true,
+            "name": "course",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": "string"
+            },
+            "required": true,
+            "name": "slug",
+            "in": "path"
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TeamCreate"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Team"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/course/{discipline}/{course}/assignment/{slug}/team/{team}": {
+      "patch": {
+        "operationId": "teamUpdate",
+        "summary": "Rename a team or give it its own deadline.",
+        "description": "`dueAt: null` goes back to the deadline of the assignment.",
+        "tags": [
+          "Assignments"
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string"
+            },
+            "required": true,
+            "name": "discipline",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": "string"
+            },
+            "required": true,
+            "name": "course",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": "string"
+            },
+            "required": true,
+            "name": "slug",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": "string"
+            },
+            "required": true,
+            "name": "team",
+            "in": "path"
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TeamPatch"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Team"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "operationId": "teamDelete",
+        "summary": "Delete a team and its repository.",
+        "tags": [
+          "Assignments"
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string"
+            },
+            "required": true,
+            "name": "discipline",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": "string"
+            },
+            "required": true,
+            "name": "course",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": "string"
+            },
+            "required": true,
+            "name": "slug",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": "string"
+            },
+            "required": true,
+            "name": "team",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TeamDeleted"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/course/{discipline}/{course}/assignment/{slug}/team/{team}/member/{username}": {
+      "put": {
+        "operationId": "teamMemberPut",
+        "summary": "Put a student in a team, taking them out of another.",
+        "description": "Idempotent: a student already in the team keeps their token. A student who moves gets a new one.",
+        "tags": [
+          "Assignments"
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string"
+            },
+            "required": true,
+            "name": "discipline",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": "string"
+            },
+            "required": true,
+            "name": "course",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": "string"
+            },
+            "required": true,
+            "name": "slug",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": "string"
+            },
+            "required": true,
+            "name": "team",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": "string"
+            },
+            "required": true,
+            "name": "username",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Team"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "operationId": "teamMemberDelete",
+        "summary": "Take a student out of a team.",
+        "description": "The team stays, with its repository and pushes.",
+        "tags": [
+          "Assignments"
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string"
+            },
+            "required": true,
+            "name": "discipline",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": "string"
+            },
+            "required": true,
+            "name": "course",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": "string"
+            },
+            "required": true,
+            "name": "slug",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": "string"
+            },
+            "required": true,
+            "name": "team",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": "string"
+            },
+            "required": true,
+            "name": "username",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Team"
                 }
               }
             }

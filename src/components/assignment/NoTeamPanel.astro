@@ -1,0 +1,122 @@
+---
+// The panel of a reader without a team: create or join one, create the own
+// repository on an individual assignment, or the notice that teams are locked.
+import { actions } from "astro:actions";
+import Field from "@/components/form/Field";
+import FormAlert from "@/components/form/FormAlert";
+import Alert from "@/components/ui/Alert";
+import {
+	assignmentTeamCreate,
+	assignmentTeamJoin,
+} from "@/core/schemas/assignment-actions";
+import { actionForm } from "@/forms/form-state";
+import { m } from "@/i18n";
+import { formatWhen } from "@/utils/assignment-view";
+
+interface Props {
+	/// The course segments and the slug the actions take.
+	params: { discipline: string; course: string; slug: string };
+	teamMin: number;
+	teamMax: number;
+	/// When teams stop forming.
+	lockAt: Date;
+}
+
+const { params, teamMin, teamMax, lockAt } = Astro.props;
+const individual = teamMax === 1;
+const locked = lockAt <= new Date();
+
+const createForm = await actionForm(
+	Astro,
+	actions.assignment.createTeam,
+	assignmentTeamCreate,
+	{
+		id: "create-team",
+		fields: {
+			name: {
+				label: m.assignments_team_name(),
+				placeholder: m.assignments_team_name_placeholder(),
+			},
+		},
+	},
+);
+const joinForm = await actionForm(
+	Astro,
+	actions.assignment.joinTeam,
+	assignmentTeamJoin,
+	{
+		id: "join-team",
+		fields: {
+			joinCode: {
+				label: m.assignments_team_code(),
+				placeholder: m.assignments_team_code_placeholder(),
+			},
+		},
+	},
+);
+const heading = individual
+	? m.assignments_panel_repository()
+	: m.assignments_panel_team();
+---
+
+<section class="flex flex-col gap-4" aria-label={heading}>
+  <h2 class="text-xl font-bold">{heading}</h2>
+
+  {locked ? (
+    <Alert variant="error">
+      <span>
+        {individual
+          ? m.assignments_locked_individual({ when: formatWhen(lockAt) })
+          : m.assignments_locked_team({ when: formatWhen(lockAt) })}
+      </span>
+    </Alert>
+  ) : individual ? (
+    <div class="card card-border bg-base-200">
+      <form method="POST" action={actions.assignment.createTeam} class="card-body gap-3 p-5">
+        <input type="hidden" name="discipline" value={params.discipline} />
+        <input type="hidden" name="course" value={params.course} />
+        <input type="hidden" name="slug" value={params.slug} />
+        <input type="hidden" name="name" value="repository" />
+        <FormAlert error={createForm.error} />
+        <p>{m.assignments_individual_text()}</p>
+        <div class="card-actions">
+          <button type="submit" class="btn btn-primary">{m.assignments_create_repository()}</button>
+        </div>
+      </form>
+    </div>
+  ) : (
+    <>
+      <p class="text-sm text-muted">
+        {m.assignments_team_intro({ min: teamMin, max: teamMax, when: formatWhen(lockAt) })}
+      </p>
+      <div class="grid gap-4 md:grid-cols-2">
+        <form method="POST" action={actions.assignment.createTeam} novalidate class="card card-border bg-base-200">
+          <div class="card-body gap-3 p-5">
+            <input type="hidden" name="discipline" value={params.discipline} />
+            <input type="hidden" name="course" value={params.course} />
+            <input type="hidden" name="slug" value={params.slug} />
+            <h3 class="font-semibold">{m.assignments_create_team_heading()}</h3>
+            <FormAlert error={createForm.error} />
+            <Field {...createForm.field("name")} />
+            <div class="card-actions">
+              <button type="submit" class="btn btn-primary">{m.assignments_create_team()}</button>
+            </div>
+          </div>
+        </form>
+        <form method="POST" action={actions.assignment.joinTeam} novalidate class="card card-border bg-base-200">
+          <div class="card-body gap-3 p-5">
+            <input type="hidden" name="discipline" value={params.discipline} />
+            <input type="hidden" name="course" value={params.course} />
+            <input type="hidden" name="slug" value={params.slug} />
+            <h3 class="font-semibold">{m.assignments_join_heading()}</h3>
+            <FormAlert error={joinForm.error} />
+            <Field {...joinForm.field("joinCode")} class="font-mono" />
+            <div class="card-actions">
+              <button type="submit" class="btn">{m.assignments_join_team()}</button>
+            </div>
+          </div>
+        </form>
+      </div>
+    </>
+  )}
+</section>

@@ -612,6 +612,39 @@ cannot be undone. From then on every student sees their own value, and a later
 push of the column reaches them at once.
 
 
+## Assignments
+
+### Compose the teams of an assignment
+
+    status: implemented
+    url: /[discipline]/[course]/assignments/[slug]
+
+Instructor opens an assignment done in teams and reads the summary: how many
+teams, how many enrolled students have none, how many delivered on time and how
+many only late, with the CLI commands that list and download the deliveries
+below it. The table shows each team's members, size and deliveries; a team
+outside the size range is marked as an exception, with the reason spelled out
+for screen readers, and an extended deadline is marked too.
+
+They create a team, add a student with no team, and move one from another team
+after a confirmation that names the team they leave. They take a member out,
+rename a team (a taken name is refused) and delete one after a confirmation that
+says how many pushes will be lost. Students left without a team are listed with
+a way to put each one in a team.
+
+
+### Follow an individual assignment
+
+    status: implemented
+    url: /[discipline]/[course]/assignments/[slug]
+
+Instructor opens an assignment done alone. The table lists students, not teams:
+each one's deliveries, an extended deadline marked as such, and "no repository"
+for those who have not created theirs. There is nothing to compose, so no team
+actions are offered. An assignment that has not opened yet is visible to the
+instructor and hidden from students.
+
+
 ## Attendance
 
 ### Take the roll call in class

@@ -151,6 +151,7 @@ const {
 	TEST_DATABASE_URL,
 	TEST_DB_DIR,
 	TEST_DIST_DIR,
+	TEST_REPOSITORY_ROOT,
 	TEST_RESOURCE_ROOT,
 	TEST_RUNNER_ORIGIN,
 	TEST_TMP_DIR,
@@ -169,6 +170,7 @@ mkdirSync(TEST_RESOURCE_ROOT, { recursive: true });
 
 process.env.DATABASE_URL = TEST_DATABASE_URL;
 process.env.RESOURCE_ROOT = TEST_RESOURCE_ROOT;
+process.env.REPOSITORY_ROOT = TEST_REPOSITORY_ROOT;
 process.env.NODE_ENV = "test";
 // The server and the test workers must agree on the origin of clone URLs.
 process.env.PUBLIC_URL = TEST_BASE_URL;

@@ -1,0 +1,41 @@
+---
+// The command-line calls that list and download the deliveries, each with a
+// button that copies it.
+import { m } from "@/i18n";
+
+interface Props {
+	commands: readonly { command: string; note: string }[];
+}
+
+const { commands } = Astro.props;
+---
+
+<section aria-label={m.assignments_cli()}>
+  <h3 class="page-subheader">{m.assignments_cli()}</h3>
+  <ul class="mt-2 grid gap-3 md:grid-cols-2">
+    {commands.map((entry) => (
+      <li class="card card-border bg-base-200">
+        <div class="card-body gap-2 p-4">
+          <div class="flex flex-wrap items-center gap-2">
+            <code class="min-w-0 flex-1 basis-full rounded-field bg-base-300 px-3 py-2 font-mono text-sm break-all sm:basis-0">{entry.command}</code>
+            <button type="button" class="btn btn-sm" data-copy={entry.command} data-copied={m.assignments_copied()}>{m.assignments_copy()}</button>
+          </div>
+          <p class="text-sm text-muted">{entry.note}</p>
+        </div>
+      </li>
+    ))}
+  </ul>
+</section>
+
+<script>
+  document.querySelectorAll<HTMLButtonElement>("button[data-copy]").forEach((button) => {
+    const label = button.textContent;
+    button.addEventListener("click", async () => {
+      await navigator.clipboard.writeText(button.dataset.copy ?? "");
+      button.textContent = button.dataset.copied ?? label;
+      setTimeout(() => {
+        button.textContent = label;
+      }, 1500);
+    });
+  });
+</script>

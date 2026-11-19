@@ -1,0 +1,104 @@
+---
+import { actions } from "astro:actions";
+import { hasPerm } from "@/auth/permissions";
+import ManagerView from "@/components/assignment/ManagerView.astro";
+import StudentView from "@/components/assignment/StudentView.astro";
+import CourseHeader from "@/components/CourseHeader.astro";
+import { NotFound } from "@/core/error";
+import { type Assignment, db } from "@/db";
+import AppLayout from "@/layouts/AppLayout.astro";
+import { pushViews } from "@/utils/assignment-view";
+import { breadcrumbs } from "@/utils/breadcrumbs";
+import { assignmentsNav } from "@/utils/course-tabs-nav";
+import { loadCourse } from "@/utils/load-course";
+
+export const prerender = false;
+
+const { discipline, course: courseSegment, slug } = Astro.params;
+const result = await loadCourse(Astro, discipline, courseSegment);
+if ("redirect" in result) return result.redirect;
+const { course, href, tabs } = result;
+
+// biome-ignore lint/style/noNonNullAssertion: every course page runs through loadCourse, which already required Astro.locals.user.
+const actor = Astro.locals.actor!;
+const manages = hasPerm(actor, "enrollment.manage", course);
+const listHref = `${href}/assignments`;
+
+// A successful change redirects to the page, so a reload does not repeat it.
+const changed = [
+	actions.assignment.createTeam,
+	actions.assignment.joinTeam,
+	actions.assignment.leaveTeam,
+	actions.assignment.rotateToken,
+].some((action) => {
+	const outcome = Astro.getActionResult(action);
+	return outcome !== undefined && !outcome.error;
+});
+if (changed) return Astro.redirect(Astro.url.pathname);
+
+if (!slug) return Astro.rewrite("/404");
+let assignment: Assignment;
+try {
+	assignment = await db.assignment.findOne(
+		{ course: course.id, slug },
+		{ actor },
+	);
+} catch (error) {
+	if (error instanceof NotFound) return Astro.rewrite("/404");
+	throw error;
+}
+
+const params = {
+	discipline: course.discipline.slug,
+	course: `${course.instructor.username}_${course.edition.slug}`,
+};
+const pk = { id: assignment.id };
+const opts = { actor };
+const visible = await db.assignment.findMany({ course: course.id }, opts);
+
+const manager = manages
+	? await Promise.all([
+			db.team.listWithDeliveries(pk, opts),
+			db.team.summary(pk, opts),
+			db.team.pushCounts(pk, opts),
+			db.enrollment.findMany({ course: course.id }, opts),
+		])
+	: null;
+
+const team = manages ? null : await db.team.findMine(pk, opts);
+const pushes = team ? await pushViews(team.id, team.pushes, team.members) : [];
+const missingFiles =
+	team && pushes.length > 0
+		? await db.team.missingFiles({ id: team.id }, opts)
+		: [];
+---
+
+<AppLayout
+  title={assignment.title}
+  trail={breadcrumbs(Astro.url, { course, item: assignment.title })}
+  nav={assignmentsNav(href, visible.length)}
+>
+  <CourseHeader course={course} tabs={tabs} active="exams" />
+
+  {manager ? (
+    <ManagerView
+      assignment={assignment}
+      teams={manager[0]}
+      summary={manager[1]}
+      pushCounts={manager[2]}
+      students={manager[3]}
+      params={params}
+      listHref={listHref}
+    />
+  ) : (
+    <StudentView
+      assignment={assignment}
+      team={team}
+      pushes={pushes}
+      missingFiles={missingFiles}
+      reader={actor.username}
+      params={params}
+      listHref={listHref}
+    />
+  )}
+</AppLayout>

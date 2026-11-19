@@ -5,6 +5,16 @@ CLI shares the server's version and is released with it.
 
 ## Unreleased
 
+- `push` reads `assignments/<slug>.md` (title, `due`, `closes`, `opens`,
+  `team`, `template`, `restrictions`; the body is the statement) and syncs it
+  three ways, after the repositories. `--drop-assignments` deletes one whose
+  file is gone, asking before it deletes the teams of one that has any.
+- `codehood assignment status`, `clone`, `extend` and `move`: list the teams
+  of an assignment with their deliveries, download each delivery into
+  `submissions/<slug>/<team>/` (the API key goes to git through the
+  environment only), give a team its own deadline, and move a student between
+  teams.
+
 ## 0.6.0 (2026-11-18)
 
 - `push` always excludes `__pycache__/`, `*.pyc`, `elm-stuff/` and

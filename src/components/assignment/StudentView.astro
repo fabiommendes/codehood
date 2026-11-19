@@ -1,0 +1,191 @@
+---
+// An assignment as a student sees it inside a course: the delivery status
+// first, then the team panel, the deadlines and the statement.
+import Alert from "@/components/ui/Alert";
+import Badge from "@/components/ui/Badge";
+import type { Assignment } from "@/db";
+import { m } from "@/i18n";
+import { readerStatus } from "@/services/assignment-status";
+import {
+	formatRelative,
+	formatWhen,
+	type PushView,
+	statusBadge,
+} from "@/utils/assignment-view";
+import { renderMarkdownBody } from "@/utils/markdown";
+import DeliveryCard from "./DeliveryCard.astro";
+import NoTeamPanel from "./NoTeamPanel.astro";
+import TeamPanel from "./TeamPanel.astro";
+
+interface Props {
+	assignment: Assignment;
+	/// The reader's team, with the clone URL and the join code they may see.
+	team: {
+		publicId: string;
+		name: string;
+		joinCode: string | null;
+		cloneUrl: string;
+		dueAt: Date;
+		extended: boolean;
+		members: readonly { username: string; name: string }[];
+		delivery: { onTime: { id: number } | null; late: { id: number } | null };
+	} | null;
+	/// The team's pushes, newest first.
+	pushes: readonly PushView[];
+	missingFiles: readonly string[];
+	reader: string;
+	/// The course segments the actions take.
+	params: { discipline: string; course: string };
+	/// Where the list of assignments is.
+	listHref: string;
+}
+
+const { assignment, team, pushes, missingFiles, reader, params, listHref } =
+	Astro.props;
+const now = new Date();
+const individual = assignment.teamMax === 1;
+const due = team?.dueAt ?? assignment.dueAt;
+const pastDue = due <= now;
+const closed = assignment.closesAt !== null && assignment.closesAt <= now;
+const lockAt = assignment.teamsLockAt ?? assignment.dueAt;
+const badge = statusBadge(
+	readerStatus({
+		individual,
+		closesAt: assignment.closesAt,
+		team: team ? { dueAt: team.dueAt, delivery: team.delivery } : null,
+		now,
+	}),
+);
+
+const byId = new Map(pushes.map((push) => [push.id, push]));
+const onTime = (team && byId.get(team.delivery.onTime?.id ?? -1)) ?? null;
+const late = (team && byId.get(team.delivery.late?.id ?? -1)) ?? null;
+const delivered = individual
+	? m.assignments_delivery_note_own({ due: formatWhen(due) })
+	: m.assignments_delivery_note_team({ due: formatWhen(due) });
+
+const deadlines = [
+	{
+		label: individual
+			? m.assignments_deadline_repository()
+			: m.assignments_deadline_teams(),
+		at: lockAt,
+		show: !individual,
+	},
+	{
+		label: individual
+			? m.assignments_deadline_own_due()
+			: team?.extended
+				? m.assignments_deadline_team_due()
+				: m.assignments_deadline_due(),
+		at: due,
+		show: true,
+		strong: true,
+	},
+	{
+		label: m.assignments_deadline_pushes(),
+		at: assignment.closesAt,
+		show: assignment.closesAt !== null,
+	},
+].filter((entry) => entry.show);
+---
+
+<div class="mt-8 flex flex-col gap-8">
+  <header>
+    <a href={listHref} class="text-sm text-primary hover:underline">{m.assignments_back()}</a>
+    <div class="mt-1 flex flex-wrap items-center gap-3">
+      <h2 class="text-2xl font-bold">{assignment.title}</h2>
+      <Badge variant={badge.variant} style="soft">{badge.label}</Badge>
+    </div>
+  </header>
+
+  {/* Delivery status: the first thing the reader needs to know. */}
+  {team && (
+    <div class="flex flex-col gap-4">
+      {closed && (
+        <Alert variant="info">
+          <span>{m.assignments_alert_closed({ when: formatWhen(assignment.closesAt as Date) })}</span>
+        </Alert>
+      )}
+      {pastDue && !closed && (
+        <Alert variant="info">
+          <span>
+            {assignment.closesAt
+              ? m.assignments_alert_due_passed_until({ closes: formatWhen(assignment.closesAt) })
+              : m.assignments_alert_due_passed_open()}
+          </span>
+        </Alert>
+      )}
+
+      {!pastDue && onTime && (
+        <DeliveryCard kind="on-time" push={onTime} note={delivered} />
+      )}
+      {!pastDue && !onTime && (
+        <section class="card card-border border-dashed bg-base-200/50" data-delivery="pending">
+          <div class="card-body gap-1 p-5">
+            <h2 class="text-lg font-bold">{m.assignments_pending_title()}</h2>
+            <p class="text-sm text-muted">
+              {m.assignments_pending_text({ when: formatWhen(due), relative: formatRelative(due) })}
+            </p>
+          </div>
+        </section>
+      )}
+
+      {pastDue && onTime && late && (
+        <div class="grid gap-4 md:grid-cols-2">
+          <DeliveryCard kind="on-time" push={onTime} pinned note={m.assignments_delivery_pinned_note()} />
+          <DeliveryCard kind="late" push={late} note={m.assignments_delivery_late_note()} />
+        </div>
+      )}
+      {pastDue && onTime && !late && (
+        <DeliveryCard kind="on-time" push={onTime} pinned note={m.assignments_delivery_pinned_note()} />
+      )}
+      {pastDue && !onTime && (
+        <div class="grid gap-4 md:grid-cols-2">
+          <DeliveryCard kind="none" />
+          {late && <DeliveryCard kind="late" push={late} note={m.assignments_delivery_late_note()} />}
+        </div>
+      )}
+    </div>
+  )}
+
+  {team ? (
+    <TeamPanel
+      params={{ ...params, slug: assignment.slug }}
+      assignment={assignment}
+      team={team}
+      reader={reader}
+      pushes={pushes}
+      missingFiles={missingFiles}
+      lockAt={lockAt}
+    />
+  ) : (
+    <NoTeamPanel
+      params={{ ...params, slug: assignment.slug }}
+      teamMin={assignment.teamMin}
+      teamMax={assignment.teamMax}
+      lockAt={lockAt}
+    />
+  )}
+
+  <section aria-label={m.assignments_deadlines()}>
+    <h3 class="page-subheader">{m.assignments_deadlines()}</h3>
+    <dl class="mt-2 grid gap-3 sm:grid-cols-3">
+      {deadlines.map((entry) => (
+        <div class:list={["rounded-box border px-4 py-3", entry.strong ? "border-base-content/40" : "border-base-content/15"]}>
+          <dt class="text-xs uppercase tracking-wide text-muted">{entry.label}</dt>
+          <dd class="mt-1 font-medium">{formatWhen(entry.at as Date)}</dd>
+          <dd class="text-sm text-muted">
+            {formatRelative(entry.at as Date)}
+            {entry.strong && team?.extended && ` · ${m.assignments_deadline_extended({ original: formatWhen(assignment.dueAt) })}`}
+          </dd>
+        </div>
+      ))}
+    </dl>
+  </section>
+
+  <section aria-label={m.assignments_statement()}>
+    <h3 class="page-subheader">{m.assignments_statement()}</h3>
+    <div class="prose mt-2 max-w-none" set:html={renderMarkdownBody(assignment.body)} />
+  </section>
+</div>

@@ -92,5 +92,9 @@
 	"forms_schema_adjustment_question_op": "Uma questão só aceita multiplicador.",
 	"forms_schema_adjustment_question_factor": "Uma questão só pode ser reduzida: o multiplicador deve ficar abaixo de 1.",
 	"forms_schema_adjustment_text_max": "O texto deve ter no máximo {max} caracteres.",
-	"forms_schema_adjustment_usernames_required": "Escolha pelo menos um aluno."
+	"forms_schema_adjustment_usernames_required": "Escolha pelo menos um aluno.",
+	"forms_schema_assignment_team_range": "O tamanho mínimo da equipe não pode passar do máximo.",
+	"forms_schema_assignment_closes_before_due": "Os pushes não podem encerrar antes do prazo.",
+	"forms_schema_assignment_opens_after_due": "O trabalho não pode abrir depois do prazo.",
+	"forms_schema_assignment_lock_after_due": "As equipes não podem trancar depois do prazo."
 }

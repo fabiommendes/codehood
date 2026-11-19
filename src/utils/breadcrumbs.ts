@@ -98,6 +98,21 @@ function courseSteps(
 	];
 	const tab = segments[2];
 	if (tab === undefined) return steps;
+	if (tab === "assignments") {
+		steps.push({
+			label: COURSE_TAB_LABELS.exams,
+			path: `${home}/exams`,
+		});
+		const listPath = `${home}/assignments`;
+		steps.push({ label: m.assignments_page_title(), path: listPath });
+		if (segments[3] !== undefined) {
+			steps.push({
+				label: labels.item,
+				path: `${listPath}/${segments[3]}`,
+			});
+		}
+		return steps;
+	}
 	if (!Object.hasOwn(COURSE_TAB_LABELS, tab)) return steps;
 	const tabPath = `${home}/${tab}`;
 	steps.push({

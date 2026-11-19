@@ -86,6 +86,14 @@ Whenever a new command is created, document it in this file.
   attempt count, and exits 1 when any is left. `--fix` deletes the ones without
   attempts; the others need a manual decision.
 
+### Team repositories
+
+`manage prune-team-repositories [--dry-run]`
+: Removes the folders of `REPOSITORY_ROOT` named `<id>.git` whose id belongs to
+  no team, such as the leftovers of a team deleted while the disk failed.
+  Leaves `_hooks`, any other name and loose files alone; a symlink is removed
+  as a link. `--dry-run` lists what it would remove and deletes nothing.
+
 ### Answer edit history
 
 `manage answer-history-stats <course> [exam] [--json]`

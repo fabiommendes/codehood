@@ -187,6 +187,24 @@ export const BLOB_QUOTA_BY_ROLE: Record<Role, number | null> = {
 	STUDENT: parseByteSize(config.storage.quota.student),
 };
 
+/**
+ * Where the bare git repositories of teams are kept, one folder per team.
+ *
+ * Unlike `RESOURCE_ROOT`, nothing here is public: a reverse proxy must never
+ * serve this folder.
+ */
+export const REPOSITORY_ROOT = config.storage.repositoryRoot;
+
+/// The most a team repository may hold on disk, in bytes.
+export const ASSIGNMENT_MAX_REPO_BYTES = parseByteSize(
+	config.storage.assignment.maxRepoBytes,
+);
+
+/// The largest file a push to a team repository may add, in bytes.
+export const ASSIGNMENT_MAX_FILE_BYTES = parseByteSize(
+	config.storage.assignment.maxFileBytes,
+);
+
 /** How long an unattached blob survives before garbage collection may take it. */
 export const BLOB_GC_GRACE_MS = 24 * 60 * 60 * 1000;
 
@@ -221,6 +239,9 @@ logEnvVariables([
 	["storage.attachmentLinkMode", ATTACHMENT_LINK_MODE],
 	["storage.quota.instructor", BLOB_QUOTA_BY_ROLE.INSTRUCTOR],
 	["storage.quota.student", BLOB_QUOTA_BY_ROLE.STUDENT],
+	["storage.repositoryRoot", REPOSITORY_ROOT],
+	["storage.assignment.maxRepoBytes", ASSIGNMENT_MAX_REPO_BYTES],
+	["storage.assignment.maxFileBytes", ASSIGNMENT_MAX_FILE_BYTES],
 	["instance.schoolIdPattern", SCHOOL_ID_PATTERN],
 ]);
 

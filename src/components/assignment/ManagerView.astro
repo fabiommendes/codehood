@@ -1,0 +1,194 @@
+---
+// The assignment page for whoever manages the course: counts, CLI commands,
+// the teams (or students) table with its composition dialogs, deadlines and
+// statement.
+import type { Assignment, TeamListed, TeamSummary } from "@/db";
+import { m } from "@/i18n";
+import { formatRelative, formatWhen } from "@/utils/assignment-view";
+import { renderMarkdownBody } from "@/utils/markdown";
+import CliCommands from "./CliCommands.astro";
+import TeamsManager, {
+	type ManagedDelivery,
+	type ManagedStudent,
+	type ManagerData,
+} from "./TeamsManager";
+
+interface Props {
+	assignment: Assignment;
+	summary: TeamSummary;
+	teams: readonly TeamListed[];
+	students: readonly ManagedStudent[];
+	/// Pushes of each team, by team id.
+	pushCounts: Readonly<Record<number, number>>;
+	/// The course segments the actions take.
+	params: { discipline: string; course: string };
+	/// Where the list of assignments is.
+	listHref: string;
+}
+
+const { assignment, summary, teams, students, pushCounts, params, listHref } =
+	Astro.props;
+const individual = assignment.teamMax === 1;
+
+const delivery = (
+	push: { newSha: string; createdAt: Date } | null,
+): ManagedDelivery | null =>
+	push ? { sha: push.newSha, at: push.createdAt.toISOString() } : null;
+const managed = teams.map((team) => ({
+	id: team.publicId,
+	name: team.name,
+	members: team.members.map(({ username, name }) => ({ username, name })),
+	dueAt: team.extended ? team.dueAt.toISOString() : null,
+	pushes: pushCounts[team.id] ?? 0,
+	sizeException: team.sizeException,
+	onTime: delivery(team.delivery.onTime),
+	late: delivery(team.delivery.late),
+}));
+const data: ManagerData = {
+	params: { ...params, slug: assignment.slug },
+	teamMin: assignment.teamMin,
+	teamMax: assignment.teamMax,
+	students: students.map(({ username, name }) => ({ username, name })),
+	teams: managed,
+	repositories: individual
+		? students.map(({ username, name }) => {
+				const own = managed.find((team) =>
+					team.members.some((member) => member.username === username),
+				);
+				return {
+					student: { username, name },
+					created: own !== undefined,
+					dueAt: own?.dueAt ?? null,
+					onTime: own?.onTime ?? null,
+					late: own?.late ?? null,
+				};
+			})
+		: [],
+};
+
+const enrolled = m.assignments_count_of_enrolled({ count: students.length });
+const counts = individual
+	? [
+			{
+				label: m.assignments_count_repositories(),
+				value: summary.teams,
+				hint: enrolled,
+			},
+			{
+				label: m.assignments_count_no_repository(),
+				value: summary.studentsWithoutTeam,
+				hint: m.assignments_count_no_repository_hint(),
+			},
+			{
+				label: m.assignments_count_on_time(),
+				value: summary.onTime,
+				hint: m.assignments_count_students_unit(),
+			},
+			{
+				label: m.assignments_count_late_only(),
+				value: summary.lateOnly,
+				hint: m.assignments_count_students_unit(),
+			},
+		]
+	: [
+			{
+				label: m.assignments_count_teams(),
+				value: summary.teams,
+				hint: m.assignments_count_teams_hint({
+					count: teams.filter((team) => team.sizeException !== null).length,
+				}),
+			},
+			{
+				label: m.assignments_count_unassigned(),
+				value: summary.studentsWithoutTeam,
+				hint: enrolled,
+			},
+			{
+				label: m.assignments_count_on_time(),
+				value: summary.onTime,
+				hint: m.assignments_count_teams_unit(),
+			},
+			{
+				label: m.assignments_count_late_only(),
+				value: summary.lateOnly,
+				hint: m.assignments_count_teams_unit(),
+			},
+		];
+
+const commands = [
+	{
+		command: `codehood assignment status ${assignment.slug}`,
+		note: individual
+			? m.assignments_cli_status_individual()
+			: m.assignments_cli_status_teams(),
+	},
+	{
+		command: `codehood assignment clone ${assignment.slug}`,
+		note: individual
+			? m.assignments_cli_clone_individual()
+			: m.assignments_cli_clone_teams(),
+	},
+];
+
+const dated: { label: string; at: Date | null; strong?: boolean }[] = [
+	{ label: m.assignments_deadline_opens(), at: assignment.opensAt },
+	{
+		label: individual
+			? m.assignments_deadline_repository()
+			: m.assignments_deadline_teams(),
+		at: assignment.teamsLockAt,
+	},
+	{ label: m.assignments_deadline_due(), at: assignment.dueAt, strong: true },
+	{ label: m.assignments_deadline_pushes(), at: assignment.closesAt },
+];
+const deadlines = dated.flatMap(({ at, ...rest }) =>
+	at ? [{ ...rest, at }] : [],
+);
+---
+
+<div class="mt-8 flex flex-col gap-8">
+  <header>
+    <a href={listHref} class="text-sm text-primary hover:underline">{m.assignments_back()}</a>
+    <h2 class="mt-1 text-2xl font-bold">{assignment.title}</h2>
+    <p class="text-sm text-muted">
+      {individual
+        ? m.assignments_kind_summary_individual()
+        : m.assignments_kind_summary_teams({ min: assignment.teamMin, max: assignment.teamMax })}
+      {" · "}{m.assignments_slug_label()} <code class="font-mono">{assignment.slug}</code>
+    </p>
+  </header>
+
+  <section aria-label={m.assignments_summary()}>
+    <dl class="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+      {counts.map((count) => (
+        <div class="rounded-box border border-base-content/15 bg-base-200/50 px-4 py-3">
+          <dt class="text-xs uppercase tracking-wide text-muted">{count.label}</dt>
+          <dd class="mt-1 text-3xl font-bold">{count.value}</dd>
+          <dd class="text-sm text-muted">{count.hint}</dd>
+        </div>
+      ))}
+    </dl>
+  </section>
+
+  <TeamsManager client:load data={data} />
+
+  <CliCommands commands={commands} />
+
+  <section aria-label={m.assignments_deadlines()}>
+    <h3 class="page-subheader">{m.assignments_deadlines()}</h3>
+    <dl class="mt-2 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+      {deadlines.map((entry) => (
+        <div class:list={["rounded-box border px-4 py-3", entry.strong ? "border-base-content/40" : "border-base-content/15"]}>
+          <dt class="text-xs uppercase tracking-wide text-muted">{entry.label}</dt>
+          <dd class="mt-1 font-medium">{formatWhen(entry.at)}</dd>
+          <dd class="text-sm text-muted">{formatRelative(entry.at)}</dd>
+        </div>
+      ))}
+    </dl>
+  </section>
+
+  <section aria-label={m.assignments_statement()} class="max-w-4xl">
+    <h3 class="page-subheader">{m.assignments_statement()}</h3>
+    <div class="prose mt-2 max-w-none" set:html={renderMarkdownBody(assignment.body)} />
+  </section>
+</div>

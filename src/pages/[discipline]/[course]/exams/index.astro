@@ -40,6 +40,9 @@ const canWrite = hasPerm(actor, "enrollment.manage", course);
 // already narrows DRAFT/ARCHIVED rows to whoever may write the course's
 // contents, so this list is exactly what `actor` may see.
 const exams = await db.exam.findMany({ course: course.id }, { actor });
+const assignmentCount = (
+	await db.assignment.findMany({ course: course.id }, { actor })
+).length;
 const now = new Date();
 // Never sent to the client: the student's own entries shift their windows and
 // the whole set decides whether grades are released.
@@ -95,7 +98,7 @@ if (!canWrite) {
 
 <AppLayout title={m.exams_list_page_title({ discipline: course.discipline.name })}
   trail={breadcrumbs(Astro.url, { course })}
-  nav={examsNav(href, canWrite ? exams : groups.flatMap((group) => group.exams))}
+  nav={examsNav(href, canWrite ? exams : groups.flatMap((group) => group.exams), assignmentCount)}
 >
   <CourseHeader course={course} tabs={tabs} active="exams" />
 

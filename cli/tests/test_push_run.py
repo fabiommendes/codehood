@@ -248,7 +248,10 @@ def test_fetch_server_state_reports_course_and_resource_refs():
             return httpx.Response(200, json=page([]))
         if request.url.path == f"{BASE}/calendar-event":
             return httpx.Response(200, json=page([]))
-        if request.method == "GET" and request.url.path == f"{BASE}/grade-column":
+        if request.method == "GET" and request.url.path in (
+            f"{BASE}/grade-column",
+            f"{BASE}/assignment",
+        ):
             return httpx.Response(200, json=page([]))
         raise AssertionError(f"unexpected request: {request.url}")
 
@@ -287,7 +290,10 @@ def test_fetch_server_state_reports_question_versions():
             return httpx.Response(200, json=page([]))
         if request.url.path == f"{BASE}/calendar-event":
             return httpx.Response(200, json=page([]))
-        if request.method == "GET" and request.url.path == f"{BASE}/grade-column":
+        if request.method == "GET" and request.url.path in (
+            f"{BASE}/grade-column",
+            f"{BASE}/assignment",
+        ):
             return httpx.Response(200, json=page([]))
         raise AssertionError(f"unexpected request: {request.url}")
 
@@ -342,7 +348,10 @@ def test_fetch_server_state_course_missing_skips_the_question_listing():
     def handler(request: httpx.Request) -> httpx.Response:
         if request.url.path == BASE:
             return httpx.Response(404, json={"message": "not found"})
-        if request.method == "GET" and request.url.path == f"{BASE}/grade-column":
+        if request.method == "GET" and request.url.path in (
+            f"{BASE}/grade-column",
+            f"{BASE}/assignment",
+        ):
             return httpx.Response(200, json=page([]))
         raise AssertionError(f"unexpected request: {request.url}")
 
@@ -360,7 +369,10 @@ def test_fetch_server_state_course_missing_skips_the_calendar_listings():
     def handler(request: httpx.Request) -> httpx.Response:
         if request.url.path == BASE:
             return httpx.Response(404, json={"message": "not found"})
-        if request.method == "GET" and request.url.path == f"{BASE}/grade-column":
+        if request.method == "GET" and request.url.path in (
+            f"{BASE}/grade-column",
+            f"{BASE}/assignment",
+        ):
             return httpx.Response(200, json=page([]))
         raise AssertionError(f"unexpected request: {request.url}")
 
@@ -395,7 +407,10 @@ def test_fetch_server_state_recomputes_time_slot_refs_locally():
             )
         if request.url.path == f"{BASE}/calendar-event":
             return httpx.Response(200, json=page([]))
-        if request.method == "GET" and request.url.path == f"{BASE}/grade-column":
+        if request.method == "GET" and request.url.path in (
+            f"{BASE}/grade-column",
+            f"{BASE}/assignment",
+        ):
             return httpx.Response(200, json=page([]))
         raise AssertionError(f"unexpected request: {request.url}")
 
@@ -431,6 +446,7 @@ def test_fetch_server_state_reads_every_entity_from_its_listing():
                 _calendar_event_json(0, "mon", "MONDAY", 14, 0, 2, 0, "Intro", None)
             ],
             f"{BASE}/grade-column": [],
+            f"{BASE}/assignment": [],
             f"{BASE}/roll-call": [],
         }
         if request.url.path == BASE:
@@ -447,6 +463,7 @@ def test_fetch_server_state_reads_every_entity_from_its_listing():
             f"{BASE}/time-slot",
             f"{BASE}/calendar-event",
             f"{BASE}/grade-column",
+            f"{BASE}/assignment",
             f"{BASE}/roll-call",
         ]
     )
@@ -528,7 +545,10 @@ def test_fetch_server_state_reports_calendar_events_as_markers():
                     ]
                 ),
             )
-        if request.method == "GET" and request.url.path == f"{BASE}/grade-column":
+        if request.method == "GET" and request.url.path in (
+            f"{BASE}/grade-column",
+            f"{BASE}/assignment",
+        ):
             return httpx.Response(200, json=page([]))
         raise AssertionError(f"unexpected request: {request.url}")
 

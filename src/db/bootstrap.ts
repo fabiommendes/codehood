@@ -6,6 +6,7 @@ import { FULL_ACCESS } from "@/auth/actor";
 import { hashToken } from "@/auth/token";
 import { DEVELOPMENT, MAX_ANSWER_HISTORY_TEXT_BYTES } from "@/core/constants";
 import { type CalendarEvent, type Course, db, type User } from "@/db";
+import { seedAssignments } from "@/db/bootstrap-assignments";
 import { prisma } from "@/db/client";
 import type { AnswerEditBatchInput } from "@/db/services/answer-edit.service";
 import type { QuestionResponse } from "@/mdq";
@@ -1193,6 +1194,16 @@ async function createDemoCoursesIfMissing(): Promise<void> {
 	await seedOpenQuiz(cs101.id, cohort[0] as User);
 	await seedPracticeAndSimulations(cs101.id, ada);
 	await seedRepositories(cs101.id);
+	await seedAssignments(cs101.id, {
+		bob,
+		hopper,
+		hamilton,
+		liskov,
+		knuth: account("knuth"),
+		ritchie: account("ritchie"),
+		thompson: account("thompson"),
+		backus: account("backus"),
+	});
 	await seedClassroomInvites(cs101.id, ada);
 
 	await seedTreesExam(cs201.id, { liskov, bob });

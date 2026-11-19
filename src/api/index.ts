@@ -1050,3 +1050,188 @@ export const rubricApi = {
 			db.rubric.preview(rubricKeyOf(params), body, { actor }),
 	}),
 };
+
+const assignmentEntity = schema.assignmentSchema
+	.omit({ id: true, courseId: true })
+	.openapi("Assignment");
+const assignmentTags = ["Assignments"];
+const assignmentPath = "/api/course/[discipline]/[course]/assignment";
+
+/// The `(course, slug)` an assignment path addresses.
+function assignmentKey(params: Record<string, string>) {
+	return { course: parseCourseParams(params), slug: params.slug as string };
+}
+
+/// A team as the instructor sees it over the API: no id, token, join code or base commit.
+const teamFields = schema.teamSchema
+	.omit({ id: true, assignmentId: true, baseSha: true, members: true })
+	.extend({
+		members: z.array(
+			schema.teamMemberSchema.pick({ username: true, name: true }),
+		),
+	});
+const teamEntity = teamFields.openapi("Team");
+const teamListedEntity = teamFields
+	.extend({
+		delivery: z.object({
+			onTime: schema.teamPushSchema
+				.pick({ newSha: true, createdAt: true, username: true })
+				.nullable(),
+			late: schema.teamPushSchema
+				.pick({ newSha: true, createdAt: true, username: true })
+				.nullable(),
+		}),
+		sizeException: schema.teamSizeException.nullable(),
+	})
+	.openapi("TeamListed");
+const teamPath = `${assignmentPath}/[slug]/team`;
+
+/// The team `[team]` of the assignment in the path, as the instructor edits it.
+function locateTeam(
+	actor: Parameters<typeof db.team.locate>[1]["actor"],
+	params: Record<string, string>,
+) {
+	return db.team.locate(
+		{ ...assignmentKey(params), publicId: params.team as string },
+		{ actor },
+	);
+}
+
+export const assignmentApi = {
+	findMany: GET(assignmentPath, {
+		out: schema.pageOf(assignmentEntity),
+		summary: "Find multiple Assignments.",
+		operationId: "assignmentList",
+		tags: assignmentTags,
+		handler: async ({ actor, params }) => ({
+			items: await db.assignment.findMany(
+				{ course: parseCourseParams(params) },
+				{ actor },
+			),
+			next: null,
+			prev: null,
+		}),
+	}),
+	findOne: GET(`${assignmentPath}/[slug]`, {
+		out: assignmentEntity,
+		summary: "Find a single Assignment.",
+		operationId: "assignmentRead",
+		tags: assignmentTags,
+		versioned: true,
+		handler: async ({ actor, params }) =>
+			db.assignment.findOne(assignmentKey(params), { actor }),
+	}),
+	upsert: PUT(`${assignmentPath}/[slug]`, {
+		in: schema.assignmentPut.openapi("AssignmentPut"),
+		out: assignmentEntity,
+		summary: "Create or update an Assignment.",
+		description:
+			"A field left out keeps its stored value; null clears it. The deadline of a team is never touched.",
+		operationId: "assignmentUpsert",
+		tags: assignmentTags,
+		versioned: true,
+		handler: async ({ actor, body, params, precondition }) =>
+			db.assignment.upsert(
+				{ ...body, ...assignmentKey(params) },
+				{ actor, ...precondition },
+			),
+	}),
+	delete: DELETE(`${assignmentPath}/[slug]`, {
+		in: schema.assignmentRemove.openapi("AssignmentRemove"),
+		out: z.object({ deleted: z.boolean() }).openapi("AssignmentDeleted"),
+		summary: "Delete an Assignment.",
+		description:
+			"Answers 409 while the assignment has teams, unless `force` is true: then its teams and their repositories go too.",
+		operationId: "assignmentDelete",
+		tags: assignmentTags,
+		versioned: true,
+		handler: async ({ actor, body, params, precondition }) => {
+			await db.assignment.remove(assignmentKey(params), body, {
+				actor,
+				...precondition,
+			});
+			return { deleted: true };
+		},
+	}),
+};
+
+export const teamApi = {
+	findMany: GET(teamPath, {
+		out: schema.pageOf(teamListedEntity),
+		summary: "List the teams of an Assignment with their deliveries.",
+		operationId: "teamList",
+		tags: assignmentTags,
+		handler: async ({ actor, params }) => ({
+			items: await db.team.listWithDeliveries(assignmentKey(params), {
+				actor,
+			}),
+			next: null,
+			prev: null,
+		}),
+	}),
+	create: POST(teamPath, {
+		in: schema.teamCreateFor.openapi("TeamCreate"),
+		out: teamEntity,
+		summary: "Make a team with the given students.",
+		operationId: "teamCreate",
+		tags: assignmentTags,
+		handler: async ({ actor, body, params }) =>
+			db.team.createFor(assignmentKey(params), body, { actor }),
+	}),
+	update: PATCH(`${teamPath}/[team]`, {
+		in: schema.teamPatch.openapi("TeamPatch"),
+		out: teamEntity,
+		summary: "Rename a team or give it its own deadline.",
+		description: "`dueAt: null` goes back to the deadline of the assignment.",
+		operationId: "teamUpdate",
+		tags: assignmentTags,
+		handler: async ({ actor, body, params }) => {
+			const pk = await locateTeam(actor, params);
+			let team: Awaited<ReturnType<typeof db.team.rename>> | undefined;
+			if (body.name !== undefined) {
+				team = await db.team.rename(pk, body.name, { actor });
+			}
+			if (body.dueAt !== undefined) {
+				team = await db.team.setDueAt(pk, body.dueAt, { actor });
+			}
+			return team as NonNullable<typeof team>;
+		},
+	}),
+	delete: DELETE(`${teamPath}/[team]`, {
+		out: z.object({ deleted: z.boolean() }).openapi("TeamDeleted"),
+		summary: "Delete a team and its repository.",
+		operationId: "teamDelete",
+		tags: assignmentTags,
+		handler: async ({ actor, params }) => {
+			await db.team.remove(await locateTeam(actor, params), { actor });
+			return { deleted: true };
+		},
+	}),
+	putMember: PUT(`${teamPath}/[team]/member/[username]`, {
+		out: teamEntity,
+		summary: "Put a student in a team, taking them out of another.",
+		description:
+			"Idempotent: a student already in the team keeps their token. A student who moves gets a new one.",
+		operationId: "teamMemberPut",
+		tags: assignmentTags,
+		handler: async ({ actor, params }) =>
+			db.team.addMember(
+				await locateTeam(actor, params),
+				params.username as string,
+				{ actor },
+			),
+	}),
+	deleteMember: DELETE(`${teamPath}/[team]/member/[username]`, {
+		out: teamEntity,
+		summary: "Take a student out of a team.",
+		description: "The team stays, with its repository and pushes.",
+		operationId: "teamMemberDelete",
+		tags: assignmentTags,
+		handler: async ({ actor, params }) =>
+			db.team.removeMember(
+				await locateTeam(actor, params),
+				params.username as string,
+				{ actor },
+			),
+	}),
+};

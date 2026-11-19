@@ -48,6 +48,41 @@
 		]
 	},
 	{
+		"pattern": "/api/course/[discipline]/[course]/assignment",
+		"methods": [
+			"get"
+		]
+	},
+	{
+		"pattern": "/api/course/[discipline]/[course]/assignment/[slug]",
+		"methods": [
+			"delete",
+			"get",
+			"put"
+		]
+	},
+	{
+		"pattern": "/api/course/[discipline]/[course]/assignment/[slug]/team",
+		"methods": [
+			"get",
+			"post"
+		]
+	},
+	{
+		"pattern": "/api/course/[discipline]/[course]/assignment/[slug]/team/[team]",
+		"methods": [
+			"delete",
+			"patch"
+		]
+	},
+	{
+		"pattern": "/api/course/[discipline]/[course]/assignment/[slug]/team/[team]/member/[username]",
+		"methods": [
+			"delete",
+			"put"
+		]
+	},
+	{
 		"pattern": "/api/course/[discipline]/[course]/attendance",
 		"methods": [
 			"get"

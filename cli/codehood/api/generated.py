@@ -23,6 +23,10 @@ class AdjustmentsItem(Model):
     reason: str | None
 
 
+class AssignmentDeleted(Model):
+    deleted: bool
+
+
 class BlobMissingInput(Model):
     hashes: list[str]
 
@@ -229,6 +233,14 @@ class Instructor(Model):
     username: str
 
 
+class Late(Model):
+    model_config = ConfigDict(populate_by_name=True)
+
+    new_sha: str = Field(alias="newSha")
+    created_at: str = Field(alias="createdAt")
+    username: str | None
+
+
 class ListQuestionResponseItemsItem2QuestionCodeAttachmentsItem(Model):
     name: str
     format: str
@@ -401,6 +413,15 @@ class ResourceDataFile(Model):
     type: Literal["FILE"]
 
 
+class Restrictions(Model):
+    model_config = ConfigDict(populate_by_name=True)
+
+    max_repo_bytes: int | None = Field(default=None, alias="maxRepoBytes")
+    max_file_bytes: int | None = Field(default=None, alias="maxFileBytes")
+    deny: list[str] | None = None
+    require: list[str] | None = None
+
+
 class RubricItem(Model):
     model_config = ConfigDict(populate_by_name=True)
 
@@ -474,6 +495,22 @@ class RubricUpdate(Model):
 class Start(Model):
     hour: int
     minute: int
+
+
+class TeamCreate(Model):
+    name: str
+    members: list[str]
+
+
+class TeamDeleted(Model):
+    deleted: bool
+
+
+class TeamPatch(Model):
+    model_config = ConfigDict(populate_by_name=True)
+
+    name: str | None = None
+    due_at: str | None = Field(default=None, alias="dueAt")
 
 
 class TestsItem(Model):
@@ -551,6 +588,41 @@ class ValuesItem(Model):
     value: float | str
 
 
+class Assignment(Model):
+    model_config = ConfigDict(populate_by_name=True)
+
+    slug: str
+    title: str
+    body: str
+    opens_at: str | None = Field(alias="opensAt")
+    due_at: str = Field(alias="dueAt")
+    closes_at: str | None = Field(alias="closesAt")
+    team_min: int = Field(alias="teamMin")
+    team_max: int = Field(alias="teamMax")
+    teams_lock_at: str | None = Field(alias="teamsLockAt")
+    template: str | None
+    restrictions: Restrictions | None
+    rev: str | None
+    created_at: str = Field(alias="createdAt")
+    updated_at: str = Field(alias="updatedAt")
+
+
+class AssignmentPut(Model):
+    model_config = ConfigDict(populate_by_name=True)
+
+    title: str
+    body: str
+    opens_at: str | None = Field(default=None, alias="opensAt")
+    due_at: str = Field(alias="dueAt")
+    closes_at: str | None = Field(default=None, alias="closesAt")
+    team_min: int | None = Field(default=None, alias="teamMin")
+    team_max: int | None = Field(default=None, alias="teamMax")
+    teams_lock_at: str | None = Field(default=None, alias="teamsLockAt")
+    template: str | None = None
+    restrictions: Restrictions | None = None
+    rev: str | None = None
+
+
 class Course(Model):
     model_config = ConfigDict(populate_by_name=True)
 
@@ -577,6 +649,13 @@ class CourseGradesResponseStudentsItemShape5(Model):
     total: float
     adjustments: list[AdjustmentsItem] | None = None
     original: Original | None = None
+
+
+class Delivery(Model):
+    model_config = ConfigDict(populate_by_name=True)
+
+    on_time: Late | None = Field(alias="onTime")
+    late: Late | None
 
 
 class Exam(Model):
@@ -1168,6 +1247,17 @@ class RubricSplit(Model):
     children: list[RubricItemCreate]
 
 
+class Team(Model):
+    model_config = ConfigDict(populate_by_name=True)
+
+    public_id: str = Field(alias="publicId")
+    name: str
+    due_at: str = Field(alias="dueAt")
+    extended: bool
+    created_at: str = Field(alias="createdAt")
+    members: list[User]
+
+
 class TimeSlot(Model):
     model_config = ConfigDict(populate_by_name=True)
 
@@ -1256,6 +1346,12 @@ class UpdateTimeslotRequest(Model):
     ) = None
     start: Start | None = None
     duration: Duration | None = None
+
+
+class AssignmentListResponse(Model):
+    items: list[Assignment]
+    next: str | None
+    prev: str | None
 
 
 class CalendarEvent(Model):
@@ -1385,6 +1481,21 @@ class ListTimeslotResponse(Model):
     prev: str | None
 
 
+class TeamListed(Model):
+    model_config = ConfigDict(populate_by_name=True)
+
+    public_id: str = Field(alias="publicId")
+    name: str
+    due_at: str = Field(alias="dueAt")
+    extended: bool
+    created_at: str = Field(alias="createdAt")
+    members: list[User]
+    delivery: Delivery
+    size_exception: Literal["above", "below", "empty", None] | None = Field(
+        alias="sizeException"
+    )
+
+
 class CourseGradesResponse(Model):
     exams: list[ExamsItem]
     students: list[CourseGradesResponseStudentsItem]
@@ -1483,6 +1594,12 @@ class QuestionCreate(Model):
         | ListQuestionResponseItemsItemQuestionCode
     )
     files: dict[str, str] | None = None
+
+
+class TeamListResponse(Model):
+    items: list[TeamListed]
+    next: str | None
+    prev: str | None
 
 
 class UpdateQuestionRequest(Model):
@@ -1641,6 +1758,110 @@ class PreconditionFailed(CodehoodAPIError):
     @property
     def updated_at(self) -> str | None:
         return self.payload.updated_at
+
+
+def assignment_delete(
+    *,
+    discipline: str,
+    course: str,
+    slug: str,
+    force: bool | None = None,
+    if_match: str | None = None,
+    client: httpx.Client | None = None,
+) -> AssignmentDeleted:
+    """
+    Delete an Assignment.
+    """
+    client = client if client is not None else get_client()
+    response = client.delete(
+        "/api/course/{discipline}/{course}/assignment/{slug}".format(
+            discipline=discipline, course=course, slug=slug
+        ),
+        params=query_params({"force": force}),
+        headers={**auth_headers(client), **header_params({"If-Match": if_match})},
+    )
+    if response.status_code == 412:
+        raise PreconditionFailed(
+            response.status_code,
+            PreconditionFailed.Payload.model_validate(response.json()),
+        )
+    if response.status_code == 200:
+        return AssignmentDeleted.model_validate(response.json())
+    response.raise_for_status()
+    raise CodehoodAPIError(response.status_code, Model())
+
+
+def assignment_list(
+    *, discipline: str, course: str, client: httpx.Client | None = None
+) -> AssignmentListResponse:
+    """
+    Find multiple Assignments.
+    """
+    client = client if client is not None else get_client()
+    response = client.get(
+        "/api/course/{discipline}/{course}/assignment".format(
+            discipline=discipline, course=course
+        ),
+        headers=auth_headers(client),
+    )
+    if response.status_code == 200:
+        return AssignmentListResponse.model_validate(response.json())
+    response.raise_for_status()
+    raise CodehoodAPIError(response.status_code, Model())
+
+
+def assignment_read(
+    *, discipline: str, course: str, slug: str, client: httpx.Client | None = None
+) -> Assignment:
+    """
+    Find a single Assignment.
+    """
+    client = client if client is not None else get_client()
+    response = client.get(
+        "/api/course/{discipline}/{course}/assignment/{slug}".format(
+            discipline=discipline, course=course, slug=slug
+        ),
+        headers=auth_headers(client),
+    )
+    if response.status_code == 200:
+        return Assignment.model_validate(response.json())
+    response.raise_for_status()
+    raise CodehoodAPIError(response.status_code, Model())
+
+
+def assignment_upsert(
+    *,
+    discipline: str,
+    course: str,
+    slug: str,
+    if_match: str | None = None,
+    if_none_match: Literal["*"] | None = None,
+    body: AssignmentPut,
+    client: httpx.Client | None = None,
+) -> Assignment:
+    """
+    Create or update an Assignment.
+    """
+    client = client if client is not None else get_client()
+    response = client.put(
+        "/api/course/{discipline}/{course}/assignment/{slug}".format(
+            discipline=discipline, course=course, slug=slug
+        ),
+        json=body.model_dump(mode="json", by_alias=True),
+        headers={
+            **auth_headers(client),
+            **header_params({"If-Match": if_match, "If-None-Match": if_none_match}),
+        },
+    )
+    if response.status_code == 412:
+        raise PreconditionFailed(
+            response.status_code,
+            PreconditionFailed.Payload.model_validate(response.json()),
+        )
+    if response.status_code == 200:
+        return Assignment.model_validate(response.json())
+    response.raise_for_status()
+    raise CodehoodAPIError(response.status_code, Model())
 
 
 def blob_missing(
@@ -3213,6 +3434,158 @@ def rubric_update(
         )
     if response.status_code == 200:
         return Rubric.model_validate(response.json())
+    response.raise_for_status()
+    raise CodehoodAPIError(response.status_code, Model())
+
+
+def team_create(
+    *,
+    discipline: str,
+    course: str,
+    slug: str,
+    body: TeamCreate,
+    client: httpx.Client | None = None,
+) -> Team:
+    """
+    Make a team with the given students.
+    """
+    client = client if client is not None else get_client()
+    response = client.post(
+        "/api/course/{discipline}/{course}/assignment/{slug}/team".format(
+            discipline=discipline, course=course, slug=slug
+        ),
+        json=body.model_dump(mode="json", by_alias=True),
+        headers=auth_headers(client),
+    )
+    if response.status_code == 200:
+        return Team.model_validate(response.json())
+    response.raise_for_status()
+    raise CodehoodAPIError(response.status_code, Model())
+
+
+def team_delete(
+    *,
+    discipline: str,
+    course: str,
+    slug: str,
+    team: str,
+    client: httpx.Client | None = None,
+) -> TeamDeleted:
+    """
+    Delete a team and its repository.
+    """
+    client = client if client is not None else get_client()
+    response = client.delete(
+        "/api/course/{discipline}/{course}/assignment/{slug}/team/{team}".format(
+            discipline=discipline, course=course, slug=slug, team=team
+        ),
+        headers=auth_headers(client),
+    )
+    if response.status_code == 200:
+        return TeamDeleted.model_validate(response.json())
+    response.raise_for_status()
+    raise CodehoodAPIError(response.status_code, Model())
+
+
+def team_list(
+    *, discipline: str, course: str, slug: str, client: httpx.Client | None = None
+) -> TeamListResponse:
+    """
+    List the teams of an Assignment with their deliveries.
+    """
+    client = client if client is not None else get_client()
+    response = client.get(
+        "/api/course/{discipline}/{course}/assignment/{slug}/team".format(
+            discipline=discipline, course=course, slug=slug
+        ),
+        headers=auth_headers(client),
+    )
+    if response.status_code == 200:
+        return TeamListResponse.model_validate(response.json())
+    response.raise_for_status()
+    raise CodehoodAPIError(response.status_code, Model())
+
+
+def team_member_delete(
+    *,
+    discipline: str,
+    course: str,
+    slug: str,
+    team: str,
+    username: str,
+    client: httpx.Client | None = None,
+) -> Team:
+    """
+    Take a student out of a team.
+    """
+    client = client if client is not None else get_client()
+    response = client.delete(
+        "/api/course/{discipline}/{course}/assignment/{slug}/team/{team}/member/{username}".format(
+            discipline=discipline,
+            course=course,
+            slug=slug,
+            team=team,
+            username=username,
+        ),
+        headers=auth_headers(client),
+    )
+    if response.status_code == 200:
+        return Team.model_validate(response.json())
+    response.raise_for_status()
+    raise CodehoodAPIError(response.status_code, Model())
+
+
+def team_member_put(
+    *,
+    discipline: str,
+    course: str,
+    slug: str,
+    team: str,
+    username: str,
+    client: httpx.Client | None = None,
+) -> Team:
+    """
+    Put a student in a team, taking them out of another.
+    """
+    client = client if client is not None else get_client()
+    response = client.put(
+        "/api/course/{discipline}/{course}/assignment/{slug}/team/{team}/member/{username}".format(
+            discipline=discipline,
+            course=course,
+            slug=slug,
+            team=team,
+            username=username,
+        ),
+        headers=auth_headers(client),
+    )
+    if response.status_code == 200:
+        return Team.model_validate(response.json())
+    response.raise_for_status()
+    raise CodehoodAPIError(response.status_code, Model())
+
+
+def team_update(
+    *,
+    discipline: str,
+    course: str,
+    slug: str,
+    team: str,
+    body: TeamPatch,
+    client: httpx.Client | None = None,
+) -> Team:
+    """
+    Rename a team or give it its own deadline.
+    """
+    client = client if client is not None else get_client()
+    response = client.patch(
+        "/api/course/{discipline}/{course}/assignment/{slug}/team/{team}".format(
+            discipline=discipline, course=course, slug=slug, team=team
+        ),
+        json=body.model_dump(mode="json", by_alias=True),
+        headers=auth_headers(client),
+    )
+    if response.status_code == 200:
+        return Team.model_validate(response.json())
     response.raise_for_status()
     raise CodehoodAPIError(response.status_code, Model())
 

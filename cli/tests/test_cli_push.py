@@ -294,7 +294,10 @@ def _fresh_server_handler(calls: list[tuple[str, str]]):
             return httpx.Response(200, json=_resource_json(slug, "whatever"))
         if (response := _calendar_defaults(request)) is not None:
             return response
-        if request.method == "GET" and request.url.path == f"{BASE}/grade-column":
+        if request.method == "GET" and request.url.path in (
+            f"{BASE}/grade-column",
+            f"{BASE}/assignment",
+        ):
             return httpx.Response(200, json=page([]))
         raise AssertionError(f"unexpected request: {request.method} {request.url}")
 
@@ -319,7 +322,10 @@ def test_dry_run_performs_zero_writes(repo, monkeypatch):
             return httpx.Response(404, json={"message": "not found"})
         if request.url.path == f"{BASE}/resource":
             return httpx.Response(200, json=page([]))
-        if request.method == "GET" and request.url.path == f"{BASE}/grade-column":
+        if request.method == "GET" and request.url.path in (
+            f"{BASE}/grade-column",
+            f"{BASE}/assignment",
+        ):
             return httpx.Response(200, json=page([]))
         raise AssertionError(f"unexpected request: {request.url}")
 
@@ -388,7 +394,10 @@ def test_dry_run_prints_a_warning_for_a_cancelled_events_pinned_slot(repo, monke
                     ]
                 ),
             )
-        if request.method == "GET" and request.url.path == f"{BASE}/grade-column":
+        if request.method == "GET" and request.url.path in (
+            f"{BASE}/grade-column",
+            f"{BASE}/assignment",
+        ):
             return httpx.Response(200, json=page([]))
         raise AssertionError(f"unexpected request: {request.method} {request.url}")
 
@@ -444,7 +453,10 @@ def test_no_prune_reports_deletion_without_executing_it(repo, monkeypatch):
             raise AssertionError("--no-prune must not execute a deletion")
         if (response := _calendar_defaults(request)) is not None:
             return response
-        if request.method == "GET" and request.url.path == f"{BASE}/grade-column":
+        if request.method == "GET" and request.url.path in (
+            f"{BASE}/grade-column",
+            f"{BASE}/assignment",
+        ):
             return httpx.Response(200, json=page([]))
         raise AssertionError(f"unexpected request: {request.method} {request.url}")
 
@@ -489,7 +501,10 @@ def test_a_failed_operation_exits_nonzero_but_still_runs_the_rest(repo, monkeypa
             return httpx.Response(200, json=_resource_json(slug, "whatever"))
         if (response := _calendar_defaults(request)) is not None:
             return response
-        if request.method == "GET" and request.url.path == f"{BASE}/grade-column":
+        if request.method == "GET" and request.url.path in (
+            f"{BASE}/grade-column",
+            f"{BASE}/assignment",
+        ):
             return httpx.Response(200, json=page([]))
         raise AssertionError(f"unexpected request: {request.method} {request.url}")
 
@@ -590,7 +605,10 @@ def test_dry_run_prints_question_ops(repo_with_question, monkeypatch):
             return httpx.Response(404, json={"message": "not found"})
         if request.url.path == f"{BASE}/resource":
             return httpx.Response(200, json=page([]))
-        if request.method == "GET" and request.url.path == f"{BASE}/grade-column":
+        if request.method == "GET" and request.url.path in (
+            f"{BASE}/grade-column",
+            f"{BASE}/assignment",
+        ):
             return httpx.Response(200, json=page([]))
         raise AssertionError(f"unexpected request: {request.url}")
 
@@ -638,7 +656,10 @@ def test_no_prune_skips_question_deletions(repo_with_question, monkeypatch):
             raise AssertionError("--no-prune must not execute a question deletion")
         if (response := _calendar_defaults(request)) is not None:
             return response
-        if request.method == "GET" and request.url.path == f"{BASE}/grade-column":
+        if request.method == "GET" and request.url.path in (
+            f"{BASE}/grade-column",
+            f"{BASE}/assignment",
+        ):
             return httpx.Response(200, json=page([]))
         raise AssertionError(f"unexpected request: {request.method} {request.url}")
 
@@ -688,7 +709,10 @@ def test_a_failed_question_operation_exits_nonzero_but_still_runs_the_rest(
             return httpx.Response(500, json={"message": "server error"})
         if (response := _calendar_defaults(request)) is not None:
             return response
-        if request.method == "GET" and request.url.path == f"{BASE}/grade-column":
+        if request.method == "GET" and request.url.path in (
+            f"{BASE}/grade-column",
+            f"{BASE}/assignment",
+        ):
             return httpx.Response(200, json=page([]))
         raise AssertionError(f"unexpected request: {request.method} {request.url}")
 
@@ -752,7 +776,7 @@ def _roll_call_server_handler(repo, calls: list[tuple[str, str]]):
             return httpx.Response(200, json=page([_calendar_event_json(week=5)]))
         if path == f"{BASE}/roll-call" and method == "GET":
             return httpx.Response(200, json=page([_roll_call_json(5, "mon", 32)]))
-        if path == f"{BASE}/grade-column" and method == "GET":
+        if path in (f"{BASE}/grade-column", f"{BASE}/assignment") and method == "GET":
             return httpx.Response(200, json=page([]))
         if method == "DELETE" and path in (
             f"{BASE}/roll-call/5/mon",
@@ -876,7 +900,7 @@ def _server_with(
             return httpx.Response(200, json=_question_json(slug, "whatever"))
         if (response := _calendar_defaults(request)) is not None:
             return response
-        if method == "GET" and path == f"{BASE}/grade-column":
+        if method == "GET" and path in (f"{BASE}/grade-column", f"{BASE}/assignment"):
             return httpx.Response(200, json=page([]))
         raise AssertionError(f"unexpected request: {method} {request.url}")
 

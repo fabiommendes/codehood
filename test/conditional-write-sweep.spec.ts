@@ -290,6 +290,39 @@ const HONORED: Record<string, Record<string, Case>> = {
 			},
 		};
 	})(),
+	assignment: (() => {
+		const row = async () => {
+			const { course } = await newCourse();
+			const body = {
+				course: course.id as CourseId,
+				slug: `sw-${uniq()}`,
+				title: "Work",
+				body: "Do it.",
+				dueAt: new Date(Date.now() + 86_400_000),
+			};
+			return {
+				assignment: await db.assignment.upsert(body, FULL_ACCESS),
+				body,
+			};
+		};
+		return {
+			upsert: async (v) => {
+				const { assignment, body } = await row();
+				return db.assignment.upsert(
+					{ ...body, title: "Changed" },
+					opts(assignment, v),
+				);
+			},
+			remove: async (v) => {
+				const { assignment } = await row();
+				return db.assignment.remove(
+					{ id: assignment.id },
+					{},
+					opts(assignment, v),
+				);
+			},
+		};
+	})(),
 	question: (() => {
 		const row = async () => {
 			const { course } = await newCourse();
@@ -896,9 +929,13 @@ const OWNER: Record<string, string> = {
 const ownerOf = (model: string) =>
 	OWNER[model] ?? model.charAt(0).toLowerCase() + model.slice(1);
 
-/// Files under `src/db/` that are not scanned. `bootstrap.ts` seeds the dev
-/// database, and no service uses it.
-const UNSCANNED = new Set(["conditional-write.ts", "bootstrap.ts"]);
+/// Files under `src/db/` that are not scanned. `bootstrap.ts` and its
+/// `bootstrap-assignments.ts` seed the dev database, and no service uses them.
+const UNSCANNED = new Set([
+	"conditional-write.ts",
+	"bootstrap.ts",
+	"bootstrap-assignments.ts",
+]);
 
 function dbSources(dir = "src/db"): { file: string; text: string }[] {
 	const found: { file: string; text: string }[] = [];

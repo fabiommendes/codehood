@@ -30,6 +30,7 @@ from .wire import Payload, canonical_question
 __all__ = [
     "Payload",
     "RemoteEntry",
+    "project_assignment",
     "project_calendar_event",
     "project_course",
     "project_exam",
@@ -176,6 +177,35 @@ def project_exam(exam: generated.Exam) -> Payload:
     return payload
 
 
+def project_assignment(assignment: generated.Assignment) -> Payload:
+    """
+    The payload of an assignment `PUT`, without its `rev`.
+
+    A restrictions object with no limit set reads back as `None`, the way a
+    file that sets none leaves it.
+    """
+    limits = (
+        assignment.restrictions.model_dump(
+            mode="json", by_alias=True, exclude_none=True
+        )
+        if assignment.restrictions is not None
+        else {}
+    )
+    return {
+        "slug": assignment.slug,
+        "title": assignment.title,
+        "body": assignment.body,
+        "opensAt": _optional_instant(assignment.opens_at),
+        "dueAt": _instant(assignment.due_at),
+        "closesAt": _optional_instant(assignment.closes_at),
+        "teamMin": assignment.team_min,
+        "teamMax": assignment.team_max,
+        "teamsLockAt": _optional_instant(assignment.teams_lock_at),
+        "template": assignment.template,
+        "restrictions": limits or None,
+    }
+
+
 def project_time_slot(slot: generated.TimeSlot) -> Payload:
     """
     The payload of a time slot `PUT`.
@@ -263,6 +293,10 @@ def project_grade_column(column: generated.GradeColumn) -> Payload:
 #
 # Utilities
 #
+def _optional_instant(text: str | None) -> str | None:
+    return None if text is None else _instant(text)
+
+
 def _instant(text: str) -> str:
     """
     Respell an ISO timestamp the way the server spells it back: UTC,

@@ -5,6 +5,7 @@
 
 from __future__ import annotations
 
+import sys
 from collections.abc import Sequence
 from dataclasses import replace
 from pathlib import Path
@@ -17,6 +18,7 @@ from pydantic import ValidationError
 from .. import repo
 from ..api.base import get_client
 from ..models.repo import RepoConfig
+from ..push.assignment import scan_assignments
 from ..push.base import BaseState, load_base, save_base
 from ..push.calendar import allocate, parse_calendar
 from ..push.errors import (
@@ -39,6 +41,7 @@ from ..push.links import (
 )
 from ..push.ours import ours_warnings, resolve_ours
 from ..push.plan import (
+    DeleteAssignment,
     DeleteCalendarEvent,
     DeleteExam,
     DeleteGradeColumn,
@@ -48,6 +51,7 @@ from ..push.plan import (
     DeleteRollCall,
     DeleteTimeSlot,
     IgnoredExamPolicy,
+    KeptAssignment,
     KeptCancelled,
     KeptDraftPublished,
     KeptExamLive,
@@ -59,6 +63,7 @@ from ..push.plan import (
     Plan,
     Rejected,
     ServerDrifted,
+    UpsertAssignment,
     UpsertCalendarEvent,
     UpsertCourse,
     UpsertExam,
@@ -109,6 +114,7 @@ PRUNE_OPS = (
     DeleteRollCall,
     DeleteGradeColumn,
     DeleteRepository,
+    DeleteAssignment,
 )
 
 
@@ -145,6 +151,16 @@ def push(
             help="Delete server repositories whose folder is gone from repositories/.",
         ),
     ] = False,
+    drop_assignments: Annotated[
+        bool,
+        typer.Option(
+            "--drop-assignments",
+            help=(
+                "Delete server assignments whose file is gone from assignments/. "
+                "One with teams asks before deleting the teams too."
+            ),
+        ),
+    ] = False,
     message: Annotated[
         str | None,
         typer.Option(
@@ -166,8 +182,8 @@ def push(
     ] = None,
 ) -> None:
     """
-    Sync the repository's course row, repositories, calendar, resources, questions,
-    exams and grade columns.
+    Sync the repository's course row, repositories, assignments, calendar,
+    resources, questions, exams and grade columns.
     """
     try:
         config = RepoConfig.open(repo.config_path(path))
@@ -197,6 +213,7 @@ def push(
             prune=prune,
             drop_roll_calls=drop_roll_calls,
             drop_repositories=drop_repositories,
+            drop_assignments=drop_assignments,
             message=message,
             ours=ours or [],
         )
@@ -214,6 +231,7 @@ def sync(
     prune: bool,
     drop_roll_calls: bool,
     drop_repositories: bool = False,
+    drop_assignments: bool = False,
     message: str | None = None,
     ours: Sequence[str] = (),
 ) -> None:
@@ -263,6 +281,7 @@ def sync(
         server,
         drop_roll_calls=drop_roll_calls,
         drop_repositories=drop_repositories,
+        drop_assignments=drop_assignments,
         message=message,
         ours=ours,
     )
@@ -307,10 +326,14 @@ def sync(
             course=local.course,
             client=client,
             repositories=repositories,
+            confirm_force=confirm_force_delete,
         ):
             results.append(result)
             if result.skipped:
                 typer.echo(f"skipped  {describe(result.op)} ({result.message})")
+                continue
+            if result.kept:
+                typer.echo(f"warning  {result.message}")
                 continue
             status = "ok" if result.ok else "failed"
             typer.echo(f"{status:>6}  {describe(result.op)}: {result.message}")
@@ -440,6 +463,7 @@ def read_local_state(path: Path, config: RepoConfig) -> LocalState:
     tracked = tuple(scan_files(path, exclude))
     files, gitignore = list_files(path)
     trees = tuple(scan_repositories(path, exclude))
+    assignments = scan_assignments(path, [tree.slug for tree in trees])
     linked = attach_repositories(allocation.events, trees)
     extras = (readme,) if readme is not None else ()
     scanned = tuple(scan_resources(path, exclude, extras))
@@ -472,6 +496,7 @@ def read_local_state(path: Path, config: RepoConfig) -> LocalState:
         ),
         resources=resources,
         repositories=trees,
+        assignments=assignments.items,
         questions=questions,
         exams=exams,
         excluded=excluded,
@@ -482,7 +507,7 @@ def read_local_state(path: Path, config: RepoConfig) -> LocalState:
             gitignore=gitignore,
             codehoodignore=ignore,
         ),
-        warnings=allocation.warnings,
+        warnings=(*allocation.warnings, *assignments.warnings),
     )
 
 
@@ -521,6 +546,10 @@ def describe(op: Write) -> str:
             return f"delete roll call {op.week}/{op.time_slot}"
         case UpsertRepository() | DeleteRepository():
             return describe_repository(op)
+        case UpsertAssignment():
+            return f"assignment {op.slug}"
+        case DeleteAssignment():
+            return f"delete assignment {op.slug}"
 
 
 def describe_repository(op: UpsertRepository | DeleteRepository) -> str:
@@ -581,6 +610,11 @@ def describe_notice(notice: Notice) -> str:
                 f"repository {notice.slug} kept: its folder is gone; "
                 "use --drop-repositories to delete it"
             )
+        case KeptAssignment():
+            return (
+                f"assignment {notice.slug} kept: its file is gone; "
+                "use --drop-assignments to delete it"
+            )
         case KeptCancelled():
             return f"event {notice.week}/{notice.time_slot} kept: it is CANCELLED"
         case ServerDrifted():
@@ -596,6 +630,27 @@ def notice_line(notice: Notice) -> str:
     """
     prefix = "invalid" if isinstance(notice, Rejected) else "warning"
     return f"{prefix}  {describe_notice(notice)}"
+
+
+def is_interactive() -> bool:
+    """
+    Whether a person can answer a question at the terminal.
+    """
+    return sys.stdin.isatty()
+
+
+def confirm_force_delete(slug: str, teams: int) -> bool:
+    """
+    Ask before deleting an assignment together with its teams and their
+    repositories; without a terminal the answer is no.
+    """
+    if not is_interactive():
+        return False
+    return typer.confirm(
+        f"assignment {slug} has {teams} team(s); deleting it also deletes them "
+        "and their repositories. Delete them all?",
+        default=False,
+    )
 
 
 def format_size(size: int) -> str:

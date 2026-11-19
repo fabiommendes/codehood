@@ -5,6 +5,7 @@ import typer
 
 from ..api.base import NotLoggedInError
 from .api import api
+from .assignment import assignment
 from .attendance import attendance
 from .auth import login, logout
 from .base import app as _app
@@ -20,6 +21,7 @@ __all__ = [
     "main",
     #: Subcommands
     "api",
+    "assignment",
     "attendance",
     "chill",
     "exam",

@@ -31,6 +31,11 @@ export default defineConfig({
 			instructor: env("BLOB_QUOTA_INSTRUCTOR", "1gb"),
 			student: env("BLOB_QUOTA_STUDENT", "200mb"),
 		},
+		repositoryRoot: env("REPOSITORY_ROOT", "./storage/repos"),
+		assignment: {
+			maxRepoBytes: env("ASSIGNMENT_MAX_REPO", "50mb"),
+			maxFileBytes: env("ASSIGNMENT_MAX_FILE", "10mb"),
+		},
 	},
 	runner: {
 		// build-time constant. Null: in development, publicUrl on the other

@@ -32,6 +32,8 @@ test.describe("defineConfig", () => {
 				resourceRoot: "./storage/resources",
 				attachmentLinkMode: "symlink",
 				quota: { instructor: "1gb", student: "200mb" },
+				repositoryRoot: "./storage/repos",
+				assignment: { maxRepoBytes: "50mb", maxFileBytes: "10mb" },
 			},
 			runner: { origin: null, languages: defaultRunners() },
 		});
@@ -116,9 +118,23 @@ test.describe("the default codehood.config.ts", () => {
 			CODEHOOD_CONFIG: "",
 			RESOURCE_ROOT: "/var/blobs",
 			BLOB_QUOTA_STUDENT: "1mb",
+			REPOSITORY_ROOT: "/var/repos",
+			ASSIGNMENT_MAX_REPO: "2mb",
+			ASSIGNMENT_MAX_FILE: "1kb",
 		};
 		expect(
-			constantsIn(vars, "[m.RESOURCE_ROOT, m.BLOB_QUOTA_BY_ROLE.STUDENT]"),
-		).toBe(JSON.stringify(["/var/blobs", 1024 * 1024]));
+			constantsIn(
+				vars,
+				"[m.RESOURCE_ROOT, m.BLOB_QUOTA_BY_ROLE.STUDENT, m.REPOSITORY_ROOT, m.ASSIGNMENT_MAX_REPO_BYTES, m.ASSIGNMENT_MAX_FILE_BYTES]",
+			),
+		).toBe(
+			JSON.stringify([
+				"/var/blobs",
+				1024 * 1024,
+				"/var/repos",
+				2 * 1024 * 1024,
+				1024,
+			]),
+		);
 	});
 });

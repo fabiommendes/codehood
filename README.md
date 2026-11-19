@@ -76,6 +76,9 @@ An instance is described by `codehood.config.ts` at the root, validated by
 | `storage.attachmentLinkMode`  | `symlink`             | `symlink`, `hardlink` or `copy`.                                         |
 | `storage.quota.instructor`    | `1gb`                 | Upload quota per instructor.                                             |
 | `storage.quota.student`       | `200mb`               | Upload quota per student.                                                |
+| `storage.repositoryRoot`      | `./storage/repos`     | Where the git repositories of teams are kept. Never served by the proxy. |
+| `storage.assignment.maxRepoBytes` | `50mb`            | Most a team repository may hold. An assignment may lower it.             |
+| `storage.assignment.maxFileBytes` | `10mb`            | Largest file a push to a team repository may add.                        |
 | `runner.origin`               | null                  | Build-time constant. Origin of the code runner, see [Code runner origin](#code-runner-origin). |
 | `runner.languages`            | `defaultRunners()`    | Build-time constant. Languages the runner runs, see [Runner languages](#runner-languages). |
 
@@ -85,7 +88,8 @@ file changes. The default file writes them as literals. The other keys are
 read again at every boot, so the default file takes them from the
 environment with `env("NAME", fallback)`, which treats a blank variable as
 unset (`SCHOOL_ID_PATTERN`, `RESOURCE_ROOT`, `ATTACHMENT_LINK_MODE`,
-`BLOB_QUOTA_INSTRUCTOR`, `BLOB_QUOTA_STUDENT`).
+`BLOB_QUOTA_INSTRUCTOR`, `BLOB_QUOTA_STUDENT`, `REPOSITORY_ROOT`,
+`ASSIGNMENT_MAX_REPO`, `ASSIGNMENT_MAX_FILE`).
 
 The time zone is not read from `TZ`: that variable also changes the Node
 process's own default zone, for anything that skips an explicit `timeZone`.
@@ -183,6 +187,25 @@ address, locale and time zone in `RELEASE`. Tags older than
 fail. The server trusts the proxy's `X-Forwarded-*` headers only for the
 `instance.publicUrl` host; with a wrong one, form posts fail Astro's origin
 check and every client has the proxy's IP.
+
+Assignments keep one bare git repository per team in
+`storage.repositoryRoot`, and the server runs the `git` binary on them
+(ADR 0021):
+
+- The server needs git 2.30 or newer on its `PATH`, and refuses to start
+  without it.
+- Back up `storage.repositoryRoot` together with the database: either one
+  alone loses the deliveries. The proxy must never serve that folder, unlike
+  `storage.resourceRoot`.
+- Students push to `/git/<token>/<slug>.git` and instructors clone from
+  `/api/course/.../assignment/<slug>/team/<team>/git/`. On both paths the
+  proxy must pass `POST` through without buffering the request or the
+  response (nginx: `proxy_request_buffering off`, `proxy_buffering off`),
+  allow a body as large as `storage.assignment.maxRepoBytes`
+  (`client_max_body_size`), wait at least 60 s, and add no
+  `WWW-Authenticate` header.
+- `node dist/manage.mjs prune-team-repositories [--dry-run]` removes
+  repository folders whose team is gone from the database.
 
 ### Performance log
 
