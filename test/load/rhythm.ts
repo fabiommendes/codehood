@@ -38,6 +38,9 @@ export function clientRhythm() {
 		saveIntervalMs: constant(CLIENT_SOURCES.attempt, "SAVE_INTERVAL_MS"),
 		/// A save unanswered for this long counts as a failed connection.
 		saveTimeoutMs: constant(CLIENT_SOURCES.attempt, "SAVE_TIMEOUT_MS"),
+		/// How long before the deadline the page starts saving what is pending on every tick of its clock.
+		deadlineLeadMs:
+			constant(CLIENT_SOURCES.attempt, "DRAFT_SAVE_LEAD_SECONDS") * 1000,
 		/// Interval of `gradingJob.forStudentQuestions` while a send waits for its worker.
 		sendsPollMs: constant(CLIENT_SOURCES.attempt, "SENDS_POLL_MS"),
 		/// Longest the page waits for the history's last flush.

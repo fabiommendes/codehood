@@ -2,8 +2,8 @@
  * The exam page of one synthetic student, without a browser.
  *
  * It saves answers, records the edit history and follows the sends as
- * `ExamAttempt.tsx` does: the same debounce, serial save queue, retry delay
- * and polling interval (`rhythm.ts`), and the page's own history transport,
+ * `ExamAttempt.tsx` does: the same save interval, serial save queue, retry
+ * delay, saves close to the deadline and polling interval (`rhythm.ts`), and the page's own history transport,
  * coordinator and adapter, with memory in place of IndexedDB.
  */
 
@@ -76,6 +76,9 @@ export interface ExamTarget {
 	exam: string;
 }
 
+/// The interval of the page's clock, which `ExamAttempt.tsx` sets on mount.
+const CLOCK_TICK_MS = 1000;
+
 export class ExamPage {
 	private readonly pending = new Map<string, string>();
 	private readonly timers = new Map<string, NodeJS.Timeout>();
@@ -87,6 +90,7 @@ export class ExamPage {
 	private readonly waits = new Map<string, GradingWait>();
 	private pollTimer: NodeJS.Timeout | undefined;
 	private closed = false;
+	private clock: NodeJS.Timeout | undefined;
 
 	constructor(
 		private readonly http: StudentHttp,
@@ -95,7 +99,16 @@ export class ExamPage {
 		private readonly attempt: string,
 		private readonly startedAt: number,
 		readonly gradingWaits: GradingWait[],
-	) {}
+		/// When the exam ends, as `Date.now()`.
+		deadlineAt?: number,
+	) {
+		if (deadlineAt === undefined) return;
+		// As the page: its clock ticks every second from the moment it opened, and close to the deadline each tick saves what is pending.
+		this.clock = setInterval(() => {
+			if (deadlineAt - Date.now() <= this.rhythm.deadlineLeadMs)
+				void this.flush();
+		}, CLOCK_TICK_MS);
+	}
 
 	/// Starts the edit history as the page does when the exam's switch is on.
 	startHistory(
@@ -325,6 +338,7 @@ export class ExamPage {
 		for (const timer of this.timers.values()) clearTimeout(timer);
 		clearTimeout(this.retryTimer);
 		clearInterval(this.pollTimer);
+		clearInterval(this.clock);
 		this.history?.disable("page closed");
 	}
 }

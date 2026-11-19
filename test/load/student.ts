@@ -614,6 +614,7 @@ export async function runStudent(ctx: StudentContext): Promise<StudentRun> {
 			attempt,
 			ctx.startedAt,
 			ctx.gradingWaits,
+			ctx.startedAt + ctx.deadline,
 		);
 		if (ctx.behaviour.history && props?.answerHistory === true)
 			page.startHistory(ctx.username, ctx.questions);
@@ -648,7 +649,9 @@ export async function runStudent(ctx: StudentContext): Promise<StudentRun> {
 		}
 	}
 	if (page) {
-		if (ctx.behaviour.burst || dice.chance(profile.finishes)) {
+		// A student still on the page when the time runs out hands nothing in: the page sends what is pending and shows the attempt as submitted.
+		const timeUp = Date.now() - ctx.startedAt >= ctx.deadline;
+		if (ctx.behaviour.burst || (!timeUp && dice.chance(profile.finishes))) {
 			await page.finish(pageUrl);
 			run.finished = true;
 		} else {

@@ -56,7 +56,7 @@ morreu e em que segundo.
 | Opção               | Padrão | O que faz                                                         |
 | :------------------ | :----- | :---------------------------------------------------------------- |
 | `--students`        | 100    | Alunos sintéticos                                                 |
-| `--duration`        | 10m    | Duração da prova; quem não terminou entrega no fim                |
+| `--duration`        | 10m    | Duração da prova; quem não terminou é pego pelo prazo, sem entregar |
 | `--ramp`            | 2m     | Janela de chegada dos alunos                                      |
 | `--history`         | 0      | Autosaves de uma prova antiga já no banco, como em produção       |
 | `--history-bytes`   | 900    | Tamanho médio de cada um desses autosaves, em caracteres          |
@@ -106,6 +106,11 @@ são lidos do código-fonte de `ExamAttempt.tsx` e `answer-edit-session.ts`
 (`rhythm.ts`). `test/load-rhythm.spec.ts` falha se uma dessas constantes
 deixar de ser um número, e se a página passar a chamar uma action que o aluno
 sintético não chama.
+
+No prazo o aluno sintético faz o que a página faz: nos últimos
+`DRAFT_SAVE_LEAD_SECONDS` salva o que está pendente a cada segundo do relógio
+da página, que começou a contar quando ela abriu, e depois do prazo manda o
+que sobrou sem chamar `exam.finish`. Só entrega quem termina antes.
 
 O que o aluno sintético não faz: baixar os assets estáticos e o runner do
 navegador (que roda os pré-testes no cliente, sem tocar o servidor).
