@@ -76,5 +76,7 @@ em produção, depois do deploy.
   conferido em 2026-11-19).
 - [ ] Uma restauração do backup foi testada.
 - [ ] Existe uma medida, antes e depois, do tempo de commit ou do p95 de uma
-  rota de escrita (autosave): ver a rodada de carga `--wal both` no handoff
-  `dev/specs/to-do/autosave-e-quedas-na-prova.handoff.md`.
+  rota de escrita (autosave): na rodada de carga `--wal both` de 2026-11-19
+  (`.load/reports/2026-11-19T17-28-27/`) o WAL não mudou o p95 de
+  `exam.answer`, porque naquela máquina o commit já custava 3 ms sem WAL; na
+  VPS ele custa 5 a 6 ms, contra 0,1 ms em WAL.

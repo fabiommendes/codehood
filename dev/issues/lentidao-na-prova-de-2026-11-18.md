@@ -16,8 +16,7 @@ inteiro; o arquivo guardado, `.perf/prova-2026-11-18/prova.jsonl`, cobre só
 das 14:00 às 19:00 (hora local) e inclui os traces das quedas. Duas causas: o `fsync` por commit, confirmado
 abaixo, e 17 quedas do servidor por falta de memória, corrigidas em
 2026-11-19 (`dev/specs/to-review/listagens-sem-historico-de-autosave.md`).
-As correções do `fsync` estão em
-`dev/specs/to-do/autosave-e-quedas-na-prova.handoff.md`, itens 2 a 4.
+As correções do `fsync` estão em "O que foi feito em 2026-11-19", no fim.
 
 ## Sintoma
 
@@ -149,3 +148,41 @@ Sem `gzip` a conexão caiu aos 32 MB.
 - Trocar de driver não resolve: `@prisma/adapter-libsql` com arquivo local
   também é síncrono por baixo (não conferido na documentação atual), e o
   SQLite tem um escritor só de qualquer forma.
+
+## O que foi feito em 2026-11-19
+
+Nada disto está em produção ainda.
+
+- Listagens sem o histórico de autosave (`24d22b7a`), que era o que esgotava
+  a memória. O release gera a migração do índice novo de `Submission`.
+- Autosave de texto no máximo uma vez a cada 30 s por questão (`9c18ff34`).
+- WAL com `synchronous=NORMAL` (`56f725dc`). Não fazer esse deploy com uma
+  prova em andamento; depois, conferir `PRAGMA journal_mode` na VPS.
+- Telas de instrutor da prova: a fila de correção lê só os envios e a
+  correção das objetivas roda em lote. Cada tela caiu de 620 a 1150 queries
+  para 86 a 144, e a mais lenta de 2,7 s para 0,44 s.
+- O aluno sintético passou a seguir o prazo como a página (`test/load/`). A
+  fila de saves no fim da prova era do teste: a página não chama
+  `exam.finish` no prazo. Com isso, `exam.answer` nos últimos 30 s tem p95
+  de 286 ms com 60 alunos (`.load/reports/2026-11-19T18-50-28/`).
+
+Medido e descartado:
+
+- Não inserir autosave idêntico ao anterior. Numa cópia do banco de produção
+  de 2026-11-19, 3 737 de 170 446 autosaves (2,2%) repetem a submissão
+  anterior da mesma tentativa e questão: 2,5 MB de 150 MB.
+- Espalhar o save final pelo último minuto: a rajada sincronizada não existe
+  na página real.
+
+Adiado:
+
+- Rascunho único por questão com retrato a cada N minutos.
+- Limpeza dos autosaves antigos em produção: irreversível, exige aval e
+  backup, e só importa pelo tamanho do arquivo.
+
+Falta:
+
+- Repetir a rodada de carga numa máquina sem outras suítes, com 100 alunos e
+  10 min, antes do deploy.
+- O deploy, fora de horário de prova.
+- `commit-que-falha-trava-a-escrita`, achado ao medir os autosaves.

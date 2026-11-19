@@ -7,7 +7,7 @@ relatedTo: [lentidao-na-prova-de-2026-11-18]
 
 # Listagens de tentativas sem o histórico de autosave
 
-Item 1 de `autosave-e-quedas-na-prova.handoff.md`. Corrige o issue
+Primeira correção de `dev/issues/lentidao-na-prova-de-2026-11-18.md`. Corrige o issue
 `oom-ao-carregar-submissoes-do-curso`, fechado com este trabalho.
 
 ## Problema
