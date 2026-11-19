@@ -36,7 +36,22 @@ test.describe("defineConfig", () => {
 				assignment: { maxRepoBytes: "50mb", maxFileBytes: "10mb" },
 			},
 			runner: { origin: null, languages: defaultRunners() },
+			exam: { autosaveIntervalMs: 30_000 },
 		});
+	});
+
+	test("the autosave interval may come from the environment as text", () => {
+		const config = defineConfig({ exam: { autosaveIntervalMs: "500" } });
+		expect(config.exam.autosaveIntervalMs).toBe(500);
+	});
+
+	test("an autosave interval that is not a positive number is refused", () => {
+		expect(() =>
+			defineConfig({ exam: { autosaveIntervalMs: "soon" } }),
+		).toThrow(/exam\.autosaveIntervalMs/);
+		expect(() => defineConfig({ exam: { autosaveIntervalMs: 0 } })).toThrow(
+			/exam\.autosaveIntervalMs/,
+		);
 	});
 
 	test("the default languages are Python, JavaScript and TypeScript", () => {

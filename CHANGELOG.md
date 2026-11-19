@@ -27,6 +27,15 @@
   não foi visitada por nenhum papel e lista os componentes `.astro` que nenhuma
   página renderizou (cobertura V8 do servidor mapeada pelos source maps).
 
+### Changed
+
+- Prova: uma resposta digitada é salva no máximo uma vez a cada 30 s por
+  questão, contando da primeira edição ainda não salva, em vez de a cada
+  pausa de 500 ms (na prova de 2026-11-18 isso dava 9 saves por minuto por
+  aluno). Sair do campo, esconder a aba, fechar a página, o prazo e a entrega
+  salvam na hora; as objetivas continuam salvando a cada clique. O intervalo
+  é a chave nova `exam.autosaveIntervalMs` de `codehood.config.ts`.
+
 ### Fixed
 
 - O servidor não cai mais por falta de memória quando o instrutor abre a home

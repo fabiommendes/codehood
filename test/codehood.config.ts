@@ -29,6 +29,10 @@ export default defineConfig({
 			maxFileBytes: env("ASSIGNMENT_MAX_FILE"),
 		},
 	},
+	exam: {
+		// Short, so a spec that types an answer sees it saved without waiting.
+		autosaveIntervalMs: env("EXAM_AUTOSAVE_INTERVAL_MS", "500"),
+	},
 	runner: {
 		origin: env("RUNNER_ORIGIN") ?? null,
 		languages: [...defaultRunners(), lua(), prolog(), elm()],

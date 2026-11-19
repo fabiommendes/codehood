@@ -95,6 +95,14 @@ export const codehoodConfig = z.object({
 			languages: runnerPlugins.default(defaultRunners),
 		})
 		.prefault({}),
+	exam: z
+		.object({
+			/// The longest a typed answer waits to be saved while the student keeps
+			/// typing, in milliseconds. Accepts a numeric string, so it may come
+			/// from `env()`.
+			autosaveIntervalMs: z.coerce.number().int().positive().default(30_000),
+		})
+		.prefault({}),
 });
 
 /** What a config file writes: every key optional. */

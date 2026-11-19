@@ -142,6 +142,51 @@ async function seedAnswer(s: Prepared, question: string, payload: string) {
 const answerBox = (page: Page) => page.getByRole("textbox").first();
 const editor = (page: Page) => page.locator("[data-code-runner] .cm-content");
 
+/// How many submissions the server holds for `question`.
+async function saves(s: Prepared, question = "text"): Promise<number> {
+	return prisma.submission.count({
+		where: { responseId: s.attempt.id, question: { slug: question } },
+	});
+}
+
+test("text typed without a pause is saved while the typing goes on", async ({
+	page,
+}) => {
+	const s = await setup({ page });
+	await page.clock.install();
+	await page.goto(s.url);
+	await page.clock.pauseAt(Date.now() + SECOND);
+
+	// The test server saves at most every 500 ms; a key every 200 ms never pauses that long.
+	await answerBox(page).click();
+	for (const letter of "abcd") {
+		await page.keyboard.type(letter);
+		await page.clock.runFor(200);
+	}
+
+	await expect.poll(() => saved(s)).toBe("abc");
+	expect(await saves(s)).toBe(1);
+});
+
+test("hiding the tab saves the typed text at once", async ({ page }) => {
+	const s = await setup({ page });
+	await page.clock.install();
+	await page.goto(s.url);
+	await page.clock.pauseAt(Date.now() + SECOND);
+
+	await answerBox(page).click();
+	await page.keyboard.type("before the tab went away");
+	await page.evaluate(() => {
+		Object.defineProperty(document, "visibilityState", {
+			configurable: true,
+			get: () => "hidden",
+		});
+		document.dispatchEvent(new Event("visibilitychange"));
+	});
+
+	await expect.poll(() => saved(s)).toBe("before the tab went away");
+});
+
 test("a failed save is retried without another edit", async ({ page }) => {
 	const s = await setup({ page });
 	let calls = 0;

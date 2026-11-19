@@ -58,6 +58,7 @@ import { QuestionFrame } from "./QuestionFrame";
 import { formatPoints } from "./question-points";
 import RegradeControls, { type QuestionRegrade } from "./RegradeControls";
 import { retryDelay } from "./save-retry";
+import { createSaveSchedule } from "./save-schedule";
 import { questionList, unansweredWarning } from "./unanswered-warning";
 
 export interface ExamAttemptProps {
@@ -111,6 +112,8 @@ export interface ExamAttemptProps {
 	answerHistory?: boolean;
 	/// Whether the attempt is the instructor's simulation, which counts for no grade and can be restarted.
 	preview?: boolean;
+	/// The longest a typed answer waits to be saved while the student keeps typing, in milliseconds.
+	saveIntervalMs?: number;
 }
 
 /// The box every state sentence of an attempt sits in.
@@ -125,8 +128,8 @@ const DRAFT_SAVE_LEAD_SECONDS = 10;
 /// How long the page waits between two reads of the sends that still wait for a worker.
 const SENDS_POLL_MS = 5000;
 
-/// How long typing pauses before a text answer is saved.
-const SAVE_DELAY_MS = 500;
+/// The longest a typed answer waits to be saved while the student keeps typing, unless the page is told otherwise.
+const SAVE_INTERVAL_MS = 30_000;
 
 /// How long a save may stay unanswered before it counts as a failed connection.
 const SAVE_TIMEOUT_MS = 15_000;
@@ -286,9 +289,12 @@ export default function ExamAttempt(props: ExamAttemptProps): JSX.Element {
 	const deadline = () =>
 		props.state.kind === "in-progress" ? props.state.deadline : null;
 
-	// Answers waiting to be sent, and the timers that will send them.
+	// Answers waiting to be sent, and when the typed ones are due.
 	const pending = new Map<string, AnswerPayload>();
-	const timers = new Map<string, ReturnType<typeof setTimeout>>();
+	const schedule = createSaveSchedule({
+		intervalMs: props.saveIntervalMs ?? SAVE_INTERVAL_MS,
+		save: (slug) => saveNow(slug),
+	});
 	// Saves run one after another so an older answer never lands after a newer one.
 	let queue: Promise<void> = Promise.resolve();
 	// The number of the latest save sent for each question: a failed older save
@@ -323,9 +329,7 @@ export default function ExamAttempt(props: ExamAttemptProps): JSX.Element {
 	}
 
 	function saveNow(slug: string): void {
-		const timer = timers.get(slug);
-		if (timer !== undefined) clearTimeout(timer);
-		timers.delete(slug);
+		schedule.cancel(slug);
 
 		const payload = pending.get(slug);
 		if (payload === undefined) return;
@@ -658,8 +662,14 @@ export default function ExamAttempt(props: ExamAttemptProps): JSX.Element {
 		withHistory((adapter) => void adapter.flushFinal());
 	}
 
+	/// Sends what the student typed and the history's pending work, as the page is being hidden or closed.
+	function saveBeforeLeaving(): void {
+		if (kind() === "in-progress" && !closing()) void flush();
+		flushHistoryNow();
+	}
+
 	function onVisibilityChange(): void {
-		if (document.visibilityState === "hidden") flushHistoryNow();
+		if (document.visibilityState === "hidden") saveBeforeLeaving();
 		else kickSessionRetry();
 	}
 
@@ -720,12 +730,7 @@ export default function ExamAttempt(props: ExamAttemptProps): JSX.Element {
 			return;
 		}
 
-		const timer = timers.get(slug);
-		if (timer !== undefined) clearTimeout(timer);
-		timers.set(
-			slug,
-			setTimeout(() => saveNow(slug), SAVE_DELAY_MS),
-		);
+		schedule.edited(slug);
 	}
 
 	/// The text each question's draft was last written with, so a confirmed save removes only the draft this page wrote.
@@ -959,13 +964,13 @@ export default function ExamAttempt(props: ExamAttemptProps): JSX.Element {
 		window.addEventListener("beforeunload", warnBeforeUnload);
 		window.addEventListener("online", retryNow);
 		window.addEventListener("focus", kickSessionRetry);
-		window.addEventListener("pagehide", flushHistoryNow);
+		window.addEventListener("pagehide", saveBeforeLeaving);
 		document.addEventListener("visibilitychange", onVisibilityChange);
 		onCleanup(() => {
 			window.removeEventListener("beforeunload", warnBeforeUnload);
 			window.removeEventListener("online", retryNow);
 			window.removeEventListener("focus", kickSessionRetry);
-			window.removeEventListener("pagehide", flushHistoryNow);
+			window.removeEventListener("pagehide", saveBeforeLeaving);
 			document.removeEventListener("visibilitychange", onVisibilityChange);
 		});
 		if (kind() !== "in-progress") {
@@ -979,7 +984,7 @@ export default function ExamAttempt(props: ExamAttemptProps): JSX.Element {
 	onCleanup(() => {
 		historyStopped = true;
 		withHistory((adapter) => adapter.disable("page closed"));
-		for (const timer of timers.values()) clearTimeout(timer);
+		schedule.dispose();
 		if (retryTimer !== undefined) clearTimeout(retryTimer);
 	});
 

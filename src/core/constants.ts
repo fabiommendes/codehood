@@ -120,6 +120,9 @@ export const RUNNER_ORIGIN: string | null = resolveRunnerOrigin(
 	ENVIRONMENT,
 );
 
+/// The longest a typed exam answer waits to be saved while the student keeps typing.
+export const EXAM_AUTOSAVE_INTERVAL_MS = config.exam.autosaveIntervalMs;
+
 // =============================================================================
 //  						    SESSION
 // =============================================================================
@@ -243,6 +246,7 @@ logEnvVariables([
 	["storage.assignment.maxRepoBytes", ASSIGNMENT_MAX_REPO_BYTES],
 	["storage.assignment.maxFileBytes", ASSIGNMENT_MAX_FILE_BYTES],
 	["instance.schoolIdPattern", SCHOOL_ID_PATTERN],
+	["exam.autosaveIntervalMs", EXAM_AUTOSAVE_INTERVAL_MS],
 ]);
 
 /**

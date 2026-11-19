@@ -79,6 +79,7 @@ An instance is described by `codehood.config.ts` at the root, validated by
 | `storage.repositoryRoot`      | `./storage/repos`     | Where the git repositories of teams are kept. Never served by the proxy. |
 | `storage.assignment.maxRepoBytes` | `50mb`            | Most a team repository may hold. An assignment may lower it.             |
 | `storage.assignment.maxFileBytes` | `10mb`            | Largest file a push to a team repository may add.                        |
+| `exam.autosaveIntervalMs`     | `30000`               | Longest a typed exam answer waits to be saved while the student keeps typing. Leaving the field, hiding the tab, the deadline and the submit save at once. |
 | `runner.origin`               | null                  | Build-time constant. Origin of the code runner, see [Code runner origin](#code-runner-origin). |
 | `runner.languages`            | `defaultRunners()`    | Build-time constant. Languages the runner runs, see [Runner languages](#runner-languages). |
 

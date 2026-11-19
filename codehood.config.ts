@@ -37,6 +37,10 @@ export default defineConfig({
 			maxFileBytes: env("ASSIGNMENT_MAX_FILE", "10mb"),
 		},
 	},
+	exam: {
+		// Milliseconds a typed answer may wait to be saved while the student keeps typing.
+		autosaveIntervalMs: env("EXAM_AUTOSAVE_INTERVAL_MS", "30000"),
+	},
 	runner: {
 		// build-time constant. Null: in development, publicUrl on the other
 		// loopback name (localhost <-> 127.0.0.1); in production, no code runner.

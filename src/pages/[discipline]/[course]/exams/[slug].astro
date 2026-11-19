@@ -8,7 +8,11 @@ import ExamQuestionsTable from "@/components/exam/ExamQuestionsTable.astro";
 import ReleaseGrades from "@/components/exam/ReleaseGrades";
 import AttachmentList from "@/components/question/AttachmentList";
 import ReleasedScore from "@/components/ReleasedScore.astro";
-import { EXAM_ANSWER_GRACE_MS, RUNNER_ORIGIN } from "@/core/constants";
+import {
+	EXAM_ANSWER_GRACE_MS,
+	EXAM_AUTOSAVE_INTERVAL_MS,
+	RUNNER_ORIGIN,
+} from "@/core/constants";
 import { db } from "@/db";
 import { m } from "@/i18n";
 import AppLayout from "@/layouts/AppLayout.astro";
@@ -421,6 +425,7 @@ const examOutcome = view.result;
           username={actor.username}
           answeredAt={view.answeredAt}
           graceMs={EXAM_ANSWER_GRACE_MS}
+          saveIntervalMs={EXAM_AUTOSAVE_INTERVAL_MS}
           attempt={attempt?.publicId}
           answerHistory={effectiveAnswerHistory(exam)}
         />
