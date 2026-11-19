@@ -19,6 +19,7 @@ import path from "node:path";
 import { monitorEventLoopDelay } from "node:perf_hooks";
 import { parseArgs } from "node:util";
 import { Recorder } from "./http";
+import { runInstructor } from "./instructor";
 import type { GradingWait } from "./page";
 import { summariseProfiles } from "./profile";
 import {
@@ -56,13 +57,16 @@ const { values: args } = parseArgs({
 	options: {
 		students: { type: "string", default: "100" },
 		history: { type: "string", default: "0" },
+		"history-bytes": { type: "string", default: "900" },
+		instructor: { type: "string", default: "0" },
+		"commit-delay": { type: "string", default: "0" },
 		duration: { type: "string", default: "10m" },
 		ramp: { type: "string", default: "2m" },
 		scenario: { type: "string", default: "all" },
 		"grading-workers": { type: "string", default: "1,4" },
 		"worker-poll": { type: "string", default: "10" },
 		"worker-cpu": { type: "string", default: "none" },
-		wal: { type: "string", default: "off" },
+		wal: { type: "string", default: "on" },
 		memory: { type: "string" },
 		cpu: { type: "string" },
 		port: { type: "string", default: "4590" },
@@ -88,6 +92,10 @@ const STUDENTS = Number(args.students);
 const DURATION = durationMs(args.duration);
 const RAMP = durationMs(args.ramp);
 const COOLDOWN = durationMs(args.cooldown);
+const INSTRUCTOR = durationMs(args.instructor);
+const COMMIT_DELAY = durationMs(args["commit-delay"]);
+/// What systemd waits before it starts a server that died again.
+const RESTART_DELAY = 2_000;
 const PORT = Number(args.port);
 const BASE = `http://localhost:${PORT}`;
 const WORKDIR = path.join(ROOT, ".load");
@@ -264,7 +272,7 @@ function build(): void {
 	run(path.join(BIN, "astro"), ["build", "--outDir", DIST], serverEnv(WORKDIR));
 }
 
-function prepareDatabase(dir: string, wal: boolean): void {
+function prepareDatabase(dir: string): void {
 	rmSync(dir, { recursive: true, force: true });
 	mkdirSync(path.join(dir, "resources"), { recursive: true });
 	const env = serverEnv(dir);
@@ -285,26 +293,60 @@ function prepareDatabase(dir: string, wal: boolean): void {
 			String(STUDENTS),
 			"--history",
 			args.history,
+			"--history-bytes",
+			args["history-bytes"],
 		],
 		env,
 	);
-	if (wal) {
-		// The journal mode is kept in the file, so the server opens it in WAL without a change.
-		run(process.execPath, [
-			"-e",
-			`const db = require("better-sqlite3")(${JSON.stringify(path.join(dir, "load.db"))}); console.log("[load] journal_mode", db.pragma("journal_mode = WAL", { simple: true })); db.close();`,
-		]);
-	}
 }
 
 interface Server {
-	process: ChildProcess;
 	pid: () => number | undefined;
 	errors: string[];
-	exit: () => string | undefined;
+	/// The exits of the server while it was meant to run, each with the second of the run it happened at.
+	exits: string[];
+	stop: () => Promise<void>;
 }
 
-function startServer(dir: string): Server {
+/// Starts the server and, like `Restart=on-failure`, starts it again whenever it dies.
+function startServer(dir: string, wal: boolean): Server {
+	const errors: string[] = [];
+	const exits: string[] = [];
+	const startedAt = Date.now();
+	writeFileSync(path.join(dir, "server.log"), "");
+	let stopping = false;
+	let child = spawnServer(dir, wal, errors);
+	const watch = (current: ChildProcess) => {
+		current.on("exit", (code, signal) => {
+			if (stopping) return;
+			exits.push(
+				`code ${code} signal ${signal} at ${Math.round((Date.now() - startedAt) / 1000)} s`,
+			);
+			console.log(`[load] the server died (${exits.at(-1)}); restarting`);
+			setTimeout(() => {
+				if (stopping) return;
+				child = spawnServer(dir, wal, errors);
+				watch(child);
+			}, RESTART_DELAY);
+		});
+	};
+	watch(child);
+	return {
+		pid: () => child.pid,
+		errors,
+		exits,
+		stop: () => {
+			stopping = true;
+			return stop(child);
+		},
+	};
+}
+
+function spawnServer(
+	dir: string,
+	wal: boolean,
+	errors: string[],
+): ChildProcess {
 	const probe = path.join(dir, "probe.jsonl");
 	const node = [
 		process.execPath,
@@ -326,20 +368,23 @@ function startServer(dir: string): Server {
 		env: {
 			...process.env,
 			...serverEnv(dir),
+			// The server sets the journal mode itself, on every connection.
+			DATABASE_JOURNAL_MODE: wal ? "wal" : "delete",
 			LOAD_PROBE_FILE: probe,
 			LOAD_TX_FILE: path.join(dir, "tx.jsonl"),
 			LOAD_SQL_FILE: path.join(dir, "sql.jsonl"),
 			LOAD_ROUTE_FILE: path.join(dir, "route.jsonl"),
+			// A commit in WAL does not pay what the delay stands for.
+			...(COMMIT_DELAY > 0 && !wal
+				? { LOAD_COMMIT_DELAY_MS: String(COMMIT_DELAY) }
+				: {}),
 			...(args["no-profile"]
 				? {}
 				: { LOAD_PROFILE_DIR: path.join(dir, "profile") }),
 		},
 		stdio: ["ignore", "pipe", "pipe"],
 	});
-	const errors: string[] = [];
-	let exit: string | undefined;
 	const log = path.join(dir, "server.log");
-	writeFileSync(log, "");
 	for (const stream of [child.stdout, child.stderr]) {
 		stream?.on("data", (chunk: Buffer) => {
 			const text = chunk.toString();
@@ -352,16 +397,14 @@ function startServer(dir: string): Server {
 					errors.push(line.slice(0, 300));
 		});
 	}
-	child.on("exit", (code, signal) => {
-		exit = `code ${code} signal ${signal}`;
-	});
-	return { process: child, pid: () => child.pid, errors, exit: () => exit };
+	return child;
 }
 
 async function waitForServer(server: Server): Promise<void> {
 	const until = Date.now() + 60_000;
 	while (Date.now() < until) {
-		if (server.exit()) throw new Error(`The server exited: ${server.exit()}`);
+		if (server.exits.length > 0)
+			throw new Error(`The server exited: ${server.exits[0]}`);
 		try {
 			const response = await fetch(`${BASE}/api/health`);
 			if (response.ok) return;
@@ -491,8 +534,8 @@ async function runScenario(
 ): Promise<ScenarioResult> {
 	const dir = path.join(OUT, scenario.name);
 	console.log(`\n[load] ${scenario.name}: ${scenario.description}`);
-	prepareDatabase(dir, scenario.wal);
-	const server = startServer(dir);
+	prepareDatabase(dir);
+	const server = startServer(dir, scenario.wal);
 	await waitForServer(server);
 	const stopSampling = sampleSystem(server.pid);
 	const workers = startWorkers(scenario.workers, scenario.workerCpu, dir);
@@ -517,6 +560,17 @@ async function runScenario(
 		);
 	}, 10_000);
 
+	let examOver = false;
+	const instructor =
+		INSTRUCTOR > 0
+			? runInstructor({
+					base: BASE,
+					recorder,
+					interval: INSTRUCTOR,
+					history: Number(args.history) > 0,
+					done: () => examOver,
+				})
+			: Promise.resolve();
 	const runs: StudentRun[] = await Promise.all(
 		Array.from({ length: scenario.students ?? STUDENTS }, (_, i) => {
 			const dice = new Dice(seededRandom(Math.floor(master() * 2 ** 32)));
@@ -542,6 +596,8 @@ async function runScenario(
 			});
 		}),
 	);
+	examOver = true;
+	await instructor;
 	clearInterval(progress);
 	const generatorSamples = generator.stop();
 	const endedAt = Date.now();
@@ -549,8 +605,11 @@ async function runScenario(
 	// The server stays up, idle, so the report shows whether its memory comes back down.
 	await new Promise((resolve) => setTimeout(resolve, COOLDOWN));
 	const system = stopSampling();
-	const serverExit = server.exit();
-	await stop(server.process);
+	const serverExit =
+		server.exits.length > 0
+			? `${server.exits.length} time${server.exits.length === 1 ? "" : "s"}, restarted after each (${server.exits.join("; ")})`
+			: undefined;
+	await server.stop();
 	return {
 		name: scenario.name,
 		description: scenario.description,
@@ -602,7 +661,11 @@ const report: LoadReport = {
 	createdAt: new Date().toISOString(),
 	options: args,
 	fsync,
-	limits: { memory: args.memory ?? null, cpu: args.cpu ?? null },
+	limits: {
+		memory: args.memory ?? null,
+		cpu: args.cpu ?? null,
+		commitDelayMs: COMMIT_DELAY,
+	},
 	scenarios: results,
 };
 writeFileSync(path.join(OUT, "report.json"), JSON.stringify(report));

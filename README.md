@@ -266,6 +266,12 @@ journalctl -u codehood -o cat --since 15:20 --until 15:40 \
              db: (map(.db) | add)}) | sort_by(-.max) | .[:10][]'
 ```
 
+`pnpm exec tsx test/perf/routes.ts <file or dir>` ranks the routes of a log by
+mean time per request, with the largest time, the time in SQLite and the
+number of statements; `--sort max|db|queries|total` changes the order and
+`--user` keeps one user's requests. A route with hundreds of statements, or
+whose largest time is far above its mean, loads more as the data grows.
+
 Every response carries its `id` in `X-Request-Id`, and a request that arrives
 with that header keeps the id. Let the proxy mint it and log its own view, to
 tell a 502 of the proxy from a slow answer of the app. With Caddy:

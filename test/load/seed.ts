@@ -28,10 +28,13 @@ const { values } = parseArgs({
 	options: {
 		students: { type: "string", default: "100" },
 		history: { type: "string", default: "0" },
+		"history-bytes": { type: "string", default: "900" },
 	},
 });
 const students = Number(values.students);
 const history = Number(values.history);
+/// Mean size of an autosave of the history, in characters.
+const historyBytes = Number(values["history-bytes"]);
 
 const now = new Date();
 const instructor = await db.user.create(
@@ -202,14 +205,18 @@ async function seedHistory(courseId: CourseId, rows: number): Promise<void> {
 				const question =
 					questions[Math.floor(row / responses.length) % questions.length];
 				if (!response || !question) return [];
-				const answer = answers.get(question.slug) ?? "";
+				const answer = answers.get(question.slug) || "x";
+				// Sizes from 1 to twice the mean, as an answer that grows while it is typed.
+				const size = 1 + ((row * 37) % Math.max(1, 2 * historyBytes));
 				return [
 					{
 						publicId: `history-${row}`,
 						kind: "AUTOSAVE" as const,
 						responseId: response.id,
 						questionId: question.id,
-						payload: answer.slice(0, 1 + (row % Math.max(1, answer.length))),
+						payload: `${answer}\n`
+							.repeat(Math.ceil(size / (answer.length + 1)))
+							.slice(0, size),
 					},
 				];
 			}),

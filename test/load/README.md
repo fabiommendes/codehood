@@ -36,6 +36,10 @@ Para cada cenário:
 4. Quando os alunos terminam, para os workers e deixa o servidor parado por
    `--cooldown` para ver se a memória volta.
 
+Se o servidor morre no meio do cenário, ele é reiniciado depois de 2 s, como o
+`Restart=on-failure` da unit de produção, e o relatório diz quantas vezes
+morreu e em que segundo.
+
 ## Cenários
 
 | Cenário        | O que isola                                                                 |
@@ -55,11 +59,14 @@ Para cada cenário:
 | `--duration`        | 10m    | Duração da prova; quem não terminou entrega no fim                |
 | `--ramp`            | 2m     | Janela de chegada dos alunos                                      |
 | `--history`         | 0      | Autosaves de uma prova antiga já no banco, como em produção       |
+| `--history-bytes`   | 900    | Tamanho médio de cada um desses autosaves, em caracteres          |
+| `--instructor`      | 0      | Intervalo em que o instrutor abre a home, o curso e as telas da prova |
+| `--commit-delay`    | 0      | Tempo a mais que cada commit bloqueia o servidor, fora do WAL     |
 | `--scenario`        | all    | `baseline`, `monitor`, `queue`, `combined` ou uma lista           |
 | `--grading-workers` | 1,4    | Workers dos cenários `queue` e `combined`; uma lista roda cada um |
 | `--worker-cpu`      | none   | `CPUQuota` de cada worker; uma lista (`none,100%`) roda cada uma  |
 | `--worker-poll`     | 10     | Segundos entre dois `claim` com a fila vazia                      |
-| `--wal`             | off    | `off`, `on` ou `both`                                             |
+| `--wal`             | on     | `off`, `on` ou `both`; `off` sobe o servidor com `DATABASE_JOURNAL_MODE=delete` |
 | `--memory`, `--cpu` | —      | Limites do servidor, como `--memory 1G --cpu 100%` (ver abaixo)   |
 | `--seed`            | 1      | Semente dos sorteios; a mesma semente repete a mesma turma        |
 | `--skip-build`      | —      | Reaproveita o build de `.load/dist`                               |
@@ -103,6 +110,47 @@ sintético não chama.
 O que o aluno sintético não faz: baixar os assets estáticos e o runner do
 navegador (que roda os pré-testes no cliente, sem tocar o servidor).
 
+### Calibração contra uma prova real
+
+`calibrate.ts` compara o ritmo dos saves de um log de produção (as linhas
+`request` do log de performance) com o de uma rodada:
+
+```sh
+pnpm exec tsx test/load/calibrate.ts --log prova.jsonl --report .load/reports/<data>/report.json
+```
+
+Ele mostra, por aluno, os saves por minuto, a fração dos minutos com algum
+save e a distribuição do intervalo entre dois saves. O intervalo curto (até
+15 s) vem da digitação: `burst` (teclas de uma vez) e `breath` (a parada entre
+duas rajadas, que só vira save quando passa de `SAVE_DELAY_MS`) de cada perfil.
+Os intervalos longos e a fração de minutos ativos vêm de `think`, `pause` e da
+duração, e só se comparam numa rodada tão longa quanto a prova.
+
+Os perfis foram ajustados contra a prova de 2026-11-18 (174 alunos, mediana de
+1,6 s entre dois saves e 9,3 saves por aluno por minuto). O log de produção
+não distingue o save do envio, então a comparação soma os dois dos dois lados.
+
+## O instrutor
+
+Com `--instructor 1m`, um instrutor sintético (`instructor.ts`) entra e abre a
+home e a página do curso a cada minuto, enquanto a prova corre. Essas páginas
+leem o curso inteiro, e não uma tentativa: o custo delas cresce com
+`--history`. No relatório aparecem como `instructor:home` e
+`instructor:course`.
+
+Em seguida ele abre as telas de instrutor da prova em andamento: a prova,
+`grading`, `grading/[question]`, `exceptions` e `results`
+(`instructor:exam`, `instructor:exam:grading` e assim por diante). Com
+`--history`, abre as mesmas telas da prova antiga, que é a que guarda os
+autosaves (`instructor:history:…`).
+
+Para reproduzir um servidor que cai por falta de memória, junte as três
+coisas:
+
+```sh
+pnpm run load --scenario monitor --history 160000 --instructor 1m --memory 600M
+```
+
 ## Máquina local × VPS
 
 O servidor roda num event loop só, então o que conta é a velocidade por
@@ -117,9 +165,27 @@ O gerador de carga e os workers ficam de fora. Os workers rodam `elm` e
 `elm-test` na mesma máquina e disputam CPU com o servidor; para separar esse
 efeito, compare `--grading-workers 0,1 --worker-cpu none,100%`.
 
-O relatório começa com o tempo de um `write` + `fsync` de 4 KiB no diretório do banco; meça o mesmo na VPS
-(por exemplo rodando a carga lá, ou `fio --rw=write --bs=4k --fsync=1`) para
-comparar. Se o gargalo for o disco, só a VPS confirma.
+O relatório começa com o tempo de um `write` + `fsync` de 4 KiB no diretório
+do banco. Esse número sozinho engana: na VPS de produção ele é tão baixo
+quanto num SSD local (p50 de 0,3 ms), e mesmo assim o `COMMIT` de um autosave
+no banco real custa de 5 a 6 ms de mediana e 11 a 18 ms de p90 em
+`journal_mode=delete` com `synchronous=FULL`, porque cada commit cria, grava,
+sincroniza e apaga o journal e ainda sincroniza o banco. Medido em
+2026-11-19 numa cópia do banco de produção, na própria VPS:
+
+| Modo                        | `COMMIT` p50 | p90        |
+| :-------------------------- | -----------: | ---------: |
+| `delete`, `synchronous=FULL`  | 4,5 a 5,9 ms | 11 a 18 ms |
+| `wal`, `synchronous=FULL`     | 1,0 a 2,3 ms | 3 a 6 ms   |
+| `wal`, `synchronous=NORMAL`   | 0,1 ms       | 0,2 ms     |
+
+`--commit-delay 15ms` faz cada commit bloquear o servidor esse tempo a mais,
+para aproximar localmente um disco mais lento que o da máquina. O atraso não
+vale nos cenários `+wal`: o WAL não paga o que ele representa. Para escolher o
+valor, compare o tempo de SQLite por `exam.answer` do log de produção (`db`
+das linhas `request`; 15 a 23 ms de mediana na prova de 2026-11-18) com o
+tempo de SQLite da mesma rota numa rodada sem atraso (coluna `of it sqlite`
+da tabela por rota, dividida pelas requisições).
 
 Rode com a máquina parada: uma suíte de testes rodando junto muda os números
 (o relatório mostra a pressão de I/O e a memória da máquina para conferir).

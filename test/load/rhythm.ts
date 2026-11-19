@@ -34,8 +34,8 @@ function constant(file: string, name: string): number {
 /// The exam page's timings, in milliseconds.
 export function clientRhythm() {
 	return {
-		/// Debounce of the autosave of a text answer.
-		saveDelayMs: constant(CLIENT_SOURCES.attempt, "SAVE_DELAY_MS"),
+		/// The longest a typed answer waits to be saved while the student keeps typing.
+		saveIntervalMs: constant(CLIENT_SOURCES.attempt, "SAVE_INTERVAL_MS"),
 		/// A save unanswered for this long counts as a failed connection.
 		saveTimeoutMs: constant(CLIENT_SOURCES.attempt, "SAVE_TIMEOUT_MS"),
 		/// Interval of `gradingJob.forStudentQuestions` while a send waits for its worker.

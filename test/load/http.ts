@@ -16,6 +16,8 @@ export interface Sample {
 	ms: number;
 	/// Action error code, `timeout` or `network`; absent on success.
 	error?: string;
+	/// The user that made it (absent in older reports).
+	who?: string;
 }
 
 export class Recorder {
@@ -41,6 +43,7 @@ export class StudentHttp {
 	constructor(
 		readonly base: string,
 		private readonly recorder: Recorder,
+		private readonly who?: string,
 	) {}
 
 	private cookieHeader(): string {
@@ -86,7 +89,7 @@ export class StudentHttp {
 				}
 			}
 			this.recorder.record(
-				{ name, status: response.status, ms, error },
+				{ name, status: response.status, ms, error, who: this.who },
 				started,
 			);
 			return { status: response.status, text };
@@ -96,7 +99,10 @@ export class StudentHttp {
 				thrown instanceof Error && thrown.name === "TimeoutError"
 					? "timeout"
 					: "network";
-			this.recorder.record({ name, status: 0, ms, error: failure }, started);
+			this.recorder.record(
+				{ name, status: 0, ms, error: failure, who: this.who },
+				started,
+			);
 			return { failure };
 		}
 	}

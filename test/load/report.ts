@@ -77,7 +77,8 @@ export interface LoadReport {
 	createdAt: string;
 	options: Record<string, unknown>;
 	fsync: FsyncMeasure;
-	limits: { memory: string | null; cpu: string | null };
+	/// `commitDelayMs` is absent in older reports.
+	limits: { memory: string | null; cpu: string | null; commitDelayMs?: number };
 	scenarios: ScenarioResult[];
 }
 
@@ -219,7 +220,7 @@ export function markdownReport(report: LoadReport): string {
 	const out: string[] = ["# Load test", ""];
 	out.push(
 		`fsync of 4 KiB in the database's directory: p50 ${report.fsync.p50.toFixed(2)} ms, p99 ${report.fsync.p99.toFixed(2)} ms (${report.fsync.count} rounds).`,
-		`Server limits: memory ${report.limits.memory ?? "none"}, CPU ${report.limits.cpu ?? "none"}.`,
+		`Server limits: memory ${report.limits.memory ?? "none"}, CPU ${report.limits.cpu ?? "none"}${report.limits.commitDelayMs ? `, every commit outside WAL held ${report.limits.commitDelayMs} ms longer` : ""}.`,
 		"",
 		"## Scenarios",
 		"",
@@ -272,7 +273,7 @@ export function markdownReport(report: LoadReport): string {
 			`${scenario.students} students, ${scenario.gradingWorkers} grading workers${scenario.workerCpu ? ` (CPUQuota=${scenario.workerCpu} each)` : ""}, WAL ${scenario.wal ? "on" : "off"}, ${sec(scenario.endedAt - scenario.startedAt)}.`,
 		);
 		if (scenario.serverExit)
-			out.push(`**The server exited during the run: ${scenario.serverExit}.**`);
+			out.push(`**The server died during the run: ${scenario.serverExit}.**`);
 		const profiles = new Map<string, StudentRun[]>();
 		for (const run of scenario.runs)
 			profiles.set(run.profile, [...(profiles.get(run.profile) ?? []), run]);

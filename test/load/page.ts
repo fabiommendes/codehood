@@ -139,12 +139,12 @@ export class ExamPage {
 	change(slug: string, type: string, text: string, kind: InputKind): void {
 		if (this.closed) return;
 		this.pending.set(slug, text);
-		const timer = this.timers.get(slug);
-		if (timer) clearTimeout(timer);
-		this.timers.set(
-			slug,
-			setTimeout(() => this.saveNow(slug), this.rhythm.saveDelayMs),
-		);
+		// As the page: the save is due one interval after the first unsaved edit, and later edits do not postpone it.
+		if (!this.timers.has(slug))
+			this.timers.set(
+				slug,
+				setTimeout(() => this.saveNow(slug), this.rhythm.saveIntervalMs),
+			);
 		if (this.history && isHistoryField(type, "answer")) {
 			try {
 				this.history.input({ questionId: slug, field: "answer" }, text, kind);
@@ -152,6 +152,11 @@ export class ExamPage {
 				// The history never holds up an answer.
 			}
 		}
+	}
+
+	/// The student left the field of `slug`, which saves what was typed at once.
+	leave(slug: string): void {
+		this.saveNow(slug);
 	}
 
 	private saveNow(slug: string): void {

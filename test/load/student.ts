@@ -42,6 +42,10 @@ export interface Profile {
 	/// Chance, per key, of stopping to think.
 	pauseChance: number;
 	pause: Range;
+	/// Keys typed in one go, before a short stop.
+	burst: Range;
+	/// The short stop between two bursts, in key times; the page saves when it outlasts the autosave delay.
+	breath: Range;
 	/// Chance of pasting the answer instead of typing it.
 	paste: number;
 	/// Small edits made after a paste.
@@ -69,6 +73,8 @@ export interface Profile {
 export const PROFILES: Profile[] = [
 	{
 		name: "careful",
+		burst: [1, 6],
+		breath: [1.5, 5],
 		slips: [1, 4],
 		weight: 40,
 		readPerChar: [60, 120],
@@ -89,6 +95,8 @@ export const PROFILES: Profile[] = [
 	},
 	{
 		name: "paster",
+		burst: [1, 7],
+		breath: [1.5, 4.5],
 		slips: [0, 1],
 		weight: 20,
 		readPerChar: [20, 60],
@@ -109,6 +117,8 @@ export const PROFILES: Profile[] = [
 	},
 	{
 		name: "fast",
+		burst: [2, 10],
+		breath: [3, 8],
 		slips: [0, 3],
 		weight: 15,
 		readPerChar: [30, 60],
@@ -129,6 +139,8 @@ export const PROFILES: Profile[] = [
 	},
 	{
 		name: "stuck",
+		burst: [1, 5],
+		breath: [1.2, 4],
 		slips: [2, 6],
 		weight: 15,
 		readPerChar: [100, 250],
@@ -149,6 +161,8 @@ export const PROFILES: Profile[] = [
 	},
 	{
 		name: "quitter",
+		burst: [1, 6],
+		breath: [1.5, 5],
 		slips: [1, 4],
 		weight: 10,
 		readPerChar: [60, 150],
@@ -436,7 +450,7 @@ class Hands {
 		const lastSpan = () =>
 			segments.findLast((s) => s.removable && !s.gone && s.typed > 0);
 
-		let burst = dice.int([4, 40]);
+		let burst = dice.int(this.profile.burst);
 		for (const segment of segments) {
 			while (segment.typed < segment.text.length) {
 				await this.wait(this.keyMs * dice.between([0.4, 1.6]));
@@ -444,10 +458,10 @@ class Hands {
 				this.text = render();
 				this.emit("typing");
 				if (--burst > 0) continue;
-				burst = dice.int([4, 40]);
-				if (dice.chance(this.profile.pauseChance * 10))
+				burst = dice.int(this.profile.burst);
+				if (dice.chance(this.profile.pauseChance * 3))
 					await this.wait(dice.between(this.profile.pause));
-				else await this.wait(this.keyMs * dice.between([3, 10]));
+				else await this.wait(this.keyMs * dice.between(this.profile.breath));
 				const span = lastSpan();
 				// Not the span being typed: that one is finished first.
 				if (span && span !== segment && dice.chance(0.35))
@@ -578,7 +592,7 @@ export async function runStudent(ctx: StudentContext): Promise<StudentRun> {
 		sends: 0,
 		finished: false,
 	};
-	const http = new StudentHttp(ctx.base, ctx.recorder);
+	const http = new StudentHttp(ctx.base, ctx.recorder, ctx.username);
 	const pageUrl = `/${ctx.target.discipline}/${ctx.target.course}/exams/${ctx.target.exam}`;
 	let page: ExamPage | null = null;
 	try {
@@ -611,6 +625,7 @@ export async function runStudent(ctx: StudentContext): Promise<StudentRun> {
 			if (await solveQuestion(ctx, page, question, profile, run))
 				run.answered++;
 			else run.skipped++;
+			page.leave(question.slug);
 			if (!ctx.behaviour.burst && dice.chance(profile.quit)) break;
 		}
 		// Done early: look the answers over, or wait for the sends, for a while.

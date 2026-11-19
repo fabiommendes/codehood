@@ -13,6 +13,9 @@
  * - `queued`: transactions already waiting when it asked;
  * - `ok`: false when it rolled back.
  *
+ * `LOAD_COMMIT_DELAY_MS`: with the transactions watched, every commit blocks
+ * the process that long first, to stand in for a disk slower than this one.
+ *
  * `LOAD_SQL_FILE`: the time better-sqlite3 spent, per second, as JSON lines
  * `{t, route, caller, sql, op, n, ms, max}`. These calls are synchronous: their
  * time is time the event loop was blocked.
@@ -45,6 +48,10 @@ import { PrismaBetterSqlite3 } from "@prisma/adapter-better-sqlite3";
 const txFile = process.env.LOAD_TX_FILE;
 const sqlFile = process.env.LOAD_SQL_FILE;
 const routeFile = process.env.LOAD_ROUTE_FILE;
+
+/// Milliseconds every commit blocks the process for, as a slower disk would (`LOAD_COMMIT_DELAY_MS`).
+const commitDelay = Number(process.env.LOAD_COMMIT_DELAY_MS ?? 0);
+const commitGate = new Int32Array(new SharedArrayBuffer(4));
 
 const round = (ms) => Math.round(ms * 100) / 100;
 
@@ -273,6 +280,8 @@ const watchTransactions = (adapter) => {
 		const commit = tx.commit.bind(tx);
 		const rollback = tx.rollback.bind(tx);
 		tx.commit = () => {
+			// Blocks like the commit's own `fsync`: the whole process waits.
+			if (commitDelay > 0) Atomics.wait(commitGate, 0, 0, commitDelay);
 			end(true);
 			return commit();
 		};
