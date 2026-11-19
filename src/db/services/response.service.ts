@@ -54,7 +54,12 @@ import {
 	examSchedule,
 	hiddenFromStudents,
 } from "@/services/exam-state";
-import type { Prisma, PrismaTx } from "../client";
+import {
+	type Prisma,
+	type PrismaClient,
+	type PrismaTx,
+	prisma,
+} from "../client";
 import { realAttemptSql } from "../preview-filter";
 import {
 	courseRefMatch,
@@ -170,545 +175,549 @@ type ResponseT = {
 };
 
 /** The response service of `client` (the shared client by default). */
-export const makeResponseService = defineService<ResponseT>()(() => {
-	/**
-	 * Opens an attempt for one student on one exam.
-	 *
-	 * Unlike `upsert`, this always inserts a fresh row: a second `create` for
-	 * a graded exam collides with the unique index and comes back as
-	 * `InvalidData`, and a second `create` for a practice exam opens a second
-	 * attempt regardless of the reuse window.
-	 *
-	 * The course's instructor creating an attempt for themself opens their
-	 * simulation of the exam instead, see {@link isSimulation}.
-	 *
-	 * @throws {@link NotFound} If the course or exam does not exist.
-	 * @throws {@link InvalidData}
-	 * If the author is not enrolled and is not opening a simulation, or a
-	 * practice session is named on a graded exam.
-	 * @throws {@link NotAllowed} If `actor` may not write the author's work.
-	 */
-	const create = op({
-		args: [responseCreate],
-		returns: responseSchema,
-		run: async (
-			tx: PrismaTx,
-			input: ResponseCreate,
-			opts: ServiceOptsWithoutTx,
-		): Promise<Response> => {
-			const { exam, authorId, preview } = await prepareAttempt(
-				tx,
-				input,
-				opts.actor,
-				"response.create",
-			);
-			if (!preview) {
-				assertExamOpen(
-					exam,
-					new Date(),
-					await loadExceptionTiming(tx, exam.id, authorId),
+const buildResponseService = () =>
+	defineService<ResponseT>()(() => {
+		/**
+		 * Opens an attempt for one student on one exam.
+		 *
+		 * Unlike `upsert`, this always inserts a fresh row: a second `create` for
+		 * a graded exam collides with the unique index and comes back as
+		 * `InvalidData`, and a second `create` for a practice exam opens a second
+		 * attempt regardless of the reuse window.
+		 *
+		 * The course's instructor creating an attempt for themself opens their
+		 * simulation of the exam instead, see {@link isSimulation}.
+		 *
+		 * @throws {@link NotFound} If the course or exam does not exist.
+		 * @throws {@link InvalidData}
+		 * If the author is not enrolled and is not opening a simulation, or a
+		 * practice session is named on a graded exam.
+		 * @throws {@link NotAllowed} If `actor` may not write the author's work.
+		 */
+		const create = op({
+			args: [responseCreate],
+			returns: responseSchema,
+			run: async (
+				tx: PrismaTx,
+				input: ResponseCreate,
+				opts: ServiceOptsWithoutTx,
+			): Promise<Response> => {
+				const { exam, authorId, preview } = await prepareAttempt(
+					tx,
+					input,
+					opts.actor,
+					"response.create",
 				);
-			}
+				if (!preview) {
+					assertExamOpen(
+						exam,
+						new Date(),
+						await loadExceptionTiming(tx, exam.id, authorId),
+					);
+				}
 
-			const slotKey =
-				exam.type === "PRACTICE" && !preview
-					? dateToSlotKey(input.practiceSession ?? new Date())
-					: 0;
+				const slotKey =
+					exam.type === "PRACTICE" && !preview
+						? dateToSlotKey(input.practiceSession ?? new Date())
+						: 0;
 
-			const row = await invalidIfExists(tx.response.create, {
-				data: {
-					publicId: generateToken(9),
-					authorId,
-					examId: exam.id,
-					slotKey,
-					preview,
-					acceptingSubmissions: input.acceptingSubmissions ?? true,
-					closedAt: input.acceptingSubmissions === false ? new Date() : null,
-				},
-				include: responseInclude(opts.actor),
-			});
-			if (!preview) await freezeQuestionVersions(tx, exam.id);
-
-			return fromDb(row);
-		},
-	});
-
-	/**
-	 * Finds an attempt by `id` or by its `publicId`, with every submission it holds.
-	 *
-	 * Visible to its author and to whoever teaches the course. An attempt the
-	 * actor may not read is `null`, exactly as a missing one is, so an id is
-	 * not a probe for whether somebody else answered.
-	 */
-	const findOne = op({
-		transaction: false,
-		args: [responsePK],
-		returns: responseSchema.nullable(),
-		run: async (
-			tx: PrismaTx,
-			filter: ResponsePK,
-			opts: ServiceOptsWithoutTx,
-		): Promise<Response | null> => {
-			const row = await tx.response.findFirst({
-				where: responseWhere(filter),
-				include: responseInclude(opts.actor),
-			});
-			if (!row) return null;
-
-			if (!hasReadAccess(opts.actor, row)) return null;
-			return fromDb(row);
-		},
-	});
-
-	/**
-	 * Lists the attempts of one course, narrowed to what `actor` may see.
-	 *
-	 * Each attempt carries only the submissions that count for each question:
-	 * every send, the newest one, the student's newest when the instructor
-	 * created the newest, and those under a regrade request. `history: true`
-	 * lists them all, as `findOne` does for one attempt.
-	 *
-	 * A student is narrowed to their own attempts in the database query, not
-	 * after the fact. An `author` filter naming somebody else is refused rather
-	 * than quietly emptied.
-	 *
-	 * @throws {@link NotAllowed}
-	 * If `actor` may not read the course's contents at all, or names another
-	 * author in `filter` while narrowed to their own rows.
-	 */
-	const findMany = op({
-		transaction: false,
-		args: [responseFilter],
-		returns: responseSchema.array(),
-		run: async (
-			tx: PrismaTx,
-			filter: ResponseFilter,
-			opts: ServiceOptsWithoutTx,
-		): Promise<Response[]> => {
-			const course = valueOrNotFound(
-				"course",
-				await tx.course.findUnique({
-					where: courseRefWhere(filter.course),
-					select: courseSelect(opts.actor),
-				}),
-			);
-
-			ensurePerm(opts.actor, "course.read-contents", course);
-
-			const owner = isCourseOwner(opts.actor, course);
-			const restrictTo = restrictToAuthor(opts.actor, owner, filter.author);
-
-			const where: Prisma.ResponseWhereInput = {
-				exam: {
-					courseId: course.id,
-					...(filter.exam ? { slug: filter.exam } : {}),
-				},
-				...(filter.practice !== undefined
-					? filter.practice
-						? { slotKey: { not: 0 } }
-						: { slotKey: 0 }
-					: {}),
-				...(filter.acceptingSubmissions !== undefined
-					? { acceptingSubmissions: filter.acceptingSubmissions }
-					: {}),
-				preview: filter.preview ?? false,
-				...(restrictTo
-					? { authorId: restrictTo }
-					: filter.author
-						? { authorId: filter.author }
-						: {}),
-			};
-			const orderBy = { createdAt: "asc" as const };
-
-			if (filter.history) {
-				const rows = await tx.response.findMany({
-					where,
+				const row = await invalidIfExists(tx.response.create, {
+					data: {
+						publicId: generateToken(9),
+						authorId,
+						examId: exam.id,
+						slotKey,
+						preview,
+						acceptingSubmissions: input.acceptingSubmissions ?? true,
+						closedAt: input.acceptingSubmissions === false ? new Date() : null,
+					},
 					include: responseInclude(opts.actor),
-					orderBy,
 				});
-				return rows.map(fromDb);
-			}
+				if (!preview) await freezeQuestionVersions(tx, exam.id);
 
-			const attempts = await tx.response.findMany({
-				where,
-				include: attemptInclude(opts.actor),
-				orderBy,
-			});
-			const counting = await countingSubmissions(
-				tx,
-				attempts.map((attempt) => attempt.id),
-			);
-			return attempts.map((attempt) =>
-				fromDb({ ...attempt, submissions: counting.get(attempt.id) ?? [] }),
-			);
-		},
-	});
+				return fromDb(row);
+			},
+		});
 
-	/**
-	 * Opens or closes an attempt to further submissions.
-	 *
-	 * Which exam or student an attempt belongs to is fixed when it is created:
-	 * moving it to another exam would rewrite history.
-	 *
-	 * @throws {@link NotFound}
-	 * If no attempt matches `filter`, or the actor may not read the one that
-	 * does.
-	 * @throws {@link NotAllowed} If `actor` may read the attempt but not write it.
-	 * Setting `acceptingSubmissions: true` on a graded attempt is refused once
-	 * the author's personal window (the exam's timing with the author's exam
-	 * exception applied) has closed: the instructor grants extra time or a new
-	 * date first. Closing an attempt is always allowed. REST `PATCH` and the
-	 * `exam.reopenAttempt` action both go through here.
-	 *
-	 * @throws {@link InvalidData}
-	 * If reopening an attempt whose personal window has closed, keyed on
-	 * `response` with `errors_response_window_closed`.
-	 */
-	const update = op({
-		args: [responsePK, responseUpdate],
-		returns: responseSchema,
-		run: async (
-			tx: PrismaTx,
-			filter: ResponsePK,
-			fields: ResponseUpdate,
-			opts: ServiceOptsWithoutTx,
-		): Promise<Response> => {
-			const response = await writableResponse(
-				tx,
-				filter,
-				opts.actor,
-				"response.update",
-				opts.expectedUpdatedAt,
-			);
-			// Before the reopen check: a stale caller sees no 400.
-			await checkVersion(tx, "response", { id: response.id }, opts);
+		/**
+		 * Finds an attempt by `id` or by its `publicId`, with every submission it holds.
+		 *
+		 * Visible to its author and to whoever teaches the course. An attempt the
+		 * actor may not read is `null`, exactly as a missing one is, so an id is
+		 * not a probe for whether somebody else answered.
+		 */
+		const findOne = op({
+			transaction: false,
+			args: [responsePK],
+			returns: responseSchema.nullable(),
+			run: async (
+				tx: PrismaTx,
+				filter: ResponsePK,
+				opts: ServiceOptsWithoutTx,
+			): Promise<Response | null> => {
+				const row = await tx.response.findFirst({
+					where: responseWhere(filter),
+					include: responseInclude(opts.actor),
+				});
+				if (!row) return null;
 
-			if (fields.acceptingSubmissions === true) {
-				await assertReopenable(tx, response);
-			}
-			if (
-				fields.acceptingSubmissions === false &&
-				response.acceptingSubmissions
-			) {
-				await promoteFinalSends(tx, sendsOf(response));
-			}
+				if (!hasReadAccess(opts.actor, row)) return null;
+				return fromDb(row);
+			},
+		});
 
-			const row = await guardedUpdate(
-				tx,
-				"response",
-				{ id: response.id },
-				{
-					acceptingSubmissions: fields.acceptingSubmissions,
-					closedAt: closedAtAfter(response, fields.acceptingSubmissions),
-				},
-				opts,
-				{ include: responseInclude(opts.actor) },
-			);
-
-			if (fields.acceptingSubmissions === false) {
-				return fromDb(await gradeOnClose(tx, row));
-			}
-			return fromDb(row);
-		},
-	});
-
-	/**
-	 * Resolves the attempt an exam write belongs to, creating it when absent.
-	 *
-	 * Keyed on the graded exam's single slot, or the open practice session, so
-	 * a client that does not know whether it has started the exam already
-	 * still lands on one row. The course's instructor may do so on an exam
-	 * that is not open, to backfill an attempt; anyone else may not.
-	 *
-	 * @throws {@link InvalidData}
-	 * If the exam is not open and `actor` is not the course's instructor.
-	 * @throws {@link NotAllowed} If `actor` may not write the author's work.
-	 */
-	const upsert = op({
-		args: [responseCreate],
-		returns: responseSchema,
-		run: async (
-			tx: PrismaTx,
-			input: ResponseCreate,
-			opts: ServiceOptsWithoutTx,
-		): Promise<Response> => {
-			const { attempt: row } = await resolveOrCreateAttempt(
-				tx,
-				input,
-				opts.actor,
-				"response.create",
-				opts.expectedUpdatedAt,
-			);
-
-			if (input.acceptingSubmissions === undefined) {
-				return fromDb(
-					await tx.response.findUniqueOrThrow({
-						where: { id: row.id },
-						include: responseInclude(opts.actor),
+		/**
+		 * Lists the attempts of one course, narrowed to what `actor` may see.
+		 *
+		 * Each attempt carries only the submissions that count for each question:
+		 * every send, the newest one, the student's newest when the instructor
+		 * created the newest, and those under a regrade request. `history: true`
+		 * lists them all, as `findOne` does for one attempt.
+		 *
+		 * A student is narrowed to their own attempts in the database query, not
+		 * after the fact. An `author` filter naming somebody else is refused rather
+		 * than quietly emptied.
+		 *
+		 * @throws {@link NotAllowed}
+		 * If `actor` may not read the course's contents at all, or names another
+		 * author in `filter` while narrowed to their own rows.
+		 */
+		const findMany = op({
+			transaction: false,
+			args: [responseFilter],
+			returns: responseSchema.array(),
+			run: async (
+				tx: PrismaTx,
+				filter: ResponseFilter,
+				opts: ServiceOptsWithoutTx,
+			): Promise<Response[]> => {
+				const course = valueOrNotFound(
+					"course",
+					await tx.course.findUnique({
+						where: courseRefWhere(filter.course),
+						select: courseSelect(opts.actor),
 					}),
 				);
-			}
 
-			// Only the course's instructor reopens a closed attempt, and only while the student can still answer.
-			if (input.acceptingSubmissions && !row.acceptingSubmissions) {
-				ensurePerm(opts.actor, "response.update", responseTarget(row));
-				await assertReopenable(tx, row);
-			}
+				ensurePerm(opts.actor, "course.read-contents", course);
 
-			if (!input.acceptingSubmissions && row.acceptingSubmissions) {
-				await promoteFinalSends(tx, sendsOf(row));
-			}
+				const owner = isCourseOwner(opts.actor, course);
+				const restrictTo = restrictToAuthor(opts.actor, owner, filter.author);
 
-			// The expectation was checked against this very row when it was resolved.
-			const updated = await guardedUpdate(
-				tx,
-				"response",
-				{ id: row.id },
-				{
-					acceptingSubmissions: input.acceptingSubmissions,
-					closedAt: closedAtAfter(row, input.acceptingSubmissions),
-				},
-				{},
-				{ include: responseInclude(opts.actor) },
-			);
-			return fromDb(
-				input.acceptingSubmissions ? updated : await gradeOnClose(tx, updated),
-			);
-		},
-	});
+				const where: Prisma.ResponseWhereInput = {
+					exam: {
+						courseId: course.id,
+						...(filter.exam ? { slug: filter.exam } : {}),
+					},
+					...(filter.practice !== undefined
+						? filter.practice
+							? { slotKey: { not: 0 } }
+							: { slotKey: 0 }
+						: {}),
+					...(filter.acceptingSubmissions !== undefined
+						? { acceptingSubmissions: filter.acceptingSubmissions }
+						: {}),
+					preview: filter.preview ?? false,
+					...(restrictTo
+						? { authorId: restrictTo }
+						: filter.author
+							? { authorId: filter.author }
+							: {}),
+				};
+				const orderBy = { createdAt: "asc" as const };
 
-	/**
-	 * Removes an attempt and every submission made in it.
-	 *
-	 * @throws {@link NotFound}
-	 * If no attempt matches `filter`, or the actor may not read the one that
-	 * does.
-	 * @throws {@link NotAllowed}
-	 * If `actor` may read the attempt but not write it, or the attempt has an
-	 * active sanction (409).
-	 */
-	const remove = op({
-		args: [responsePK],
-		transaction: false,
-		run: (
-			tx: PrismaTx,
-			filter: ResponsePK,
-			opts: ServiceOptsWithoutTx,
-		): Promise<void> =>
-			loggingAnswerHistoryRemoval(
-				tx,
-				"response-delete",
-				async (inner, measure) => {
-					const response = await writableResponse(
-						inner,
-						filter,
-						opts.actor,
-						"response.delete",
-						opts.expectedUpdatedAt,
-					);
-					// Before anything is measured or deleted: a stale caller loses nothing.
-					await checkVersion(inner, "response", { id: response.id }, opts);
-					// A sanction is a record of a decision: only a revoked one goes with the attempt.
-					const sanctioned = await inner.examAdjustment.count({
-						where: { responseId: response.id, revokedAt: null },
+				if (filter.history) {
+					const rows = await tx.response.findMany({
+						where,
+						include: responseInclude(opts.actor),
+						orderBy,
 					});
-					if (sanctioned > 0) {
-						throw new NotAllowed("response.delete", { status: 409 });
-					}
+					return rows.map(fromDb);
+				}
 
-					await measure({ responseIds: [response.id] });
-					await inner.submission.deleteMany({
-						where: { responseId: response.id },
-					});
-					await guardedDelete(inner, "response", { id: response.id }, opts);
-				},
-			),
-	});
+				const attempts = await tx.response.findMany({
+					where,
+					include: attemptInclude(opts.actor),
+					orderBy,
+				});
+				const counting = await countingSubmissions(
+					tx,
+					attempts.map((attempt) => attempt.id),
+				);
+				return attempts.map((attempt) =>
+					fromDb({ ...attempt, submissions: counting.get(attempt.id) ?? [] }),
+				);
+			},
+		});
 
-	/**
-	 * Closes the author's attempt at an exam to further answers.
-	 *
-	 * The student's "Submit exam". On a practice exam it is the newest attempt,
-	 * the current session's; a simulation keeps its own slot. Calling it on an
-	 * attempt that is already closed returns it unchanged. The author may close
-	 * their own attempt; the course's instructor may close anyone's.
-	 *
-	 * @throws {@link NotFound}
-	 * If the author has no attempt at the exam, or it belongs to someone the
-	 * actor may not see.
-	 */
-	const finish = op({
-		args: [responseFinish],
-		returns: responseSchema,
-		run: async (
-			tx: PrismaTx,
-			input: ResponseFinish,
-			opts: ServiceOptsWithoutTx,
-		): Promise<Response> => {
-			const course = valueOrNotFound(
-				"course",
-				await tx.course.findUnique({
-					where: courseRefWhere(input.course),
-					select: courseSelect(opts.actor),
-				}),
-			);
-			const authorId = resolveAuthorId(input.author, opts.actor);
-			if (
-				!hasPerm(opts.actor, "response.read", {
-					author: { username: authorId },
-					course,
-				})
-			) {
-				throw new NotFound("response");
-			}
+		/**
+		 * Opens or closes an attempt to further submissions.
+		 *
+		 * Which exam or student an attempt belongs to is fixed when it is created:
+		 * moving it to another exam would rewrite history.
+		 *
+		 * @throws {@link NotFound}
+		 * If no attempt matches `filter`, or the actor may not read the one that
+		 * does.
+		 * @throws {@link NotAllowed} If `actor` may read the attempt but not write it.
+		 * Setting `acceptingSubmissions: true` on a graded attempt is refused once
+		 * the author's personal window (the exam's timing with the author's exam
+		 * exception applied) has closed: the instructor grants extra time or a new
+		 * date first. Closing an attempt is always allowed. REST `PATCH` and the
+		 * `exam.reopenAttempt` action both go through here.
+		 *
+		 * @throws {@link InvalidData}
+		 * If reopening an attempt whose personal window has closed, keyed on
+		 * `response` with `errors_response_window_closed`.
+		 */
+		const update = op({
+			args: [responsePK, responseUpdate],
+			returns: responseSchema,
+			run: async (
+				tx: PrismaTx,
+				filter: ResponsePK,
+				fields: ResponseUpdate,
+				opts: ServiceOptsWithoutTx,
+			): Promise<Response> => {
+				const response = await writableResponse(
+					tx,
+					filter,
+					opts.actor,
+					"response.update",
+					opts.expectedUpdatedAt,
+				);
+				// Before the reopen check: a stale caller sees no 400.
+				await checkVersion(tx, "response", { id: response.id }, opts);
 
-			const exam = valueOrNotFound(
-				"exam",
-				await tx.exam.findUnique({
-					where: { courseId_slug: { courseId: course.id, slug: input.exam } },
-					select: { id: true, type: true },
-				}),
-			);
-			const include = responseInclude(opts.actor);
-			const row = valueOrNotFound(
-				"response",
-				exam.type === "PRACTICE" && !isSimulation(opts.actor, authorId, course)
-					? await tx.response.findFirst({
-							where: { authorId, examId: exam.id, preview: false },
-							orderBy: { slotKey: "desc" },
-							include,
-						})
-					: await tx.response.findUnique({
-							where: {
-								authorId_examId_slotKey: {
-									authorId,
-									examId: exam.id,
-									slotKey: 0,
-								},
-							},
-							include,
+				if (fields.acceptingSubmissions === true) {
+					await assertReopenable(tx, response);
+				}
+				if (
+					fields.acceptingSubmissions === false &&
+					response.acceptingSubmissions
+				) {
+					await promoteFinalSends(tx, sendsOf(response));
+				}
+
+				const row = await guardedUpdate(
+					tx,
+					"response",
+					{ id: response.id },
+					{
+						acceptingSubmissions: fields.acceptingSubmissions,
+						closedAt: closedAtAfter(response, fields.acceptingSubmissions),
+					},
+					opts,
+					{ include: responseInclude(opts.actor) },
+				);
+
+				if (fields.acceptingSubmissions === false) {
+					return fromDb(await gradeOnClose(tx, row));
+				}
+				return fromDb(row);
+			},
+		});
+
+		/**
+		 * Resolves the attempt an exam write belongs to, creating it when absent.
+		 *
+		 * Keyed on the graded exam's single slot, or the open practice session, so
+		 * a client that does not know whether it has started the exam already
+		 * still lands on one row. The course's instructor may do so on an exam
+		 * that is not open, to backfill an attempt; anyone else may not.
+		 *
+		 * @throws {@link InvalidData}
+		 * If the exam is not open and `actor` is not the course's instructor.
+		 * @throws {@link NotAllowed} If `actor` may not write the author's work.
+		 */
+		const upsert = op({
+			args: [responseCreate],
+			returns: responseSchema,
+			run: async (
+				tx: PrismaTx,
+				input: ResponseCreate,
+				opts: ServiceOptsWithoutTx,
+			): Promise<Response> => {
+				const { attempt: row } = await resolveOrCreateAttempt(
+					tx,
+					input,
+					opts.actor,
+					"response.create",
+					opts.expectedUpdatedAt,
+				);
+
+				if (input.acceptingSubmissions === undefined) {
+					return fromDb(
+						await tx.response.findUniqueOrThrow({
+							where: { id: row.id },
+							include: responseInclude(opts.actor),
 						}),
-			);
-			if (!row.acceptingSubmissions) return fromDb(row);
+					);
+				}
 
-			await promoteFinalSends(tx, sendsOf(row));
+				// Only the course's instructor reopens a closed attempt, and only while the student can still answer.
+				if (input.acceptingSubmissions && !row.acceptingSubmissions) {
+					ensurePerm(opts.actor, "response.update", responseTarget(row));
+					await assertReopenable(tx, row);
+				}
 
-			// The student's own call: it never carries an expectation, and must not fail on one.
-			const updated = await guardedUpdate(
-				tx,
-				"response",
-				{ id: row.id },
-				{ acceptingSubmissions: false, closedAt: new Date() },
-				{},
-				{ include: responseInclude(opts.actor) },
-			);
-			return fromDb(await gradeOnClose(tx, updated));
-		},
-	});
+				if (!input.acceptingSubmissions && row.acceptingSubmissions) {
+					await promoteFinalSends(tx, sendsOf(row));
+				}
 
-	/**
-	 * Grades the objective answers of the attempts that were closed, or ran out of time, without being graded.
-	 *
-	 * It is the catch-up for attempts closed before the server graded on closing. Exams whose grades were released are left out unless `released`, and an attempt still open is never touched. With `dryRun` nothing is written. Returns one line per exam that has such attempts.
-	 *
-	 * @throws {@link NotAllowed} When the actor lacks `system.manage`.
-	 * @throws {@link NotFound} If the course does not exist.
-	 */
-	const gradeObjectives = op({
-		args: [responseGradeObjectives],
-		returns: z.array(
-			z.object({
-				exam: z.string(),
-				attempts: z.number().int(),
-				graded: z.number().int(),
-				released: z.boolean(),
-			}),
-		),
-		run: async (
-			tx: PrismaTx,
-			input: ResponseGradeObjectives,
-			opts: ServiceOptsWithoutTx,
-		): Promise<ObjectiveGradingLine[]> => {
-			ensurePerm(opts.actor, "system.manage");
-			const course = valueOrNotFound(
-				"course",
-				await tx.course.findUnique({
-					where: courseRefWhere(input.course),
-					select: { id: true },
+				// The expectation was checked against this very row when it was resolved.
+				const updated = await guardedUpdate(
+					tx,
+					"response",
+					{ id: row.id },
+					{
+						acceptingSubmissions: input.acceptingSubmissions,
+						closedAt: closedAtAfter(row, input.acceptingSubmissions),
+					},
+					{},
+					{ include: responseInclude(opts.actor) },
+				);
+				return fromDb(
+					input.acceptingSubmissions
+						? updated
+						: await gradeOnClose(tx, updated),
+				);
+			},
+		});
+
+		/**
+		 * Removes an attempt and every submission made in it.
+		 *
+		 * @throws {@link NotFound}
+		 * If no attempt matches `filter`, or the actor may not read the one that
+		 * does.
+		 * @throws {@link NotAllowed}
+		 * If `actor` may read the attempt but not write it, or the attempt has an
+		 * active sanction (409).
+		 */
+		const remove = op({
+			args: [responsePK],
+			transaction: false,
+			run: (
+				tx: PrismaTx,
+				filter: ResponsePK,
+				opts: ServiceOptsWithoutTx,
+			): Promise<void> =>
+				loggingAnswerHistoryRemoval(
+					tx,
+					"response-delete",
+					async (inner, measure) => {
+						const response = await writableResponse(
+							inner,
+							filter,
+							opts.actor,
+							"response.delete",
+							opts.expectedUpdatedAt,
+						);
+						// Before anything is measured or deleted: a stale caller loses nothing.
+						await checkVersion(inner, "response", { id: response.id }, opts);
+						// A sanction is a record of a decision: only a revoked one goes with the attempt.
+						const sanctioned = await inner.examAdjustment.count({
+							where: { responseId: response.id, revokedAt: null },
+						});
+						if (sanctioned > 0) {
+							throw new NotAllowed("response.delete", { status: 409 });
+						}
+
+						await measure({ responseIds: [response.id] });
+						await inner.submission.deleteMany({
+							where: { responseId: response.id },
+						});
+						await guardedDelete(inner, "response", { id: response.id }, opts);
+					},
+				),
+		});
+
+		/**
+		 * Closes the author's attempt at an exam to further answers.
+		 *
+		 * The student's "Submit exam". On a practice exam it is the newest attempt,
+		 * the current session's; a simulation keeps its own slot. Calling it on an
+		 * attempt that is already closed returns it unchanged. The author may close
+		 * their own attempt; the course's instructor may close anyone's.
+		 *
+		 * @throws {@link NotFound}
+		 * If the author has no attempt at the exam, or it belongs to someone the
+		 * actor may not see.
+		 */
+		const finish = op({
+			args: [responseFinish],
+			returns: responseSchema,
+			run: async (
+				tx: PrismaTx,
+				input: ResponseFinish,
+				opts: ServiceOptsWithoutTx,
+			): Promise<Response> => {
+				const course = valueOrNotFound(
+					"course",
+					await tx.course.findUnique({
+						where: courseRefWhere(input.course),
+						select: courseSelect(opts.actor),
+					}),
+				);
+				const authorId = resolveAuthorId(input.author, opts.actor);
+				if (
+					!hasPerm(opts.actor, "response.read", {
+						author: { username: authorId },
+						course,
+					})
+				) {
+					throw new NotFound("response");
+				}
+
+				const exam = valueOrNotFound(
+					"exam",
+					await tx.exam.findUnique({
+						where: { courseId_slug: { courseId: course.id, slug: input.exam } },
+						select: { id: true, type: true },
+					}),
+				);
+				const include = responseInclude(opts.actor);
+				const row = valueOrNotFound(
+					"response",
+					exam.type === "PRACTICE" &&
+						!isSimulation(opts.actor, authorId, course)
+						? await tx.response.findFirst({
+								where: { authorId, examId: exam.id, preview: false },
+								orderBy: { slotKey: "desc" },
+								include,
+							})
+						: await tx.response.findUnique({
+								where: {
+									authorId_examId_slotKey: {
+										authorId,
+										examId: exam.id,
+										slotKey: 0,
+									},
+								},
+								include,
+							}),
+				);
+				if (!row.acceptingSubmissions) return fromDb(row);
+
+				await promoteFinalSends(tx, sendsOf(row));
+
+				// The student's own call: it never carries an expectation, and must not fail on one.
+				const updated = await guardedUpdate(
+					tx,
+					"response",
+					{ id: row.id },
+					{ acceptingSubmissions: false, closedAt: new Date() },
+					{},
+					{ include: responseInclude(opts.actor) },
+				);
+				return fromDb(await gradeOnClose(tx, updated));
+			},
+		});
+
+		/**
+		 * Grades the objective answers of the attempts that were closed, or ran out of time, without being graded.
+		 *
+		 * It is the catch-up for attempts closed before the server graded on closing. Exams whose grades were released are left out unless `released`, and an attempt still open is never touched. With `dryRun` nothing is written. Returns one line per exam that has such attempts.
+		 *
+		 * @throws {@link NotAllowed} When the actor lacks `system.manage`.
+		 * @throws {@link NotFound} If the course does not exist.
+		 */
+		const gradeObjectives = op({
+			args: [responseGradeObjectives],
+			returns: z.array(
+				z.object({
+					exam: z.string(),
+					attempts: z.number().int(),
+					graded: z.number().int(),
+					released: z.boolean(),
 				}),
-			);
-			const exams = await tx.exam.findMany({
-				where: {
-					courseId: course.id,
-					...(input.exam ? { slug: input.exam } : {}),
-					...(input.released ? {} : { gradesReleasedAt: null }),
-				},
-				select: { id: true, slug: true, gradesReleasedAt: true },
-				orderBy: { id: "asc" },
-			});
-			const lines: ObjectiveGradingLine[] = [];
-			for (const exam of exams) {
-				const { attempts, graded } = await gradeExpiredObjectives(tx, {
-					examId: exam.id,
-					dryRun: input.dryRun,
+			),
+			run: async (
+				tx: PrismaTx,
+				input: ResponseGradeObjectives,
+				opts: ServiceOptsWithoutTx,
+			): Promise<ObjectiveGradingLine[]> => {
+				ensurePerm(opts.actor, "system.manage");
+				const course = valueOrNotFound(
+					"course",
+					await tx.course.findUnique({
+						where: courseRefWhere(input.course),
+						select: { id: true },
+					}),
+				);
+				const exams = await tx.exam.findMany({
+					where: {
+						courseId: course.id,
+						...(input.exam ? { slug: input.exam } : {}),
+						...(input.released ? {} : { gradesReleasedAt: null }),
+					},
+					select: { id: true, slug: true, gradesReleasedAt: true },
+					orderBy: { id: "asc" },
 				});
-				if (attempts === 0) continue;
-				lines.push({
-					exam: exam.slug,
-					attempts,
-					graded,
-					released: exam.gradesReleasedAt !== null,
-				});
-			}
-			return lines;
-		},
-	});
+				const lines: ObjectiveGradingLine[] = [];
+				for (const exam of exams) {
+					const { attempts, graded } = await gradeExpiredObjectives(tx, {
+						examId: exam.id,
+						dryRun: input.dryRun,
+					});
+					if (attempts === 0) continue;
+					lines.push({
+						exam: exam.slug,
+						attempts,
+						graded,
+						released: exam.gradesReleasedAt !== null,
+					});
+				}
+				return lines;
+			},
+		});
 
-	/**
-	 * Grades the objective answers of the attempts of an exam whose time ran out, and returns how many answers it graded.
-	 *
-	 * It covers the attempts nobody delivered, which no flow closes by itself. An attempt still within its time is left alone, and `acceptingSubmissions` is never changed. It is idempotent: an answer that already has a grading pass is not graded again, and it returns early when no answer lacks one.
-	 *
-	 * @throws {@link NotFound} If the course or the exam does not exist.
-	 * @throws {@link NotAllowed} If the actor is not the course's instructor and `author` is not the actor.
-	 */
-	const settleExpired = op({
-		args: [responseSettleExpired],
-		returns: z.number().int().nonnegative(),
-		run: async (
-			tx: PrismaTx,
-			input: ResponseSettleExpired,
-			opts: ServiceOptsWithoutTx,
-		): Promise<number> => {
-			const course = valueOrNotFound(
-				"course",
-				await tx.course.findUnique({
-					where: courseRefWhere(input.course),
-					select: courseSelect(
-						opts.actor,
-						...(input.author === undefined ? [] : [input.author]),
-					),
-				}),
-			);
-			if (input.author === undefined) {
-				ensurePerm(opts.actor, "course.update-contents", course);
-			} else {
-				ensurePerm(opts.actor, "response.read", {
-					author: { username: input.author },
-					course,
-				});
-			}
-			const exam = valueOrNotFound(
-				"exam",
-				await tx.exam.findUnique({
-					where: { courseId_slug: { courseId: course.id, slug: input.exam } },
-					select: { id: true },
-				}),
-			);
-			// Raw SQL: Prisma's `feedbacks: { none: {} }` aggregates the whole
-			// `Feedback` table, and this walks only the attempts of the exam.
-			const waiting = await tx.$queryRawUnsafe<{ id: number | bigint }[]>(
-				`SELECT s.id AS id
+		/**
+		 * Grades the objective answers of the attempts of an exam whose time ran out, and returns how many answers it graded.
+		 *
+		 * It covers the attempts nobody delivered, which no flow closes by itself. An attempt still within its time is left alone, and `acceptingSubmissions` is never changed. It is idempotent: an answer that already has a grading pass is not graded again, and it returns early when no answer lacks one.
+		 *
+		 * @throws {@link NotFound} If the course or the exam does not exist.
+		 * @throws {@link NotAllowed} If the actor is not the course's instructor and `author` is not the actor.
+		 */
+		const settleExpired = op({
+			args: [responseSettleExpired],
+			returns: z.number().int().nonnegative(),
+			run: async (
+				tx: PrismaTx,
+				input: ResponseSettleExpired,
+				opts: ServiceOptsWithoutTx,
+			): Promise<number> => {
+				const course = valueOrNotFound(
+					"course",
+					await tx.course.findUnique({
+						where: courseRefWhere(input.course),
+						select: courseSelect(
+							opts.actor,
+							...(input.author === undefined ? [] : [input.author]),
+						),
+					}),
+				);
+				if (input.author === undefined) {
+					ensurePerm(opts.actor, "course.update-contents", course);
+				} else {
+					ensurePerm(opts.actor, "response.read", {
+						author: { username: input.author },
+						course,
+					});
+				}
+				const exam = valueOrNotFound(
+					"exam",
+					await tx.exam.findUnique({
+						where: { courseId_slug: { courseId: course.id, slug: input.exam } },
+						select: { id: true },
+					}),
+				);
+				// Raw SQL: Prisma's `feedbacks: { none: {} }` aggregates the whole
+				// `Feedback` table, and this walks only the attempts of the exam.
+				const waiting = await tx.$queryRawUnsafe<{ id: number | bigint }[]>(
+					`SELECT s.id AS id
 				FROM ResponseRef r
 				CROSS JOIN Submission s ON s.responseId = r.id
 				WHERE r.examId = ?
@@ -719,142 +728,156 @@ export const makeResponseService = defineService<ResponseT>()(() => {
 						SELECT 1 FROM Feedback f WHERE f.submissionId = s.id
 					)
 				LIMIT 1`,
-				exam.id,
-				...(input.author === undefined ? [] : [input.author]),
-			);
-			if (waiting.length === 0) return 0;
-			const { graded } = await gradeExpiredObjectives(tx, {
-				examId: exam.id,
-				author: input.author,
-			});
-			return graded;
-		},
+					exam.id,
+					...(input.author === undefined ? [] : [input.author]),
+				);
+				if (waiting.length === 0) return 0;
+				const { graded } = await gradeExpiredObjectives(tx, {
+					examId: exam.id,
+					author: input.author,
+				});
+				return graded;
+			},
+		});
+
+		/**
+		 * Deletes the actor's simulation of an exam, with everything it holds, and opens another.
+		 *
+		 * The new simulation has a new `publicId`, so its shuffling seed changes with it. With no simulation to delete it only opens one.
+		 *
+		 * @throws {@link NotFound} If the course or exam does not exist.
+		 * @throws {@link NotAllowed} If the actor does not teach the course.
+		 */
+		const restartPreview = op({
+			args: [responseRestartPreview],
+			returns: responseSchema,
+			run: async (
+				tx: PrismaTx,
+				input: ResponseRestartPreview,
+				opts: ServiceOptsWithoutTx,
+			): Promise<Response> => {
+				const { exam, authorId, preview } = await prepareAttempt(
+					tx,
+					input,
+					opts.actor,
+					"response.create",
+				);
+				if (!preview) throw new NotAllowed("response.create");
+
+				const old = await tx.response.findFirst({
+					where: { authorId, examId: exam.id, preview: true },
+					select: { id: true },
+				});
+				if (old) {
+					await tx.submission.deleteMany({ where: { responseId: old.id } });
+					await guardedDelete(tx, "response", { id: old.id }, {});
+				}
+				return fromDb(
+					await invalidIfExists(tx.response.create, {
+						data: {
+							publicId: generateToken(9),
+							authorId,
+							examId: exam.id,
+							preview: true,
+						},
+						include: responseInclude(opts.actor),
+					}),
+				);
+			},
+		});
+
+		/**
+		 * Resolves the attempt and appends one submission to it, in one call.
+		 *
+		 * This is what a client answering a question actually does; `upsert` then
+		 * `submission.create` is the same thing spelled out, minus the guarantee
+		 * that both halves land together. Answering the same question again
+		 * appends a second submission rather than replacing the first.
+		 *
+		 * A `SUBMIT` whose code equals an earlier send of the question in the
+		 * attempt (see `enqueueGradingJob`) appends nothing and spends nothing; the
+		 * answer carries `duplicate: true`.
+		 *
+		 * @throws {@link InvalidData}
+		 * If the attempt is closed to new submissions, its exam is not open,
+		 * its deadline has passed, or the question is not one the exam carries.
+		 * @throws {@link NotAllowed} If `actor` may not write the author's work.
+		 */
+		const submit = op({
+			args: [responseSubmit],
+			returns: responseSubmitted,
+			run: async (
+				tx: PrismaTx,
+				input: ResponseSubmit,
+				opts: ServiceOptsWithoutTx,
+			): Promise<Response & { duplicate: boolean }> => {
+				const { row, duplicate } = await appendSubmission(
+					tx,
+					input,
+					opts.actor,
+				);
+				const updated = valueOrNotFound(
+					"response",
+					await tx.response.findUnique({
+						where: { id: row.id },
+						include: responseInclude(opts.actor),
+					}),
+				);
+				return { ...fromDb(updated), duplicate };
+			},
+		});
+
+		/**
+		 * Appends a submission as `submit` does, answering only with what the exam page reads back instead of the whole attempt.
+		 *
+		 * @throws {@link NotFound} If the course, exam or question does not exist.
+		 * @throws {@link InvalidData}
+		 * If the attempt is closed, the exam is not open, the question is not in
+		 * the exam, or the payload does not fit it.
+		 * @throws {@link NotAllowed} If `actor` may not write the author's work.
+		 */
+		const answer = op({
+			args: [responseSubmit],
+			returns: responseAnswered,
+			run: async (
+				tx: PrismaTx,
+				input: ResponseSubmit,
+				opts: ServiceOptsWithoutTx,
+			): Promise<ResponseAnswered> => {
+				const { row, duplicate } = await appendSubmission(
+					tx,
+					input,
+					opts.actor,
+				);
+				return {
+					response: row.publicId,
+					answerHistory: effectiveAnswerHistory(row.exam),
+					duplicate,
+				};
+			},
+		});
+
+		return {
+			create,
+			findOne,
+			findMany,
+			update,
+			upsert,
+			delete: remove,
+			finish,
+			gradeObjectives,
+			settleExpired,
+			restartPreview,
+			submit,
+			answer,
+		};
 	});
 
-	/**
-	 * Deletes the actor's simulation of an exam, with everything it holds, and opens another.
-	 *
-	 * The new simulation has a new `publicId`, so its shuffling seed changes with it. With no simulation to delete it only opens one.
-	 *
-	 * @throws {@link NotFound} If the course or exam does not exist.
-	 * @throws {@link NotAllowed} If the actor does not teach the course.
-	 */
-	const restartPreview = op({
-		args: [responseRestartPreview],
-		returns: responseSchema,
-		run: async (
-			tx: PrismaTx,
-			input: ResponseRestartPreview,
-			opts: ServiceOptsWithoutTx,
-		): Promise<Response> => {
-			const { exam, authorId, preview } = await prepareAttempt(
-				tx,
-				input,
-				opts.actor,
-				"response.create",
-			);
-			if (!preview) throw new NotAllowed("response.create");
-
-			const old = await tx.response.findFirst({
-				where: { authorId, examId: exam.id, preview: true },
-				select: { id: true },
-			});
-			if (old) {
-				await tx.submission.deleteMany({ where: { responseId: old.id } });
-				await guardedDelete(tx, "response", { id: old.id }, {});
-			}
-			return fromDb(
-				await invalidIfExists(tx.response.create, {
-					data: {
-						publicId: generateToken(9),
-						authorId,
-						examId: exam.id,
-						preview: true,
-					},
-					include: responseInclude(opts.actor),
-				}),
-			);
-		},
-	});
-
-	/**
-	 * Resolves the attempt and appends one submission to it, in one call.
-	 *
-	 * This is what a client answering a question actually does; `upsert` then
-	 * `submission.create` is the same thing spelled out, minus the guarantee
-	 * that both halves land together. Answering the same question again
-	 * appends a second submission rather than replacing the first.
-	 *
-	 * A `SUBMIT` whose code equals an earlier send of the question in the
-	 * attempt (see `enqueueGradingJob`) appends nothing and spends nothing; the
-	 * answer carries `duplicate: true`.
-	 *
-	 * @throws {@link InvalidData}
-	 * If the attempt is closed to new submissions, its exam is not open,
-	 * its deadline has passed, or the question is not one the exam carries.
-	 * @throws {@link NotAllowed} If `actor` may not write the author's work.
-	 */
-	const submit = op({
-		args: [responseSubmit],
-		returns: responseSubmitted,
-		run: async (
-			tx: PrismaTx,
-			input: ResponseSubmit,
-			opts: ServiceOptsWithoutTx,
-		): Promise<Response & { duplicate: boolean }> => {
-			const { row, duplicate } = await appendSubmission(tx, input, opts.actor);
-			const updated = valueOrNotFound(
-				"response",
-				await tx.response.findUnique({
-					where: { id: row.id },
-					include: responseInclude(opts.actor),
-				}),
-			);
-			return { ...fromDb(updated), duplicate };
-		},
-	});
-
-	/**
-	 * Appends a submission as `submit` does, answering only with what the exam page reads back instead of the whole attempt.
-	 *
-	 * @throws {@link NotFound} If the course, exam or question does not exist.
-	 * @throws {@link InvalidData}
-	 * If the attempt is closed, the exam is not open, the question is not in
-	 * the exam, or the payload does not fit it.
-	 * @throws {@link NotAllowed} If `actor` may not write the author's work.
-	 */
-	const answer = op({
-		args: [responseSubmit],
-		returns: responseAnswered,
-		run: async (
-			tx: PrismaTx,
-			input: ResponseSubmit,
-			opts: ServiceOptsWithoutTx,
-		): Promise<ResponseAnswered> => {
-			const { row, duplicate } = await appendSubmission(tx, input, opts.actor);
-			return {
-				response: row.publicId,
-				answerHistory: effectiveAnswerHistory(row.exam),
-				duplicate,
-			};
-		},
-	});
-
-	return {
-		create,
-		findOne,
-		findMany,
-		update,
-		upsert,
-		delete: remove,
-		finish,
-		gradeObjectives,
-		settleExpired,
-		restartPreview,
-		submit,
-		answer,
-	};
-});
+/**
+ * Builds the response service over `client`.
+ */
+export const makeResponseService = (client: PrismaClient = prisma) =>
+	buildResponseService()(client);
 
 /** The response service, as built by {@link makeResponseService}. */
 export type ResponseService = ReturnType<typeof makeResponseService>;
