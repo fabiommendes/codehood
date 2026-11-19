@@ -185,4 +185,3 @@ Falta:
 - Repetir a rodada de carga numa máquina sem outras suítes, com 100 alunos e
   10 min, antes do deploy.
 - O deploy, fora de horário de prova.
-- `commit-que-falha-trava-a-escrita`, achado ao medir os autosaves.
