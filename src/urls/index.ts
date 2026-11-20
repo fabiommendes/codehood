@@ -19,10 +19,16 @@ export function courseHref(ref: CourseNaturalKey): Href {
 
 export * from "./attachments";
 export {
+	type Anchor,
+	anchor,
 	type CourseUrls,
 	courseRoutes,
 	type ExamUrls,
+	type ExternalUrl,
+	external,
 	type Href,
+	type LinkTarget,
+	playgroundPage,
 	type Route,
 	type UrlPattern,
 	urls,

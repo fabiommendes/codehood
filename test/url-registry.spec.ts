@@ -22,6 +22,8 @@ const MIGRATED_PREFIXES = [
 	"/404",
 	"/500",
 	"/[discipline]/[course]",
+	"/files",
+	"/design",
 ];
 
 /// The root of the course pages, whose paths start with parameters and are
@@ -61,6 +63,8 @@ const registry = [
 ];
 const pages = new Set(discoverRoutes().map((route) => route.pattern));
 
+// Pages below `/design/playground/` are transient prototypes, linked through
+// `playgroundPage()` from the listing of their folder.
 test("every page under a migrated prefix is in the registry", () => {
 	const registered = new Set<string>(
 		registry.map(([, route]) => route.pattern),
@@ -68,6 +72,7 @@ test("every page under a migrated prefix is in the registry", () => {
 	const missing = [...pages].filter(
 		(pattern) =>
 			MIGRATED_PREFIXES.some((prefix) => underPrefix(pattern, prefix)) &&
+			!pattern.startsWith("/design/playground/") &&
 			!registered.has(pattern),
 	);
 	expect(missing).toEqual([]);
@@ -99,6 +104,22 @@ test("no code outside src/urls appends a course page's segment to an interpolati
 		`\\$\\{[^}]*\\}/(${courseSegments.join("|")})(?=["'\`/?#$]|$)`,
 	);
 	expect(offenders(appended, ["api"])).toEqual([]);
+});
+
+/// The components that render `<a>`; everything else renders them.
+const LINK_COMPONENTS = [
+	path.join("src", "components", "Link.astro"),
+	path.join("src", "components", "Link.tsx"),
+];
+
+test("no markup outside the Link components writes an <a>", () => {
+	const anchorTag = /<a(\s|>|$)/;
+	const found = offenders(anchorTag).filter(
+		(line) =>
+			!LINK_COMPONENTS.some((file) => line.startsWith(`${file}:`)) &&
+			/\.(astro|tsx):/.test(line),
+	);
+	expect(found).toEqual([]);
 });
 
 /// Each line of `src/` outside {@link UNCHECKED_DIRS} and `skip` that matches

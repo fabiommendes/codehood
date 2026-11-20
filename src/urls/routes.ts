@@ -7,6 +7,35 @@ export type { UrlPattern };
 /** A URL of one of the server's own pages, built by a {@link Route}; a plain string is not one. */
 export type Href = Marked<string, "Href">;
 
+/** A URL outside the server's own pages (another site, `mailto:`), marked by {@link external}. */
+export type ExternalUrl = Marked<string, "ExternalUrl">;
+
+/** A fragment of the current page, `#id`, marked by {@link anchor}. */
+export type Anchor = Marked<`#${string}`, "Anchor">;
+
+/** What a `<Link>` may point to: a page of ours, another site, or a fragment of the current page. */
+export type LinkTarget = Href | ExternalUrl | Anchor;
+
+/**
+ * Marks `url` as a link out of the server: another site or a `mailto:`.
+ *
+ * @example
+ * external("https://github.com/fabiommendes/codehood");
+ */
+export function external(url: string | URL): ExternalUrl {
+	return String(url) as ExternalUrl;
+}
+
+/**
+ * The fragment `#id` of the current page; `""` gives the bare `#`.
+ *
+ * @example
+ * anchor("how-it-works"); // "#how-it-works"
+ */
+export function anchor(id: string): Anchor {
+	return `#${id}` as Anchor;
+}
+
 /** Values a route takes in its query string; `true` is written as `1`, `false` and `undefined` are left out. */
 export type QueryParams = Record<string, string | number | boolean | undefined>;
 
@@ -157,8 +186,54 @@ export const urls = {
 		editions: route("/admin/editions"),
 		reports: route("/admin/reports"),
 	},
+	files: {
+		/// A stored file by its hash.
+		blob: route("/files/[hash]"),
+		/// A stored file by its hash, with the name the browser saves it as.
+		named: route("/files/[hash]/[name]"),
+	},
+	design: {
+		index: route("/design"),
+		brand: route("/design/brand"),
+		colors: route("/design/colors"),
+		components: {
+			index: route("/design/components"),
+			course: route("/design/components/course"),
+			exams: route("/design/components/exams"),
+			grading: route("/design/components/grading"),
+			reports: route("/design/components/reports"),
+			schedule: route("/design/components/schedule"),
+			ui: route("/design/components/ui"),
+		},
+		crash: route("/design/crash"),
+		elements: route("/design/elements"),
+		forms: route("/design/forms"),
+		layouts: {
+			index: route("/design/layouts"),
+			appLayout: route("/design/layouts/app-layout"),
+			centeredLayout: route("/design/layouts/centered-layout"),
+			designLayout: route("/design/layouts/design-layout"),
+			layout: route("/design/layouts/layout"),
+		},
+		motifs: route("/design/motifs"),
+		playground: route("/design/playground"),
+		questions: route("/design/questions"),
+		runner: route("/design/runner"),
+		themes: route("/design/themes"),
+		typography: route("/design/typography"),
+	},
 	course: courseUrls,
 } as const;
+
+/**
+ * A page of the design playground, by its path below `/design/playground/`.
+ *
+ * Playground pages come and go with the design work, so they are found by
+ * listing the folder rather than registered one by one.
+ */
+export function playgroundPage(path: string): Href {
+	return `/design/playground/${path.split("/").map(encodeURIComponent).join("/")}` as Href;
+}
 
 /// The query of the grading pages: the list view of a question and the students' names.
 type GradingQuery = { view?: "list"; names?: boolean };

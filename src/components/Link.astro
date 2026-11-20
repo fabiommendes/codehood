@@ -1,0 +1,15 @@
+---
+/**
+ * The one `<a>` of the server's markup: `href` comes from the registry
+ * (`urls`), or from `external()` or `anchor()`, never from a plain string.
+ */
+import type { HTMLAttributes } from "astro/types";
+import type { LinkTarget } from "@/urls";
+
+interface Props extends Omit<HTMLAttributes<"a">, "href"> {
+	href: LinkTarget;
+}
+
+const { href, ...attrs } = Astro.props;
+---
+<a href={href} {...attrs}><slot /></a>

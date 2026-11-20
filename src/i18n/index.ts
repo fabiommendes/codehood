@@ -4,6 +4,7 @@ import type { z } from "zod";
 import enLocale from "zod/v4/locales/en.js";
 import ptLocale from "zod/v4/locales/pt.js";
 import { getLocale, type Locale } from "@/generated/paraglide/runtime.js";
+import type { LinkTarget } from "@/urls";
 
 export { m } from "@/generated/paraglide/messages.js";
 export type { Locale };
@@ -29,6 +30,21 @@ export function escapeHtml(text: string): string {
 		.replaceAll("<", "&lt;")
 		.replaceAll(">", "&gt;")
 		.replaceAll('"', "&quot;");
+}
+
+/**
+ * An `<a>` to `href` reading `text`, for the parameters of a message rendered with `set:html`.
+ *
+ * @example
+ * m.auth_invite_body({ link: linkHtml(urls.login(), m.auth_log_in(), "link") });
+ */
+export function linkHtml(
+	href: LinkTarget,
+	text: string,
+	className?: string,
+): string {
+	const cls = className ? ` class="${escapeHtml(className)}"` : "";
+	return `<a${cls} href="${escapeHtml(href)}">${escapeHtml(text)}</a>`;
 }
 
 /// Placeholder value that marks where markup goes inside a message, for {@link splitAtSlot}.
