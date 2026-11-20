@@ -48,8 +48,17 @@ como as URLs passam a ser montadas e como migrar o que falta.
   estar no registro, e nenhum código fora de `src/urls/` escreve o caminho
   como literal. A regra do `<a>` só é ligada quando os links ainda não
   migrados deixarem de quebrá-la, seja por prefixo, seja no fim da migração.
-  Ordem: `/admin` e as rotas fora de curso (feitos), depois o curso e por
-  último os exames.
+  Ordem: `/admin` e as rotas fora de curso, depois o curso e os exames
+  juntos, porque os links de exame estão espalhados pelas páginas do curso.
+  Todas as rotas estão migradas.
+- **O curso como objeto de URLs.** `urls.course(ref)` recebe um `CourseRef`
+  e devolve `CourseUrls`, com as sub-rotas do curso e `exam(slug)` com as
+  do exame. Componentes recebem `CourseUrls` (ou `ExamUrls`) em vez de um
+  `href` base. Ilhas Solid recebem `courseRef: CourseRef`, porque suas props
+  precisam ser serializáveis. Loaders devolvem o `ref` do curso, não URLs
+  prontas. Como o caminho do curso começa com parâmetros, o teste de
+  literais rejeita, fora de `src/urls/` e `src/api/`, uma interpolação
+  seguida de um segmento estático de página do curso.
 
 ## Alternativas descartadas
 

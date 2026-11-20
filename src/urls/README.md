@@ -28,12 +28,32 @@ typecheck. Routes are declared with `route(pattern, query?)`: the parameters
 come from the pattern (`urls.invite({ token })`), the query from
 `query<{ next?: string }>()`, and both are encoded there.
 
+The pages of a course hang from `urls.course(ref)`, which takes a `CourseRef`
+and the slugs below it:
+
+```ts
+const course = urls.course(ref); // also `links`, from loadCourse()
+course.roster();
+course.repository(slug, ["src", "main.py"]);
+course.exam(slug).gradingQuestion(question, { view: "list", names: true });
+```
+
+A component that links to several pages of a course takes `course: CourseUrls`
+(or `exam: ExamUrls`), never a base `href` to append to. A Solid island takes
+`courseRef: CourseRef` instead, since its props must be serializable, and calls
+`urls.course()` itself. `withAnchor(href, id)` adds a fragment and
+`withSearch(href, search)` a query built by a codec of its own (the question
+bank's filters); both keep the `Href`. Appending a string to an `Href` gives a
+plain `string`.
+
 `test/url-registry.spec.ts` covers what types cannot. For each prefix in its
 `MIGRATED_PREFIXES`, it checks that every page under the prefix is registered
 and that no code outside `src/urls/` writes the path as a string literal
-(comments are allowed).
+(comments are allowed). Course paths start with parameters, so for them it
+rejects any interpolation followed by a static segment of a course page
+(`${x}/roster`, `${x}/exams`).
 
-The migration goes one prefix at a time. So far: `/admin` and every route outside a course. The decision, the
+Every page is in the registry. The decision, the
 `<Link>` component that comes next and the alternatives left out are in ADR 0022
 (`dev/adr/0022-rotas-tipadas-pelo-registro-urls.md`).
 

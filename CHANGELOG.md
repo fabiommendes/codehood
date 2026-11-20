@@ -62,6 +62,12 @@
 
 ### Changed
 
+- Os links do servidor saem do registro `urls` (`src/urls/routes.ts`, ADR 0022),
+  não de template strings: cada função devolve um `Href` e codifica os
+  parâmetros, e um padrão que nenhuma página serve não compila. O curso e os
+  exames ficam em `urls.course(ref)`. `test/url-registry.spec.ts` garante que
+  toda página está no registro e que nenhum código fora de `src/urls/` escreve
+  o caminho à mão. Depois de entrar num curso, o redirect usa `?joined=1`.
 - Prova: uma resposta digitada é salva no máximo uma vez a cada 30 s por
   questão, contando da primeira edição ainda não salva, em vez de a cada
   pausa de 500 ms (na prova de 2026-11-18 isso dava 9 saves por minuto por
