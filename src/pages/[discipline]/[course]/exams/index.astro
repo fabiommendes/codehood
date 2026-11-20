@@ -30,7 +30,7 @@ export const prerender = false;
 const { discipline, course: courseSegment } = Astro.params;
 const result = await loadCourse(Astro, discipline, courseSegment);
 if ("redirect" in result) return result.redirect;
-const { course, href, links, tabs } = result;
+const { course, links, ref, tabs } = result;
 
 // biome-ignore lint/style/noNonNullAssertion: every course page runs through loadCourse, which already required Astro.locals.user.
 const actor = Astro.locals.actor!;
@@ -119,7 +119,7 @@ if (!canWrite) {
       <div class="mt-4">
         <ExamsTable
           exams={exams.map(({ id: _id, questions: _questions, ...e }) => e)}
-          href={href}
+          courseRef={ref}
           client:load
         />
       </div>
@@ -134,7 +134,7 @@ if (!canWrite) {
               {group.exams.map((exam) => (
                 <ExamRow
                   exam={exam}
-                  href={href}
+                  course={links}
                   score={scores.get(exam.slug)}
                   state={states.get(exam.slug)}
                   exception={ownExceptions.get(exam.slug)}

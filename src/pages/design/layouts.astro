@@ -21,19 +21,25 @@ const SAMPLE_COURSES: SidebarCourse[] = [
 	{
 		code: "cs201",
 		edition: "2026-1",
-		href: "/cs201/alan_2026-1",
+		href: urls
+			.course({ discipline: "cs201", instructor: "alan", edition: "2026-1" })
+			.index(),
 		teaching: false,
 	},
 	{
 		code: "cs101",
 		edition: "2026-1",
-		href: "/cs101/ada_2026-1",
+		href: urls
+			.course({ discipline: "cs101", instructor: "ada", edition: "2026-1" })
+			.index(),
 		teaching: true,
 	},
 	{
 		code: "ma141",
 		edition: "2026-1",
-		href: "/ma141/euler_2026-1",
+		href: urls
+			.course({ discipline: "ma141", instructor: "euler", edition: "2026-1" })
+			.index(),
 		teaching: false,
 	},
 ];
@@ -71,7 +77,7 @@ const SAMPLE_TRAILS: Crumb[][] = [
 const SIDEBAR_PAGES = [
 	["Home", urls.root()],
 	["My courses", urls.courses.index()],
-	["A course", "/cs201/alan_2026-1/exams"],
+	["A course", sampleCourse.exams()],
 	["Admin", urls.admin.index()],
 ] as const;
 

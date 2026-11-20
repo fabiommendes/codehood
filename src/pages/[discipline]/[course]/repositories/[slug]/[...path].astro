@@ -38,7 +38,7 @@ export const prerender = false;
 const { discipline, course: courseSegment, slug, path: rawPath } = Astro.params;
 const result = await loadCourse(Astro, discipline, courseSegment);
 if ("redirect" in result) return result.redirect;
-const { course, href, links, tabs } = result;
+const { course, links, tabs } = result;
 
 // biome-ignore lint/style/noNonNullAssertion: every course page runs through loadCourse, which already required Astro.locals.user.
 const actor = Astro.locals.actor!;
@@ -61,7 +61,7 @@ const resourceGroups = groupResourcesByType(
 );
 
 const path = (rawPath ?? "").replace(/\/+$/, "");
-const repoHref = `${href}/repositories/${slug}`;
+const repoHref = links.repository(slug);
 const pk = { id: repository.id };
 const opts = { actor };
 
@@ -122,7 +122,7 @@ const tooLarge =
 	view?.kind === "download" && (file?.size ?? 0) > MAX_RENDERED_BYTES;
 
 const segments = path ? path.split("/") : [];
-const parentHref = `${repoHref}${segments.length > 1 ? `/${segments.slice(0, -1).map(encodeURIComponent).join("/")}` : ""}`;
+const parentHref = links.repository(slug, segments.slice(0, -1));
 
 const rotation = Astro.getActionResult(actions.repository.rotateToken);
 if (rotation && !rotation.error) return Astro.redirect(repoHref);
@@ -164,7 +164,7 @@ function code(text: string): string {
   {!path && (
     repository.head ? (
       <div class="mt-4 flex flex-col gap-2">
-        <CloneBox cloneUrl={repository.cloneUrl} zipHref={`${repoHref}.zip`} />
+        <CloneBox cloneUrl={repository.cloneUrl} zipHref={links.repositoryZip(slug)} />
         <p class="text-sm text-muted">
           {repository.message}
           {repository.committedAt && <> · {m.repositories_last_commit({ date: formatDateTime(repository.committedAt) })}</>}
@@ -186,7 +186,7 @@ function code(text: string): string {
         <>
           <span class="text-muted">/</span>
           {index < segments.length - 1 ? (
-            <a href={`${repoHref}/${segments.slice(0, index + 1).map(encodeURIComponent).join("/")}`} class="link link-hover">{segment}</a>
+            <a href={links.repository(slug, segments.slice(0, index + 1))} class="link link-hover">{segment}</a>
           ) : (
             <span>{segment}</span>
           )}
@@ -197,7 +197,7 @@ function code(text: string): string {
 
   {entries && (
     <div class="mt-6">
-      <DirListing entries={entries} href={path ? `${repoHref}/${segments.map(encodeURIComponent).join("/")}` : repoHref} />
+      <DirListing entries={entries} course={links} slug={slug} segments={segments} />
     </div>
   )}
   {readmeHtml && (

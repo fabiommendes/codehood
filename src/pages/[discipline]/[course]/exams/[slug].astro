@@ -55,7 +55,7 @@ export const prerender = false;
 const { discipline, course: courseSegment, slug } = Astro.params;
 const result = await loadCourse(Astro, discipline, courseSegment);
 if ("redirect" in result) return result.redirect;
-const { course, href, links, tabs } = result;
+const { course, links, ref, tabs } = result;
 
 // biome-ignore lint/style/noNonNullAssertion: every course page runs through loadCourse, which already required Astro.locals.user.
 const actor = Astro.locals.actor!;
@@ -64,6 +64,7 @@ const canManage = hasPerm(actor, "enrollment.manage", course);
 if (!slug) return Astro.rewrite(urls.notFound());
 const exam = await db.exam.findOne({ course: course.id, slug }, { actor });
 if (!exam) return Astro.rewrite(urls.notFound());
+const examLinks = links.exam(exam.slug);
 
 const now = new Date();
 // The exceptions never reach the client: they only shift the student's own
@@ -308,7 +309,7 @@ const examOutcome = view.result;
             count: pendingAnswers,
           })}
         </span>
-        <a href={`${href}/exams/${exam.slug}/grading`} class="btn btn-primary btn-sm">
+        <a href={examLinks.grading()} class="btn btn-primary btn-sm">
           {m.exams_detail_grade_answers()}
         </a>
       </div>
@@ -318,7 +319,7 @@ const examOutcome = view.result;
   {
     canManage && openRegrades > 0 && (
       <p role="status" class="mt-6 rounded-box border border-edge bg-base-200 p-4 text-sm">
-        <a href={`${href}/exams/${exam.slug}/regrades`} class="link font-medium">
+        <a href={examLinks.regrades()} class="link font-medium">
           {m.grades_regrade_banner({ count: openRegrades })}
         </a>
       </p>
@@ -351,7 +352,7 @@ const examOutcome = view.result;
             {releaseBlocker === "pending" && (
               <>
                 {" "}
-                <a href={`${href}/exams/${exam.slug}/grading`} class="link">{m.exams_detail_grade_answers()}</a>
+                <a href={examLinks.grading()} class="link">{m.exams_detail_grade_answers()}</a>
               </>
             )}
           </p>
@@ -360,7 +361,7 @@ const examOutcome = view.result;
     )
   }
 
-  {canManage && <ExamQuestionsTable href={href} rows={questionRows} stats={questionStats} />}
+  {canManage && <ExamQuestionsTable course={links} rows={questionRows} stats={questionStats} />}
 
   {
     canManage && (
@@ -406,6 +407,7 @@ const examOutcome = view.result;
           client:load
           discipline={discipline!}
           course={courseSegment!}
+          courseRef={ref}
           exam={slug}
           type={exam.type}
           state={state}

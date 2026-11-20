@@ -19,7 +19,7 @@ const result = await loadCourse(Astro, discipline, courseSegment, {
 	manage: true,
 });
 if ("redirect" in result) return result.redirect;
-const { course, href, links, tabs } = result;
+const { course, links, tabs } = result;
 
 const initCommand = [
 	"codehood init",

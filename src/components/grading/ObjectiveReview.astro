@@ -5,6 +5,7 @@ import type {
 	ObjectiveReview,
 	ReviewSection,
 } from "@/services/objective-review";
+import type { Href } from "@/urls";
 import AttentionList from "./AttentionList";
 import GroupedAnswers from "./GroupedAnswers";
 import { percentOf } from "./grade-actions";
@@ -21,9 +22,9 @@ interface Props {
 	/// Display names by username.
 	names: Record<string, string>;
 	/// The page that lists the open regrade requests.
-	regradesHref: string;
+	regradesHref: Href;
 	/// The page that edits the question.
-	editHref: string;
+	editHref: Href;
 }
 
 const { review, target, names, regradesHref, editHref } = Astro.props;

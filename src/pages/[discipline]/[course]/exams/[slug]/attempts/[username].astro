@@ -66,8 +66,8 @@ const result = await loadGrading(Astro, discipline, courseSegment, slug, {
 if ("redirect" in result) return result.redirect;
 const {
 	course,
-	href,
 	links,
+	ref,
 	tabs,
 	exam,
 	questions,
@@ -179,6 +179,8 @@ const roster = attemptRoster(students, allRows, adjusted);
 const at = roster.findIndex((entry) => entry.username === author);
 const neighbour = (offset: number) =>
 	at < 0 ? undefined : roster[(at + offset + roster.length) % roster.length];
+const previousStudent = neighbour(-1);
+const nextStudent = neighbour(1);
 
 // The active adjustments of this student: the ones of the whole exam in order of application, and the one of each question.
 const mine = adjustments.filter((entry) => entry.author === author);
@@ -193,7 +195,7 @@ const onQuestion = new Map(
 const notesOf = (entry: object): string | null =>
 	"notes" in entry && typeof entry.notes === "string" ? entry.notes : null;
 const adjustable = exam.type !== "PRACTICE";
-const examHref = `${href}/exams/${exam.slug}`;
+const examLinks = links.exam(exam.slug);
 
 const points = pointsByPosition(exam.questions);
 const rows = outcomes.questions.map((outcome, index) => {
@@ -292,8 +294,8 @@ const totalText = (total: number | null | undefined): string =>
 
   <div class="mt-6 flex flex-wrap items-center justify-between gap-2">
     <div class="flex items-center gap-1">
-      {neighbour(-1) && (
-        <a href={`${examHref}/attempts/${neighbour(-1)?.username}`} class="btn btn-ghost btn-sm btn-square text-base-content/60" aria-label={m.grades_adjustment_previous_student()} title={m.grades_adjustment_previous_student()}>
+      {previousStudent && (
+        <a href={examLinks.attempt(previousStudent.username)} class="btn btn-ghost btn-sm btn-square text-base-content/60" aria-label={m.grades_adjustment_previous_student()} title={m.grades_adjustment_previous_student()}>
           <Icon name="chevronLeft" />
         </a>
       )}
@@ -301,8 +303,8 @@ const totalText = (total: number | null | undefined): string =>
         {name}
         {student?.dropped && <span class="badge badge-outline badge-sm ml-2">{m.exams_attempt_dropped()}</span>}
       </h2>
-      {neighbour(1) && (
-        <a href={`${examHref}/attempts/${neighbour(1)?.username}`} class="btn btn-ghost btn-sm btn-square text-base-content/60" aria-label={m.grades_adjustment_next_student()} title={m.grades_adjustment_next_student()}>
+      {nextStudent && (
+        <a href={examLinks.attempt(nextStudent.username)} class="btn btn-ghost btn-sm btn-square text-base-content/60" aria-label={m.grades_adjustment_next_student()} title={m.grades_adjustment_next_student()}>
           <Icon name="chevronRight" />
         </a>
       )}
@@ -311,12 +313,12 @@ const totalText = (total: number | null | undefined): string =>
       client:load
       discipline={discipline!}
       course={courseSegment!}
+      courseRef={ref}
       exam={exam.slug}
       author={author}
       base={outcomes.original?.total ?? outcomes.total}
       adjustments={onExam.map((entry) => ({ op: entry.op, value: entry.value }))}
       roster={roster}
-      attemptHref={`${examHref}/attempts`}
       adjustable={adjustable}
     />
   </div>
@@ -349,7 +351,7 @@ const totalText = (total: number | null | undefined): string =>
         <span class="font-medium">{m.exams_attempt_exception()}:</span>{" "}
         {[exceptionExtra, exceptionDate && m.exams_detail_new_date({ date: exceptionDate })].filter(Boolean).join(" · ")}
         {" · "}
-        <a class="link" href={`${examHref}/exceptions`}>{m.exams_attempt_edit_exception()}</a>
+        <a class="link" href={examLinks.exceptions()}>{m.exams_attempt_edit_exception()}</a>
       </p>
     )
   }
@@ -456,7 +458,7 @@ const totalText = (total: number | null | undefined): string =>
               <span class="badge badge-warning badge-sm">{m.exams_attempt_answered_late({ seconds: Math.round((counting.createdAt.getTime() - deadline.getTime()) / 1000) })}</span>
             )}
             {counting && openRegrades.has(counting.publicId) && (
-              <a href={`${examHref}/regrades#regrade-${openRegrades.get(counting.publicId)}`} class="badge badge-warning badge-sm">{m.grades_regrade_requested()}</a>
+              <a href={withAnchor(examLinks.regrades(), `regrade-${openRegrades.get(counting.publicId)}`)} class="badge badge-warning badge-sm">{m.grades_regrade_requested()}</a>
             )}
             {counting && counting.payload !== null && asked ? (
               <>
@@ -485,7 +487,7 @@ const totalText = (total: number | null | undefined): string =>
               <p>
                 <a
                   class="link"
-                  href={withAnchor(links.exam(exam.slug).gradingQuestion(outcome.question, { names: true }), `answer-${counting.publicId}`)}
+                  href={withAnchor(examLinks.gradingQuestion(outcome.question, { names: true }), `answer-${counting.publicId}`)}
                 >
                   {m.exams_attempt_grade_this()}
                 </a>

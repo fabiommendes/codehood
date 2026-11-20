@@ -11,6 +11,7 @@ import {
 import { gradeReleaseBlocker } from "@/services/exam-state";
 import { instructorHome, type TaughtExam } from "@/services/instructor-home";
 import type { HomeCourse } from "@/services/student-home";
+import { urls } from "@/urls";
 
 const MINUTE = 60_000;
 
@@ -331,7 +332,10 @@ test("gradeReleaseBlocker: a pending answer still blocks, next to not-graded one
 //
 
 const algebra: HomeCourse = {
-	href: "/mat101/ada_2026-1",
+	ref: { discipline: "mat101", instructor: "ada", edition: "2026-1" },
+	href: urls
+		.course({ discipline: "mat101", instructor: "ada", edition: "2026-1" })
+		.index(),
 	code: "mat101",
 	name: "Algebra",
 };

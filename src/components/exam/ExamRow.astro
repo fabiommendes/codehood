@@ -11,6 +11,7 @@ import {
 	examPhase,
 	viewerTiming,
 } from "@/services/exam-state";
+import type { CourseUrls } from "@/urls";
 import {
 	examBadge,
 	examTypeLabels,
@@ -20,8 +21,8 @@ import { formatDateTime } from "@/utils/schedule-time";
 
 interface Props {
 	exam: Exam;
-	/** The course's base URL, e.g. `/cs101/ada_2026-1` — links to `${href}/exams/${slug}`. */
-	href: string;
+	/** The URLs of the exam's course; the row links to the exam's page. */
+	course: CourseUrls;
 	/** The student's total as a percentage, when their grades are released and complete. */
 	score?: string;
 	/** The viewer's own attempt state, which replaces the phase badge once they have submitted. */
@@ -36,7 +37,7 @@ interface Props {
 
 const {
 	exam,
-	href,
+	course,
 	score,
 	state,
 	pending = 0,
@@ -65,7 +66,7 @@ const detail = [
 	.join(" · ");
 ---
 
-<ListRow href={`${href}/exams/${exam.slug}`} muted={phase === "draft"}>
+<ListRow href={course.exam(exam.slug).index()} muted={phase === "draft"}>
   <p class="font-medium">{exam.title}</p>
   <p class="text-sm text-muted">
     {detail}

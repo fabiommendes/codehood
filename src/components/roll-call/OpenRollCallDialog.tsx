@@ -6,6 +6,7 @@ import FormAlert from "@/components/form/FormAlert";
 import Alert from "@/components/ui/Alert";
 import { rollCallOpen } from "@/core/schemas/roll-call";
 import { m } from "@/i18n";
+import { courseRoutes } from "@/urls";
 
 export interface OpenRollCallDialogProps {
 	/// The course's URL segments, as the roll call actions take them.
@@ -14,8 +15,6 @@ export interface OpenRollCallDialogProps {
 	/// The meeting's week and time slot slug.
 	week: number;
 	timeSlot: string;
-	/// The course's base URL; the roll call page is `<href>/roll-call/<week>/<timeSlot>`.
-	href: string;
 	/// The opening button's text; "Roll call" by default.
 	label?: string;
 	/// Shown above the form, e.g. when the roll call would open outside the meeting.
@@ -42,7 +41,12 @@ export default function OpenRollCallDialog(
 			timeSlot: props.timeSlot,
 		},
 		onSuccess: () => {
-			window.location.href = `${props.href}/roll-call/${props.week}/${props.timeSlot}`;
+			window.location.href = courseRoutes.rollCall({
+				discipline: props.discipline,
+				course: props.course,
+				week: String(props.week),
+				timeSlot: props.timeSlot,
+			});
 		},
 	});
 

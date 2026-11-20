@@ -14,10 +14,13 @@ import {
 	discriminationFlag,
 	type QuestionStats as Stats,
 } from "@/services/question-stats";
+import { type CourseRef, urls } from "@/urls";
 
 interface Props {
-	/// The exam page's URL.
-	href: string;
+	/// The exam's course.
+	courseRef: CourseRef;
+	/// The exam's slug.
+	exam: string;
 	/// One entry per exam question, in exam order.
 	stats: Stats[];
 	/// The display title of each question, by slug; a missing one falls back to the slug.
@@ -75,6 +78,8 @@ function compareRows(
  * Every column sorts; the question column sorts by exam order.
  */
 export default function QuestionStats(props: Props): JSX.Element {
+	/// The URLs of the exam's pages.
+	const links = () => urls.course(props.courseRef).exam(props.exam);
 	const [sort, setSort] = createSignal(DEFAULT_SORT);
 	const sorted = createMemo(() =>
 		props.stats
@@ -147,7 +152,7 @@ export default function QuestionStats(props: Props): JSX.Element {
 					/>
 					<div class="min-w-0">
 						<a
-							href={`${props.href}/grading/${entry.question}?view=list`}
+							href={links().gradingQuestion(entry.question, { view: "list" })}
 							class="link"
 						>
 							{props.titles.get(entry.question) ?? entry.question}
@@ -182,7 +187,7 @@ export default function QuestionStats(props: Props): JSX.Element {
 		),
 		numeric(m.grades_stats_col_to_grade(), "pending", (entry) => (
 			<Show when={entry.pending > 0}>
-				<a href={`${props.href}/grading/${entry.question}`} class="link">
+				<a href={links().gradingQuestion(entry.question)} class="link">
 					{entry.pending}
 				</a>
 			</Show>

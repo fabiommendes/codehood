@@ -157,7 +157,7 @@ test("student: redeem a classroom invite link", async ({ page }) => {
 		await expect(page.getByText("You're logged in as")).toBeVisible();
 		await page.getByRole("button", { name: "Join the course" }).click();
 
-		await expect(page).toHaveURL(/\?joined$/);
+		await expect(page).toHaveURL(/\?joined=1$/);
 		await expect(
 			page.getByText(`You joined ${next.discipline.name}.`),
 		).toBeVisible();

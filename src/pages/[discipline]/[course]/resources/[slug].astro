@@ -8,7 +8,7 @@ import { m } from "@/i18n";
 import AppLayout from "@/layouts/AppLayout.astro";
 import { runnerLanguage } from "@/runner/languages";
 import { splitByEvent } from "@/services/event-resources";
-import { urls } from "@/urls";
+import { urls, withAnchor } from "@/urls";
 import { breadcrumbs } from "@/utils/breadcrumbs";
 import { resourcesNav } from "@/utils/course-tabs-nav";
 import { highlightCode } from "@/utils/highlight-code";
@@ -25,7 +25,7 @@ export const prerender = false;
 const { discipline, course: courseSegment, slug } = Astro.params;
 const result = await loadCourse(Astro, discipline, courseSegment);
 if ("redirect" in result) return result.redirect;
-const { course, href, links, tabs } = result;
+const { course, links, tabs } = result;
 
 // biome-ignore lint/style/noNonNullAssertion: every course page runs through loadCourse, which already required Astro.locals.user.
 const actor = Astro.locals.actor!;
@@ -97,8 +97,8 @@ const bodyHtml =
 
   <a
     href={resource.event
-      ? `${href}/schedule#event-${resource.event.id}`
-      : `${href}/resources`}
+      ? withAnchor(links.schedule(), `event-${resource.event.id}`)
+      : links.resources()}
     class="text-sm text-muted hover:text-primary"
     >{resource.event ? m.courses_resource_back_schedule() : m.courses_resource_back_resources()}</a
   >

@@ -44,6 +44,13 @@ export const prerender = false;
 
 const { now, minutes, seconds } = clock();
 
+/// The pages of the sample course the components link to.
+const courseLinks = urls.course({
+	discipline: "algorithms",
+	instructor: "ada",
+	edition: "2026-2",
+});
+
 //
 // Roll call: student. Fixtures for `AttendanceResult`, `AttendanceRefused` and
 // `SignUpForm`, kept together so a change in `AttendanceView` lands in one place.
@@ -55,7 +62,7 @@ const recorded: AttendanceView = {
 	recordedAt: minutes(-1),
 	repeat: false,
 	course: "Algorithms",
-	courseHref: "#",
+	courseHref: courseLinks.index(),
 	joined: false,
 	student: "Ada Lovelace",
 };
@@ -195,8 +202,8 @@ const manager = {
 	...target,
 	week: 6,
 	timeSlot: "mon-a",
-	pageHref: "#",
-	scheduleHref: "#",
+	projectHref: courseLinks.rollCallProject(6, "mon-a"),
+	scheduleHref: courseLinks.schedule(),
 	students,
 	now: now.getTime(),
 } satisfies Omit<RollCallManagerProps, "initial">;
@@ -207,7 +214,7 @@ const projector = {
 	week: 6,
 	timeSlot: "mon-a",
 	title: "Lecture 12: Graph search",
-	manageHref: "#",
+	manageHref: courseLinks.rollCall(6, "mon-a"),
 	now: now.getTime(),
 } satisfies Omit<RollCallProjectorProps, "initial">;
 const projected: RollCallProjectorProps["initial"] = {
@@ -228,12 +235,6 @@ const groups = {
 };
 const selected = selectVariants(Astro.url, groups);
 
-const courseHref = "/algorithms/ada_2026-2";
-const courseLinks = urls.course({
-	discipline: "algorithms",
-	instructor: "ada",
-	edition: "2026-2",
-});
 /// A Tuesday at noon UTC: the day of the second meeting, which is still to come.
 const meetingDay = new Date(Date.UTC(2026, 9, 6, 12));
 
@@ -270,7 +271,6 @@ const sections = [
         week={5}
         entries={scheduleEntries}
         next={scheduleEntries[3]}
-        href={courseHref}
         links={courseLinks}
         resources={scheduleResources}
         attendance={new Map([
@@ -285,7 +285,6 @@ const sections = [
         week={5}
         entries={scheduleEntries}
         next={scheduleEntries[3]}
-        href={courseHref}
         links={courseLinks}
         resources={scheduleResources}
         rollCallManager={target}
@@ -308,7 +307,7 @@ const sections = [
       </div>
       <div class="rounded-box border border-edge bg-base-100 p-5">
         <h3 class="text-sm font-semibold text-muted">EventRepositories</h3>
-        <EventRepositories repositories={scheduleRowRepositories} href={courseHref} />
+        <EventRepositories repositories={scheduleRowRepositories} course={courseLinks} />
       </div>
     </div>
   </section>
@@ -436,14 +435,12 @@ const sections = [
         course="ada_2026-2"
         week={4}
         timeSlot="tue-10"
-        href="/algorithms/ada_2026-2"
       />
       <OpenRollCallDialog
         discipline="algorithms"
         course="ada_2026-2"
         week={4}
         timeSlot="thu-10"
-        href="/algorithms/ada_2026-2"
         label="Open roll call"
         warning="The meeting starts in 2 hours."
       />

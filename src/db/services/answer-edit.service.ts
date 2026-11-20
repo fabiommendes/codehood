@@ -68,7 +68,7 @@ import {
 	isHistoryField,
 } from "@/services/answer-history";
 import { attemptClosedAt, attemptDeadline } from "@/services/exam-state";
-import { courseHref } from "@/urls";
+import { urls } from "@/urls";
 import { logEvent } from "@/utils/log";
 import type { Prisma, PrismaClient, PrismaTx } from "../client";
 import { realAttempt, realAttemptSql } from "../preview-filter";
@@ -651,11 +651,14 @@ async function describeRemoval(
 		return {
 			...who,
 			course: only
-				? courseHref({
-						discipline: only.course.disciplineSlug,
-						instructor: only.course.instructorId,
-						edition: only.course.editionSlug,
-					}).slice(1)
+				? urls
+						.course({
+							discipline: only.course.disciplineSlug,
+							instructor: only.course.instructorId,
+							edition: only.course.editionSlug,
+						})
+						.index()
+						.slice(1)
 				: null,
 			exam: only?.slug ?? null,
 			...totalOf(rows),

@@ -21,7 +21,7 @@ const result = await loadCourse(Astro, discipline, courseSegment, {
 	manage: true,
 });
 if ("redirect" in result) return result.redirect;
-const { course, href, links, tabs } = result;
+const { course, links, tabs } = result;
 
 // biome-ignore lint/style/noNonNullAssertion: loadCourse({ manage: true }) already required Astro.locals.actor.
 const actor = Astro.locals.actor!;

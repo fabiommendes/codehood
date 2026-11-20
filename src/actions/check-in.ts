@@ -10,7 +10,7 @@ import { checkInCode, checkInSignUp } from "@/core/schemas/roll-call";
 import { db } from "@/db";
 import type { CheckInResult } from "@/db/services/roll-call.service";
 import { m } from "@/i18n";
-import { courseHref } from "@/urls";
+import { type Href, urls } from "@/urls";
 import { CLAIM_TTL_MS, readClaim, signClaim } from "@/utils/pending-check-in";
 import { createLimiter } from "@/utils/rate-limit";
 import { uniqueConstraintError, withActionErrors } from "./helpers";
@@ -46,7 +46,7 @@ export interface AttendanceView {
 	/// Name of the discipline of the roll call's course.
 	course: string;
 	/// Link to the course home.
-	courseHref: string;
+	courseHref: Href;
 	/// Whether this check-in enrolled the student in the course.
 	joined: boolean;
 	/// The student's name, answering the roll call.
@@ -128,11 +128,13 @@ async function viewOf(
 		recordedAt: result.recordedAt,
 		repeat: result.repeat,
 		course: course.discipline.name,
-		courseHref: courseHref({
-			discipline: course.discipline.slug,
-			instructor: course.instructor.username,
-			edition: course.edition.slug,
-		}),
+		courseHref: urls
+			.course({
+				discipline: course.discipline.slug,
+				instructor: course.instructor.username,
+				edition: course.edition.slug,
+			})
+			.index(),
 		joined: result.joined !== null && !result.repeat,
 		student: student.name,
 	};

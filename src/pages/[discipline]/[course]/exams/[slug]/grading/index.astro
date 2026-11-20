@@ -16,7 +16,7 @@ export const prerender = false;
 const { discipline, course: courseSegment, slug } = Astro.params;
 const result = await loadGrading(Astro, discipline, courseSegment, slug);
 if ("redirect" in result) return result.redirect;
-const { course, href, links, tabs, exam, questions, answers } = result;
+const { course, links, tabs, exam, questions, answers } = result;
 const names = wantsNames(Astro.url);
 
 // biome-ignore lint/style/noNonNullAssertion: loadGrading already redirected an anonymous visitor.

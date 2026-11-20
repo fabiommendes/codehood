@@ -17,7 +17,7 @@ const result = await loadCourse(Astro, discipline, courseSegment, {
 	manage: true,
 });
 if ("redirect" in result) return result.redirect;
-const { course, href, tabs } = result;
+const { course, ref, tabs } = result;
 
 // biome-ignore lint/style/noNonNullAssertion: every course page runs through loadCourse, which already required Astro.locals.user.
 const actor = Astro.locals.actor!;
@@ -74,7 +74,7 @@ const courseParams = {
     tags={tags}
     query={query}
     search={here.search}
-    href={href}
+    courseRef={ref}
     discipline={courseParams.discipline}
     course={courseParams.course}
     client:load

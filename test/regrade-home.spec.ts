@@ -7,6 +7,7 @@ import {
 	type HomeRegrade,
 	recentRegrades,
 } from "@/services/student-home";
+import { urls } from "@/urls";
 
 const HOUR = 60 * 60_000;
 const DAY = 24 * HOUR;
@@ -18,7 +19,10 @@ function at(ms: number): Date {
 }
 
 const algebra: HomeCourse = {
-	href: "/mat101/ada_2026-1",
+	ref: { discipline: "mat101", instructor: "ada", edition: "2026-1" },
+	href: urls
+		.course({ discipline: "mat101", instructor: "ada", edition: "2026-1" })
+		.index(),
 	code: "mat101",
 	name: "Algebra",
 };

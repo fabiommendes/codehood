@@ -23,7 +23,7 @@ export const prerender = false;
 const { discipline, course: courseSegment, slug } = Astro.params;
 const result = await loadGrading(Astro, discipline, courseSegment, slug);
 if ("redirect" in result) return result.redirect;
-const { course, href, tabs, exam, answers, attempts } = result;
+const { course, tabs, exam, answers, attempts } = result;
 
 // biome-ignore lint/style/noNonNullAssertion: loadGrading already redirected an anonymous visitor.
 const actor = Astro.locals.actor!;

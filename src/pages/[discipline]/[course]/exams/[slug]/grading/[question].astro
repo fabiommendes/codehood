@@ -24,7 +24,7 @@ import { answersTo, gradingOrder } from "@/services/grading";
 import { objectiveReview, restMeans } from "@/services/objective-review";
 import { questionStats } from "@/services/question-stats";
 import { pendingBlanks, reviewResult } from "@/services/review";
-import { urls } from "@/urls";
+import { urls, withAnchor } from "@/urls";
 import { adjustmentLabel } from "@/utils/adjustment-label";
 import { breadcrumbs } from "@/utils/breadcrumbs";
 import { graderState } from "@/utils/grader-state";
@@ -50,7 +50,6 @@ const result = await loadGrading(Astro, discipline, courseSegment, slug);
 if ("redirect" in result) return result.redirect;
 const {
 	course,
-	href,
 	links,
 	tabs,
 	exam,
@@ -128,7 +127,7 @@ const openRegrades = new Map(
 		)
 	).map((request) => [request.submission, request.publicId]),
 );
-const regradesHref = `${href}/exams/${exam.slug}/regrades`;
+const regradesHref = examLinks.regrades();
 // The adjustments of the exam, and the factor of each student's on this question.
 const sanctions = await db.examAdjustment.findMany(
 	{ course: course.id, exam: exam.slug },
@@ -361,7 +360,7 @@ const review = auto
       target={{ discipline: discipline!, course: courseSegment!, exam: exam.slug, question: questionSlug }}
       names={Object.fromEntries(studentNames)}
       regradesHref={regradesHref}
-      editHref={`${href}/questions/${questionSlug}`}
+      editHref={links.question(questionSlug)}
     />
   )}
 
@@ -375,7 +374,7 @@ const review = auto
             {shown.map(({ answer, result }, position) => (
               <div id={`answer-${answer.submission}`} hidden={position !== 0}>
                 {openRegrades.has(answer.submission) && (
-                  <a href={`${regradesHref}#regrade-${openRegrades.get(answer.submission)}`} class="badge badge-warning badge-sm">{m.grades_regrade_requested()}</a>
+                  <a href={withAnchor(regradesHref, `regrade-${openRegrades.get(answer.submission)}`)} class="badge badge-warning badge-sm">{m.grades_regrade_requested()}</a>
                 )}
                 {sanctionLabel(answer.author) && <span class="badge badge-error badge-sm">{sanctionLabel(answer.author)}</span>}
                 {answer.passes.some((pass) => pass.notes !== undefined) && (
@@ -422,7 +421,7 @@ const review = auto
             <div class="card-body">
               <p class="text-sm font-semibold text-muted">{label}</p>
               {openRegrades.has(answer.submission) && (
-                <a href={`${regradesHref}#regrade-${openRegrades.get(answer.submission)}`} class="badge badge-warning badge-sm">{m.grades_regrade_requested()}</a>
+                <a href={withAnchor(regradesHref, `regrade-${openRegrades.get(answer.submission)}`)} class="badge badge-warning badge-sm">{m.grades_regrade_requested()}</a>
               )}
               {sanctionLabel(answer.author) && <span class="badge badge-error badge-sm">{sanctionLabel(answer.author)}</span>}
               {answer.passes.some((pass) => pass.notes !== undefined) && (

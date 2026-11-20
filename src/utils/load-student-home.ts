@@ -12,7 +12,7 @@ import {
 	type StudentHome,
 	studentHome,
 } from "@/services/student-home";
-import { courseHref } from "@/urls";
+import { urls } from "@/urls";
 import { loadCourseExceptions } from "./load-exam-exceptions";
 import { startOfLocalDay } from "./schedule-time";
 
@@ -32,12 +32,14 @@ export async function loadStudentHome(
 
 	const perCourse = await Promise.all(
 		courses.map(async (course) => {
+			const ref = {
+				discipline: course.discipline.slug,
+				instructor: course.instructor.username,
+				edition: course.edition.slug,
+			};
 			const home: HomeCourse = {
-				href: courseHref({
-					discipline: course.discipline.slug,
-					instructor: course.instructor.username,
-					edition: course.edition.slug,
-				}),
+				href: urls.course(ref).index(),
+				ref,
 				code: course.discipline.slug,
 				name: course.discipline.name,
 			};

@@ -29,7 +29,13 @@ import {
 } from "@/services/exam-result";
 import type { AttemptState } from "@/services/exam-state";
 import type { ReviewResult } from "@/services/review";
-import { examQuestionAttachmentUrl, examSubmissionFileUrl, urls } from "@/urls";
+import {
+	type CourseRef,
+	examQuestionAttachmentUrl,
+	examSubmissionFileUrl,
+	type Href,
+	urls,
+} from "@/urls";
 import { adjustmentLabel } from "@/utils/adjustment-label";
 import type { CodeBlocksHtml } from "@/utils/code-blocks";
 import type { PretestSource } from "@/utils/pretest-sources";
@@ -68,6 +74,8 @@ export interface ExamAttemptProps {
 	discipline: string;
 	course: string;
 	exam: string;
+	/// The exam's course, whose pages the attempt links to.
+	courseRef: CourseRef;
 	/// The exam type, which picks how sentences and buttons refer to the exam.
 	type: Exam["type"];
 	/// Where the viewing student stands, computed on the server at `now`.
@@ -1433,7 +1441,7 @@ export default function ExamAttempt(props: ExamAttemptProps): JSX.Element {
 												target={target}
 												manualKey={
 													props.preview
-														? `/${props.discipline}/${props.course}/questions/${entry.slug}`
+														? urls.course(props.courseRef).question(entry.slug)
 														: undefined
 												}
 											/>
@@ -1893,7 +1901,7 @@ function Outcome(props: {
 	regrade: QuestionRegrade | undefined;
 	target: { discipline: string; course: string; exam: string };
 	/// In a simulation, where the question's answer key is: an answer nobody grades reads "manual grading" and links to it.
-	manualKey?: string;
+	manualKey?: Href;
 }): JSX.Element {
 	return (
 		<Show when={props.outcome}>

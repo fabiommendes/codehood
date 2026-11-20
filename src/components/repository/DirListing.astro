@@ -3,14 +3,19 @@
 // service returns them, each one a link to its page.
 import type { RepositoryDirEntry } from "@/db";
 import { m } from "@/i18n";
+import type { CourseUrls } from "@/urls";
 
 interface Props {
 	entries: RepositoryDirEntry[];
-	/// URL of the directory being listed, without a trailing slash.
-	href: string;
+	/// The pages of the course the repository belongs to.
+	course: CourseUrls;
+	/// The repository's slug.
+	slug: string;
+	/// Path of the directory being listed, one segment per directory; empty for the root.
+	segments: readonly string[];
 }
 
-const { entries, href } = Astro.props;
+const { entries, course, slug, segments } = Astro.props;
 
 /// Human size of a file: "812 B", "3.4 KB", "1.2 MB".
 function formatSize(bytes: number): string {
@@ -23,7 +28,7 @@ function formatSize(bytes: number): string {
 <ul aria-label={m.repositories_files_label()} class="menu w-full rounded-box border border-base-content/15 bg-base-200/50 p-1">
   {entries.map((entry) => (
     <li>
-      <a href={`${href}/${encodeURIComponent(entry.name)}`} class="flex items-center gap-3">
+      <a href={course.repository(slug, [...segments, entry.name])} class="flex items-center gap-3">
         <span class="flex-1 font-mono text-sm">{entry.type === "dir" ? `${entry.name}/` : entry.name}</span>
         {entry.size !== null && (
           <span class="text-xs text-muted">{formatSize(entry.size)}</span>

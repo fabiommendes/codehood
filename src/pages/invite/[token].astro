@@ -11,7 +11,7 @@ import { db } from "@/db";
 import { actionForm } from "@/forms/form-state";
 import { escapeHtml, m } from "@/i18n";
 import CenteredLayout from "@/layouts/CenteredLayout.astro";
-import { courseHref, urls } from "@/urls";
+import { urls } from "@/urls";
 
 const { token } = Astro.params;
 const viewer = Astro.locals.actor;
@@ -24,21 +24,22 @@ const isValid = Boolean(invite) && !isExpired && !isExhausted;
 const course = invite?.courseId
 	? await db.course.findOne({ id: invite.courseId }, FULL_ACCESS)
 	: null;
-const href = course
-	? courseHref({
+const links = course
+	? urls.course({
 			discipline: course.discipline.slug,
 			instructor: course.instructor.username,
 			edition: course.edition.slug,
 		})
 	: null;
+const href = links?.index() ?? null;
 
 const result = Astro.getActionResult(actions.auth.acceptInvite);
 if (result && !result.error) {
 	return Astro.redirect("/");
 }
 const joined = Astro.getActionResult(actions.auth.joinWithInvite);
-if (joined && !joined.error && href) {
-	return Astro.redirect(`${href}?joined`);
+if (joined && !joined.error && links) {
+	return Astro.redirect(links.index({ joined: true }));
 }
 const joinError = joined?.error;
 

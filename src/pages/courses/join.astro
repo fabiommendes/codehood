@@ -7,7 +7,7 @@ import { passphraseRedeem } from "@/core/schemas/passphrase";
 import { actionForm } from "@/forms/form-state";
 import { m } from "@/i18n";
 import AppLayout from "@/layouts/AppLayout.astro";
-import { courseHref, urls } from "@/urls";
+import { urls } from "@/urls";
 
 export const prerender = false;
 
@@ -18,7 +18,7 @@ if (!Astro.locals.actor) {
 
 const result = Astro.getActionResult(actions.course.joinCourse);
 if (result && !result.error) {
-	return Astro.redirect(`${courseHref(result.data)}?joined`);
+	return Astro.redirect(urls.course(result.data).index({ joined: true }));
 }
 
 const form = await actionForm(

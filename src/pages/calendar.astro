@@ -16,7 +16,7 @@ import {
 	type CalendarEntry,
 	calendarEntries,
 } from "@/services/calendar-entries";
-import { courseHref, urls } from "@/urls";
+import { type Href, urls, withAnchor } from "@/urls";
 import { examTypeLabels, formatDuration } from "@/utils/exam-display";
 import { loadCourseExceptions } from "@/utils/load-exam-exceptions";
 import {
@@ -49,10 +49,10 @@ const DOT_PALETTE = [
 const courseColor = new Map(
 	courses.map((c, i) => [c.id, DOT_PALETTE[i % DOT_PALETTE.length]]),
 );
-const courseHrefs = new Map(
+const courseLinks = new Map(
 	courses.map((c) => [
 		c.id,
-		courseHref({
+		urls.course({
 			discipline: c.discipline.slug,
 			instructor: c.instructor.username,
 			edition: c.edition.slug,
@@ -166,12 +166,12 @@ function startTime(instant: Date): string {
 }
 
 /// Where an entry leads: a meeting to its row on its course's schedule, an exam to its own page.
-function entryHref(entry: CalendarEntry): string | undefined {
-	const href = courseHrefs.get(entry.courseId);
-	if (!href) return undefined;
+function entryHref(entry: CalendarEntry): Href | undefined {
+	const links = courseLinks.get(entry.courseId);
+	if (!links) return undefined;
 	return entry.kind === "exam"
-		? `${href}/exams/${entry.exam.slug}`
-		: `${href}/schedule#event-${entry.event.id}`;
+		? links.exam(entry.exam.slug).index()
+		: withAnchor(links.schedule(), `event-${entry.event.id}`);
 }
 
 /// An entry's title as its course wrote it.

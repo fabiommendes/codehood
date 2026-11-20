@@ -6,6 +6,7 @@
  */
 
 import type { Exam, RegradeRequest } from "@/db";
+import type { CourseRef, Href } from "@/urls";
 import { localDateOf } from "@/utils/schedule-time";
 import type { ExamResult } from "./exam-result";
 import {
@@ -26,7 +27,9 @@ export const HOME_HORIZON_MS = 7 * 24 * 60 * 60 * 1000;
 /// A course as the home page labels and links it.
 export interface HomeCourse {
 	/// The course URL, e.g. `/cs101/ada_2026-1`.
-	href: string;
+	href: Href;
+	/// The course's key, for the links to its pages through `urls.course`.
+	ref: CourseRef;
 	/// The discipline code, e.g. `cs101`.
 	code: string;
 	name: string;

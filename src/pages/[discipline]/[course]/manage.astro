@@ -8,5 +8,5 @@ const result = await loadCourse(Astro, discipline, courseSegment, {
 	manage: true,
 });
 if ("redirect" in result) return result.redirect;
-return Astro.redirect(`${result.href}/roster`);
+return Astro.redirect(result.links.roster());
 ---

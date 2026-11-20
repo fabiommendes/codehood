@@ -91,20 +91,23 @@ const courseSegments = [
 	),
 ].sort();
 
+// `src/api/` builds the paths of REST endpoints, whose segments (`preview`)
+// share names with course pages.
 test("no code outside src/urls appends a course page's segment to an interpolation", () => {
 	expect(courseSegments).toContain("roster");
 	const appended = new RegExp(
 		`\\$\\{[^}]*\\}/(${courseSegments.join("|")})(?=["'\`/?#$]|$)`,
 	);
-	expect(offenders(appended)).toEqual([]);
+	expect(offenders(appended, ["api"])).toEqual([]);
 });
 
-/// Each line of `src/` outside {@link UNCHECKED_DIRS} that matches `pattern`, comments left out.
-function offenders(pattern: RegExp): string[] {
+/// Each line of `src/` outside {@link UNCHECKED_DIRS} and `skip` that matches
+/// `pattern`, comments left out.
+function offenders(pattern: RegExp, skip: string[] = []): string[] {
 	return sourceFiles("src")
 		.filter(
 			(file) =>
-				!UNCHECKED_DIRS.some((dir) =>
+				![...UNCHECKED_DIRS, ...skip].some((dir) =>
 					file.startsWith(`src${path.sep}${dir}${path.sep}`),
 				),
 		)

@@ -19,6 +19,7 @@ import type { Question } from "@/db/services/question.service";
 import { errorMessage } from "@/forms/field-errors";
 import { locale, m } from "@/i18n";
 import { webNext } from "@/services/question-status";
+import { type CourseRef, type Href, urls, withSearch } from "@/urls";
 import {
 	questionStatusLabels,
 	questionTypeLabels,
@@ -50,8 +51,8 @@ interface Props {
 	query: QuestionListQuery;
 	/// The query of the page, which a change of filter starts from.
 	search: string;
-	/** The course's base URL, e.g. `/cs101/ada_2026-1` — questions link to `${href}/questions/${slug}`. */
-	href: string;
+	/** The course the bank belongs to, which the questions link under. */
+	courseRef: CourseRef;
 	/** The course's URL segments, needed by the Actions column's status-cycle control. */
 	discipline: string;
 	course: string;
@@ -91,9 +92,11 @@ export default function QuestionsTable(props: Props): JSX.Element {
 	const [typeMenuOpen, setTypeMenuOpen] = createSignal(false);
 	const [tagMenuOpen, setTagMenuOpen] = createSignal(false);
 
+	const links = urls.course(props.courseRef);
+
 	/// The address of the first page of the bank under `query`.
-	const hrefOf = (query: QuestionListQuery): string =>
-		`${props.href}/questions${questionListSearch(props.search, query)}`;
+	const hrefOf = (query: QuestionListQuery): Href =>
+		withSearch(links.questions(), questionListSearch(props.search, query));
 
 	/// Leaves for the bank with `change` applied to the filters of this page.
 	function show(change: Partial<QuestionListQuery>): void {
@@ -209,10 +212,7 @@ export default function QuestionsTable(props: Props): JSX.Element {
 			class: "font-medium",
 			sortKey: "title" satisfies QuestionListSortField,
 			render: (question) => (
-				<a
-					href={`${props.href}/questions/${question.slug}`}
-					class="link link-hover"
-				>
+				<a href={links.question(question.slug)} class="link link-hover">
 					{titleOf(question)}
 				</a>
 			),
@@ -276,7 +276,7 @@ export default function QuestionsTable(props: Props): JSX.Element {
 							<action.Icon />
 						</button>
 						<a
-							href={`${props.href}/questions/${question.slug}`}
+							href={links.question(question.slug)}
 							class="btn btn-ghost btn-square btn-sm"
 							aria-label={m.questions_open_named({ title: titleOf(question) })}
 							title={m.questions_open_title()}

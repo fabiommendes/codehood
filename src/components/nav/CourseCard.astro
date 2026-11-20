@@ -4,11 +4,12 @@
 // with children folds like an accordion, one open at a time. Children sit
 // flush with their parent and are told apart by size, weight and colour.
 import CourseTile from "@/components/CourseTile.astro";
+import type { Href } from "@/urls";
 import type { MarkedEntry, MarkedNav } from "@/utils/course-nav";
 import { courseTransitionName } from "@/utils/view-transition";
 
 interface Props {
-	course: { code: string; edition: string; href: string };
+	course: { code: string; edition: string; href: Href };
 	/// The tab of the page, when it has one.
 	tab?: string;
 	nav?: MarkedNav;

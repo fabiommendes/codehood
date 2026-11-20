@@ -1,6 +1,7 @@
 import { For, type JSX } from "solid-js";
 import { m } from "@/i18n";
 import type { AttentionRow } from "@/services/objective-review";
+import { type Href, withAnchor } from "@/urls";
 import Icon from "./Icon";
 
 /// An attention row of an open regrade request.
@@ -11,7 +12,7 @@ interface Props {
 	/// Display names by username.
 	names: Record<string, string>;
 	/// The page that lists the open regrade requests.
-	regradesHref: string;
+	regradesHref: Href;
 }
 
 /**
@@ -33,7 +34,7 @@ export default function AttentionList(props: Props): JSX.Element {
 							{m.grades_objective_regrade_detail()}
 						</span>
 						<a
-							href={`${props.regradesHref}#regrade-${row.request}`}
+							href={withAnchor(props.regradesHref, `regrade-${row.request}`)}
 							class="btn btn-ghost btn-sm btn-square"
 							aria-label={m.grades_objective_view_request()}
 							title={m.grades_objective_view_request()}

@@ -3,6 +3,7 @@ import { createSignal, type JSX, onCleanup, onMount, Show } from "solid-js";
 import FormAlert from "@/components/form/FormAlert";
 import { errorMessage } from "@/forms/field-errors";
 import { m } from "@/i18n";
+import type { Href } from "@/urls";
 import { createNow, formatCountdown } from "./countdown";
 
 export interface RollCallProjectorProps {
@@ -13,7 +14,7 @@ export interface RollCallProjectorProps {
 	timeSlot: string;
 	title: string;
 	/// The management page, linked back from the projection.
-	manageHref: string;
+	manageHref: Href;
 	initial: {
 		code: string;
 		/// When `code` came up on screen.

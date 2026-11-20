@@ -4,7 +4,7 @@ import type { CursorPage } from "@/components/ui/Pagination";
 import type { ColumnConfig } from "@/components/ui/Table";
 import type { Course } from "@/db";
 import { m } from "@/i18n";
-import { courseHref } from "@/urls";
+import { urls } from "@/urls";
 import { formatIsoDate } from "@/utils/schedule-time";
 
 interface Props {
@@ -59,11 +59,13 @@ export default function CoursesTable(props: Props): JSX.Element {
 			headerClass: "text-right",
 			render: (row) => (
 				<a
-					href={courseHref({
-						discipline: row.discipline.slug,
-						instructor: row.instructor.username,
-						edition: row.edition.slug,
-					})}
+					href={urls
+						.course({
+							discipline: row.discipline.slug,
+							instructor: row.instructor.username,
+							edition: row.edition.slug,
+						})
+						.index()}
 					class="btn btn-square btn-ghost btn-sm"
 					aria-label={m.admin_courses_open()}
 					title={m.admin_courses_open()}

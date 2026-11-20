@@ -6,6 +6,7 @@ import Badge from "@/components/ui/Badge";
 import type { Assignment } from "@/db";
 import { m } from "@/i18n";
 import { readerStatus } from "@/services/assignment-status";
+import type { Href } from "@/urls";
 import {
 	formatRelative,
 	formatWhen,
@@ -40,7 +41,7 @@ interface Props {
 	/// The course segments the actions take.
 	params: { discipline: string; course: string };
 	/// Where the list of assignments is.
-	listHref: string;
+	listHref: Href;
 }
 
 const { assignment, team, pushes, missingFiles, reader, params, listHref } =

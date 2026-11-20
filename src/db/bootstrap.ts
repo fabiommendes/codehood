@@ -16,6 +16,7 @@ import {
 	replayEdits,
 } from "@/services/answer-edits/codec";
 import type { IsoDate } from "@/typing/iso-date";
+import { urls } from "@/urls";
 import { hashBytes } from "@/utils/content-hash";
 import {
 	courseWeekZero,
@@ -1447,8 +1448,11 @@ async function seedReports(instructor: User, edition: string): Promise<void> {
 		instructor: instructor.username,
 		edition,
 	};
+	/// Where the dev server runs, as the reports' URLs say they were sent from.
+	const origin = "http://localhost:4321";
+	const links = urls.course(course);
 	const sent = {
-		url: `http://localhost:4321/cs101/ada_${edition}`,
+		url: `${origin}${links.index()}`,
 		userAgent:
 			"Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36",
 		viewport: "1280x720",
@@ -1471,7 +1475,7 @@ async function seedReports(instructor: User, edition: string): Promise<void> {
 			kind: "SUGGESTION",
 			message:
 				"It would help to filter the exam list by status. Right now I scroll through everything to find the open ones.",
-			url: `http://localhost:4321/cs101/ada_${edition}/exams`,
+			url: `${origin}${links.exams()}`,
 			userAgent: sent.userAgent,
 			viewport: "1440x900",
 			attachments: [
@@ -1526,7 +1530,7 @@ async function seedReports(instructor: User, edition: string): Promise<void> {
 			kind: "BUG",
 			message:
 				"Saving my profile with an empty bio returns an error page instead of a message.",
-			url: "http://localhost:4321/profile",
+			url: `${origin}${urls.profile()}`,
 			userAgent: sent.userAgent,
 			viewport: "1280x720",
 		},

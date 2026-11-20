@@ -8,7 +8,7 @@
 import type { Course } from "@/db";
 import type { CalendarEntry } from "@/services/calendar-entries";
 import { hiddenFromStudents } from "@/services/exam-state";
-import { courseHref } from "@/urls";
+import { urls, withAnchor } from "@/urls";
 import { examTypeLabels } from "@/utils/exam-display";
 import { type IcalEvent, renderIcal } from "@/utils/ical";
 
@@ -36,7 +36,7 @@ export interface CalendarFeedOptions {
  * `METHOD:PUBLISH` and `X-WR-CALNAME:<name>`, with every time in UTC and no
  * `VTIMEZONE`. Events keep the order of `entries`.
  *
- * Below, `<course>` is `<origin>` followed by `courseHref` of the entry's
+ * Below, `<course>` is `<origin>` followed by the index URL of the entry's
  * course, `<label>` its discipline slug, and `<host>` the host of `origin`.
  *
  * A meeting (`kind: "event"`) becomes:
@@ -74,13 +74,12 @@ export function renderCalendar(
 			throw new Error(`Course ${entry.courseId} missing from feed courses`);
 		}
 		const label = course.discipline.slug;
-		const courseUrl =
-			opts.origin +
-			courseHref({
-				discipline: course.discipline.slug,
-				instructor: course.instructor.username,
-				edition: course.edition.slug,
-			});
+		const links = urls.course({
+			discipline: course.discipline.slug,
+			instructor: course.instructor.username,
+			edition: course.edition.slug,
+		});
+		const courseUrl = opts.origin + links.index();
 		// A zero-length entry has no DTEND: RFC 5545 gives an event with only a
 		// DTSTART no duration, which is what an untimed exam is.
 		const base = {
@@ -100,7 +99,7 @@ export function renderCalendar(
 				description: event.description
 					? `${event.description}\n\n${courseUrl}`
 					: courseUrl,
-				url: `${courseUrl}/schedule#event-${event.id}`,
+				url: opts.origin + withAnchor(links.schedule(), `event-${event.id}`),
 				status: event.kind === "CANCELLED" ? "CANCELLED" : undefined,
 			});
 		} else {
@@ -110,7 +109,7 @@ export function renderCalendar(
 				uid: `exam-${exam.id}@${host}`,
 				stamp: exam.updatedAt,
 				summary: `${label} · ${examTypeLabels[exam.type]}: ${exam.title}`,
-				url: `${courseUrl}/exams/${exam.slug}`,
+				url: opts.origin + links.exam(exam.slug).index(),
 			});
 		}
 	}

@@ -25,6 +25,7 @@ import {
 	examPhase,
 	examPhaseLabels,
 } from "@/services/exam-state";
+import { type CourseRef, urls } from "@/urls";
 import {
 	examPhaseBadgeClass,
 	examTypeLabels,
@@ -39,8 +40,8 @@ type ExamRow = Omit<Exam, "id" | "questions">;
 
 interface Props {
 	exams: ExamRow[];
-	/** The course's base URL, e.g. `/cs101/ada_2026-1` — exams link to `${href}/exams/${slug}`. */
-	href: string;
+	/** The course of the exams, whose pages the titles link to. */
+	courseRef: CourseRef;
 }
 
 const SORT_FIELDS = [
@@ -168,7 +169,10 @@ export default function ExamsTable(props: Props): JSX.Element {
 			class: "font-medium max-sm:basis-full max-sm:p-0",
 			sortKey: "title" satisfies SortField,
 			render: (exam) => (
-				<a href={`${props.href}/exams/${exam.slug}`} class="link link-hover">
+				<a
+					href={urls.course(props.courseRef).exam(exam.slug).index()}
+					class="link link-hover"
+				>
 					{exam.title}
 				</a>
 			),

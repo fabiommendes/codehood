@@ -22,7 +22,7 @@ export const prerender = false;
 const { discipline, course: courseSegment } = Astro.params;
 const result = await loadCourse(Astro, discipline, courseSegment);
 if ("redirect" in result) return result.redirect;
-const { course, href, links, tabs } = result;
+const { course, links, tabs } = result;
 
 // biome-ignore lint/style/noNonNullAssertion: every course page runs through loadCourse, which already required Astro.locals.user.
 const actor = Astro.locals.actor!;
@@ -94,7 +94,7 @@ function code(text: string): string {
     <ul class="mt-4 flex flex-col gap-3">
       {rows.map(({ assignment, badge, due, unopened }) => (
         <li>
-          <ListRow href={`${href}/assignments/${assignment.slug}`} muted={unopened}>
+          <ListRow href={links.assignment(assignment.slug)} muted={unopened}>
             <p class="font-medium">{assignment.title}</p>
             <p class="text-sm text-muted">
               {assignment.teamMax === 1

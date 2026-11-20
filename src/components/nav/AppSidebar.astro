@@ -5,13 +5,13 @@
 // current course (or follows the list when no course is current).
 import Sketch, { type SketchArt } from "@/components/brand/Sketch.astro";
 import { m } from "@/i18n";
-import { urls } from "@/urls";
+import { type Href, urls } from "@/urls";
 import CourseRow from "./CourseRow.astro";
 
 export interface SidebarCourse {
 	code: string;
 	edition: string;
-	href: string;
+	href: Href;
 	teaching: boolean;
 }
 

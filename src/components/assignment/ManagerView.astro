@@ -4,6 +4,7 @@
 // statement.
 import type { Assignment, TeamListed, TeamSummary } from "@/db";
 import { m } from "@/i18n";
+import type { Href } from "@/urls";
 import { formatRelative, formatWhen } from "@/utils/assignment-view";
 import { renderMarkdownBody } from "@/utils/markdown";
 import CliCommands from "./CliCommands.astro";
@@ -23,7 +24,7 @@ interface Props {
 	/// The course segments the actions take.
 	params: { discipline: string; course: string };
 	/// Where the list of assignments is.
-	listHref: string;
+	listHref: Href;
 }
 
 const { assignment, summary, teams, students, pushCounts, params, listHref } =

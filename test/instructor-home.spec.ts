@@ -8,6 +8,7 @@ import {
 	type TaughtExam,
 } from "@/services/instructor-home";
 import type { HomeCourse } from "@/services/student-home";
+import { urls } from "@/urls";
 
 const MINUTE = 60_000;
 const HOUR = 60 * MINUTE;
@@ -20,12 +21,18 @@ function at(ms: number): Date {
 }
 
 const algebra: HomeCourse = {
-	href: "/mat101/ada_2026-1",
+	ref: { discipline: "mat101", instructor: "ada", edition: "2026-1" },
+	href: urls
+		.course({ discipline: "mat101", instructor: "ada", edition: "2026-1" })
+		.index(),
 	code: "mat101",
 	name: "Algebra",
 };
 const compilers: HomeCourse = {
-	href: "/cs301/ada_2026-1",
+	ref: { discipline: "cs301", instructor: "ada", edition: "2026-1" },
+	href: urls
+		.course({ discipline: "cs301", instructor: "ada", edition: "2026-1" })
+		.index(),
 	code: "cs301",
 	name: "Compilers",
 };

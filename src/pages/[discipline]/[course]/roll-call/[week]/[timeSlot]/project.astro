@@ -16,7 +16,7 @@ const result = await loadCourse(Astro, discipline, courseSegment, {
 	manage: true,
 });
 if ("redirect" in result) return result.redirect;
-const { course, href } = result;
+const { course, links } = result;
 
 // biome-ignore lint/style/noNonNullAssertion: loadCourse({ manage: true }) already required Astro.locals.user.
 const actor = Astro.locals.actor!;
@@ -46,7 +46,7 @@ const { code, changedAt, nextChangeAt } = await db.rollCall.currentCode(pk, {
     week={weekNumber}
     timeSlot={timeSlot}
     title={event.title}
-    manageHref={`${href}/roll-call/${weekNumber}/${timeSlot}`}
+    manageHref={links.rollCall(weekNumber, timeSlot)}
     initial={{
       code,
       changedAt,

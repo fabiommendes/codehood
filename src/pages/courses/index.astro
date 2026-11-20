@@ -6,7 +6,7 @@ import { CursorPagination } from "@/components/ui/Pagination";
 import { db } from "@/db";
 import { m } from "@/i18n";
 import AppLayout from "@/layouts/AppLayout.astro";
-import { courseHref, urls } from "@/urls";
+import { urls } from "@/urls";
 import { listUrl, readPage } from "@/utils/list-page";
 import { pageLinks } from "@/utils/page-links";
 
@@ -67,11 +67,11 @@ const courses = page.items;
     ) : (
       <div class="mt-8 grid grid-cols-1 gap-5 sm:grid-cols-2 xl:grid-cols-3">
         {courses.map((course) => {
-          const href = courseHref({
+          const href = urls.course({
             discipline: course.discipline.slug,
             instructor: course.instructor.username,
             edition: course.edition.slug,
-          });
+          }).index();
           const isInstructor = course.instructor.username === actor.username;
           return (
             <a

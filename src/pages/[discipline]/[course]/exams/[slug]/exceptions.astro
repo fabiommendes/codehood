@@ -21,7 +21,7 @@ export const prerender = false;
 const { discipline, course: courseSegment, slug } = Astro.params;
 const result = await loadExamStaff(Astro, discipline, courseSegment, slug);
 if ("redirect" in result) return result.redirect;
-const { course, href, links, tabs, exam, exceptions, data } = result;
+const { course, links, tabs, exam, exceptions, data } = result;
 const { students, storedExceptions } = data;
 const schedule = examSchedule(exam, exceptions);
 

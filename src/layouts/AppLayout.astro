@@ -10,7 +10,7 @@ import ReportDialog from "@/components/report/ReportDialog";
 import ThemeToggle from "@/components/ThemeToggle.astro";
 import { db } from "@/db";
 import { m } from "@/i18n";
-import { courseHref, parseCourseSegment, urls } from "@/urls";
+import { parseCourseSegment, urls } from "@/urls";
 import {
 	breadcrumbs,
 	COURSE_TAB_LABELS,
@@ -52,11 +52,13 @@ const courses = user
 			code: course.discipline.slug,
 			edition: course.edition.slug,
 			teaching: course.instructor.username === user.username,
-			href: courseHref({
-				discipline: course.discipline.slug,
-				instructor: course.instructor.username,
-				edition: course.edition.slug,
-			}),
+			href: urls
+				.course({
+					discipline: course.discipline.slug,
+					instructor: course.instructor.username,
+					edition: course.edition.slug,
+				})
+				.index(),
 		}))
 	: [];
 
@@ -65,11 +67,13 @@ const courses = user
 const CONTENT_TABS = new Set(["questions", "exams", "resources"]);
 const memberCourse = user
 	? (userCourses.find((course) => {
-			const href = courseHref({
-				discipline: course.discipline.slug,
-				instructor: course.instructor.username,
-				edition: course.edition.slug,
-			});
+			const href = urls
+				.course({
+					discipline: course.discipline.slug,
+					instructor: course.instructor.username,
+					edition: course.edition.slug,
+				})
+				.index();
 			return (
 				Astro.url.pathname === href || Astro.url.pathname.startsWith(`${href}/`)
 			);
@@ -90,11 +94,13 @@ const reportCourse =
 			)
 		: null);
 const reportCourseHref = reportCourse
-	? courseHref({
-			discipline: reportCourse.discipline.slug,
-			instructor: reportCourse.instructor.username,
-			edition: reportCourse.edition.slug,
-		})
+	? urls
+			.course({
+				discipline: reportCourse.discipline.slug,
+				instructor: reportCourse.instructor.username,
+				edition: reportCourse.edition.slug,
+			})
+			.index()
 	: null;
 const reportContext = reportCourse
 	? {

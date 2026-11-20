@@ -9,6 +9,7 @@ import { db } from "@/db";
 import { m } from "@/i18n";
 import AppLayout from "@/layouts/AppLayout.astro";
 import { attendanceCsvRows } from "@/services/attendance-table";
+import { withAnchor } from "@/urls";
 import { breadcrumbs } from "@/utils/breadcrumbs";
 import { studentsNav } from "@/utils/course-tabs-nav";
 import { loadCourse } from "@/utils/load-course";
@@ -18,13 +19,13 @@ export const prerender = false;
 const { discipline, course: courseSegment } = Astro.params;
 const result = await loadCourse(Astro, discipline, courseSegment);
 if ("redirect" in result) return result.redirect;
-const { course, href, links, tabs } = result;
+const { course, links, tabs } = result;
 
 // biome-ignore lint/style/noNonNullAssertion: every course page runs through loadCourse, which already required Astro.locals.user.
 const actor = Astro.locals.actor!;
 const manages = hasPerm(actor, "enrollment.manage", course);
 // A student's attendance is a section of the course home.
-if (!manages) return Astro.redirect(`${href}#attendance`);
+if (!manages) return Astro.redirect(withAnchor(links.index(), "attendance"));
 const report = await db.rollCall.courseAttendance(course.id, { actor });
 const csvFilename = `attendance-${course.discipline.slug}-${course.edition.slug}.csv`;
 ---

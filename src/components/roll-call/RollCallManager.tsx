@@ -10,6 +10,7 @@ import {
 import { createStore, reconcile } from "solid-js/store";
 import { errorMessage } from "@/forms/field-errors";
 import { m } from "@/i18n";
+import type { Href } from "@/urls";
 import { formatDateTime } from "@/utils/schedule-time";
 import { createNow, formatCountdown } from "./countdown";
 
@@ -32,10 +33,10 @@ export interface RollCallManagerProps {
 	course: string;
 	week: number;
 	timeSlot: string;
-	/// The roll call page's URL; the projection lives under it.
-	pageHref: string;
+	/// The roll call's projection for the classroom screen.
+	projectHref: Href;
 	/// The course's schedule URL, where a deleted roll call sends the instructor.
-	scheduleHref: string;
+	scheduleHref: Href;
 	students: { username: string; name: string; dropped: boolean }[];
 	initial: Snapshot;
 	/// Server time when the page rendered, in milliseconds.
@@ -257,10 +258,7 @@ export default function RollCallManager(
 						</Reserve>
 					</span>
 					<div class="ml-auto flex gap-2">
-						<a
-							class="btn btn-primary btn-sm"
-							href={`${props.pageHref}/project`}
-						>
+						<a class="btn btn-primary btn-sm" href={props.projectHref}>
 							{m.attendance_manager_project()}
 						</a>
 						<button

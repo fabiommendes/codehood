@@ -2,14 +2,15 @@
 // The repositories a meeting cites, as compact rows next to its resources,
 // each one a link to the repository's page.
 import { m } from "@/i18n";
+import type { CourseUrls } from "@/urls";
 
 interface Props {
 	repositories: ReadonlyArray<{ slug: string; title: string }>;
-	/// The course's own URL, which repository pages hang from.
-	href: string;
+	/// The pages of the course the repositories belong to.
+	course: CourseUrls;
 }
 
-const { repositories, href } = Astro.props;
+const { repositories, course } = Astro.props;
 ---
 
 {
@@ -18,7 +19,7 @@ const { repositories, href } = Astro.props;
       {repositories.map((repository) => (
         <li>
           <a
-            href={`${href}/repositories/${repository.slug}`}
+            href={course.repository(repository.slug)}
             class="-mx-1 inline-flex items-center gap-1.5 rounded px-1 py-0.5 hover:bg-base-200 hover:text-primary"
           >
             <svg

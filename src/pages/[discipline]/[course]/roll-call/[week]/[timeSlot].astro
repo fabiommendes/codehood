@@ -21,7 +21,7 @@ const result = await loadCourse(Astro, discipline, courseSegment, {
 	manage: true,
 });
 if ("redirect" in result) return result.redirect;
-const { course, href, links, tabs } = result;
+const { course, links, tabs } = result;
 
 // biome-ignore lint/style/noNonNullAssertion: loadCourse({ manage: true }) already required Astro.locals.user.
 const actor = Astro.locals.actor!;
@@ -65,8 +65,8 @@ const courseParams = {
     {...courseParams}
     week={weekNumber}
     timeSlot={timeSlot}
-    pageHref={`${href}/roll-call/${weekNumber}/${timeSlot}`}
-    scheduleHref={`${href}/schedule`}
+    projectHref={links.rollCallProject(weekNumber, timeSlot)}
+    scheduleHref={links.schedule()}
     students={students}
     initial={{
       closesAt: rollCall.closesAt,

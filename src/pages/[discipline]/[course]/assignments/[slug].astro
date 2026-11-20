@@ -18,12 +18,12 @@ export const prerender = false;
 const { discipline, course: courseSegment, slug } = Astro.params;
 const result = await loadCourse(Astro, discipline, courseSegment);
 if ("redirect" in result) return result.redirect;
-const { course, href, links, tabs } = result;
+const { course, links, tabs } = result;
 
 // biome-ignore lint/style/noNonNullAssertion: every course page runs through loadCourse, which already required Astro.locals.user.
 const actor = Astro.locals.actor!;
 const manages = hasPerm(actor, "enrollment.manage", course);
-const listHref = `${href}/assignments`;
+const listHref = links.assignments();
 
 // A successful change redirects to the page, so a reload does not repeat it.
 const changed = [

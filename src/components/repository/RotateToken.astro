@@ -4,6 +4,7 @@
 import { actions } from "astro:actions";
 import FormAlert from "@/components/form/FormAlert";
 import { escapeHtml, m } from "@/i18n";
+import type { Href } from "@/urls";
 
 interface Props {
 	discipline: string;
@@ -12,7 +13,7 @@ interface Props {
 	/// Whether the confirmation form is showing instead of the button.
 	confirming: boolean;
 	/// Page the button and the cancel link lead to.
-	href: string;
+	href: Href;
 	error?: string;
 }
 

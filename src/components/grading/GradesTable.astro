@@ -15,12 +15,13 @@ import {
 	type GradesTable,
 	type PushedGrades,
 } from "@/services/grades-table";
+import type { CourseUrls } from "@/urls";
 import { adjustmentLabel } from "@/utils/adjustment-label";
 import { formatAttendancePercent } from "@/utils/course-grades";
 
 interface Props {
-	/// The course's URL prefix.
-	href: string;
+	/// The URLs of the course.
+	course: CourseUrls;
 	table: GradesTable;
 	/// The pushed grade columns, lined up with the rows of `table`.
 	pushed: PushedGrades;
@@ -28,8 +29,11 @@ interface Props {
 	attendance?: ReadonlyMap<string, { present: number; total: number }>;
 }
 
-const { href, table, pushed, attendance } = Astro.props;
-const segments = href.split("/").filter(Boolean);
+const { course, table, pushed, attendance } = Astro.props;
+/// The URLs of the exam in the column at `index`; the cells of a row line up with `table.columns`.
+const examAt = (index: number) =>
+	course.exam(table.columns[index]?.exam.slug ?? "");
+const segments = course.index().split("/").filter(Boolean);
 const params = {
 	discipline: segments[0] ?? "",
 	course: segments[1] ?? "",
@@ -77,7 +81,7 @@ const hasAttempt = (cell: GradeCell): boolean =>
           table.columns.map((column) => (
             <th scope="col" class="align-top max-sm:px-2">
               <div class="max-sm:w-24 max-sm:whitespace-normal">
-                <a href={`${href}/exams/${column.exam.slug}`} class="link">
+                <a href={course.exam(column.exam.slug).index()} class="link">
                   {column.exam.title}
                 </a>
                 <div class="mt-1 text-xs font-normal text-muted">
@@ -113,7 +117,7 @@ const hasAttempt = (cell: GradeCell): boolean =>
         {
           attendance && (
             <th scope="col" class="align-top max-sm:px-2">
-              <a href={`${href}/attendance`} class="link">{m.grades_table_col_attendance()}</a>
+              <a href={course.attendance()} class="link">{m.grades_table_col_attendance()}</a>
             </th>
           )
         }
@@ -131,7 +135,7 @@ const hasAttempt = (cell: GradeCell): boolean =>
                 {hasAttempt(cell) ? (
                   <>
                     <a
-                      href={`${href}/exams/${table.columns[index]?.exam.slug}/attempts/${row.username}`}
+                      href={examAt(index).attempt(row.username)}
                       class="link"
                       title={adjustmentTitle(cell)}
                     >
@@ -146,7 +150,7 @@ const hasAttempt = (cell: GradeCell): boolean =>
                     </a>
                     {cell.kind === "total" && cell.unadjusted !== undefined && (
                       <a
-                        href={`${href}/exams/${table.columns[index]?.exam.slug}/adjustments`}
+                        href={examAt(index).adjustments()}
                         class="link ml-1 align-middle text-muted"
                         aria-label={m.grades_adjustment_title()}
                         title={m.grades_adjustment_title()}

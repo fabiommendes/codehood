@@ -449,7 +449,7 @@ const sections = [
           data-variant={state.key}
           hidden={selected.statistics !== state.key}
         >
-          <QuestionStats client:load href="#" stats={state.stats} titles={statsTitles} points={state.stats.map(() => "10")} />
+          <QuestionStats client:load courseRef={{ discipline: "algorithms", instructor: "ada", edition: "2026-2" }} exam="midterm" stats={state.stats} titles={statsTitles} points={state.stats.map(() => "10")} />
         </div>
       ))
     }

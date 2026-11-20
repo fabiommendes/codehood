@@ -46,7 +46,7 @@ export const prerender = false;
 const { discipline, course: courseSegment } = Astro.params;
 const result = await loadCourse(Astro, discipline, courseSegment);
 if ("redirect" in result) return result.redirect;
-const { course, href, links, tabs } = result;
+const { course, links, tabs } = result;
 
 // biome-ignore lint/style/noNonNullAssertion: loadCourse already required Astro.locals.user.
 const actor = Astro.locals.actor!;
@@ -270,7 +270,7 @@ const sectionLinks = studentView
         <span class="text-sm text-muted">{m.courses_home_happening_now()}</span>
         {meetingNowRollCall ? (
           <a
-            href={`${href}/roll-call/${meetingNow.week}/${meetingNow.timeSlot.slug}`}
+            href={links.rollCall(meetingNow.week, meetingNow.timeSlot.slug)}
             class="btn btn-primary btn-sm ml-auto"
           >
             {m.courses_home_view_roll_call()}
@@ -283,7 +283,6 @@ const sectionLinks = studentView
             course={courseParams.course}
             week={meetingNow.week}
             timeSlot={meetingNow.timeSlot.slug}
-            href={href}
           />
         )}
       </div>
@@ -299,7 +298,7 @@ const sectionLinks = studentView
   }
 
   <section id="this-week" class="mt-10 scroll-mt-20">
-    <SectionHeader title={m.courses_home_this_week()} href={`${href}/schedule`} />
+    <SectionHeader title={m.courses_home_this_week()} href={links.schedule()} />
 
     {
       slots.length === 0 && !thisWeek ? (
@@ -335,7 +334,6 @@ const sectionLinks = studentView
                 week={thisWeek.week}
                 entries={thisWeek.entries}
                 next={next}
-                href={href}
                 links={links}
                 resources={eventResources}
                 rollCallManager={canWrite ? courseParams : undefined}
@@ -357,11 +355,11 @@ const sectionLinks = studentView
         <SectionHeader title={m.courses_home_open_exams()} />
         <div class="mt-4 flex flex-col gap-3">
           {openExams.slice(0, OPEN_EXAMS_SHOWN).map((exam) => (
-            <ExamRow exam={exam} href={href} exception={ownExceptions.get(exam.slug)} />
+            <ExamRow exam={exam} course={links} exception={ownExceptions.get(exam.slug)} />
           ))}
         </div>
         {openExams.length > OPEN_EXAMS_SHOWN && (
-          <a href={`${href}/exams`} class="mt-3 inline-block text-sm text-primary hover:underline">
+          <a href={links.exams()} class="mt-3 inline-block text-sm text-primary hover:underline">
             {m.courses_home_more_open_exams({ count: openExams.length - OPEN_EXAMS_SHOWN })}
           </a>
         )}
@@ -372,11 +370,11 @@ const sectionLinks = studentView
   {
     !studentView && examPreview.exams.length > 0 && (
       <section id="exams" class="mt-10 scroll-mt-20">
-        <SectionHeader title={examPreview.title} href={`${href}/exams`} />
+        <SectionHeader title={examPreview.title} href={links.exams()} />
 
         <div class="mt-4 flex flex-col gap-3">
           {shownExams.map(({ exam, pending }) => (
-            <ExamRow exam={exam} href={href} pending={pending} exception={ownExceptions.get(exam.slug)} />
+            <ExamRow exam={exam} course={links} pending={pending} exception={ownExceptions.get(exam.slug)} />
           ))}
         </div>
       </section>
@@ -424,7 +422,7 @@ const sectionLinks = studentView
   {
     !studentView && (
     <section id="resources" class="mt-10 scroll-mt-20">
-    <SectionHeader title={m.nav_course_tab_resources()} href={`${href}/resources`} />
+    <SectionHeader title={m.nav_course_tab_resources()} href={links.resources()} />
 
     {
       resources.length === 0 ? (
@@ -432,7 +430,7 @@ const sectionLinks = studentView
           {eventResources.size > 0 ? (
             <span
               set:html={m.courses_resources_on_schedule({
-                schedule: `<a href="${escapeHtml(href)}/schedule" class="link">${escapeHtml(m.courses_resources_schedule_link())}</a>`,
+                schedule: `<a href="${escapeHtml(links.schedule())}" class="link">${escapeHtml(m.courses_resources_schedule_link())}</a>`,
               })}
             />
           ) : canWrite ? (

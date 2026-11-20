@@ -8,6 +8,7 @@ import {
 } from "@/components/ui/table-sort";
 import { m } from "@/i18n";
 import type { AttemptRow } from "@/services/grading";
+import { type CourseRef, urls } from "@/urls";
 import AdjustmentDialog from "./AdjustmentDialog";
 import { attemptTotalLabel } from "./attempt-total";
 import Icon from "./Icon";
@@ -16,8 +17,8 @@ import Icon from "./Icon";
 export type ResultRow = AttemptRow & { unadjusted?: number | null };
 
 interface Props {
-	/// The exam page's URL.
-	href: string;
+	/// The exam's course, whose pages the table links to.
+	courseRef: CourseRef;
 	/// The course's URL segments and the exam slug, as the adjustment action takes them.
 	discipline: string;
 	course: string;
@@ -69,6 +70,8 @@ function compareRows(
  * The instructor's view of how an exam went: one row per attempt, sortable by any column, and the way into grading.
  */
 export default function ExamResults(props: Props): JSX.Element {
+	/// The URLs of the exam's pages.
+	const links = () => urls.course(props.courseRef).exam(props.exam);
 	const [sort, setSort] = createSignal(DEFAULT_SORT);
 	const [adjusting, setAdjusting] = createSignal(false);
 	const [selected, setSelected] = createSignal<ReadonlySet<string>>(new Set());
@@ -100,7 +103,7 @@ export default function ExamResults(props: Props): JSX.Element {
 							toggle(row.author, event.currentTarget.checked)
 						}
 					/>
-					<a href={`${props.href}/attempts/${row.author}`} class="link">
+					<a href={links().attempt(row.author)} class="link">
 						{row.name}
 					</a>
 					<Show when={row.dropped}>
@@ -158,7 +161,7 @@ export default function ExamResults(props: Props): JSX.Element {
 						</del>
 					</Show>{" "}
 					<a
-						href={`${props.href}/adjustments`}
+						href={links().adjustments()}
 						class="link align-middle text-muted"
 						aria-label={m.grades_adjustment_title()}
 						title={m.grades_adjustment_title()}
@@ -176,7 +179,7 @@ export default function ExamResults(props: Props): JSX.Element {
 				<h3 class="page-subsubheader">{m.grades_results_students_title()}</h3>
 				<div class="flex items-center gap-2">
 					<Show when={props.rows.length > 0 && pending() === 0}>
-						<a href={`${props.href}/grading`} class="btn btn-outline btn-sm">
+						<a href={links().grading()} class="btn btn-outline btn-sm">
 							{m.grades_results_review()}
 						</a>
 					</Show>

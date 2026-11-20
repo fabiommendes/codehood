@@ -12,6 +12,7 @@ import {
 	examSchedule,
 	timingFor,
 } from "@/services/exam-state";
+import { withAnchor } from "@/urls";
 import { breadcrumbs } from "@/utils/breadcrumbs";
 import { examNav } from "@/utils/exam-nav";
 import { loadExamStaff } from "@/utils/load-exam-staff";
@@ -21,7 +22,7 @@ export const prerender = false;
 const { discipline, course: courseSegment, slug } = Astro.params;
 const result = await loadExamStaff(Astro, discipline, courseSegment, slug);
 if ("redirect" in result) return result.redirect;
-const { course, href, links, tabs, exam, exceptions, data } = result;
+const { course, links, ref, tabs, exam, exceptions, data } = result;
 
 // biome-ignore lint/style/noNonNullAssertion: loadExamStaff already redirected an anonymous visitor.
 const actor = Astro.locals.actor!;
@@ -41,7 +42,7 @@ const phase = examPhase(
 	timingFor(examSchedule(exam, exceptions), null),
 	new Date(),
 );
-const examHref = `${href}/exams/${exam.slug}`;
+const examLinks = links.exam(exam.slug);
 // An adjusted attempt carries the total it would have without the adjustments.
 const resultRows = data.resultRows.map((row) =>
 	data.originalTotals.has(row.author)
@@ -53,7 +54,7 @@ const resultRows = data.resultRows.map((row) =>
 <AppLayout title={`${m.grades_results_title()} · ${exam.title}`}
   trail={breadcrumbs(Astro.url, { course, item: exam.title, page: m.grades_results_title() })}
   nav={examNav({
-    exam: links.exam(exam.slug),
+    exam: examLinks,
     title: exam.title,
     manage: true,
     pending: data.pending,
@@ -72,25 +73,25 @@ const resultRows = data.resultRows.map((row) =>
         class="mt-4 flex items-center justify-between gap-4 rounded-box border border-edge bg-base-200 p-4 text-sm"
       >
         <span>{m.exams_detail_pending_banner({ phase: examPhaseLabels[phase], count: data.pending })}</span>
-        <a href={`${examHref}/grading`} class="btn btn-primary btn-sm">{m.exams_detail_grade_answers()}</a>
+        <a href={examLinks.grading()} class="btn btn-primary btn-sm">{m.exams_detail_grade_answers()}</a>
       </div>
     )
   }
   {
     exam.type === "EXAM" && (
       <p class="mt-2 text-sm text-muted">
-        <a href={`${examHref}#release-status`} class="link">{m.exams_release_button()}</a>
+        <a href={withAnchor(examLinks.index(), "release-status")} class="link">{m.exams_release_button()}</a>
       </p>
     )
   }
 
   <div id="by-question" class="scroll-mt-20">
-    <QuestionStatsTable client:load href={examHref} stats={data.statsRows} titles={titles} points={pointsByPosition(exam.questions)} />
+    <QuestionStatsTable client:load courseRef={ref} exam={exam.slug} stats={data.statsRows} titles={titles} points={pointsByPosition(exam.questions)} />
   </div>
   <div id="by-student" class="scroll-mt-20">
     <ExamResults
       client:load
-      href={examHref}
+      courseRef={ref}
       discipline={discipline!}
       course={courseSegment!}
       exam={exam.slug}

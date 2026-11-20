@@ -2,11 +2,12 @@
 // The clone command of a repository with a button that copies it, the zip
 // download, and the note on updating a clone that has local commits.
 import { escapeHtml, m } from "@/i18n";
+import type { Href } from "@/urls";
 
 interface Props {
 	cloneUrl: string;
 	/// Absent while the repository has no commit, which leaves nothing to zip.
-	zipHref?: string;
+	zipHref?: Href;
 	/// Replaces the note on updating a clone, for a URL that is not a repository's.
 	note?: string;
 	/// Replaces the accessible name of the box.

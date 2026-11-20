@@ -2,6 +2,7 @@ import { createMemo, createSignal, type JSX, Show } from "solid-js";
 import { m } from "@/i18n";
 import { adjustTotal, formatScore } from "@/services/exam-result";
 import type { RosterRow, RosterStatus } from "@/services/grading";
+import { type CourseRef, urls } from "@/urls";
 import AdjustmentDialog, { type AdjustmentPreview } from "./AdjustmentDialog";
 import Dialog from "./Dialog";
 import Icon from "./Icon";
@@ -20,8 +21,8 @@ interface Props {
 	adjustments: readonly { op: "SET" | "FACTOR" | "OFFSET"; value: string }[];
 	/// Every active student of the exam.
 	roster: readonly RosterRow[];
-	/// The exam's attempts URL; a student's page is this followed by `/<username>`.
-	attemptHref: string;
+	/// The exam's course, whose attempt pages the student list links to.
+	courseRef: CourseRef;
 	/// Whether the exam takes adjustments at all; a practice exam does not.
 	adjustable: boolean;
 }
@@ -170,7 +171,10 @@ export default function AttemptActions(props: Props): JSX.Element {
 								render: (row) => (
 									<a
 										class="link link-hover font-medium"
-										href={`${props.attemptHref}/${row.username}`}
+										href={urls
+											.course(props.courseRef)
+											.exam(props.exam)
+											.attempt(row.username)}
 									>
 										{row.name}
 									</a>

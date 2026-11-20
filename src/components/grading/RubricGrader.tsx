@@ -16,6 +16,7 @@ import { errorMessage } from "@/forms/field-errors";
 import { m } from "@/i18n";
 import { formatScore } from "@/services/exam-result";
 import { isNumberInRange, rubricScore } from "@/services/rubric";
+import type { Href } from "@/urls";
 import type { GraderItem, GraderState } from "@/utils/grader-state";
 import type { GradingTarget } from "./grading-target";
 import NewRubricItem from "./NewRubricItem";
@@ -27,7 +28,7 @@ export interface RubricGraderProps {
 	target: GradingTarget;
 	initial: GraderState;
 	/// Where the queue of the exam's questions is.
-	queueHref: string;
+	queueHref: Href;
 }
 
 /// The `id` of the `datalist` that suggests group paths.

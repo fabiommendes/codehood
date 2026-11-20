@@ -28,7 +28,7 @@ const result = await loadExamStaff(Astro, discipline, courseSegment, slug, {
 	practice: true,
 });
 if ("redirect" in result) return result.redirect;
-const { course, href, links, tabs, exam, data } = result;
+const { course, links, ref, tabs, exam, data } = result;
 
 // biome-ignore lint/style/noNonNullAssertion: loadExamStaff already redirected an anonymous visitor.
 const actor = Astro.locals.actor!;
@@ -104,6 +104,7 @@ const codeRun = effectiveCodeRun(exam);
       preview
       discipline={discipline!}
       course={courseSegment!}
+      courseRef={ref}
       exam={exam.slug}
       type={exam.type}
       state={state}

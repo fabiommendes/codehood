@@ -17,6 +17,7 @@ import type { Exam } from "@/db";
 import { m } from "@/i18n";
 import { publicForm, scoreResponse } from "@/mdq";
 import type { AttemptRow } from "@/services/grading";
+import { urls } from "@/urls";
 import { pretestSources } from "@/utils/pretest-sources";
 import {
 	formatDateTime,
@@ -333,7 +334,7 @@ const sections = [
         examRows.map((row) => (
           <div>
             <p class="mb-1 text-xs text-muted">{row.label}</p>
-            <ExamRow exam={row.exam} href="#" score={row.score} pending={row.pending} />
+            <ExamRow exam={row.exam} course={urls.course({ discipline: "algorithms", instructor: "ada", edition: "2026-2" })} score={row.score} pending={row.pending} />
           </div>
         ))
       }
@@ -399,7 +400,7 @@ const sections = [
           data-variant={state.key}
           hidden={selected.results !== state.key}
         >
-          <ExamResults client:load href="#" discipline="cs101" course="ada_2026-1" exam="midterm" rows={state.rows} questions={[]} />
+          <ExamResults client:load courseRef={{ discipline: "cs101", instructor: "ada", edition: "2026-1" }} discipline="cs101" course="ada_2026-1" exam="midterm" rows={state.rows} questions={[]} />
         </div>
       ))
     }
@@ -503,6 +504,7 @@ const sections = [
         <div data-variant-group="attempt" data-variant={entry.key} hidden={selected.attempt !== entry.key}>
           <ExamAttempt
             {...examTarget}
+            courseRef={{ discipline: "algorithms", instructor: "ada", edition: "2026-2" }}
             type="EXAM"
             state={entry.state as never}
             now={now}

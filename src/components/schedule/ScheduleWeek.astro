@@ -22,8 +22,6 @@ interface Props {
 	entries: CalendarEntry[];
 	/// The entry marked "Next", if it is in this week.
 	next: CalendarEntry | undefined;
-	/// The course's own URL, which exam and resource links hang from.
-	href: string;
 	/// The pages of the course.
 	links: CourseUrls;
 	/// Each meeting's resources; a meeting with none is absent.
@@ -42,7 +40,6 @@ const {
 	week,
 	entries,
 	next,
-	href,
 	links,
 	resources,
 	rollCallManager,
@@ -135,7 +132,7 @@ function faded(entry: CalendarEntry): boolean {
                 </p>
               ) : (
                 <a
-                  href={`${href}/exams/${entry.exam.slug}`}
+                  href={links.exam(entry.exam.slug).index()}
                   class:list={[
                     "link link-hover font-medium",
                     faded(entry) && "text-muted",
@@ -154,7 +151,7 @@ function faded(entry: CalendarEntry): boolean {
               {entry.kind === "event" && rollCallManager && entry.event.kind === "REGULAR" && (
                 rollCallKeys.has(rollCallKey(entry.event)) ? (
                   <a
-                    href={`${href}/roll-call/${entry.event.week}/${entry.event.timeSlot.slug}`}
+                    href={links.rollCall(entry.event.week, entry.event.timeSlot.slug)}
                     class="btn btn-outline btn-sm"
                   >
                     {m.schedule_roll_call()}
@@ -166,7 +163,6 @@ function faded(entry: CalendarEntry): boolean {
                     course={rollCallManager.course}
                     week={entry.event.week}
                     timeSlot={entry.event.timeSlot.slug}
-                    href={href}
                   />
                 )
               )}
@@ -201,7 +197,7 @@ function faded(entry: CalendarEntry): boolean {
             {entry.kind === "event" && (
               <EventRepositories
                 repositories={entry.event.repositories}
-                href={href}
+                course={links}
               />
             )}
             {entry.kind === "event" && resources.has(entry.event.id) && (

@@ -11,6 +11,7 @@ import type {
 	DiscriminationGap,
 	QuestionStats,
 } from "@/services/question-stats";
+import type { CourseUrls } from "@/urls";
 
 interface Row {
 	slug: string;
@@ -24,15 +25,15 @@ interface Row {
 }
 
 interface Props {
-	/// The course's URL prefix.
-	href: string;
+	/// The URLs of the exam's course.
+	course: CourseUrls;
 	/// One row per exam question, in exam order.
 	rows: Row[];
 	/// The statistics of each question, by slug; absent while no attempt is closed.
 	stats?: ReadonlyMap<string, QuestionStats>;
 }
 
-const { href, rows, stats } = Astro.props;
+const { course, rows, stats } = Astro.props;
 
 const twoDecimals = new Intl.NumberFormat(locale, {
 	minimumFractionDigits: 2,
@@ -77,7 +78,7 @@ const gapReasons: Record<DiscriminationGap, string> = {
                     <div class="flex items-center gap-3">
                       <span class="min-w-8 font-display text-lg font-bold tabular-nums">{m.exams_attempt_question_short({ number: index + 1 })}</span>
                       <div class="min-w-0">
-                        <a href={`${href}/questions/${row.slug}`} class="link">{row.title}</a>
+                        <a href={course.question(row.slug)} class="link">{row.title}</a>
                         {row.grading && <p class="text-sm text-muted">{row.grading}</p>}
                       </div>
                     </div>

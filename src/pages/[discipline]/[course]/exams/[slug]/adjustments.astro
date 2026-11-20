@@ -16,7 +16,7 @@ export const prerender = false;
 const { discipline, course: courseSegment, slug } = Astro.params;
 const result = await loadExamStaff(Astro, discipline, courseSegment, slug);
 if ("redirect" in result) return result.redirect;
-const { course, href, links, tabs, exam, data } = result;
+const { course, links, tabs, exam, data } = result;
 
 // biome-ignore lint/style/noNonNullAssertion: loadExamStaff already redirected an anonymous visitor.
 const actor = Astro.locals.actor!;
@@ -40,7 +40,7 @@ const names = new Map(
 const titles = new Map(
 	stored.map((entry) => [entry.slug, entry.question.title ?? entry.slug]),
 );
-const examHref = `${href}/exams/${exam.slug}`;
+const examLinks = links.exam(exam.slug);
 const rows = adjustments.map((entry) => ({
 	entry,
 	student: names.get(entry.author) ?? entry.author,
@@ -59,7 +59,7 @@ const rows = adjustments.map((entry) => ({
 <AppLayout title={`${m.grades_adjustment_title()} · ${exam.title}`}
   trail={breadcrumbs(Astro.url, { course, item: exam.title, page: m.grades_adjustment_title() })}
   nav={examNav({
-    exam: links.exam(exam.slug),
+    exam: examLinks,
     title: exam.title,
     manage: true,
     pending: data.pending,
@@ -93,7 +93,7 @@ const rows = adjustments.map((entry) => ({
             {rows.map(({ entry, student, label, target, notes, by, revokedBy, active }) => (
               <tr class:list={["align-top", !active && "text-base-content/60"]}>
                 <th scope="row" class="font-medium">
-                  <a href={`${examHref}/attempts/${entry.author}`} class="link">{student}</a>
+                  <a href={examLinks.attempt(entry.author)} class="link">{student}</a>
                   <div class="whitespace-nowrap text-xs font-normal text-muted">{formatDateTime(entry.createdAt, { year: "numeric" })}</div>
                   {by && <div class="text-xs font-normal text-muted">{m.grades_adjustment_by_line({ name: by })}</div>}
                   {revokedBy && <div class="text-xs font-normal text-muted">{m.grades_adjustment_revoked_by_line({ name: revokedBy })}</div>}
