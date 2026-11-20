@@ -213,3 +213,49 @@ test("a student settles only their own attempt", async () => {
 		),
 	).toBe(1);
 });
+
+test("settleExpired grades an exam with more answers than SQLite's parameter limit", async () => {
+	const sitting = await makeSitting();
+	const question = await prisma.questionRef.findUniqueOrThrow({
+		where: { slug_courseId: { slug: "choice", courseId: sitting.course.id } },
+		select: { id: true },
+	});
+	const count = 1500;
+	const prefix = tag("many-");
+	const usernames = Array.from({ length: count }, (_, i) => `${prefix}${i}`);
+	await prisma.user.createMany({
+		data: usernames.map((username) => ({
+			username,
+			name: username,
+			passwordHash: "",
+			role: "STUDENT",
+			email: `${username}@example.com`,
+			schoolId: username,
+			githubId: username,
+		})),
+	});
+	const startedAt = new Date(Date.now() - 180 * MINUTE);
+	await prisma.response.createMany({
+		data: usernames.map((username) => ({
+			publicId: `r-${username}`,
+			authorId: username,
+			examId: sitting.exam.id,
+			createdAt: startedAt,
+		})),
+	});
+	const responses = await prisma.response.findMany({
+		where: { examId: sitting.exam.id },
+		select: { id: true, authorId: true },
+	});
+	await prisma.submission.createMany({
+		data: responses.map((response) => ({
+			publicId: `s-${response.authorId}`,
+			responseId: response.id,
+			questionId: question.id,
+			payload: "brasilia",
+		})),
+	});
+
+	expect(await settle(sitting)).toBe(count);
+	expect(await feedbackCount(sitting)).toBe(count);
+});

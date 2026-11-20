@@ -71,9 +71,11 @@ async function gradeAttempts(
 		) WHERE position = 1`,
 		JSON.stringify(responseIds),
 	);
+	// No `orderBy`: with one, Prisma cannot split a long `in` list into
+	// batches, and an exam with about 1000 answers exceeds SQLite's parameter
+	// limit. Each submission is graded on its own, so the order does not matter.
 	const counting = await tx.submission.findMany({
 		where: { id: { in: newest.map((row) => Number(row.id)) } },
-		orderBy: [{ createdAt: "desc" }, { id: "desc" }],
 		select: {
 			id: true,
 			status: true,
