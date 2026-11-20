@@ -32,6 +32,8 @@ import {
 	gradingJobRequeued,
 	gradingJobResult,
 	gradingJobSchema,
+	gradingJobSettle,
+	gradingJobSettled,
 	gradingJobStudentBatchQuery,
 	gradingJobStudentBatchView,
 	gradingJobStudentQuery,
@@ -70,7 +72,11 @@ import {
 	unsafePinnedDocument,
 } from "./exam-questions";
 import { examReleaseSelect, makeFeedbackService } from "./feedback.service";
-import { promoteExpiredSends } from "./grading-job-queue";
+import {
+	promoteExpiredSends,
+	settleCancelledSends,
+	unsettledCancelledSends,
+} from "./grading-job-queue";
 
 //
 // Type definitions
@@ -79,6 +85,7 @@ export type GradingJobClaim = z.input<typeof gradingJobClaim>;
 export type GradingJobRenew = z.input<typeof gradingJobRenew>;
 export type GradingJobFail = z.infer<typeof gradingJobFail>;
 export type GradingJobQueue = z.infer<typeof gradingJobQueue>;
+export type GradingJobSettle = z.infer<typeof gradingJobSettle>;
 export type GradingJobStudentQuery = z.infer<typeof gradingJobStudentQuery>;
 export type Job = z.infer<typeof gradingJobSchema>;
 export type GradingJobResult = z.infer<typeof gradingJobResult>;
@@ -368,6 +375,37 @@ export const makeGradingJobService = defineService()((client) => {
 	});
 
 	/**
+	 * Marks as `WILL_NOT_GRADE` the sends of the course's real attempts whose job was cancelled and that still wait for a grade.
+	 *
+	 * Repairs the sends replaced before sending began to settle them.
+	 * Returns how many it marked, or with `dryRun` how many it would mark.
+	 *
+	 * @throws {@link NotFound} No such course.
+	 * @throws {@link NotAllowed} The actor does not teach the course.
+	 */
+	const settleCancelled = op({
+		args: [gradingJobSettle],
+		returns: gradingJobSettled,
+		run: async (
+			tx: PrismaTx,
+			input: GradingJobSettle,
+			opts: ServiceOptsWithoutTx,
+		): Promise<{ settled: number }> => {
+			const course = await managedCourse(tx, input, opts.actor);
+			const where = {
+				response: { preview: false, exam: { courseId: course.id } },
+			} satisfies Prisma.SubmissionWhereInput;
+			if (input.dryRun) {
+				const settled = await tx.submission.count({
+					where: unsettledCancelledSends(where),
+				});
+				return { settled };
+			}
+			return { settled: await settleCancelledSends(tx, where) };
+		},
+	});
+
+	/**
 	 * The jobs of a question by state, the failed ones with their error, and when the instructor's `BOT` keys were last used.
 	 *
 	 * @throws {@link NotFound} No such course.
@@ -653,6 +691,7 @@ export const makeGradingJobService = defineService()((client) => {
 		fail,
 		complete,
 		requeueFailed,
+		settleCancelled,
 		summary,
 		totals,
 		forStudent,
@@ -958,7 +997,7 @@ async function failedJobIds(
 /// The course of a queue, which the actor must teach.
 async function managedCourse(
 	tx: PrismaTx,
-	input: GradingJobQueue,
+	input: Pick<GradingJobQueue, "course">,
 	actor: Actor,
 ) {
 	const course = valueOrNotFound(

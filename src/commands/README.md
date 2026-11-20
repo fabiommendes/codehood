@@ -79,6 +79,13 @@ Whenever a new command is created, document it in this file.
   what it would grade and writes nothing. Run it per exam, with `--dry-run`
   first.
 
+`manage settle-cancelled-sends --course <course> [--dry-run]`
+: Marks as `WILL_NOT_GRADE` the code sends whose grading job was cancelled
+  because the student sent again, and that still wait for a grade without
+  any pass. Servers before 0.7.1 left them pending, which kept their question
+  pending and the exam's grades from being released. Sends graded by hand
+  stay as they are. Running it again changes nothing.
+
 ### Enrollments
 
 `manage check-instructor-enrollments [--fix]`

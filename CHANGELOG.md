@@ -8,6 +8,12 @@
   P2029, limite de parâmetros do SQLite) na leitura e na edição de itens, e
   com ela a tela de correção. A contagem de usos dos itens agora lê só a
   submissão que conta de cada tentativa antes de carregar os passes.
+- Um envio de código substituído por outro antes de ser corrigido ficava
+  `PENDING_GRADE` para sempre: o job era cancelado, mas a questão ficava
+  pendente, a tentativa sem total e a prova sem poder liberar as notas. Agora
+  o envio substituído vira `WILL_NOT_GRADE` junto com o cancelamento do job.
+  Os envios que já estão nesse estado se resolvem com
+  `manage settle-cancelled-sends --course <curso>`.
 
 ## 0.7.0 (2026-11-20)
 

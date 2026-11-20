@@ -215,6 +215,47 @@ test("a SUBMIT cancels the QUEUED job of the previous one", async () => {
 
 	const jobs = await jobsOf(ctx);
 	expect(jobs.map((j) => j.state)).toEqual(["CANCELLED", "QUEUED"]);
+	expect(jobs.map((j) => j.submission.status)).toEqual([
+		"WILL_NOT_GRADE",
+		"PENDING_GRADE",
+	]);
+});
+
+test("settleCancelled marks the pending sends of cancelled jobs as not graded, and only those", async () => {
+	const ctx = await setup();
+	await ctx.save("a", "SUBMIT");
+	await ctx.save("b", "SUBMIT");
+	await ctx.save("c", "SUBMIT");
+	const [stale, graded] = await jobsOf(ctx);
+	if (!stale || !graded) throw new Error("no jobs");
+	// As left by earlier versions: the cancelled send still waits for a grade.
+	await prisma.submission.update({
+		where: { id: stale.submission.id },
+		data: { status: "PENDING_GRADE" },
+	});
+	// A cancelled send the instructor graded by hand keeps its grade.
+	await prisma.submission.update({
+		where: { id: graded.submission.id },
+		data: { status: "GRADED_MANUALLY" },
+	});
+	const course = ctx.course.id;
+
+	expect(
+		await db.gradingJob.settleCancelled({ course, dryRun: true }, FULL_ACCESS),
+	).toEqual({ settled: 1 });
+	expect((await submissionsOf(ctx))[0]?.status).toBe("PENDING_GRADE");
+
+	expect(await db.gradingJob.settleCancelled({ course }, FULL_ACCESS)).toEqual({
+		settled: 1,
+	});
+	expect((await jobsOf(ctx)).map((j) => j.submission.status)).toEqual([
+		"WILL_NOT_GRADE",
+		"GRADED_MANUALLY",
+		"PENDING_GRADE",
+	]);
+	expect(await db.gradingJob.settleCancelled({ course }, FULL_ACCESS)).toEqual({
+		settled: 0,
+	});
 });
 
 test("a cancelled job does not spend a send", async () => {

@@ -10,6 +10,7 @@ import { importResourcesCommand } from "./import-resources";
 import { pruneTeamRepositoriesCommand } from "./prune-team-repositories";
 import { recomputeEventTimesCommand } from "./recompute-event-times";
 import { resetPasswordCommand } from "./reset-password";
+import { settleCancelledSendsCommand } from "./settle-cancelled-sends";
 import { upgradeQuestionsCommand } from "./upgrade-questions";
 
 const manage = new Command("manage").description(
@@ -28,5 +29,6 @@ manage.addCommand(answerHistoryStatsCommand);
 manage.addCommand(checkInstructorEnrollmentsCommand);
 manage.addCommand(gradeObjectivesCommand);
 manage.addCommand(pruneTeamRepositoriesCommand);
+manage.addCommand(settleCancelledSendsCommand);
 
 await manage.parseAsync(process.argv);

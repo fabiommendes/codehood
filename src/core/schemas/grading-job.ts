@@ -106,6 +106,18 @@ export const gradingJobQueue = z.object({
 	question: slug,
 });
 
+/// Names the course whose cancelled sends `settleCancelled` marks.
+export const gradingJobSettle = z.object({
+	course: courseRef,
+	/// Counts the sends and writes nothing.
+	dryRun: z.boolean().optional(),
+});
+
+/// How many sends `settleCancelled` marked, or would mark.
+export const gradingJobSettled = z.object({
+	settled: z.number().int().min(0),
+});
+
 /// How many jobs of a queue `requeueFailed` put back.
 export const gradingJobRequeued = z.object({
 	requeued: z.number().int().min(0),

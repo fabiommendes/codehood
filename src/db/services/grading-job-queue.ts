@@ -136,7 +136,7 @@ export async function enqueueGradingJob(
 				questionId: target.questionId,
 			},
 		},
-		select: { id: true, state: true, leaseUntil: true },
+		select: { id: true, state: true, leaseUntil: true, submissionId: true },
 	});
 	const now = new Date();
 	// A lease that ran out no longer holds the job: the worker is gone or late.
@@ -182,7 +182,40 @@ export async function enqueueGradingJob(
 			{},
 		);
 	}
+	await settleCancelledSends(tx, {
+		id: { in: open.map((job) => job.submissionId) },
+	});
 	return { id: created.id, duplicate: false };
+}
+
+/**
+ * Marks as `WILL_NOT_GRADE` the sends in `where` whose job was cancelled and that still wait for a grade.
+ *
+ * A cancelled job never reports back, so without this the send would keep its
+ * question pending, and the exam unreleasable, for good. A send someone graded
+ * by hand is left alone. Returns how many sends it marked.
+ */
+export async function settleCancelledSends(
+	tx: PrismaTx,
+	where: Prisma.SubmissionWhereInput,
+): Promise<number> {
+	const { count } = await tx.submission.updateMany({
+		where: unsettledCancelledSends(where),
+		data: { status: "WILL_NOT_GRADE" },
+	});
+	return count;
+}
+
+/// Narrows `where` to the sends {@link settleCancelledSends} marks.
+export function unsettledCancelledSends(
+	where: Prisma.SubmissionWhereInput,
+): Prisma.SubmissionWhereInput {
+	return {
+		...where,
+		status: "PENDING_GRADE",
+		gradingJob: { state: "CANCELLED" },
+		feedbacks: { none: {} },
+	};
 }
 
 /**
