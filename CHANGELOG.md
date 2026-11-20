@@ -14,6 +14,8 @@
   o envio substituído vira `WILL_NOT_GRADE` junto com o cancelamento do job.
   Os envios que já estão nesse estado se resolvem com
   `manage settle-cancelled-sends --course <curso>`.
+- A correção das objetivas de uma prova com cerca de mil respostas ou mais
+  falhava com P2029 (limite de parâmetros do SQLite).
 
 ## 0.7.0 (2026-11-20)
 
