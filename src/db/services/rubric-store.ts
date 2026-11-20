@@ -244,25 +244,14 @@ export async function rubricStanding(
 	examId: number,
 	questionRefId: number,
 ): Promise<RubricStanding> {
+	// Scalars only: a question may hold thousands of autosaves, and a nested
+	// relation load would bind all their ids in a single `in` list.
 	const submissions = await tx.submission.findMany({
 		where: {
 			questionId: questionRefId,
 			response: { ...realAttempt, examId },
 		},
-		select: {
-			id: true,
-			createdAt: true,
-			responseId: true,
-			feedbacks: {
-				orderBy: [{ createdAt: "asc" }, { id: "asc" }],
-				select: {
-					updatedAt: true,
-					rubricItems: {
-						select: { itemId: true, item: { select: { retiredAt: true } } },
-					},
-				},
-			},
-		},
+		select: { id: true, createdAt: true, responseId: true },
 	});
 
 	const counting = new Map<number, (typeof submissions)[number]>();
@@ -273,10 +262,31 @@ export async function rubricStanding(
 		}
 	}
 
+	// No `orderBy`: with one, Prisma cannot split a long `in` list into
+	// batches. The passes are put in creation order below.
+	const passes = await tx.feedback.findMany({
+		where: { submissionId: { in: [...counting.values()].map((s) => s.id) } },
+		select: {
+			id: true,
+			submissionId: true,
+			createdAt: true,
+			updatedAt: true,
+			rubricItems: {
+				select: { itemId: true, item: { select: { retiredAt: true } } },
+			},
+		},
+	});
+	passes.sort(
+		(a, b) => a.createdAt.getTime() - b.createdAt.getTime() || a.id - b.id,
+	);
+	const passesBySubmission = Map.groupBy(passes, (pass) => pass.submissionId);
+
 	const uses = new Map<number, number>();
 	let review = 0;
 	for (const submission of counting.values()) {
-		const verdict = newestPassesFirst(submission.feedbacks)[0];
+		const verdict = newestPassesFirst(
+			passesBySubmission.get(submission.id) ?? [],
+		)[0];
 		if (!verdict) continue;
 		for (const link of verdict.rubricItems) {
 			uses.set(link.itemId, (uses.get(link.itemId) ?? 0) + 1);

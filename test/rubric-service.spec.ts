@@ -745,6 +745,34 @@ test("review counts one per counting answer", async () => {
 	expect((await db.rubric.findOne(s.main.pk, opts(s))).review).toBe(2);
 });
 
+test("findOne and updateItem count uses on a question with thousands of autosaves", async () => {
+	const { s, rubric } = await reviewFixture();
+	const answer = await s.addAnswer();
+	await s.seedPass(answer, rubric, { ref: "p", keys: ["old"], score: "0.5" });
+	const { responseId, questionId } = answer.submission;
+	const older = answer.submission.createdAt.getTime() - 60_000;
+	await prisma.submission.createMany({
+		data: Array.from({ length: 6000 }, (_, i) => ({
+			publicId: `autosave-${responseId}-${i}`,
+			responseId,
+			questionId,
+			payload: {},
+			createdAt: new Date(older - i),
+		})),
+	});
+	await s.close();
+
+	const found = await db.rubric.findOne(s.main.pk, opts(s));
+	expect(found.review).toBe(1);
+	expect(found.items.find((i) => i.key === "old")?.uses).toBe(1);
+	const updated = await db.rubric.updateItem(
+		itemPK(s.main.pk, "fresh"),
+		{ text: "Fresher" },
+		opts(s),
+	);
+	expect(updated.uses).toBe(0);
+});
+
 //
 // R17: renameGroup
 //

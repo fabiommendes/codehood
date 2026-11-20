@@ -2,6 +2,13 @@
 
 ## Unreleased
 
+### Fixed
+
+- A rubrica de uma questão com milhares de autosaves respondia 500 (Prisma
+  P2029, limite de parâmetros do SQLite) na leitura e na edição de itens, e
+  com ela a tela de correção. A contagem de usos dos itens agora lê só a
+  submissão que conta de cada tentativa antes de carregar os passes.
+
 ## 0.7.0 (2026-11-20)
 
 ### Added
