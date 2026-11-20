@@ -10,7 +10,7 @@ import ReportDialog from "@/components/report/ReportDialog";
 import ThemeToggle from "@/components/ThemeToggle.astro";
 import { db } from "@/db";
 import { m } from "@/i18n";
-import { courseHref, parseCourseSegment } from "@/urls";
+import { courseHref, parseCourseSegment, urls } from "@/urls";
 import {
 	breadcrumbs,
 	COURSE_TAB_LABELS,
@@ -185,7 +185,7 @@ const card =
             user ? (
               <UserMenu user={user} />
             ) : (
-              <a href="/login" class="btn btn-primary btn-sm rounded-full">
+              <a href={urls.login()} class="btn btn-primary btn-sm rounded-full">
                 {m.nav_log_in()}
               </a>
             )

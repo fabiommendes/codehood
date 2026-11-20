@@ -7,6 +7,7 @@ import type { UserActor } from "@/auth/actor";
 import Avatar from "@/components/Avatar.astro";
 import ThemeToggle from "@/components/ThemeToggle.astro";
 import { m } from "@/i18n";
+import { urls } from "@/urls";
 import { roleLabels } from "@/utils/roles";
 
 interface Props {
@@ -38,12 +39,12 @@ const { user, open = false } = Astro.props;
       </span>
     </li>
     <li>
-      <a href="/profile" class="cut">{m.nav_profile()}</a>
+      <a href={urls.profile()} class="cut">{m.nav_profile()}</a>
     </li>
     {
       user.role !== "STUDENT" && (
         <li>
-          <a href="/getting-started" class="cut">{m.nav_set_up_cli()}</a>
+          <a href={urls.gettingStarted()} class="cut">{m.nav_set_up_cli()}</a>
         </li>
       )
     }
@@ -54,7 +55,7 @@ const { user, open = false } = Astro.props;
       <ThemeToggle variant="menu" class="cut" />
     </li>
     <li>
-      <form method="POST" action={`/login${actions.auth.logout}`} data-clear-drafts={m.exams_code_logout_discards_draft()} class="cut p-0">
+      <form method="POST" action={`${urls.login()}${actions.auth.logout}`} data-clear-drafts={m.exams_code_logout_discards_draft()} class="cut p-0">
         <button type="submit" class="w-full px-3 py-1.5 text-left">{m.nav_log_out()}</button>
       </form>
     </li>

@@ -15,6 +15,7 @@ import { errorMessage } from "@/forms/field-errors";
 import { actionForm } from "@/forms/form-state";
 import { locale, m } from "@/i18n";
 import AppLayout from "@/layouts/AppLayout.astro";
+import { urls } from "@/urls";
 import { toReportRow } from "@/utils/report-row";
 import { roleLabels } from "@/utils/roles";
 
@@ -22,17 +23,17 @@ const logoutEverywhereResult = Astro.getActionResult(
 	actions.profile.logoutEverywhere,
 );
 if (logoutEverywhereResult && !logoutEverywhereResult.error) {
-	return Astro.redirect("/login");
+	return Astro.redirect(urls.login());
 }
 
 if (!Astro.locals.actor) {
-	return Astro.redirect("/login");
+	return Astro.redirect(urls.login());
 }
 
 const actor = Astro.locals.actor;
 const user = await db.user.findOne({ username: actor.username }, { actor });
 if (!user) {
-	return Astro.redirect("/login");
+	return Astro.redirect(urls.login());
 }
 
 const apiKeys = await db.apiKey.findMany(
@@ -54,7 +55,7 @@ const removeFeedResult = Astro.getActionResult(
 	actions.profile.removeCalendarFeed,
 );
 const feedUrl = calendarFeed
-	? `${Astro.url.origin}/calendar/${calendarFeed.token}.ics`
+	? `${Astro.url.origin}${urls.calendarFeed({ token: calendarFeed.token })}`
 	: null;
 
 const updateResult = Astro.getActionResult(actions.profile.update);
@@ -255,7 +256,7 @@ const profileTabs = [
                 {m.profile_api_keys_note()}
               </p>
               <a
-                href="/getting-started"
+                href={urls.gettingStarted()}
                 class="text-sm text-primary hover:underline"
                 >{m.profile_api_keys_guide()}</a
               >

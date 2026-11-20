@@ -230,6 +230,7 @@ const tabs = [
 </dialog>
 
 <script>
+  import { urls } from "@/urls";
   import { actions } from "astro:actions";
   import { errorMessage } from "@/forms/field-errors";
   import { locale, m } from "@/i18n";
@@ -244,7 +245,7 @@ const tabs = [
   }
 
   function inviteUrl(token: string): string {
-    return new URL(`/invite/${token}`, window.location.origin).toString();
+    return new URL(urls.invite({ token }), window.location.origin).toString();
   }
 
   // Copy buttons hold the id of the input they copy; the icon turns into a

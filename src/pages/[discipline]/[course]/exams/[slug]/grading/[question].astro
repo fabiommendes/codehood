@@ -24,6 +24,7 @@ import { answersTo, gradingOrder } from "@/services/grading";
 import { objectiveReview, restMeans } from "@/services/objective-review";
 import { questionStats } from "@/services/question-stats";
 import { pendingBlanks, reviewResult } from "@/services/review";
+import { urls } from "@/urls";
 import { adjustmentLabel } from "@/utils/adjustment-label";
 import { breadcrumbs } from "@/utils/breadcrumbs";
 import { graderState } from "@/utils/grader-state";
@@ -60,7 +61,7 @@ const {
 } = result;
 
 const position = questions.indexOf(questionSlug ?? "");
-if (!questionSlug || position < 0) return Astro.rewrite("/404");
+if (!questionSlug || position < 0) return Astro.rewrite(urls.notFound());
 
 // biome-ignore lint/style/noNonNullAssertion: loadGrading already redirected an anonymous visitor.
 const actor = Astro.locals.actor!;
@@ -74,7 +75,7 @@ const stored = await db.question.findOne(
 	},
 	{ actor },
 );
-if (!stored) return Astro.rewrite("/404");
+if (!stored) return Astro.rewrite(urls.notFound());
 
 const versionMissing =
 	pinnedVersion !== null && stored.version !== pinnedVersion;

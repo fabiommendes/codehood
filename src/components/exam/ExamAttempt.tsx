@@ -29,7 +29,11 @@ import {
 } from "@/services/exam-result";
 import type { AttemptState } from "@/services/exam-state";
 import type { ReviewResult } from "@/services/review";
-import { examQuestionAttachmentUrl, examSubmissionFileUrl } from "@/urls";
+import {
+	examQuestionAttachmentUrl,
+	examSubmissionFileUrl,
+	urls,
+} from "@/urls";
 import { adjustmentLabel } from "@/utils/adjustment-label";
 import type { CodeBlocksHtml } from "@/utils/code-blocks";
 import type { PretestSource } from "@/utils/pretest-sources";
@@ -1730,7 +1734,7 @@ function AttemptBar(props: AttemptBarProps): JSX.Element {
 
 /// The notice that the session ended, with a link to log in again in a new tab and come back to this exam.
 function SessionLostNotice(props: { next: string }): JSX.Element {
-	const href = () => `/login?next=${encodeURIComponent(props.next)}`;
+	const href = () => urls.login({ next: props.next });
 	return (
 		<div role="alert" class="alert alert-error mt-2 text-sm">
 			<span>{m.exams_attempt_session_lost()}</span>

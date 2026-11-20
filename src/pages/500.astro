@@ -4,6 +4,7 @@
 // It's also just a normal route, reachable directly at /500 for previewing.
 import { m } from "@/i18n";
 import ErrorLayout from "@/layouts/ErrorLayout.astro";
+import { urls } from "@/urls";
 
 const error = Astro.props.error as Error | undefined;
 const user = Astro.locals?.actor;
@@ -16,7 +17,7 @@ const user = Astro.locals?.actor;
       <button type="button" class="btn btn-primary rounded-full" onclick="location.reload()">
         {m.nav_try_again()}
       </button>
-      <a href="/courses" class="btn btn-ghost">{m.nav_back_to_my_courses()}</a>
+      <a href={urls.courses.index()} class="btn btn-ghost">{m.nav_back_to_my_courses()}</a>
       {
         user && (
           <button

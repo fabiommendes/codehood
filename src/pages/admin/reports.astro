@@ -8,6 +8,7 @@ import { CursorPagination } from "@/components/ui/Pagination";
 import { db } from "@/db";
 import { m } from "@/i18n";
 import AppLayout from "@/layouts/AppLayout.astro";
+import { urls } from "@/urls";
 import { listUrl, readPage } from "@/utils/list-page";
 import { pageLinks } from "@/utils/page-links";
 import { parseReportFilters } from "@/utils/report-filters";
@@ -15,7 +16,7 @@ import { toReportRow } from "@/utils/report-row";
 
 // adminMiddleware already turns away anyone who is not an admin; the check is
 // here to narrow `Astro.locals.actor`.
-if (!Astro.locals.actor) return Astro.redirect("/login");
+if (!Astro.locals.actor) return Astro.redirect(urls.login());
 const actor = Astro.locals.actor;
 
 const filters = parseReportFilters(Astro.url.searchParams);

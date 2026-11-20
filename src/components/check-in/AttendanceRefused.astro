@@ -1,5 +1,6 @@
 ---
 import { m } from "@/i18n";
+import { urls } from "@/urls";
 
 interface Props {
 	/// Why the check-in was refused.
@@ -21,8 +22,8 @@ const { message, next } = Astro.props;
     <p class="text-lg font-semibold text-balance">{message}</p>
   </div>
   <div class="flex w-full flex-col gap-2">
-    {next === "retype" && <a href="/check-in" class="btn btn-primary btn-block rounded-full">{m.auth_check_in_type_code()}</a>}
-    {next === "courses" && <a href="/courses" class="btn btn-primary btn-block rounded-full">{m.attendance_refused_my_courses()}</a>}
+    {next === "retype" && <a href={urls.checkIn()} class="btn btn-primary btn-block rounded-full">{m.auth_check_in_type_code()}</a>}
+    {next === "courses" && <a href={urls.courses.index()} class="btn btn-primary btn-block rounded-full">{m.attendance_refused_my_courses()}</a>}
     {next === "start" && <a href="/" class="btn btn-block rounded-full">{m.auth_check_in_back()}</a>}
   </div>
 </section>

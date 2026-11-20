@@ -1,4 +1,5 @@
 import { renderSVG } from "uqr";
+import { urls } from "@/urls";
 
 /**
  * Renders the QR code of the check-in link for `code` as an SVG string.
@@ -10,5 +11,8 @@ export function checkInQrSvg(
 	rollCallId: number,
 	code: string,
 ): string {
-	return renderSVG(`${origin}/c/${rollCallId}/${code}`, { ecc: "M" });
+	return renderSVG(
+		`${origin}${urls.rollCallCheckIn({ rollCallId: String(rollCallId), code })}`,
+		{ ecc: "M" },
+	);
 }

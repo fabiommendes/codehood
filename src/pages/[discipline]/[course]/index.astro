@@ -22,6 +22,7 @@ import {
 	viewerTiming,
 } from "@/services/exam-state";
 import { formatGradeValue } from "@/services/grades-table";
+import { urls } from "@/urls";
 import { breadcrumbs } from "@/utils/breadcrumbs";
 import { eventKindLabel } from "@/utils/calendar-event-display";
 import { formatAttendancePercent } from "@/utils/course-grades";
@@ -292,7 +293,7 @@ const sectionLinks = studentView
   {
     isEnrolled && !canWrite && openRollCall && (
       <div class="mt-6">
-        <a href="/check-in" class="btn btn-primary btn-sm">{m.courses_home_check_in()}</a>
+        <a href={urls.checkIn()} class="btn btn-primary btn-sm">{m.courses_home_check_in()}</a>
       </div>
     )
   }
@@ -524,6 +525,7 @@ const sectionLinks = studentView
 }
 
 <script>
+  import { urls } from "@/urls";
   import { actions } from "astro:actions";
 
   const form = document.getElementById(
@@ -538,6 +540,6 @@ const sectionLinks = studentView
       errorBox?.removeAttribute("hidden");
       return;
     }
-    window.location.href = "/courses?left=1";
+    window.location.href = urls.courses.index({ left: true });
   });
 </script>

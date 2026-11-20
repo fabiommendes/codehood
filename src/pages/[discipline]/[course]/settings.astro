@@ -6,6 +6,7 @@ import CourseHeader from "@/components/CourseHeader.astro";
 import { PUBLIC_URL } from "@/core/constants";
 import { m } from "@/i18n";
 import AppLayout from "@/layouts/AppLayout.astro";
+import { urls } from "@/urls";
 import { breadcrumbs } from "@/utils/breadcrumbs";
 import { homeNav } from "@/utils/course-tabs-nav";
 import { loadCourse } from "@/utils/load-course";
@@ -96,7 +97,7 @@ const courseFields = [
     <h2 id="settings-cli" class="page-subheader">{m.courses_settings_cli_heading()}</h2>
     <p class="mt-1 text-sm text-muted">
       {m.courses_settings_cli_intro()}{" "}
-      <a href="/getting-started" class="link link-primary">{m.common_set_up_cli()}</a>
+      <a href={urls.gettingStarted()} class="link link-primary">{m.common_set_up_cli()}</a>
     </p>
     <div class="mt-4 flex flex-col gap-2">
       {cliCommands.map((command) => (

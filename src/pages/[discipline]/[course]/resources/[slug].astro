@@ -8,6 +8,7 @@ import { m } from "@/i18n";
 import AppLayout from "@/layouts/AppLayout.astro";
 import { runnerLanguage } from "@/runner/languages";
 import { splitByEvent } from "@/services/event-resources";
+import { urls } from "@/urls";
 import { breadcrumbs } from "@/utils/breadcrumbs";
 import { resourcesNav } from "@/utils/course-tabs-nav";
 import { highlightCode } from "@/utils/highlight-code";
@@ -30,7 +31,7 @@ const { course, href, tabs } = result;
 const actor = Astro.locals.actor!;
 
 if (!slug) {
-	return Astro.rewrite("/404");
+	return Astro.rewrite(urls.notFound());
 }
 
 const resource = await db.resource.findOne(
@@ -38,7 +39,7 @@ const resource = await db.resource.findOne(
 	{ actor },
 );
 if (!resource) {
-	return Astro.rewrite("/404");
+	return Astro.rewrite(urls.notFound());
 }
 // LINK and FILE resources have no page of their own: the address sends the
 // reader to the link or the download, so a lesson can link it by a stable URL.

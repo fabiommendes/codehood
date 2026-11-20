@@ -11,7 +11,7 @@ import { db } from "@/db";
 import { actionForm } from "@/forms/form-state";
 import { escapeHtml, m } from "@/i18n";
 import CenteredLayout from "@/layouts/CenteredLayout.astro";
-import { courseHref } from "@/urls";
+import { courseHref, urls } from "@/urls";
 
 const { token } = Astro.params;
 const viewer = Astro.locals.actor;
@@ -73,7 +73,7 @@ const invitedHtml = invite
 			role: roleHtml[invite.invitedRole],
 		})
 	: "";
-const logInHref = `/login?next=${encodeURIComponent(`/invite/${token}`)}`;
+const logInHref = urls.login({ next: urls.invite({ token: token ?? "" }) });
 const logInLink = `<a class="link link-primary" href="${escapeHtml(logInHref)}">${escapeHtml(m.auth_invite_log_in_to_join())}</a>`;
 
 // GitHub and school id are optional for roles other than student.

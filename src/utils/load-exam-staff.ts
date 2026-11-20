@@ -17,6 +17,7 @@ import {
 	type GradedStudent,
 } from "@/services/grading";
 import { type QuestionStats, questionStats } from "@/services/question-stats";
+import { urls } from "@/urls";
 import type { CourseTab } from "./course-tabs";
 import { loadCourse } from "./load-course";
 import { loadCourseExceptions } from "./load-exam-exceptions";
@@ -194,7 +195,7 @@ export async function loadExamStaff(
 		? await db.exam.findOne({ course: course.id, slug }, { actor })
 		: null;
 	if (!exam || (exam.type === "PRACTICE" && !options.practice)) {
-		return { redirect: await Astro.rewrite("/404") };
+		return { redirect: await Astro.rewrite(urls.notFound()) };
 	}
 	const exceptions =
 		(await loadCourseExceptions(course.id)).get(exam.slug) ?? new Map();

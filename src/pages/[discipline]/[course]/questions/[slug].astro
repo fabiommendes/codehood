@@ -9,7 +9,7 @@ import { db } from "@/db";
 import { locale, m } from "@/i18n";
 import AppLayout from "@/layouts/AppLayout.astro";
 import { publicForm, questionProblems } from "@/mdq";
-import { questionAttachmentUrl } from "@/urls";
+import { questionAttachmentUrl, urls } from "@/urls";
 import { breadcrumbs } from "@/utils/breadcrumbs";
 import { highlightCode } from "@/utils/highlight-code";
 import { highlightQuestionCodeBlocks } from "@/utils/highlight-code-blocks";
@@ -33,12 +33,12 @@ const { course, href, tabs } = result;
 // biome-ignore lint/style/noNonNullAssertion: every course page runs through loadCourse, which already required Astro.locals.user.
 const actor = Astro.locals.actor!;
 
-if (!slug) return Astro.rewrite("/404");
+if (!slug) return Astro.rewrite(urls.notFound());
 const question = await db.question.findOne(
 	{ course: course.id, slug, public: false },
 	{ actor },
 );
-if (!question) return Astro.rewrite("/404");
+if (!question) return Astro.rewrite(urls.notFound());
 const { question: doc } = question;
 
 const { publicId } = question;

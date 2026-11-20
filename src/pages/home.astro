@@ -6,6 +6,7 @@ import OpenRollCallDialog from "@/components/roll-call/OpenRollCallDialog";
 import { m } from "@/i18n";
 import AppLayout from "@/layouts/AppLayout.astro";
 import { formatScore } from "@/services/exam-result";
+import { urls } from "@/urls";
 import { loadInstructorHome } from "@/utils/load-instructor-home";
 import { loadStudentHome } from "@/utils/load-student-home";
 import { formatRelative, formatTimeLeft } from "@/utils/relative-time";
@@ -14,7 +15,7 @@ import { formatDateTime } from "@/utils/schedule-time";
 export const prerender = false;
 
 const actor = Astro.locals.actor;
-if (!actor) return Astro.redirect("/login");
+if (!actor) return Astro.redirect(urls.login());
 
 const now = new Date();
 const [home, teaching] = await Promise.all([

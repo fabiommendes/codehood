@@ -3,6 +3,7 @@ import type { AttendanceView } from "@/actions/check-in";
 import PartyLights from "@/components/brand/PartyLights.astro";
 import { roof, wall } from "@/components/brand/paper";
 import { m } from "@/i18n";
+import { urls } from "@/urls";
 import { formatDateTime } from "@/utils/schedule-time";
 
 interface Props {
@@ -115,7 +116,7 @@ const CONFETTI: [
     <a href={view.courseHref} class="btn btn-primary btn-block rounded-full">
       {m.attendance_result_go_to_course({ course: view.course })}
     </a>
-    {another && <a href="/check-in" class="btn btn-ghost btn-block rounded-full">{m.attendance_result_type_another()}</a>}
+    {another && <a href={urls.checkIn()} class="btn btn-ghost btn-block rounded-full">{m.attendance_result_type_another()}</a>}
   </div>
 </section>
 

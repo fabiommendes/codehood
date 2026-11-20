@@ -7,13 +7,13 @@ import { passphraseRedeem } from "@/core/schemas/passphrase";
 import { actionForm } from "@/forms/form-state";
 import { m } from "@/i18n";
 import AppLayout from "@/layouts/AppLayout.astro";
-import { courseHref } from "@/urls";
+import { courseHref, urls } from "@/urls";
 
 export const prerender = false;
 
 if (!Astro.locals.actor) {
 	const next = Astro.url.pathname + Astro.url.search;
-	return Astro.redirect(`/login?next=${encodeURIComponent(next)}`);
+	return Astro.redirect(urls.login({ next }));
 }
 
 const result = Astro.getActionResult(actions.course.joinCourse);

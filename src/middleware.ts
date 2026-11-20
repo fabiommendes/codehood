@@ -106,9 +106,9 @@ export const adminMiddleware = defineMiddleware((context, next) => {
 	const root = urls.admin.index();
 	if (pathname !== root && !pathname.startsWith(`${root}/`)) return next();
 
-	if (!context.locals.actor) return context.redirect("/login");
+	if (!context.locals.actor) return context.redirect(urls.login());
 	if (!hasPerm(context.locals.actor, "system.manage"))
-		return context.redirect("/403");
+		return context.redirect(urls.forbidden());
 
 	return next();
 });

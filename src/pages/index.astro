@@ -11,11 +11,12 @@ import AppFooter from "@/components/nav/AppFooter.astro";
 import ThemeToggle from "@/components/ThemeToggle.astro";
 import { m } from "@/i18n";
 import Layout from "@/layouts/Layout.astro";
+import { urls } from "@/urls";
 
 export const prerender = false;
 
 if (Astro.locals.actor) {
-	return Astro.rewrite("/home");
+	return Astro.rewrite(urls.home());
 }
 
 /// Each step is marked with a piece of the logo: the C, an o, the house.
@@ -72,7 +73,7 @@ const features: { scene: SceneName; title: string; body: string }[] = [
         <a href="#top" aria-label={m.auth_home_logo_label()}><Logo height={40} /></a>
         <div class="flex items-center gap-2">
           <ThemeToggle />
-          <a class="btn btn-primary" href="/login">{m.auth_login_action()}</a>
+          <a class="btn btn-primary" href={urls.login()}>{m.auth_login_action()}</a>
         </div>
       </div>
     </header>
@@ -86,7 +87,7 @@ const features: { scene: SceneName; title: string; body: string }[] = [
             {m.auth_home_lead()}
           </p>
           <div class="mt-8 flex flex-wrap items-center gap-4">
-            <a class="btn btn-primary btn-lg" href="/login">{m.auth_login_action()}</a>
+            <a class="btn btn-primary btn-lg" href={urls.login()}>{m.auth_login_action()}</a>
             <a class="link link-hover font-bold" href="#how-it-works">{m.auth_home_see_how()}</a>
             <a class="link link-hover font-bold" href="#join">{m.auth_home_have_code()}</a>
           </div>
@@ -217,7 +218,7 @@ const features: { scene: SceneName; title: string; body: string }[] = [
                   {m.auth_home_join_body()}
                 </p>
               </div>
-              <form method="GET" action="/courses/join" class="flex w-full max-w-md flex-wrap items-end gap-3">
+              <form method="GET" action={urls.courses.join()} class="flex w-full max-w-md flex-wrap items-end gap-3">
                 <fieldset class="fieldset flex-1">
                   <label class="fieldset-legend" for="join-code">{m.auth_home_join_code_label()}</label>
                   <input
@@ -232,7 +233,7 @@ const features: { scene: SceneName; title: string; body: string }[] = [
                   />
                 </fieldset>
                 <button type="submit" class="btn btn-primary">{m.auth_join_submit()}</button>
-                <a class="btn btn-ghost" href="/login">{m.auth_login_action()}</a>
+                <a class="btn btn-ghost" href={urls.login()}>{m.auth_login_action()}</a>
               </form>
             </div>
           </div>

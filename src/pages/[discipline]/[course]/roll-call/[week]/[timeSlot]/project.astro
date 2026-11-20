@@ -6,6 +6,7 @@ import { db } from "@/db";
 import { m } from "@/i18n";
 import Layout from "@/layouts/Layout.astro";
 import { checkInQrSvg } from "@/services/roll-call-qr";
+import { urls } from "@/urls";
 import { loadCourse } from "@/utils/load-course";
 
 export const prerender = false;
@@ -26,12 +27,12 @@ if (
 	!timeSlot ||
 	!slug.safeParse(timeSlot).success
 ) {
-	return Astro.rewrite("/404");
+	return Astro.rewrite(urls.notFound());
 }
 const pk = { course: course.id, week: weekNumber, timeSlot };
 const rollCall = await db.rollCall.findOne(pk, { actor });
 const event = await db.calendarEvent.findOne(pk, { actor });
-if (!rollCall || !event) return Astro.rewrite("/404");
+if (!rollCall || !event) return Astro.rewrite(urls.notFound());
 
 const { code, changedAt, nextChangeAt } = await db.rollCall.currentCode(pk, {
 	actor,

@@ -3,14 +3,14 @@ import { Readable } from "node:stream";
 import type { APIRoute } from "astro";
 import { NotAllowed } from "@/core/error";
 import { db } from "@/db";
-import { parseCourseSegment } from "@/urls";
+import { parseCourseSegment, urls } from "@/urls";
 
 export const prerender = false;
 
 /// Streams the zip of a repository's head to a signed-in reader of the course.
 export const GET: APIRoute = async ({ locals, params, redirect }) => {
 	const actor = locals.actor;
-	if (!actor) return redirect("/login");
+	if (!actor) return redirect(urls.login());
 
 	const parsed = params.course ? parseCourseSegment(params.course) : null;
 	if (!parsed || !params.discipline || !params.slug) {

@@ -22,6 +22,7 @@ import {
 	countingAnswers,
 	type GradedStudent,
 } from "@/services/grading";
+import { urls } from "@/urls";
 import type { CourseNav } from "./course-nav";
 import type { CourseTab } from "./course-tabs";
 import { examNav } from "./exam-nav";
@@ -74,7 +75,7 @@ export async function loadGrading(
 	const actor = Astro.locals.actor!;
 
 	const loaded = await loadExamGrading(course.id, examSlug, actor, options);
-	if (!loaded) return { redirect: await Astro.rewrite("/404") };
+	if (!loaded) return { redirect: await Astro.rewrite(urls.notFound()) };
 
 	return { course, href, tabs, ...loaded };
 }

@@ -46,7 +46,7 @@ import {
 	questionMark,
 } from "@/services/grading";
 import { reviewResult } from "@/services/review";
-import { questionAttachmentUrl } from "@/urls";
+import { questionAttachmentUrl, urls } from "@/urls";
 import { adjustmentEffect, adjustmentLabel } from "@/utils/adjustment-label";
 import { breadcrumbs } from "@/utils/breadcrumbs";
 import { gradingHref } from "@/utils/grading-urls";
@@ -91,7 +91,8 @@ const [students, stored, adjustments] = await Promise.all([
 // An enrolled student without an attempt has a page too, with every question unanswered.
 const attempt = attempts.find((entry) => entry.author === username);
 const student = students.find((entry) => entry.username === username);
-if (!attempt && (!student || student.dropped)) return Astro.rewrite("/404");
+if (!attempt && (!student || student.dropped))
+	return Astro.rewrite(urls.notFound());
 const author = attempt?.author ?? student?.username ?? "";
 
 const adjustmentsOf = adjustmentsByResponse(adjustments);

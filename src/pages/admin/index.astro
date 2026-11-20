@@ -19,7 +19,7 @@ import { urls } from "@/urls";
 // adminMiddleware (src/middleware/admin.ts) already redirects anonymous/
 // non-admin visitors before this runs; the check below is here only so
 // TypeScript narrows `Astro.locals.user` for the calls that need an `Actor`.
-if (!Astro.locals.actor) return Astro.redirect("/login");
+if (!Astro.locals.actor) return Astro.redirect(urls.login());
 const actor = Astro.locals.actor;
 
 const revokeResult = Astro.getActionResult(actions.admin.revokeInvite);
@@ -28,7 +28,10 @@ const editionResult = Astro.getActionResult(actions.admin.createEdition);
 
 const inviteResult = Astro.getActionResult(actions.auth.createPersonalInvite);
 const inviteUrl = inviteResult?.data
-	? new URL(`/invite/${inviteResult.data.token}`, Astro.url).toString()
+	? new URL(
+			urls.invite({ token: inviteResult.data.token }),
+			Astro.url,
+		).toString()
 	: null;
 
 const inviteForm = await actionForm(

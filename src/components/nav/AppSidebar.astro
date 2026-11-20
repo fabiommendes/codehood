@@ -28,17 +28,17 @@ const { courses, currentPath, admin = false, card = false } = Astro.props;
 const nav = [
 	{
 		label: m.nav_home(),
-		href: "/",
+		href: urls.root(),
 		icon: "M4 11.5 12 4l8 7.5M6 10v9a1 1 0 0 0 1 1h10a1 1 0 0 0 1-1v-9",
 	},
 	{
 		label: m.nav_my_courses(),
-		href: "/courses",
+		href: urls.courses.index(),
 		icon: "M4 5.5A2.5 2.5 0 0 1 6.5 3H19a1 1 0 0 1 1 1v14a1 1 0 0 1-1 1H6.5A2.5 2.5 0 0 0 4 21.5v-16ZM4 17.5A2.5 2.5 0 0 1 6.5 15H20",
 	},
 	{
 		label: m.nav_calendar(),
-		href: "/calendar",
+		href: urls.calendar(),
 		icon: "M7 3.5v3M17 3.5v3M4 9h16M5.5 6h13A1.5 1.5 0 0 1 20 7.5v12A1.5 1.5 0 0 1 18.5 21h-13A1.5 1.5 0 0 1 4 19.5v-12A1.5 1.5 0 0 1 5.5 6Z",
 	},
 	...(admin
@@ -59,7 +59,8 @@ const after = cardAt < 0 ? [] : courses.slice(cardAt + 1);
 
 function isActive(href: string): boolean {
 	// `/` renders the home page by rewrite, so the request path reads `/home`.
-	if (href === "/") return currentPath === "/" || currentPath === "/home";
+	if (href === urls.root())
+		return currentPath === urls.root() || currentPath === urls.home();
 	return currentPath === href || currentPath.startsWith(`${href}/`);
 }
 
@@ -68,8 +69,8 @@ function isActive(href: string): boolean {
 function sketch(): { art: SketchArt; seed?: string } {
 	const course = courses.find((c) => isActive(c.href));
 	if (course) return { art: "athos", seed: course.href };
-	if (isActive("/courses")) return { art: "loose" };
-	if (isActive("/calendar")) return { art: "construction" };
+	if (isActive(urls.courses.index())) return { art: "loose" };
+	if (isActive(urls.calendar())) return { art: "construction" };
 	if (isActive(urls.admin.index())) return { art: "protractor" };
 	const [discipline, edition] = currentPath.split("/").filter(Boolean);
 	if (edition?.includes("_"))

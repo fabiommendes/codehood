@@ -28,7 +28,7 @@ import {
 	windowEnd,
 } from "@/services/exam-state";
 import type { QuestionStats } from "@/services/question-stats";
-import { examAttachmentUrl } from "@/urls";
+import { examAttachmentUrl, urls } from "@/urls";
 import { breadcrumbs } from "@/utils/breadcrumbs";
 import {
 	examBadge,
@@ -61,9 +61,9 @@ const { course, href, tabs } = result;
 const actor = Astro.locals.actor!;
 const canManage = hasPerm(actor, "enrollment.manage", course);
 
-if (!slug) return Astro.rewrite("/404");
+if (!slug) return Astro.rewrite(urls.notFound());
 const exam = await db.exam.findOne({ course: course.id, slug }, { actor });
-if (!exam) return Astro.rewrite("/404");
+if (!exam) return Astro.rewrite(urls.notFound());
 
 const now = new Date();
 // The exceptions never reach the client: they only shift the student's own

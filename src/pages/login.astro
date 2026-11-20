@@ -8,6 +8,7 @@ import { sessionLogin } from "@/core/schemas/session";
 import { actionForm } from "@/forms/form-state";
 import { m } from "@/i18n";
 import CenteredLayout from "@/layouts/CenteredLayout.astro";
+import { urls } from "@/urls";
 
 /// Where to go after logging in. Only paths on this site are accepted, so the
 /// parameter cannot send someone to another origin.
@@ -18,7 +19,7 @@ const localPath = (value: unknown) =>
 // lives in one page instead of in every page that has the menu.
 const loggedOut = Astro.getActionResult(actions.auth.logout);
 if (loggedOut && !loggedOut.error) {
-	return Astro.redirect("/login");
+	return Astro.redirect(urls.login());
 }
 
 // The action posts back to `?_action=...`, which drops the query string, so the

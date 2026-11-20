@@ -63,8 +63,8 @@ const SAMPLE_TRAILS: Crumb[][] = [
 	],
 ];
 const SIDEBAR_PAGES = [
-	["Home", "/"],
-	["My courses", "/courses"],
+	["Home", urls.root()],
+	["My courses", urls.courses.index()],
 	["A course", "/cs201/alan_2026-1/exams"],
 	["Admin", urls.admin.index()],
 ] as const;

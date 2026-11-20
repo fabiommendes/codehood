@@ -1,6 +1,7 @@
 ---
 import { m } from "@/i18n";
 import ErrorLayout from "@/layouts/ErrorLayout.astro";
+import { urls } from "@/urls";
 
 export const prerender = false;
 
@@ -12,7 +13,7 @@ const signedIn = Boolean(Astro.locals.actor);
   {m.nav_404_text()}
   <div slot="actions">
     <a
-      href={signedIn ? "/courses" : "/"}
+      href={signedIn ? urls.courses.index() : urls.root()}
       class="btn btn-primary rounded-full"
     >
       {signedIn ? m.nav_back_to_my_courses() : m.nav_back_to_home()}

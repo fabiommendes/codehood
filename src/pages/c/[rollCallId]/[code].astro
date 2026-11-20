@@ -18,6 +18,7 @@ import SignUpForm from "@/components/check-in/SignUpForm.astro";
 import type { RollCallId } from "@/core/schemas/base";
 import { escapeHtml, m } from "@/i18n";
 import CenteredLayout from "@/layouts/CenteredLayout.astro";
+import { urls } from "@/urls";
 
 const { rollCallId: rawId = "", code = "" } = Astro.params;
 const rollCallId = /^[1-9]\d*$/.test(rawId)
@@ -54,9 +55,7 @@ if (rollCallId !== null) {
 					code,
 				}));
 			if (!claim.actsAsInvite) {
-				return Astro.redirect(
-					`/login?next=${encodeURIComponent(Astro.url.pathname)}`,
-				);
+				return Astro.redirect(urls.login({ next: Astro.url.pathname }));
 			}
 			wantsSignUp = true;
 		}
@@ -67,7 +66,7 @@ if (rollCallId !== null) {
 	}
 }
 
-const logInHref = `/login?next=${encodeURIComponent(Astro.url.pathname)}`;
+const logInHref = urls.login({ next: Astro.url.pathname });
 const logInLink = `<a class="link link-primary" href="${escapeHtml(logInHref)}">${escapeHtml(m.auth_check_in_log_in())}</a>`;
 ---
 

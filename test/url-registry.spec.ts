@@ -6,8 +6,27 @@ import { urlPatternsModule } from "@/urls/integration";
 import { discoverRoutes } from "./tour/routes";
 
 /// Path prefixes whose every page and endpoint is in the registry, and that
-/// no code outside `src/urls/` (and the generated types) writes as a string literal.
-const MIGRATED_PREFIXES = ["/admin"];
+/// no code outside {@link UNCHECKED_DIRS} writes as a literal.
+const MIGRATED_PREFIXES = [
+	"/admin",
+	"/login",
+	"/home",
+	"/profile",
+	"/getting-started",
+	"/calendar",
+	"/courses",
+	"/invite",
+	"/check-in",
+	"/c",
+	"/403",
+	"/404",
+	"/500",
+];
+
+/// Directories under `src/` the literal check skips: the registry itself, the
+/// generated types, and the runner, whose `/home` is a directory of the
+/// virtual file system a program runs in, not a page.
+const UNCHECKED_DIRS = ["urls", "generated", "runner"];
 
 function registeredRoutes(node: unknown, at: string[] = []): [string, Route][] {
 	if (typeof node === "function" && "pattern" in node) {
@@ -48,12 +67,12 @@ test("every page under a migrated prefix is in the registry", () => {
 
 test("no code outside src/urls writes a migrated path as a literal", () => {
 	const literal = new RegExp(
-		`["'\`](${MIGRATED_PREFIXES.join("|")})(?=["'\`/?#$])`,
+		`["'\`}](${MIGRATED_PREFIXES.join("|")})(?=["'\`/?#$])`,
 	);
 	const offenders = sourceFiles("src")
 		.filter(
 			(file) =>
-				!["urls", "generated"].some((dir) =>
+				!UNCHECKED_DIRS.some((dir) =>
 					file.startsWith(`src${path.sep}${dir}${path.sep}`),
 				),
 		)
@@ -68,9 +87,19 @@ test("no code outside src/urls writes a migrated path as a literal", () => {
 	expect(offenders).toEqual([]);
 });
 
-test("a static route builds its own pattern", () => {
-	expect(urls.admin.index()).toBe("/admin");
+test("a route fills its parameters from the pattern, encoded", () => {
 	expect(urls.admin.reports()).toBe("/admin/reports");
+	expect(urls.invite({ token: "a b/c" })).toBe("/invite/a%20b%2Fc");
+	expect(urls.calendarFeed({ token: "t0k" })).toBe("/calendar/t0k.ics");
+	expect(urls.rollCallCheckIn({ rollCallId: "7", code: "XY" })).toBe("/c/7/XY");
+});
+
+test("a route writes the query values that are set, true as 1", () => {
+	expect(urls.login({ next: "/check-in" })).toBe("/login?next=%2Fcheck-in");
+	expect(urls.login({ next: undefined })).toBe("/login");
+	expect(urls.courses.index({ left: true })).toBe("/courses?left=1");
+	expect(urls.courses.index({ left: false })).toBe("/courses");
+	expect(urls.calendar({ month: "2026-11" })).toBe("/calendar?month=2026-11");
 });
 
 test("the UrlPattern union keeps the project's routes, sorted and once each", () => {

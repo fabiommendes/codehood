@@ -2,6 +2,7 @@ import type { AstroGlobal } from "astro";
 import { hasPerm } from "@/auth/permissions";
 import { NotAllowed } from "@/core/error";
 import { type Course, db } from "@/db";
+import { urls } from "@/urls";
 import { courseHref, parseCourseSegment } from "../urls";
 import { type CourseTab, courseTabs } from "./course-tabs";
 
@@ -33,13 +34,13 @@ export async function loadCourse(
 	if (!actor) {
 		const next = `${Astro.url.pathname}${Astro.url.search}`;
 		return {
-			redirect: Astro.redirect(`/login?next=${encodeURIComponent(next)}`),
+			redirect: Astro.redirect(urls.login({ next })),
 		};
 	}
 
 	const parsed = courseSegment ? parseCourseSegment(courseSegment) : null;
 	if (!disciplineSlug || !courseSegment || !parsed) {
-		return { redirect: await Astro.rewrite("/404") };
+		return { redirect: await Astro.rewrite(urls.notFound()) };
 	}
 	const segment = courseSegment;
 
@@ -61,7 +62,7 @@ export async function loadCourse(
 	}
 
 	if (!course) {
-		return { redirect: await Astro.rewrite("/404") };
+		return { redirect: await Astro.rewrite(urls.notFound()) };
 	}
 	if (opts?.manage && !hasPerm(actor, "enrollment.manage", course)) {
 		return { redirect: await forbidden(Astro, segment) };
@@ -80,7 +81,7 @@ export async function loadCourse(
 }
 
 function forbidden(Astro: AstroGlobal, courseName: string): Promise<Response> {
-	const url = new URL("/403", Astro.url);
+	const url = new URL(urls.forbidden(), Astro.url);
 	url.searchParams.set("course", courseName);
 	return Astro.rewrite(url);
 }

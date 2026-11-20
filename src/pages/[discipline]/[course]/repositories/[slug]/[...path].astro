@@ -16,6 +16,7 @@ import {
 import { escapeHtml, m } from "@/i18n";
 import AppLayout from "@/layouts/AppLayout.astro";
 import { splitByEvent } from "@/services/event-resources";
+import { urls } from "@/urls";
 import { breadcrumbs } from "@/utils/breadcrumbs";
 import { resourcesNav } from "@/utils/course-tabs-nav";
 import { highlightCode } from "@/utils/highlight-code";
@@ -43,12 +44,12 @@ const { course, href, tabs } = result;
 const actor = Astro.locals.actor!;
 const canWrite = hasPerm(actor, "course.update-contents", course);
 
-if (!slug) return Astro.rewrite("/404");
+if (!slug) return Astro.rewrite(urls.notFound());
 const repository = await db.repository.findOne(
 	{ course: course.id, slug },
 	{ actor },
 );
-if (!repository) return Astro.rewrite("/404");
+if (!repository) return Astro.rewrite(urls.notFound());
 
 const repositories = await db.repository.findMany(
 	{ course: course.id },
@@ -75,8 +76,8 @@ if (repository.head) {
 		if (!(error instanceof InvalidData)) throw error;
 	}
 }
-if (path && !entries && !file) return Astro.rewrite("/404");
-if (path && !repository.head) return Astro.rewrite("/404");
+if (path && !entries && !file) return Astro.rewrite(urls.notFound());
+if (path && !repository.head) return Astro.rewrite(urls.notFound());
 
 /// The text of a stored file, read from the blob store.
 async function textOf(attachment: Attachment): Promise<string> {

@@ -14,13 +14,14 @@ import { errorMessage } from "@/forms/field-errors";
 import { actionForm, submittedValues } from "@/forms/form-state";
 import { m } from "@/i18n";
 import AppLayout from "@/layouts/AppLayout.astro";
+import { urls } from "@/urls";
 import { actionHref, listUrl, readPage } from "@/utils/list-page";
 import { pageLinks } from "@/utils/page-links";
 
 // adminMiddleware (src/middleware/admin.ts) already redirects anonymous/
 // non-admin visitors before this runs; the check below is here only so
 // TypeScript narrows `Astro.locals.user` for the calls that need an `Actor`.
-if (!Astro.locals.actor) return Astro.redirect("/login");
+if (!Astro.locals.actor) return Astro.redirect(urls.login());
 const actor = Astro.locals.actor;
 const here = listUrl(Astro.url);
 

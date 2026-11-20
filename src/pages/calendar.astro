@@ -16,7 +16,7 @@ import {
 	type CalendarEntry,
 	calendarEntries,
 } from "@/services/calendar-entries";
-import { courseHref } from "@/urls";
+import { courseHref, urls } from "@/urls";
 import { examTypeLabels, formatDuration } from "@/utils/exam-display";
 import { loadCourseExceptions } from "@/utils/load-exam-exceptions";
 import {
@@ -29,7 +29,7 @@ import {
 export const prerender = false;
 
 const actor = Astro.locals.actor;
-if (!actor) return Astro.redirect("/login");
+if (!actor) return Astro.redirect(urls.login());
 
 const courses = await db.course.findMany({ member: actor.username }, { actor });
 const courseIds = courses.map((c) => c.id);
@@ -109,12 +109,16 @@ const monthEnd = toInstant(
 const today = localDateOf(now);
 const currentMonth = today.slice(0, 7);
 const shownMonth = `${year}-${String(month).padStart(2, "0")}`;
-const todayHref = `/calendar?month=${currentMonth}`;
+const todayHref = urls.calendar({ month: currentMonth });
 
 const prevMonth = month === 1 ? 12 : month - 1;
 const prevMonthYear = month === 1 ? year - 1 : year;
-const nextHref = `/calendar?month=${nextMonthYear}-${String(nextMonth).padStart(2, "0")}`;
-const prevHref = `/calendar?month=${prevMonthYear}-${String(prevMonth).padStart(2, "0")}`;
+const nextHref = urls.calendar({
+	month: `${nextMonthYear}-${String(nextMonth).padStart(2, "0")}`,
+});
+const prevHref = urls.calendar({
+	month: `${prevMonthYear}-${String(prevMonth).padStart(2, "0")}`,
+});
 
 // Paging stops at the months that hold something: the first and last entry,
 // and today. Beyond them every month is empty.
@@ -227,7 +231,7 @@ const monthLabel = new Intl.DateTimeFormat(locale, {
   <p class="mt-2 text-base-content/70">
     {m.schedule_calendar_subtitle()}
   </p>
-  <a href="/profile?tab=calendar" class="mt-1 inline-block text-sm text-primary hover:underline"
+  <a href={urls.profile({ tab: "calendar" })} class="mt-1 inline-block text-sm text-primary hover:underline"
     >{m.schedule_calendar_subscribe()}</a
   >
 

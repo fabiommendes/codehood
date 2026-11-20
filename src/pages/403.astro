@@ -6,6 +6,7 @@
 // page. The segment itself is never printed.
 import { m } from "@/i18n";
 import ErrorLayout from "@/layouts/ErrorLayout.astro";
+import { urls } from "@/urls";
 
 export const prerender = false;
 
@@ -16,6 +17,6 @@ const course = Astro.url.searchParams.get("course");
 <ErrorLayout code="403" title={m.nav_403_title()} scene="lockedHouse">
   {course ? m.nav_403_course() : m.nav_403_page()}
   <div slot="actions">
-    <a href="/courses" class="btn btn-primary rounded-full">{m.nav_back_to_my_courses()}</a>
+    <a href={urls.courses.index()} class="btn btn-primary rounded-full">{m.nav_back_to_my_courses()}</a>
   </div>
 </ErrorLayout>
