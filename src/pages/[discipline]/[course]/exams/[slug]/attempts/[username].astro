@@ -46,10 +46,9 @@ import {
 	questionMark,
 } from "@/services/grading";
 import { reviewResult } from "@/services/review";
-import { questionAttachmentUrl, urls } from "@/urls";
+import { questionAttachmentUrl, urls, withAnchor } from "@/urls";
 import { adjustmentEffect, adjustmentLabel } from "@/utils/adjustment-label";
 import { breadcrumbs } from "@/utils/breadcrumbs";
-import { gradingHref } from "@/utils/grading-urls";
 import { highlightQuestionCodeBlocks } from "@/utils/highlight-code-blocks";
 import {
 	gradingExamNav,
@@ -68,6 +67,7 @@ if ("redirect" in result) return result.redirect;
 const {
 	course,
 	href,
+	links,
 	tabs,
 	exam,
 	questions,
@@ -485,10 +485,7 @@ const totalText = (total: number | null | undefined): string =>
               <p>
                 <a
                   class="link"
-                  href={gradingHref(`${examHref}/grading/${outcome.question}`, {
-                    names: true,
-                    anchor: `answer-${counting.publicId}`,
-                  })}
+                  href={withAnchor(links.exam(exam.slug).gradingQuestion(outcome.question, { names: true }), `answer-${counting.publicId}`)}
                 >
                   {m.exams_attempt_grade_this()}
                 </a>

@@ -3,14 +3,17 @@
  * pure step that marks where the reader is. No Astro, no Prisma import.
  */
 
+import type { Href } from "@/urls";
+
 /** A leaf of the card: a page, or a section of one when `href` has a hash. */
 export interface NavLink {
 	label: string;
-	href: string;
+	/// A page, or a section of the page being read (`#id`).
+	href: Href | `#${string}`;
 	/// Short count or status shown at the end of the row.
 	meta?: string | number;
 	/// Path prefixes of the pages that belong to this entry: it is the current one on them too.
-	under?: string[];
+	under?: Href[];
 }
 
 /** A top-level row; its `children` fold under it, and go no deeper. */
@@ -35,7 +38,9 @@ export interface CourseNav {
 }
 
 /** A link resolved against the current URL. */
-export interface MarkedLink extends NavLink {
+export interface MarkedLink extends Omit<NavLink, "href"> {
+	/// The link, or only its hash when it points into the page being shown.
+	href: string;
 	/// The page being shown.
 	current: boolean;
 	/// A section of the page being shown, marked as the reader scrolls.

@@ -21,7 +21,7 @@ const result = await loadCourse(Astro, discipline, courseSegment, {
 	manage: true,
 });
 if ("redirect" in result) return result.redirect;
-const { course, href, tabs } = result;
+const { course, href, links, tabs } = result;
 
 // biome-ignore lint/style/noNonNullAssertion: loadCourse({ manage: true }) already required Astro.locals.actor.
 const actor = Astro.locals.actor!;
@@ -43,7 +43,7 @@ const [page, total] = await Promise.all([
 <AppLayout
 	title={m.report_course_title()}
 	trail={breadcrumbs(Astro.url, { course })}
-	nav={homeNav(href)}
+	nav={homeNav(links)}
 >
 	<CourseHeader course={course} tabs={tabs} active="home" />
 

@@ -17,7 +17,7 @@ const result = await loadCourse(Astro, discipline, courseSegment, {
 	manage: true,
 });
 if ("redirect" in result) return result.redirect;
-const { course, href, tabs } = result;
+const { course, href, links, tabs } = result;
 
 // biome-ignore lint/style/noNonNullAssertion: loadCourse({ manage: true }) already required Astro.locals.user.
 const actor = Astro.locals.actor!;
@@ -59,7 +59,7 @@ const csvRows = [
 
 <AppLayout title={m.courses_roster_page_title({ discipline: course.discipline.name })}
   trail={breadcrumbs(Astro.url, { course })}
-  nav={studentsNav(href)}
+  nav={studentsNav(links)}
 >
   <CourseHeader course={course} tabs={tabs} active="students" />
 

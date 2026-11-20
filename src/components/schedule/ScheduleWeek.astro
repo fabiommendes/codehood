@@ -8,6 +8,7 @@ import type { Resource } from "@/db";
 import { m } from "@/i18n";
 import type { CalendarEntry } from "@/services/calendar-entries";
 import { rollCallOpenable } from "@/services/roll-call-window";
+import type { CourseUrls } from "@/urls";
 import { eventKindLabel } from "@/utils/calendar-event-display";
 import { scheduleWeekId } from "@/utils/course-tabs-nav";
 import { examTypeLabels, formatDuration } from "@/utils/exam-display";
@@ -23,6 +24,8 @@ interface Props {
 	next: CalendarEntry | undefined;
 	/// The course's own URL, which exam and resource links hang from.
 	href: string;
+	/// The pages of the course.
+	links: CourseUrls;
 	/// Each meeting's resources; a meeting with none is absent.
 	resources: ReadonlyMap<CalendarEventId, Resource[]>;
 	/// Set only for those who run the course's roll calls: the course's URL segments.
@@ -40,6 +43,7 @@ const {
 	entries,
 	next,
 	href,
+	links,
 	resources,
 	rollCallManager,
 	rollCallKeys = new Set<string>(),
@@ -203,7 +207,7 @@ function faded(entry: CalendarEntry): boolean {
             {entry.kind === "event" && resources.has(entry.event.id) && (
               <EventResources
                 resources={resources.get(entry.event.id) ?? []}
-                href={href}
+                course={links}
               />
             )}
           </div>

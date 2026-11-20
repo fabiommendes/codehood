@@ -1,6 +1,7 @@
 /// Fixtures shared by the theme pages of the component catalogue.
 
 import { code, essay, multipleChoice, shortAnswer } from "@/mdq/fixtures";
+import { urls } from "@/urls";
 
 /**
  * Returns the current time and helpers that offset it, so a fixture is relative to the moment of the request.
@@ -61,24 +62,28 @@ export const headerCourse = {
 	edition: { slug: "2026-2" },
 } as never;
 
-const courseHref = "/algorithms/ada_2026-2";
+const courseLinks = urls.course({
+	discipline: "algorithms",
+	instructor: "ada",
+	edition: "2026-2",
+});
 
 /// The tab strip a student sees on a course page.
 export const studentTabs = [
-	{ key: "home", label: "Home", href: courseHref },
-	{ key: "schedule", label: "Schedule", href: `${courseHref}/schedule` },
-	{ key: "resources", label: "Resources", href: `${courseHref}/resources` },
-	{ key: "exams", label: "Exams", href: `${courseHref}/exams` },
+	{ key: "home", label: "Home", href: courseLinks.index() },
+	{ key: "schedule", label: "Schedule", href: courseLinks.schedule() },
+	{ key: "resources", label: "Resources", href: courseLinks.resources() },
+	{ key: "exams", label: "Exams", href: courseLinks.exams() },
 ] as const;
 
 /// The tab strip the course's instructor sees: the student's, plus Students and Questions.
 export const instructorTabs = [
 	studentTabs[0],
 	studentTabs[1],
-	{ key: "students", label: "Students", href: `${courseHref}/roster` },
+	{ key: "students", label: "Students", href: courseLinks.roster() },
 	studentTabs[2],
 	studentTabs[3],
-	{ key: "questions", label: "Questions", href: `${courseHref}/questions` },
+	{ key: "questions", label: "Questions", href: courseLinks.questions() },
 ] as const;
 
 //

@@ -28,7 +28,7 @@ export const prerender = false;
 const { discipline, course: courseSegment } = Astro.params;
 const result = await loadCourse(Astro, discipline, courseSegment);
 if ("redirect" in result) return result.redirect;
-const { course, href, tabs } = result;
+const { course, href, links, tabs } = result;
 
 // biome-ignore lint/style/noNonNullAssertion: every course page runs through loadCourse, which already required Astro.locals.user.
 const actor = Astro.locals.actor!;
@@ -89,7 +89,7 @@ function weekSpan(weeks: { week: number }[]): string {
 
 <AppLayout title={m.schedule_page_title({ discipline: course.discipline.name })}
   trail={breadcrumbs(Astro.url, { course })}
-  nav={scheduleNav(href, { past, ahead }, foldPast)}
+  nav={scheduleNav(links, { past, ahead }, foldPast)}
 >
   <CourseHeader course={course} tabs={tabs} active="schedule" />
 
@@ -145,6 +145,7 @@ function weekSpan(weeks: { week: number }[]): string {
                       entries={entries}
                       next={next}
                       href={href}
+                      links={links}
                       resources={eventResources}
                       rollCallManager={rollCallManager}
                       rollCallKeys={rollCallKeys}
@@ -160,6 +161,7 @@ function weekSpan(weeks: { week: number }[]): string {
                 entries={entries}
                 next={next}
                 href={href}
+                links={links}
                 resources={eventResources}
                 rollCallManager={rollCallManager}
                 rollCallKeys={rollCallKeys}

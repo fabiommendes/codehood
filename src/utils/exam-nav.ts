@@ -4,11 +4,12 @@
  */
 
 import { m } from "@/i18n";
+import { type ExamUrls, withAnchor } from "@/urls";
 import type { CourseNav, NavEntry } from "./course-nav";
 
 export interface ExamNavInput {
-	/// URL of the exam page, `<course>/exams/<slug>`.
-	href: string;
+	/// The pages of the exam.
+	exam: ExamUrls;
 	title: string;
 	/// Sections of the exam page a student sees, in page order.
 	sections?: readonly { id: string; label: string }[];
@@ -32,6 +33,7 @@ export interface ExamNavInput {
  * Students get the sections of the exam page.
  */
 export function examNav(input: ExamNavInput): CourseNav {
+	const { exam } = input;
 	if (!input.manage) {
 		return {
 			context: input.title,
@@ -39,53 +41,56 @@ export function examNav(input: ExamNavInput): CourseNav {
 				{
 					entries: (input.sections ?? []).map((s) => ({
 						label: s.label,
-						href: `${input.href}#${s.id}`,
+						href: withAnchor(exam.index(), s.id),
 					})),
 				},
 			],
 		};
 	}
 	const entries: NavEntry[] = [
-		{ label: m.nav_exam_overview(), href: input.href },
+		{ label: m.nav_exam_overview(), href: exam.index() },
 		{
 			label: m.nav_exam_preview(),
-			href: `${input.href}/preview`,
+			href: exam.preview(),
 		},
 	];
+	const results = exam.results();
+	/// The prefix of every student's attempt page, which belongs to the results: an empty username drops its segment.
+	const attempts = exam.attempt("");
 	if (!input.practice)
 		entries.push(
 			{
 				label: m.exams_exceptions_heading(),
-				href: `${input.href}/exceptions`,
+				href: exam.exceptions(),
 			},
 			{
 				label: m.nav_crumb_grading(),
-				href: `${input.href}/grading`,
+				href: exam.grading(),
 				meta: input.pending || undefined,
-				under: [`${input.href}/grading`],
+				under: [exam.grading()],
 			},
 			{
 				label: m.grades_regrade_page_title(),
-				href: `${input.href}/regrades`,
+				href: exam.regrades(),
 				meta: input.regrades || undefined,
 			},
 			{
 				label: m.grades_adjustment_title(),
-				href: `${input.href}/adjustments`,
+				href: exam.adjustments(),
 				meta: input.adjustments || undefined,
 			},
 			{
 				label: m.grades_results_title(),
-				href: `${input.href}/results`,
-				under: [`${input.href}/attempts`],
+				href: results,
+				under: [attempts],
 				children: [
 					{
 						label: m.nav_exam_by_question(),
-						href: `${input.href}/results#by-question`,
+						href: withAnchor(results, "by-question"),
 					},
 					{
 						label: m.nav_exam_by_student(),
-						href: `${input.href}/results#by-student`,
+						href: withAnchor(results, "by-student"),
 					},
 				],
 			},

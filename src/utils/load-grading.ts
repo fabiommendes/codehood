@@ -22,7 +22,7 @@ import {
 	countingAnswers,
 	type GradedStudent,
 } from "@/services/grading";
-import { urls } from "@/urls";
+import { type CourseRef, type CourseUrls, type Href, urls } from "@/urls";
 import type { CourseNav } from "./course-nav";
 import type { CourseTab } from "./course-tabs";
 import { examNav } from "./exam-nav";
@@ -32,8 +32,10 @@ import { loadCourseExceptions } from "./load-exam-exceptions";
 export type LoadGradingResult =
 	| {
 			course: Course;
-			/// The course's URL prefix.
-			href: string;
+			/// The course's own page; the other pages are in `links`.
+			href: Href;
+			ref: CourseRef;
+			links: CourseUrls;
 			/// The course tab strip the actor sees.
 			tabs: readonly CourseTab[];
 			exam: Exam;
@@ -69,7 +71,7 @@ export async function loadGrading(
 		manage: true,
 	});
 	if ("redirect" in result) return result;
-	const { course, href, tabs } = result;
+	const { course, href, ref, links, tabs } = result;
 
 	// biome-ignore lint/style/noNonNullAssertion: loadCourse already redirected an anonymous visitor.
 	const actor = Astro.locals.actor!;
@@ -77,13 +79,13 @@ export async function loadGrading(
 	const loaded = await loadExamGrading(course.id, examSlug, actor, options);
 	if (!loaded) return { redirect: await Astro.rewrite(urls.notFound()) };
 
-	return { course, href, tabs, ...loaded };
+	return { course, href, ref, links, tabs, ...loaded };
 }
 
 /// What the grading of one exam reads, without the course it belongs to.
 export type ExamGrading = Omit<
 	Extract<LoadGradingResult, { exam: Exam }>,
-	"course" | "href" | "tabs"
+	"course" | "href" | "ref" | "links" | "tabs"
 >;
 
 /**
@@ -256,13 +258,13 @@ export async function loadGrades(
 export async function gradingExamNav(
 	loaded: Pick<
 		Extract<LoadGradingResult, { exam: Exam }>,
-		"course" | "href" | "exam" | "answers"
+		"course" | "links" | "exam" | "answers"
 	>,
 	actor: UserActor,
 	context?: string,
 	adjustments?: readonly unknown[],
 ): Promise<CourseNav> {
-	const { course, href, exam, answers } = loaded;
+	const { course, links, exam, answers } = loaded;
 	const [regrades, known] = await Promise.all([
 		db.regradeRequest.findMany(
 			{ course: course.id, exam: exam.slug, status: "OPEN" },
@@ -277,7 +279,7 @@ export async function gradingExamNav(
 				)),
 	]);
 	const nav = examNav({
-		href: `${href}/exams/${exam.slug}`,
+		exam: links.exam(exam.slug),
 		title: exam.title,
 		manage: true,
 		practice: exam.type === "PRACTICE",

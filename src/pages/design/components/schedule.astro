@@ -22,6 +22,7 @@ import ScheduleWeek from "@/components/schedule/ScheduleWeek.astro";
 import { CheckInError } from "@/core/error";
 import { escapeHtml, m } from "@/i18n";
 import { checkInQrSvg } from "@/services/roll-call-qr";
+import { urls } from "@/urls";
 import ComponentsPage from "./_ComponentsPage.astro";
 import {
 	attendanceReport,
@@ -228,6 +229,11 @@ const groups = {
 const selected = selectVariants(Astro.url, groups);
 
 const courseHref = "/algorithms/ada_2026-2";
+const courseLinks = urls.course({
+	discipline: "algorithms",
+	instructor: "ada",
+	edition: "2026-2",
+});
 /// A Tuesday at noon UTC: the day of the second meeting, which is still to come.
 const meetingDay = new Date(Date.UTC(2026, 9, 6, 12));
 
@@ -265,6 +271,7 @@ const sections = [
         entries={scheduleEntries}
         next={scheduleEntries[3]}
         href={courseHref}
+        links={courseLinks}
         resources={scheduleResources}
         attendance={new Map([
           ["5/mon-10", "present"],
@@ -279,6 +286,7 @@ const sections = [
         entries={scheduleEntries}
         next={scheduleEntries[3]}
         href={courseHref}
+        links={courseLinks}
         resources={scheduleResources}
         rollCallManager={target}
         rollCallKeys={new Set(["5/mon-10"])}
@@ -296,7 +304,7 @@ const sections = [
     <div class="grid max-w-3xl gap-6 sm:grid-cols-2">
       <div class="rounded-box border border-edge bg-base-100 p-5">
         <h3 class="text-sm font-semibold text-muted">EventResources</h3>
-        <EventResources resources={scheduleRowResources} href={courseHref} />
+        <EventResources resources={scheduleRowResources} course={courseLinks} />
       </div>
       <div class="rounded-box border border-edge bg-base-100 p-5">
         <h3 class="text-sm font-semibold text-muted">EventRepositories</h3>

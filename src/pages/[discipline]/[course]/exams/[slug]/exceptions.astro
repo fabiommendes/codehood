@@ -21,7 +21,7 @@ export const prerender = false;
 const { discipline, course: courseSegment, slug } = Astro.params;
 const result = await loadExamStaff(Astro, discipline, courseSegment, slug);
 if ("redirect" in result) return result.redirect;
-const { course, href, tabs, exam, exceptions, data } = result;
+const { course, href, links, tabs, exam, exceptions, data } = result;
 const { students, storedExceptions } = data;
 const schedule = examSchedule(exam, exceptions);
 
@@ -70,7 +70,7 @@ const exceptionRows: ExceptionRow[] = storedExceptions
 <AppLayout title={`${m.exams_exceptions_heading()} · ${exam.title}`}
   trail={breadcrumbs(Astro.url, { course, item: exam.title, page: m.exams_exceptions_heading() })}
   nav={examNav({
-    href: `${href}/exams/${exam.slug}`,
+    exam: links.exam(exam.slug),
     title: exam.title,
     manage: true,
     pending: data.pending,

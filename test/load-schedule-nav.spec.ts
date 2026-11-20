@@ -4,6 +4,7 @@ import { db } from "@/db";
 import { persistedCalendarEventFactory } from "@/fixtures/calendar-event.factory";
 import { persistedCourseFactory } from "@/fixtures/course.factory";
 import { persistedTimeSlotFactory } from "@/fixtures/time-slot.factory";
+import { urls } from "@/urls";
 import { loadScheduleNav } from "@/utils/load-schedule-nav";
 import { addDays, todayIn } from "@/utils/schedule-time";
 import { futureDate, resetDatabase, seedUser } from "./stories/helpers";
@@ -42,14 +43,19 @@ test("the schedule card lists the same weeks for the instructor and a student, w
 		});
 	}
 	const href = "/cs101/ada_2026-2";
+	const links = urls.course({
+		discipline: "cs101",
+		instructor: "ada",
+		edition: "2026-2",
+	});
 
 	const asInstructor = await loadScheduleNav(
 		course,
-		href,
+		links,
 		actorOf({ ...course.instructor, role: "INSTRUCTOR" }),
 		"Week 0",
 	);
-	const asStudent = await loadScheduleNav(course, href, actorOf(student));
+	const asStudent = await loadScheduleNav(course, links, actorOf(student));
 
 	expect(asInstructor.context).toBe("Week 0");
 	expect(asStudent.context).toBeUndefined();

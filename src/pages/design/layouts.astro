@@ -42,22 +42,28 @@ const SAMPLE_USER = {
 	username: "grace",
 	role: "INSTRUCTOR",
 } as const;
+/// The pages of the course the sample trails walk through.
+const sampleCourse = urls.course({
+	discipline: "cs201",
+	instructor: "alan",
+	edition: "2026-1",
+});
 /// Sample trails for the top bar: a typical one and one long enough to truncate.
 const SAMPLE_TRAILS: Crumb[][] = [
 	[
-		{ label: "cs201 · 2026-1", href: "#" },
-		{ label: "Exams", href: "#" },
-		{ label: "Midterm", href: "#" },
-		{ label: "Grading", href: "#" },
+		{ label: "cs201 · 2026-1", href: sampleCourse.index() },
+		{ label: "Exams", href: sampleCourse.exams() },
+		{ label: "Midterm", href: sampleCourse.exam("midterm").index() },
+		{ label: "Grading", href: sampleCourse.exam("midterm").grading() },
 		{ label: "Two sums" },
 	],
 	[
-		{ label: "cs201 · 2026-1", href: "#" },
-		{ label: "Exams", href: "#" },
+		{ label: "cs201 · 2026-1", href: sampleCourse.index() },
+		{ label: "Exams", href: sampleCourse.exams() },
 		{
 			label:
 				"Final exam on balanced search trees, hash tables with open addressing, and amortized analysis",
-			href: "#",
+			href: sampleCourse.exam("final").index(),
 		},
 		{ label: "Grace Hopper" },
 	],

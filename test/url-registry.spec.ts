@@ -1,7 +1,7 @@
 import { readdirSync, readFileSync } from "node:fs";
 import path from "node:path";
 import { expect, test } from "@playwright/test";
-import { type Route, urls } from "@/urls";
+import { courseRoutes, type Route, urls, withAnchor, withSearch } from "@/urls";
 import { urlPatternsModule } from "@/urls/integration";
 import { discoverRoutes } from "./tour/routes";
 
@@ -21,7 +21,12 @@ const MIGRATED_PREFIXES = [
 	"/403",
 	"/404",
 	"/500",
+	"/[discipline]/[course]",
 ];
+
+/// The root of the course pages, whose paths start with parameters and are
+/// checked by their static segments instead of by prefix.
+const COURSE_ROOT = "/[discipline]/[course]";
 
 /// Directories under `src/` the literal check skips: the registry itself, the
 /// generated types, and the runner, whose `/home` is a directory of the
@@ -50,7 +55,10 @@ function sourceFiles(dir: string): string[] {
 	});
 }
 
-const registry = registeredRoutes(urls);
+const registry = [
+	...registeredRoutes(urls),
+	...registeredRoutes(courseRoutes, ["courseRoutes"]),
+];
 const pages = new Set(discoverRoutes().map((route) => route.pattern));
 
 test("every page under a migrated prefix is in the registry", () => {
@@ -67,9 +75,33 @@ test("every page under a migrated prefix is in the registry", () => {
 
 test("no code outside src/urls writes a migrated path as a literal", () => {
 	const literal = new RegExp(
-		`["'\`}](${MIGRATED_PREFIXES.join("|")})(?=["'\`/?#$])`,
+		`["'\`}](${MIGRATED_PREFIXES.filter((p) => !p.includes("[")).join("|")})(?=["'\`/?#$])`,
 	);
-	const offenders = sourceFiles("src")
+	expect(offenders(literal)).toEqual([]);
+});
+
+/// The static segments of the course pages below the course itself:
+/// `roster`, `exams`, `grading`, ...
+const courseSegments = [
+	...new Set(
+		[...pages]
+			.filter((pattern) => underPrefix(pattern, COURSE_ROOT))
+			.flatMap((pattern) => pattern.slice(COURSE_ROOT.length).split("/"))
+			.filter((segment) => segment !== "" && !segment.includes("[")),
+	),
+].sort();
+
+test("no code outside src/urls appends a course page's segment to an interpolation", () => {
+	expect(courseSegments).toContain("roster");
+	const appended = new RegExp(
+		`\\$\\{[^}]*\\}/(${courseSegments.join("|")})(?=["'\`/?#$]|$)`,
+	);
+	expect(offenders(appended)).toEqual([]);
+});
+
+/// Each line of `src/` outside {@link UNCHECKED_DIRS} that matches `pattern`, comments left out.
+function offenders(pattern: RegExp): string[] {
+	return sourceFiles("src")
 		.filter(
 			(file) =>
 				!UNCHECKED_DIRS.some((dir) =>
@@ -81,11 +113,10 @@ test("no code outside src/urls writes a migrated path as a literal", () => {
 				.split("\n")
 				.map((line, index) => ({ line, at: `${file}:${index + 1}` }))
 				.filter(({ line }) => !/^\s*(\/\/|\*|\/\*)/.test(line))
-				.filter(({ line }) => literal.test(line))
+				.filter(({ line }) => pattern.test(line))
 				.map(({ at, line }) => `${at}  ${line.trim()}`),
 		);
-	expect(offenders).toEqual([]);
-});
+}
 
 test("a route fills its parameters from the pattern, encoded", () => {
 	expect(urls.admin.reports()).toBe("/admin/reports");
@@ -100,6 +131,39 @@ test("a route writes the query values that are set, true as 1", () => {
 	expect(urls.courses.index({ left: true })).toBe("/courses?left=1");
 	expect(urls.courses.index({ left: false })).toBe("/courses");
 	expect(urls.calendar({ month: "2026-11" })).toBe("/calendar?month=2026-11");
+});
+
+test("a course's URLs take its reference and the slugs below it", () => {
+	const course = urls.course({
+		discipline: "cs101",
+		instructor: "ana",
+		edition: "2026-1",
+	});
+	expect(course.index()).toBe("/cs101/ana_2026-1");
+	expect(course.index({ joined: true })).toBe("/cs101/ana_2026-1?joined=1");
+	expect(course.resource("a b")).toBe("/cs101/ana_2026-1/resources/a%20b");
+	expect(course.rollCall(3, "mon-08")).toBe(
+		"/cs101/ana_2026-1/roll-call/3/mon-08",
+	);
+	expect(course.repository("r")).toBe("/cs101/ana_2026-1/repositories/r");
+	expect(course.repository("r", ["src", "a b.py"], { rotate: true })).toBe(
+		"/cs101/ana_2026-1/repositories/r/src/a%20b.py?rotate=1",
+	);
+	expect(course.repositoryZip("r")).toBe(
+		"/cs101/ana_2026-1/repositories/r.zip",
+	);
+	expect(course.exam("p1").attempt("bob")).toBe(
+		"/cs101/ana_2026-1/exams/p1/attempts/bob",
+	);
+	expect(
+		course.exam("p1").gradingQuestion("q1", { view: "list", names: true }),
+	).toBe("/cs101/ana_2026-1/exams/p1/grading/q1?view=list&names=1");
+});
+
+test("an anchor or a search keeps a URL of the registry", () => {
+	expect(withAnchor(urls.home(), "event-4")).toBe("/home#event-4");
+	expect(withSearch(urls.home(), "?a=1")).toBe("/home?a=1");
+	expect(withSearch(urls.home(), new URLSearchParams())).toBe("/home");
 });
 
 test("the UrlPattern union keeps the project's routes, sorted and once each", () => {

@@ -16,7 +16,7 @@ export const prerender = false;
 const { discipline, course: courseSegment, slug } = Astro.params;
 const result = await loadExamStaff(Astro, discipline, courseSegment, slug);
 if ("redirect" in result) return result.redirect;
-const { course, href, tabs, exam, data } = result;
+const { course, href, links, tabs, exam, data } = result;
 
 // biome-ignore lint/style/noNonNullAssertion: loadExamStaff already redirected an anonymous visitor.
 const actor = Astro.locals.actor!;
@@ -59,7 +59,7 @@ const rows = adjustments.map((entry) => ({
 <AppLayout title={`${m.grades_adjustment_title()} · ${exam.title}`}
   trail={breadcrumbs(Astro.url, { course, item: exam.title, page: m.grades_adjustment_title() })}
   nav={examNav({
-    href: examHref,
+    exam: links.exam(exam.slug),
     title: exam.title,
     manage: true,
     pending: data.pending,

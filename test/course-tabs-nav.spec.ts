@@ -1,4 +1,5 @@
 import { expect, test } from "@playwright/test";
+import { urls } from "@/urls";
 import {
 	examsNav,
 	homeNav,
@@ -10,6 +11,11 @@ import {
 } from "@/utils/course-tabs-nav";
 
 const href = "/cs101/ada_2026-2";
+const course = urls.course({
+	discipline: "cs101",
+	instructor: "ada",
+	edition: "2026-2",
+});
 
 test.describe("resourcesNav", () => {
 	const groups = [
@@ -19,29 +25,29 @@ test.describe("resourcesNav", () => {
 
 	test("folds the groups under the resources entry only when expanded", () => {
 		const [entry] =
-			resourcesNav(href, groups, 0, { expand: true }).sections[0]?.entries ??
+			resourcesNav(course, groups, 0, { expand: true }).sections[0]?.entries ??
 			[];
 		expect(entry?.href).toBe(`${href}/resources`);
 		expect(entry?.children).toEqual([
 			{ label: "Files", href: `${href}/resources#group-file`, meta: 2 },
 			{ label: "Notes", href: `${href}/resources#group-md`, meta: 1 },
 		]);
-		const [plain] = resourcesNav(href, groups).sections[0]?.entries ?? [];
+		const [plain] = resourcesNav(course, groups).sections[0]?.entries ?? [];
 		expect(plain?.children).toEqual([]);
 	});
 
 	test("ends with the repositories page when the actor sees any", () => {
-		const entries = resourcesNav(href, [], 2).sections[0]?.entries;
+		const entries = resourcesNav(course, [], 2).sections[0]?.entries;
 		expect(entries?.map((e) => e.href)).toEqual([
 			`${href}/resources`,
 			`${href}/repositories`,
 		]);
 		expect(entries?.[1]?.meta).toBe(2);
-		expect(resourcesNav(href, []).sections[0]?.entries).toHaveLength(1);
+		expect(resourcesNav(course, []).sections[0]?.entries).toHaveLength(1);
 	});
 
 	test("carries the entity of the page as context", () => {
-		expect(resourcesNav(href, [], 0, { context: "Notes" }).context).toBe(
+		expect(resourcesNav(course, [], 0, { context: "Notes" }).context).toBe(
 			"Notes",
 		);
 	});
@@ -51,14 +57,14 @@ test.describe("scheduleNav", () => {
 	const weeks = { past: [{ week: 1 }, { week: 2 }], ahead: [{ week: 3 }] };
 
 	test("lists every week when none is folded", () => {
-		const entries = scheduleNav(href, weeks, false).sections[0]?.entries;
+		const entries = scheduleNav(course, weeks, false).sections[0]?.entries;
 		expect(entries?.map((e) => e.href)).toEqual(
 			[1, 2, 3].map((w) => `${href}/schedule#${scheduleWeekId(w)}`),
 		);
 	});
 
 	test("folds the past weeks under one entry", () => {
-		const entries = scheduleNav(href, weeks, true).sections[0]?.entries;
+		const entries = scheduleNav(course, weeks, true).sections[0]?.entries;
 		expect(entries).toHaveLength(2);
 		expect(entries?.[0]?.children?.map((c) => c.href)).toEqual([
 			`${href}/schedule#week-1`,
@@ -70,7 +76,7 @@ test.describe("scheduleNav", () => {
 
 test.describe("examsNav", () => {
 	test("one section per type present, in a fixed order", () => {
-		const nav = examsNav(href, [
+		const nav = examsNav(course, [
 			{ slug: "q1", title: "Quiz 1", type: "QUIZ" },
 			{ slug: "mid", title: "Midterm", type: "EXAM" },
 			{ slug: "q2", title: "Quiz 2", type: "QUIZ" },
@@ -86,13 +92,13 @@ test.describe("examsNav", () => {
 	});
 
 	test("no exams, no sections", () => {
-		expect(examsNav(href, []).sections).toEqual([]);
+		expect(examsNav(course, []).sections).toEqual([]);
 	});
 });
 
 test.describe("studentsNav", () => {
 	test("links the roster, the grades and the attendance, in that order", () => {
-		const entries = studentsNav(href).sections[0]?.entries;
+		const entries = studentsNav(course).sections[0]?.entries;
 		expect(entries).toEqual([
 			{ label: "Roster", href: `${href}/roster` },
 			{ label: "Grades", href: `${href}/grades` },
@@ -103,7 +109,7 @@ test.describe("studentsNav", () => {
 
 test.describe("homeNav", () => {
 	test("lists home, reports and settings on every page", () => {
-		expect(homeNav(href).sections[0]?.entries.map((e) => e.href)).toEqual([
+		expect(homeNav(course).sections[0]?.entries.map((e) => e.href)).toEqual([
 			href,
 			`${href}/reports`,
 			`${href}/settings`,
@@ -111,7 +117,7 @@ test.describe("homeNav", () => {
 	});
 
 	test("folds the sections of the page the reader is on under its entry", () => {
-		const entries = homeNav(href, {
+		const entries = homeNav(course, {
 			page: "home",
 			sections: [
 				{ id: "schedule", label: "Schedule" },
@@ -126,7 +132,7 @@ test.describe("homeNav", () => {
 	});
 
 	test("settings sections hang from the settings entry", () => {
-		const entries = homeNav(href, {
+		const entries = homeNav(course, {
 			page: "settings",
 			sections: [{ id: "settings-cli", label: "CLI" }],
 		}).sections[0]?.entries;

@@ -46,7 +46,7 @@ export const prerender = false;
 const { discipline, course: courseSegment } = Astro.params;
 const result = await loadCourse(Astro, discipline, courseSegment);
 if ("redirect" in result) return result.redirect;
-const { course, href, tabs } = result;
+const { course, href, links, tabs } = result;
 
 // biome-ignore lint/style/noNonNullAssertion: loadCourse already required Astro.locals.user.
 const actor = Astro.locals.actor!;
@@ -245,7 +245,7 @@ const sectionLinks = studentView
   trail={breadcrumbs(Astro.url, { course })}
   nav={studentView
     ? studentHomeNav(sectionLinks)
-    : homeNav(href, { page: "home", sections: sectionLinks })}
+    : homeNav(links, { page: "home", sections: sectionLinks })}
 >
   {
     justJoined && (
@@ -336,6 +336,7 @@ const sectionLinks = studentView
                 entries={thisWeek.entries}
                 next={next}
                 href={href}
+                links={links}
                 resources={eventResources}
                 rollCallManager={canWrite ? courseParams : undefined}
                 rollCallKeys={rollCallKeys}
@@ -446,7 +447,7 @@ const sectionLinks = studentView
         <div class="mt-4 flex flex-col gap-3">
           {newestResources.map((resource) => (
             <ListRow
-              href={resourceHref(resource, href)}
+              href={resourceHref(resource, links)}
               download={
                 resource.data.type === "FILE"
                   ? fileDownloadName(resource, resource.data)

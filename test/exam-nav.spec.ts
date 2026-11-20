@@ -1,13 +1,17 @@
 import { expect, test } from "@playwright/test";
+import { urls } from "@/urls";
 import { markCourseNav } from "@/utils/course-nav";
 import { examNav } from "@/utils/exam-nav";
 
 const href = "/cs101/ada_2026-2/exams/test-02";
+const exam = urls
+	.course({ discipline: "cs101", instructor: "ada", edition: "2026-2" })
+	.exam("test-02");
 const sections = [{ id: "questions", label: "Questions" }];
 
 function manager(practice: boolean, adjustments = 0) {
 	return examNav({
-		href,
+		exam,
 		title: "Test 2",
 		sections,
 		manage: true,
@@ -99,7 +103,7 @@ test.describe("examNav", () => {
 	});
 
 	test("students see the sections under the exam title", () => {
-		const nav = examNav({ href, title: "Test 2", sections, manage: false });
+		const nav = examNav({ exam, title: "Test 2", sections, manage: false });
 		expect(nav.context).toBe("Test 2");
 		expect(nav.sections[0]?.entries.map((e) => e.href)).toEqual([
 			`${href}#questions`,

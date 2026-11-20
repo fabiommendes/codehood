@@ -5,6 +5,7 @@
  */
 
 import { m } from "@/i18n";
+import { type CourseUrls, type Href, withAnchor } from "@/urls";
 import type { CourseNav, NavEntry, NavLink, NavSection } from "./course-nav";
 import { examTypeLabels } from "./exam-display";
 
@@ -24,7 +25,7 @@ export function scheduleWeekId(week: number): string {
  * under its entry only when `expand` is set, as the other pages do not show them.
  */
 export function resourcesNav(
-	href: string,
+	course: CourseUrls,
 	groups: readonly {
 		type: string;
 		label: string;
@@ -33,7 +34,7 @@ export function resourcesNav(
 	repositories = 0,
 	here: { expand?: boolean; context?: string } = {},
 ): CourseNav {
-	const base = `${href}/resources`;
+	const base = course.resources();
 	const entries: NavEntry[] = [
 		{
 			label: m.nav_course_tab_resources(),
@@ -41,7 +42,7 @@ export function resourcesNav(
 			children: here.expand
 				? groups.map((group) => ({
 						label: group.label,
-						href: `${base}#${resourceGroupId(group.type)}`,
+						href: withAnchor(base, resourceGroupId(group.type)),
 						meta: group.resources.length,
 					}))
 				: [],
@@ -50,7 +51,7 @@ export function resourcesNav(
 	if (repositories > 0)
 		entries.push({
 			label: m.nav_course_tab_repositories(),
-			href: `${href}/repositories`,
+			href: course.repositories(),
 			meta: repositories,
 		});
 	return { context: here.context, sections: [{ entries }] };
@@ -61,23 +62,23 @@ export function resourcesNav(
  * folds them away, share a "Past weeks" entry that unfolds to list them.
  */
 export function scheduleNav(
-	href: string,
+	course: CourseUrls,
 	weeks: {
 		past: readonly { week: number }[];
 		ahead: readonly { week: number }[];
 	},
 	foldPast: boolean,
 ): CourseNav {
-	const base = `${href}/schedule`;
+	const base = course.schedule();
 	const link = ({ week }: { week: number }): NavEntry => ({
 		label: m.schedule_week({ week }),
-		href: `${base}#${scheduleWeekId(week)}`,
+		href: withAnchor(base, scheduleWeekId(week)),
 	});
 	const entries: NavEntry[] = foldPast
 		? [
 				{
 					label: m.schedule_nav_past_weeks(),
-					href: `${base}#past-weeks`,
+					href: withAnchor(base, "past-weeks"),
 					children: weeks.past.map(link),
 				},
 				...weeks.ahead.map(link),
@@ -98,28 +99,30 @@ export interface HomeSections {
  * The page the reader is on passes its own `sections`, which fold under its
  * entry; the others show no sections, as they would not be on screen.
  */
-export function homeNav(href: string, here?: HomeSections): CourseNav {
-	const children = (page: HomeSections["page"], base: string): NavLink[] =>
+export function homeNav(course: CourseUrls, here?: HomeSections): CourseNav {
+	const children = (page: HomeSections["page"], base: Href): NavLink[] =>
 		here?.page === page
 			? here.sections.map(({ id, label }) => ({
 					label,
-					href: `${base}#${id}`,
+					href: withAnchor(base, id),
 				}))
 			: [];
+	const home = course.index();
+	const settings = course.settings();
 	return {
 		sections: [
 			{
 				entries: [
 					{
 						label: m.nav_course_tab_home(),
-						href,
-						children: children("home", href),
+						href: home,
+						children: children("home", home),
 					},
-					{ label: m.nav_course_tab_reports(), href: `${href}/reports` },
+					{ label: m.nav_course_tab_reports(), href: course.reports() },
 					{
 						label: m.nav_course_settings(),
-						href: `${href}/settings`,
-						children: children("settings", `${href}/settings`),
+						href: settings,
+						children: children("settings", settings),
 					},
 				],
 			},
@@ -151,14 +154,14 @@ export function studentHomeNav(
  * Links to the pages of the students tab: the roster, the grades and the
  * attendance of the class. Every one of those pages passes the same value.
  */
-export function studentsNav(href: string): CourseNav {
+export function studentsNav(course: CourseUrls): CourseNav {
 	return {
 		sections: [
 			{
 				entries: [
-					{ label: m.nav_students_roster(), href: `${href}/roster` },
-					{ label: m.nav_course_tab_grades(), href: `${href}/grades` },
-					{ label: m.attendance_page_heading(), href: `${href}/attendance` },
+					{ label: m.nav_students_roster(), href: course.roster() },
+					{ label: m.nav_course_tab_grades(), href: course.grades() },
+					{ label: m.attendance_page_heading(), href: course.attendance() },
 				],
 			},
 		],
@@ -168,8 +171,8 @@ export function studentsNav(href: string): CourseNav {
 const EXAM_TYPE_ORDER = ["EXAM", "QUIZ", "PRACTICE"] as const;
 
 /// The entry of the assignments list in the card of the exams tab.
-function assignmentsEntry(href: string, count: number): NavEntry {
-	const base = `${href}/assignments`;
+function assignmentsEntry(course: CourseUrls, count: number): NavEntry {
+	const base = course.assignments();
 	return {
 		label: m.assignments_nav_label(),
 		href: base,
@@ -183,7 +186,7 @@ function assignmentsEntry(href: string, count: number): NavEntry {
  * least one of them, and to the assignments when the actor sees any.
  */
 export function examsNav(
-	href: string,
+	course: CourseUrls,
 	exams: readonly {
 		slug: string;
 		title: string;
@@ -199,13 +202,13 @@ export function examsNav(
 				label: examTypeLabels[type],
 				entries: ofType.map((exam) => ({
 					label: exam.title,
-					href: `${href}/exams/${exam.slug}`,
+					href: course.exam(exam.slug).index(),
 				})),
 			},
 		];
 	});
 	if (assignments > 0) {
-		sections.push({ entries: [assignmentsEntry(href, assignments)] });
+		sections.push({ entries: [assignmentsEntry(course, assignments)] });
 	}
 	return { sections };
 }
@@ -214,13 +217,16 @@ export function examsNav(
  * Links to the pages of the exams tab an assignment page can show: the exams
  * and the assignments, which hold the page being read.
  */
-export function assignmentsNav(href: string, assignments: number): CourseNav {
+export function assignmentsNav(
+	course: CourseUrls,
+	assignments: number,
+): CourseNav {
 	return {
 		sections: [
 			{
 				entries: [
-					{ label: m.nav_course_tab_exams(), href: `${href}/exams` },
-					assignmentsEntry(href, assignments),
+					{ label: m.nav_course_tab_exams(), href: course.exams() },
+					assignmentsEntry(course, assignments),
 				],
 			},
 		],

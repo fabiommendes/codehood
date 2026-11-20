@@ -25,7 +25,7 @@ export const prerender = false;
 const { discipline, course: courseSegment, slug } = Astro.params;
 const result = await loadCourse(Astro, discipline, courseSegment);
 if ("redirect" in result) return result.redirect;
-const { course, href, tabs } = result;
+const { course, href, links, tabs } = result;
 
 // biome-ignore lint/style/noNonNullAssertion: every course page runs through loadCourse, which already required Astro.locals.user.
 const actor = Astro.locals.actor!;
@@ -55,11 +55,11 @@ const data = resource.data;
 // to the schedule tab instead and shows its weeks.
 const nav = resource.event
 	? {
-			...(await loadScheduleNav(course, href, actor, resource.title)),
+			...(await loadScheduleNav(course, links, actor, resource.title)),
 			tab: m.nav_course_tab_schedule(),
 		}
 	: resourcesNav(
-			href,
+			links,
 			groupResourcesByType(
 				splitByEvent(
 					await db.resource.findMany({ course: course.id }, { actor }),

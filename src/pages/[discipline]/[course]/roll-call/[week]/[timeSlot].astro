@@ -21,7 +21,7 @@ const result = await loadCourse(Astro, discipline, courseSegment, {
 	manage: true,
 });
 if ("redirect" in result) return result.redirect;
-const { course, href, tabs } = result;
+const { course, href, links, tabs } = result;
 
 // biome-ignore lint/style/noNonNullAssertion: loadCourse({ manage: true }) already required Astro.locals.user.
 const actor = Astro.locals.actor!;
@@ -57,7 +57,7 @@ const courseParams = {
 <AppLayout
   title={m.attendance_roll_call_page_title({ event: event.title })}
   trail={breadcrumbs(Astro.url, { course })}
-  nav={await loadScheduleNav(course, href, actor, `${m.schedule_week({ week: weekNumber })} · ${formatDateTime(event.startAt)}`)}
+  nav={await loadScheduleNav(course, links, actor, `${m.schedule_week({ week: weekNumber })} · ${formatDateTime(event.startAt)}`)}
 >
   <CourseHeader course={course} tabs={tabs} active="schedule" />
   <h2 class="mt-8 mb-4 page-subheader">{event.title}</h2>

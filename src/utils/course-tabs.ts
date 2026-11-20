@@ -7,7 +7,7 @@
 import type { Actor } from "@/auth/actor";
 import { type CourseTarget, hasPerm } from "@/auth/permissions";
 import { m } from "@/i18n";
-import { type CourseNaturalKey, courseHref } from "@/urls";
+import { type CourseNaturalKey, type Href, urls } from "@/urls";
 import { COURSE_TAB_LABELS } from "./breadcrumbs";
 
 export type CourseTabKey =
@@ -21,7 +21,7 @@ export type CourseTabKey =
 export interface CourseTab {
 	key: CourseTabKey;
 	label: string;
-	href: string;
+	href: Href;
 }
 
 /**
@@ -39,21 +39,23 @@ export function courseTabs(
 	ref: CourseNaturalKey,
 	actor: Actor,
 ): readonly CourseTab[] {
-	const href = courseHref(ref);
+	const links = urls.course(ref);
 	const manages = hasPerm(actor, "enrollment.manage", course);
-	const tab = (key: CourseTabKey, label: string, path: string): CourseTab => ({
+	const tab = (key: CourseTabKey, label: string, href: Href): CourseTab => ({
 		key,
 		label,
-		href: `${href}${path}`,
+		href,
 	});
 	return [
-		tab("home", m.nav_course_tab_home(), ""),
-		tab("schedule", COURSE_TAB_LABELS.schedule, "/schedule"),
-		...(manages ? [tab("students", COURSE_TAB_LABELS.roster, "/roster")] : []),
-		tab("resources", COURSE_TAB_LABELS.resources, "/resources"),
-		tab("exams", COURSE_TAB_LABELS.exams, "/exams"),
+		tab("home", m.nav_course_tab_home(), links.index()),
+		tab("schedule", COURSE_TAB_LABELS.schedule, links.schedule()),
 		...(manages
-			? [tab("questions", COURSE_TAB_LABELS.questions, "/questions")]
+			? [tab("students", COURSE_TAB_LABELS.roster, links.roster())]
+			: []),
+		tab("resources", COURSE_TAB_LABELS.resources, links.resources()),
+		tab("exams", COURSE_TAB_LABELS.exams, links.exams()),
+		...(manages
+			? [tab("questions", COURSE_TAB_LABELS.questions, links.questions())]
 			: []),
 	];
 }

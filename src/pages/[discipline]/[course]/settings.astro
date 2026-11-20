@@ -19,7 +19,7 @@ const result = await loadCourse(Astro, discipline, courseSegment, {
 	manage: true,
 });
 if ("redirect" in result) return result.redirect;
-const { course, href, tabs } = result;
+const { course, href, links, tabs } = result;
 
 const initCommand = [
 	"codehood init",
@@ -62,7 +62,7 @@ const courseFields = [
 
 <AppLayout title={m.courses_settings_page_title({ discipline: course.discipline.name })}
   trail={breadcrumbs(Astro.url, { course })}
-  nav={homeNav(href, {
+  nav={homeNav(links, {
     page: "settings",
     sections: [
       { id: "settings-course", label: m.courses_settings_course_heading() },

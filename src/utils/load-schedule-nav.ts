@@ -9,6 +9,7 @@ import {
 	type CourseSchedule,
 	courseSchedule,
 } from "@/services/course-schedule";
+import type { CourseUrls } from "@/urls";
 import type { CourseNav } from "./course-nav";
 import { scheduleNav } from "./course-tabs-nav";
 import { loadCourseExceptions } from "./load-exam-exceptions";
@@ -64,7 +65,7 @@ export async function loadSchedule(
  */
 export async function loadScheduleNav(
 	course: Course,
-	href: string,
+	links: CourseUrls,
 	actor: UserActor,
 	context?: string,
 ): Promise<CourseNav> {
@@ -73,6 +74,6 @@ export async function loadScheduleNav(
 		actor,
 		new Date(),
 	);
-	const nav = scheduleNav(href, { past, ahead }, foldPast);
+	const nav = scheduleNav(links, { past, ahead }, foldPast);
 	return context ? { ...nav, context } : nav;
 }

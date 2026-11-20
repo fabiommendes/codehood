@@ -1,7 +1,12 @@
 import { expect, test } from "@playwright/test";
+import { urls, withAnchor } from "@/urls";
 import { type CourseNav, markCourseNav } from "@/utils/course-nav";
 
 const exam = "/cs201/turing_2026-1/exams/test-02";
+/// The pages of the same exam, as the registry builds them.
+const links = urls
+	.course({ discipline: "cs201", instructor: "turing", edition: "2026-1" })
+	.exam("test-02");
 
 /// The same nav every page of an exam hands to the layout.
 const nav: CourseNav = {
@@ -11,18 +16,21 @@ const nav: CourseNav = {
 			entries: [
 				{
 					label: "Overview",
-					href: exam,
+					href: links.index(),
 					children: [
-						{ label: "Instructions", href: `${exam}#instructions` },
-						{ label: "Results", href: `${exam}#results` },
+						{
+							label: "Instructions",
+							href: withAnchor(links.index(), "instructions"),
+						},
+						{ label: "Results", href: withAnchor(links.index(), "results") },
 					],
 				},
 				{
 					label: "Grading",
-					href: `${exam}/grading`,
-					children: [{ label: "Q1", href: `${exam}/grading/q1` }],
+					href: links.grading(),
+					children: [{ label: "Q1", href: links.gradingQuestion("q1") }],
 				},
-				{ label: "Regrades", href: `${exam}/regrades` },
+				{ label: "Regrades", href: links.regrades() },
 			],
 		},
 	],
@@ -81,13 +89,15 @@ test.describe("markCourseNav", () => {
 
 	test("a query parameter the link carries must match", () => {
 		const withQuery: CourseNav = {
-			sections: [{ entries: [{ label: "A", href: "/x?page=a" }] }],
+			sections: [
+				{ entries: [{ label: "A", href: urls.calendar({ month: "a" }) }] },
+			],
 		};
 		const marked = (path: string) =>
 			markCourseNav(withQuery, new URL(path, "http://localhost")).sections[0]
 				?.entries[0]?.current;
-		expect(marked("/x?page=a&frame")).toBe(true);
-		expect(marked("/x?page=b")).toBe(false);
+		expect(marked("/calendar?month=a&frame")).toBe(true);
+		expect(marked("/calendar?month=b")).toBe(false);
 	});
 
 	test("a trailing slash does not matter", () => {

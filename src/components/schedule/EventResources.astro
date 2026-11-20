@@ -4,16 +4,17 @@
 // opens its page.
 import type { Resource } from "@/db";
 import { m } from "@/i18n";
+import type { CourseUrls } from "@/urls";
 import { RESOURCE_ICONS } from "@/utils/resource-icons";
 import { fileDownloadName, resourceHref } from "@/utils/resource-url";
 
 interface Props {
 	resources: Resource[];
-	/// The course's own URL, which note and snippet pages hang from.
-	href: string;
+	/// The pages of the course, among them the note and snippet pages.
+	course: CourseUrls;
 }
 
-const { resources, href } = Astro.props;
+const { resources, course } = Astro.props;
 ---
 
 {
@@ -25,7 +26,7 @@ const { resources, href } = Astro.props;
         return (
           <li>
             <a
-              href={resourceHref(resource, href)}
+              href={resourceHref(resource, course)}
               download={file ? fileDownloadName(resource, file) : undefined}
               target={external ? "_blank" : undefined}
               rel={external ? "noopener noreferrer" : undefined}

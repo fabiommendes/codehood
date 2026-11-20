@@ -30,7 +30,7 @@ export const prerender = false;
 const { discipline, course: courseSegment } = Astro.params;
 const result = await loadCourse(Astro, discipline, courseSegment);
 if ("redirect" in result) return result.redirect;
-const { course, href, tabs } = result;
+const { course, href, links, tabs } = result;
 
 // biome-ignore lint/style/noNonNullAssertion: every course page runs through loadCourse, which already required Astro.locals.user.
 const actor = Astro.locals.actor!;
@@ -98,7 +98,7 @@ if (!canWrite) {
 
 <AppLayout title={m.exams_list_page_title({ discipline: course.discipline.name })}
   trail={breadcrumbs(Astro.url, { course })}
-  nav={examsNav(href, canWrite ? exams : groups.flatMap((group) => group.exams), assignmentCount)}
+  nav={examsNav(links, canWrite ? exams : groups.flatMap((group) => group.exams), assignmentCount)}
 >
   <CourseHeader course={course} tabs={tabs} active="exams" />
 

@@ -7,7 +7,7 @@ import { m } from "@/i18n";
 import AppLayout from "@/layouts/AppLayout.astro";
 import { gradingQueue } from "@/services/grading";
 import { breadcrumbs } from "@/utils/breadcrumbs";
-import { gradingHref, wantsNames } from "@/utils/grading-urls";
+import { wantsNames } from "@/utils/grading-urls";
 import { gradingExamNav, loadGrading } from "@/utils/load-grading";
 import { questionKindLabel } from "@/utils/question-display";
 
@@ -16,7 +16,7 @@ export const prerender = false;
 const { discipline, course: courseSegment, slug } = Astro.params;
 const result = await loadGrading(Astro, discipline, courseSegment, slug);
 if ("redirect" in result) return result.redirect;
-const { course, href, tabs, exam, questions, answers } = result;
+const { course, href, links, tabs, exam, questions, answers } = result;
 const names = wantsNames(Astro.url);
 
 // biome-ignore lint/style/noNonNullAssertion: loadGrading already redirected an anonymous visitor.
@@ -106,7 +106,7 @@ const nothingLeft =
       rows.map((row) => (
         <li class="group card card-border bg-base-100 transition-colors hover:border-primary">
           <a
-            href={gradingHref(`${href}/exams/${exam.slug}/grading/${row.slug}`, { names })}
+            href={links.exam(exam.slug).gradingQuestion(row.slug, { names })}
             aria-labelledby={`queue-${row.slug}`}
             class="card-body flex-row items-center gap-4 py-4"
           >

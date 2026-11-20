@@ -1,3 +1,4 @@
+import type { CourseUrls } from "@/urls";
 import { extensionForMime } from "./mime";
 import { slugify } from "./slugify";
 
@@ -33,7 +34,7 @@ export function blobHref(
 
 /**
  * Where a resource's row leads: the file's download, the link itself, or the
- * resource's own page under `courseHref`.
+ * resource's own page in `course`.
  */
 export function resourceHref(
 	resource: {
@@ -45,7 +46,7 @@ export function resourceHref(
 					type: "MD" | "CODE";
 			  };
 	},
-	courseHref: string,
+	course: CourseUrls,
 ): string {
 	switch (resource.data.type) {
 		case "FILE":
@@ -53,6 +54,6 @@ export function resourceHref(
 		case "LINK":
 			return resource.data.url;
 		default:
-			return `${courseHref}/resources/${resource.slug}`;
+			return course.resource(resource.slug);
 	}
 }
