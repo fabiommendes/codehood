@@ -1,4 +1,5 @@
 ---
+import Link from "@/components/Link.astro";
 export const prerender = false;
 
 import { actions } from "astro:actions";
@@ -9,7 +10,7 @@ import PasswordConfirm from "@/components/PasswordConfirm.astro";
 import { inviteAccept } from "@/core/schemas/invite";
 import { db } from "@/db";
 import { actionForm } from "@/forms/form-state";
-import { escapeHtml, m } from "@/i18n";
+import { escapeHtml, linkHtml, m } from "@/i18n";
 import CenteredLayout from "@/layouts/CenteredLayout.astro";
 import { urls } from "@/urls";
 
@@ -75,7 +76,11 @@ const invitedHtml = invite
 		})
 	: "";
 const logInHref = urls.login({ next: urls.invite({ token: token ?? "" }) });
-const logInLink = `<a class="link link-primary" href="${escapeHtml(logInHref)}">${escapeHtml(m.auth_invite_log_in_to_join())}</a>`;
+const logInLink = linkHtml(
+	logInHref,
+	m.auth_invite_log_in_to_join(),
+	"link link-primary",
+);
 
 // GitHub and school id are optional for roles other than student.
 const form = await actionForm(Astro, actions.auth.acceptInvite, inviteAccept, {
@@ -127,9 +132,9 @@ const email = form.field("email");
     alreadyIn && href && (
       <>
         <p class="text-sm">{m.auth_invite_already_in()}</p>
-        <a href={href} class="btn btn-primary btn-block rounded-full">
+        <Link href={href} class="btn btn-primary btn-block rounded-full">
           {m.auth_invite_open_course()}
-        </a>
+        </Link>
       </>
     )
   }
@@ -156,7 +161,7 @@ const email = form.field("email");
           class="text-sm"
           set:html={m.auth_invite_logged_in_nothing_to_add({ name: escapeHtml(viewer.name) })}
         />
-        <a href="/" class="btn btn-block rounded-full">{m.auth_invite_go_home()}</a>
+        <Link href={urls.root()} class="btn btn-block rounded-full">{m.auth_invite_go_home()}</Link>
       </>
     )
   }

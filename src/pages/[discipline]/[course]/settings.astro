@@ -3,6 +3,7 @@
 // comes from the course repository) and the CLI commands that set up its repository.
 // It has no tab of its own: the course card on the home links it.
 import CourseHeader from "@/components/CourseHeader.astro";
+import Link from "@/components/Link.astro";
 import { PUBLIC_URL } from "@/core/constants";
 import { m } from "@/i18n";
 import AppLayout from "@/layouts/AppLayout.astro";
@@ -97,7 +98,7 @@ const courseFields = [
     <h2 id="settings-cli" class="page-subheader">{m.courses_settings_cli_heading()}</h2>
     <p class="mt-1 text-sm text-muted">
       {m.courses_settings_cli_intro()}{" "}
-      <a href={urls.gettingStarted()} class="link link-primary">{m.common_set_up_cli()}</a>
+      <Link href={urls.gettingStarted()} class="link link-primary">{m.common_set_up_cli()}</Link>
     </p>
     <div class="mt-4 flex flex-col gap-2">
       {cliCommands.map((command) => (

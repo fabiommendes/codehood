@@ -1,4 +1,5 @@
 ---
+import Link from "@/components/Link.astro";
 // The viewer's own schedule, aggregated across every course they take or
 // teach: what comes up next, then a month grid navigated with
 // ?month=YYYY-MM and the month's meetings and dated exams listed by day, so a
@@ -166,9 +167,11 @@ function startTime(instant: Date): string {
 }
 
 /// Where an entry leads: a meeting to its row on its course's schedule, an exam to its own page.
-function entryHref(entry: CalendarEntry): Href | undefined {
+function entryHref(entry: CalendarEntry): Href {
 	const links = courseLinks.get(entry.courseId);
-	if (!links) return undefined;
+	// Entries are read for `courseIds` only, so every one has its course here.
+	if (!links)
+		throw new Error(`No course ${entry.courseId} for a calendar entry`);
 	return entry.kind === "exam"
 		? links.exam(entry.exam.slug).index()
 		: withAnchor(links.schedule(), `event-${entry.event.id}`);
@@ -231,8 +234,8 @@ const monthLabel = new Intl.DateTimeFormat(locale, {
   <p class="mt-2 text-base-content/70">
     {m.schedule_calendar_subtitle()}
   </p>
-  <a href={urls.profile({ tab: "calendar" })} class="mt-1 inline-block text-sm text-primary hover:underline"
-    >{m.schedule_calendar_subscribe()}</a
+  <Link href={urls.profile({ tab: "calendar" })} class="mt-1 inline-block text-sm text-primary hover:underline"
+    >{m.schedule_calendar_subscribe()}</Link
   >
 
   {
@@ -308,9 +311,9 @@ const monthLabel = new Intl.DateTimeFormat(locale, {
     <div class="flex items-center justify-between">
       {
         hasPrev ? (
-          <a href={prevHref} class="btn btn-ghost btn-sm" aria-label={m.schedule_calendar_prev_month()}>
+          <Link href={prevHref} class="btn btn-ghost btn-sm" aria-label={m.schedule_calendar_prev_month()}>
             ←
-          </a>
+          </Link>
         ) : (
           <span class="btn btn-ghost btn-sm invisible" aria-hidden="true">
             ←
@@ -321,17 +324,17 @@ const monthLabel = new Intl.DateTimeFormat(locale, {
         <h2 class="font-display text-lg font-semibold">{monthLabel}</h2>
         {
           shownMonth !== currentMonth && (
-            <a href={todayHref} class="btn btn-outline btn-xs">
+            <Link href={todayHref} class="btn btn-outline btn-xs">
               {m.schedule_calendar_today()}
-            </a>
+            </Link>
           )
         }
       </div>
       {
         hasNext ? (
-          <a href={nextHref} class="btn btn-ghost btn-sm" aria-label={m.schedule_calendar_next_month()}>
+          <Link href={nextHref} class="btn btn-ghost btn-sm" aria-label={m.schedule_calendar_next_month()}>
             →
-          </a>
+          </Link>
         ) : (
           <span class="btn btn-ghost btn-sm invisible" aria-hidden="true">
             →
@@ -469,7 +472,7 @@ const monthLabel = new Intl.DateTimeFormat(locale, {
               <ul class="mt-2 divide-y divide-base-content/10 rounded-box border border-base-content/15 bg-base-200/50 group-target:border-primary">
                 {dayEntries.map((entry) => (
                   <li>
-                    <a
+                    <Link
                       href={entryHref(entry)}
                       class:list={[
                         "flex items-baseline gap-3 px-4 py-2.5 text-sm hover:bg-base-200",
@@ -521,7 +524,7 @@ const monthLabel = new Intl.DateTimeFormat(locale, {
                           </span>
                         </span>
                       )}
-                    </a>
+                    </Link>
                   </li>
                 ))}
               </ul>

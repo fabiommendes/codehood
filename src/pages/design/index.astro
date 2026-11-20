@@ -1,65 +1,67 @@
 ---
+import Link from "@/components/Link.astro";
 import PageKicker from "@/components/PageKicker.astro";
 import DesignLayout from "@/layouts/DesignLayout.astro";
+import { urls } from "@/urls";
 
 export const prerender = false;
 
 const sections = [
 	{
-		href: "/design/brand",
+		href: urls.design.brand(),
 		title: "Brand",
 		description:
 			"The logo in both themes, its flanks, small sizes and the ipê calendar.",
 	},
 	{
-		href: "/design/motifs",
+		href: urls.design.motifs(),
 		title: "Motifs",
 		description: "Athos Bulcão tiles, course tiles, icons and illustrations.",
 	},
 	{
-		href: "/design/themes",
+		href: urls.design.themes(),
 		title: "Themes",
 		description:
 			"The light and dark themes side by side, rendering the same screens.",
 	},
 	{
-		href: "/design/typography",
+		href: urls.design.typography(),
 		title: "Typography",
 		description:
 			"Fraunces, Atkinson Hyperlegible and JetBrains Mono: roles, heading scale, body copy, code.",
 	},
 	{
-		href: "/design/colors",
+		href: urls.design.colors(),
 		title: "Colors",
 		description:
 			"Cerrado (light) and Forest (dark) tokens side by side, with content colors and contrast notes.",
 	},
 	{
-		href: "/design/layouts",
+		href: urls.design.layouts.index(),
 		title: "Layouts",
 		description:
 			"The page shells the app is built from: Layout, AppLayout, CenteredLayout, DesignLayout.",
 	},
 	{
-		href: "/design/elements",
+		href: urls.design.elements(),
 		title: "Elements",
 		description:
 			"Buttons, badges, alerts and cards in both themes, and the loud and quiet screen rule.",
 	},
 	{
-		href: "/design/questions",
+		href: urls.design.questions(),
 		title: "Questions",
 		description:
 			"MultipleChoiceView in answer, readonly, and review mode, driven by real Question objects.",
 	},
 	{
-		href: "/design/forms",
+		href: urls.design.forms(),
 		title: "Forms",
 		description:
 			"Inputs, selects, textareas, checkboxes, radios and validation states.",
 	},
 	{
-		href: "/design/components",
+		href: urls.design.components.index(),
 		title: "Components",
 		description:
 			"Shared pieces and components of specific flows, by theme: base UI, course, schedule and attendance, exams, grading, reports.",
@@ -81,7 +83,7 @@ const sections = [
   <div class="grid grid-cols-1 gap-5 sm:grid-cols-2">
     {
       sections.map((section) => (
-        <a
+        <Link
           href={section.href}
           class="card card-border bg-base-100 transition-colors hover:border-primary"
         >
@@ -89,7 +91,7 @@ const sections = [
             <h2 class="card-title">{section.title}</h2>
             <p class="text-sm text-base-content/70">{section.description}</p>
           </div>
-        </a>
+        </Link>
       ))
     }
   </div>

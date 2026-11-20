@@ -1,5 +1,6 @@
 import { actions } from "astro:actions";
 import { createSignal, For, type JSX, onCleanup, Show } from "solid-js";
+import Link from "@/components/Link";
 import {
 	type ReportKind,
 	type ReportStatus,
@@ -8,6 +9,7 @@ import {
 } from "@/core/schemas/report";
 import { errorMessage } from "@/forms/field-errors";
 import { m } from "@/i18n";
+import { reportAttachmentUrl } from "@/urls";
 import {
 	REPORT_KIND_LABELS,
 	REPORT_STATUS_LABELS,
@@ -160,13 +162,20 @@ function ReportCard(props: {
 						<For each={props.row.attachments}>
 							{(attachment) => (
 								<li>
-									<a href={attachment.url} target="_blank" rel="noreferrer">
+									<Link
+										href={reportAttachmentUrl(
+											props.row.publicId,
+											attachment.filename,
+										)}
+										target="_blank"
+										rel="noreferrer"
+									>
 										<img
 											src={attachment.url}
 											alt={attachment.filename}
 											class="max-h-32 rounded-box border border-edge"
 										/>
-									</a>
+									</Link>
 								</li>
 							)}
 						</For>

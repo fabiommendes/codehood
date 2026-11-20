@@ -1,4 +1,5 @@
 ---
+import Link from "@/components/Link.astro";
 import PageKicker from "@/components/PageKicker.astro";
 import DesignLayout from "@/layouts/DesignLayout.astro";
 import { themes } from "./_themes";
@@ -20,12 +21,12 @@ export const prerender = false;
   <div class="grid grid-cols-1 gap-5 sm:grid-cols-2">
     {
       themes.map((theme) => (
-        <a href={theme.href} class="card card-border bg-base-100 transition-colors hover:border-primary">
+        <Link href={theme.href} class="card card-border bg-base-100 transition-colors hover:border-primary">
           <div class="card-body">
             <h2 class="card-title">{theme.label}</h2>
             <p class="text-sm text-base-content/70">{theme.description}</p>
           </div>
-        </a>
+        </Link>
       ))
     }
   </div>

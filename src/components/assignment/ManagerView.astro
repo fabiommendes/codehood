@@ -1,4 +1,5 @@
 ---
+import Link from "@/components/Link.astro";
 // The assignment page for whoever manages the course: counts, CLI commands,
 // the teams (or students) table with its composition dialogs, deadlines and
 // statement.
@@ -180,7 +181,7 @@ const deadlines = dated.flatMap(({ at, ...rest }) =>
 
 <div class="mt-8 flex flex-col gap-8">
   <header>
-    <a href={listHref} class="text-sm text-primary hover:underline">{m.assignments_back()}</a>
+    <Link href={listHref} class="text-sm text-primary hover:underline">{m.assignments_back()}</Link>
     <h2 class="mt-1 text-2xl font-bold">{assignment.title}</h2>
     <p class="text-sm text-muted">
       {individual

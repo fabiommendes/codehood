@@ -6,6 +6,7 @@ import {
 	type JSX,
 	onMount,
 } from "solid-js";
+import Link from "@/components/Link";
 import Badge from "@/components/ui/Badge";
 import Table, {
 	type ColumnConfig,
@@ -169,12 +170,12 @@ export default function ExamsTable(props: Props): JSX.Element {
 			class: "font-medium max-sm:basis-full max-sm:p-0",
 			sortKey: "title" satisfies SortField,
 			render: (exam) => (
-				<a
+				<Link
 					href={urls.course(props.courseRef).exam(exam.slug).index()}
 					class="link link-hover"
 				>
 					{exam.title}
-				</a>
+				</Link>
 			),
 		},
 		{

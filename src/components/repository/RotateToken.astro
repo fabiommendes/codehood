@@ -3,6 +3,7 @@
 // JS dialog in between. The confirmation posts the `repository.rotateToken` action.
 import { actions } from "astro:actions";
 import FormAlert from "@/components/form/FormAlert";
+import Link from "@/components/Link.astro";
 import { escapeHtml, m } from "@/i18n";
 import type { Href } from "@/urls";
 
@@ -35,7 +36,7 @@ const { discipline, course, slug, confirming, href, error } = Astro.props;
         })}
       />
       <div class="card-actions">
-        <a href={href} class="btn btn-ghost btn-sm">{m.repositories_rotate_cancel()}</a>
+        <Link href={href} class="btn btn-ghost btn-sm">{m.repositories_rotate_cancel()}</Link>
         <button type="submit" class="btn btn-warning btn-sm">{m.repositories_rotate_confirm()}</button>
       </div>
     </form>

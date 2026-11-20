@@ -16,7 +16,7 @@ import AttendanceRefused from "@/components/check-in/AttendanceRefused.astro";
 import AttendanceResult from "@/components/check-in/AttendanceResult.astro";
 import SignUpForm from "@/components/check-in/SignUpForm.astro";
 import type { RollCallId } from "@/core/schemas/base";
-import { escapeHtml, m } from "@/i18n";
+import { linkHtml, m } from "@/i18n";
 import CenteredLayout from "@/layouts/CenteredLayout.astro";
 import { urls } from "@/urls";
 
@@ -67,7 +67,11 @@ if (rollCallId !== null) {
 }
 
 const logInHref = urls.login({ next: Astro.url.pathname });
-const logInLink = `<a class="link link-primary" href="${escapeHtml(logInHref)}">${escapeHtml(m.auth_check_in_log_in())}</a>`;
+const logInLink = linkHtml(
+	logInHref,
+	m.auth_check_in_log_in(),
+	"link link-primary",
+);
 ---
 
 <CenteredLayout title={wantsSignUp ? m.auth_check_in_join_class() : m.auth_check_in_title()} quiet>

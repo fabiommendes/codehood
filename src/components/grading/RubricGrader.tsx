@@ -11,6 +11,7 @@ import {
 	untrack,
 } from "solid-js";
 import FormAlert from "@/components/form/FormAlert";
+import Link from "@/components/Link";
 import { scoreValue } from "@/core/score";
 import { errorMessage } from "@/forms/field-errors";
 import { m } from "@/i18n";
@@ -339,9 +340,9 @@ export default function RubricGrader(props: RubricGraderProps): JSX.Element {
 							>
 								{m.grades_grader_keep_reviewing()}
 							</button>
-							<a href={props.queueHref} class="btn btn-primary btn-sm">
+							<Link href={props.queueHref} class="btn btn-primary btn-sm">
 								{m.grades_grader_done_back()}
-							</a>
+							</Link>
 						</div>
 					</section>
 				}

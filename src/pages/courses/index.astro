@@ -1,5 +1,6 @@
 ---
 import EmptyState from "@/components/EmptyState.astro";
+import Link from "@/components/Link.astro";
 import PageKicker from "@/components/PageKicker.astro";
 import Alert from "@/components/ui/Alert";
 import { CursorPagination } from "@/components/ui/Pagination";
@@ -41,9 +42,9 @@ const courses = page.items;
     </div>
     {
       courses.length > 0 && (
-        <a href={urls.courses.join()} class="btn btn-primary rounded-full">
+        <Link href={urls.courses.join()} class="btn btn-primary rounded-full">
           {m.courses_list_join()}
-        </a>
+        </Link>
       )
     }
   </div>
@@ -60,9 +61,9 @@ const courses = page.items;
     courses.length === 0 ? (
       <EmptyState scene="constellation" title={m.courses_list_empty_title()} class="mt-10">
         {m.courses_list_empty_body()}
-        <a slot="actions" href={urls.courses.join()} class="btn btn-primary rounded-full">
+        <Link slot="actions" href={urls.courses.join()} class="btn btn-primary rounded-full">
           {m.courses_list_join()}
-        </a>
+        </Link>
       </EmptyState>
     ) : (
       <div class="mt-8 grid grid-cols-1 gap-5 sm:grid-cols-2 xl:grid-cols-3">
@@ -74,7 +75,7 @@ const courses = page.items;
           }).index();
           const isInstructor = course.instructor.username === actor.username;
           return (
-            <a
+            <Link
               href={href}
               class="card card-border bg-base-100 shadow-sm transition-shadow hover:shadow-md"
             >
@@ -95,7 +96,7 @@ const courses = page.items;
                   {m.courses_list_enrolled({ edition: course.edition.slug, count: course.enrollmentCount })}
                 </p>
               </div>
-            </a>
+            </Link>
           );
         })}
       </div>

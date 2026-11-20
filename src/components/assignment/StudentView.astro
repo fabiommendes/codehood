@@ -1,4 +1,5 @@
 ---
+import Link from "@/components/Link.astro";
 // An assignment as a student sees it inside a course: the delivery status
 // first, then the team panel, the deadlines and the statement.
 import Alert from "@/components/ui/Alert";
@@ -116,7 +117,7 @@ const deadlines = dated.filter((entry) => entry.show);
 
 <div class="mt-8 flex flex-col gap-8">
   <header>
-    <a href={listHref} class="text-sm text-primary hover:underline">{m.assignments_back()}</a>
+    <Link href={listHref} class="text-sm text-primary hover:underline">{m.assignments_back()}</Link>
     <div class="mt-1 flex flex-wrap items-center gap-3">
       <h2 class="text-2xl font-bold">{assignment.title}</h2>
       <Badge variant={badge.variant} style="soft">{badge.label}</Badge>

@@ -22,6 +22,7 @@ import {
 	scoreBlanks,
 	scoreResponse,
 } from "@/mdq";
+import type { Href } from "@/urls";
 import type { CodeBlocksHtml } from "@/utils/code-blocks";
 import { pretestSources } from "@/utils/pretest-sources";
 import { withViewTransition } from "@/utils/view-transition";
@@ -49,7 +50,7 @@ export interface QuestionPreviewProps {
 	/** The highlighted HTML of the model answer of a code question, from `highlightCode`. Trusted: never user HTML. */
 	keyHtml?: string;
 	/** The download URL of each attachment of the question by name, which an island can take as a prop; a name without one has no download link. */
-	attachmentUrls?: Readonly<Record<string, string>>;
+	attachmentUrls?: Readonly<Record<string, Href>>;
 	/** The highlighted fenced blocks of the question, from `highlightQuestionCodeBlocks`. */
 	codeBlocks?: CodeBlocksHtml;
 }

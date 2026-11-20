@@ -9,7 +9,7 @@ import FormAlert from "@/components/form/FormAlert";
 import PageKicker from "@/components/PageKicker.astro";
 import { db } from "@/db";
 import { errorMessage } from "@/forms/field-errors";
-import { m } from "@/i18n";
+import { linkHtml, m } from "@/i18n";
 import AppLayout from "@/layouts/AppLayout.astro";
 import { urls } from "@/urls";
 
@@ -26,7 +26,7 @@ const username = Astro.locals.actor.username;
 const server = Astro.url.origin;
 const codeTag = (text: string) =>
 	`<code class="rounded bg-base-200 px-1.5 py-0.5 font-mono text-xs">${text}</code>`;
-const profileLink = `<a href="${urls.profile()}" class="link">${m.auth_gs_profile_link()}</a>`;
+const profileLink = linkHtml(urls.profile(), m.auth_gs_profile_link(), "link");
 ---
 
 <AppLayout title={m.auth_gs_title()}>

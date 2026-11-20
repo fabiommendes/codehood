@@ -9,6 +9,7 @@ import {
 	ShortAnswer,
 	TrueFalse,
 } from "mdq/solid";
+import Link from "@/components/Link.astro";
 import { AnyQuestionView, mdqMessages } from "@/components/question/mdq";
 import Card from "@/components/ui/Card";
 import { locale } from "@/i18n";
@@ -30,6 +31,7 @@ import {
 	shortAnswer,
 	trueFalse,
 } from "@/mdq/fixtures";
+import { anchor } from "@/urls";
 import { areaFunction, capitals, greenhouse } from "./components/_fixtures";
 
 export const prerender = false;
@@ -475,13 +477,13 @@ const sectionLinks = [
         {
           sectionLinks.map((link) => (
             <li>
-              <a
-                href={`#${link.id}`}
+              <Link
+                href={anchor(link.id)}
                 data-section-link={link.id}
                 class="-ml-px block border-l-2 border-transparent py-1 pl-3 text-sm text-muted transition-colors hover:border-edge hover:text-base-content aria-current:border-primary aria-current:font-semibold aria-current:text-primary"
               >
                 {link.label}
-              </a>
+              </Link>
             </li>
           ))
         }

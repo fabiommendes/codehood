@@ -1,6 +1,7 @@
 import { actions } from "astro:actions";
 import { createSignal, type JSX, onCleanup, onMount, Show } from "solid-js";
 import FormAlert from "@/components/form/FormAlert";
+import Link from "@/components/Link";
 import { errorMessage } from "@/forms/field-errors";
 import { m } from "@/i18n";
 import type { Href } from "@/urls";
@@ -100,14 +101,14 @@ export default function RollCallProjector(
 	return (
 		<main class="flex h-screen max-h-screen flex-col gap-4 overflow-hidden bg-base-100 p-6 text-center">
 			<header class="mx-auto grid w-full max-w-2xl grid-cols-[1fr_auto_1fr] items-center gap-4">
-				<a
+				<Link
 					class="btn btn-ghost btn-circle justify-self-start"
 					href={props.manageHref}
 					aria-label={m.attendance_projector_back()}
 					title={m.attendance_projector_back()}
 				>
 					<BackIcon />
-				</a>
+				</Link>
 				<h1 class="text-3xl font-bold">{props.title}</h1>
 				<span class="badge badge-lg badge-neutral justify-self-end">
 					{m.attendance_projector_present({ count: shown().present })}

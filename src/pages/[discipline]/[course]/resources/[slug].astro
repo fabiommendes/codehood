@@ -1,5 +1,6 @@
 ---
 import CourseHeader from "@/components/CourseHeader.astro";
+import Link from "@/components/Link.astro";
 import CodeRunner from "@/components/runner/CodeRunner";
 import Badge from "@/components/ui/Badge";
 import { RUNNER_ORIGIN } from "@/core/constants";
@@ -95,12 +96,12 @@ const bodyHtml =
     active={resource.event ? "schedule" : "resources"}
   />
 
-  <a
+  <Link
     href={resource.event
       ? withAnchor(links.schedule(), `event-${resource.event.id}`)
       : links.resources()}
     class="text-sm text-muted hover:text-primary"
-    >{resource.event ? m.courses_resource_back_schedule() : m.courses_resource_back_resources()}</a
+    >{resource.event ? m.courses_resource_back_schedule() : m.courses_resource_back_resources()}</Link
   >
 
   <div class="mt-2 flex flex-wrap items-center gap-2">

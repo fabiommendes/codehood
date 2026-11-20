@@ -2,6 +2,7 @@
 import CourseHeader from "@/components/CourseHeader.astro";
 import QuestionNumber from "@/components/exam/QuestionNumber.astro";
 import { pointsByPosition } from "@/components/exam/question-points";
+import Link from "@/components/Link.astro";
 import { db } from "@/db";
 import { m } from "@/i18n";
 import AppLayout from "@/layouts/AppLayout.astro";
@@ -105,7 +106,7 @@ const nothingLeft =
     {
       rows.map((row) => (
         <li class="group card card-border bg-base-100 transition-colors hover:border-primary">
-          <a
+          <Link
             href={links.exam(exam.slug).gradingQuestion(row.slug, { names })}
             aria-labelledby={`queue-${row.slug}`}
             class="card-body flex-row items-center gap-4 py-4"
@@ -116,7 +117,7 @@ const nothingLeft =
               {row.kind && <p class="text-sm text-muted">{row.kind}</p>}
             </div>
             <span class="text-sm">{row.counts}</span>
-          </a>
+          </Link>
         </li>
       ))
     }

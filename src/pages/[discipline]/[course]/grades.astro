@@ -2,6 +2,7 @@
 import CourseHeader from "@/components/CourseHeader.astro";
 import CsvDownload from "@/components/CsvDownload.astro";
 import GradesTable from "@/components/grading/GradesTable.astro";
+import Link from "@/components/Link.astro";
 import { db } from "@/db";
 import { m } from "@/i18n";
 import AppLayout from "@/layouts/AppLayout.astro";
@@ -58,7 +59,7 @@ const csvFilename = `grades-${course.discipline.slug}-${course.edition.slug}.csv
     ) : table.rows.length === 0 ? (
       <div class="mt-4">
         <p class="text-muted">{m.grades_page_no_students()}</p>
-        <a href={links.roster()} class="link mt-2 inline-block">{m.grades_page_students_link()}</a>
+        <Link href={links.roster()} class="link mt-2 inline-block">{m.grades_page_students_link()}</Link>
       </div>
     ) : (
       <GradesTable course={links} table={table} pushed={pushed} attendance={attendance} />

@@ -2,6 +2,7 @@
 import { hasPerm } from "@/auth/permissions";
 import CliSetupLink from "@/components/CliSetupLink.astro";
 import CourseHeader from "@/components/CourseHeader.astro";
+import Link from "@/components/Link.astro";
 import Alert from "@/components/ui/Alert";
 import { db, groupResourcesByType } from "@/db";
 import { escapeHtml, m } from "@/i18n";
@@ -66,7 +67,7 @@ function code(text: string): string {
     {repositories.map((repository) => (
       <li class="card border border-base-content/15 bg-base-200/50">
         <div class="card-body gap-1 p-4">
-          <a href={links.repository(repository.slug)} class="link link-hover font-medium">{repository.title}</a>
+          <Link href={links.repository(repository.slug)} class="link link-hover font-medium">{repository.title}</Link>
           {repository.head ? (
             <p class="text-sm text-muted">
               {repository.message}

@@ -6,12 +6,13 @@ import { C, O, roof, wall } from "@/components/brand/paper";
 import Scene from "@/components/brand/Scene.astro";
 import type { SceneName } from "@/components/brand/scenes";
 import CourseTile from "@/components/CourseTile.astro";
+import Link from "@/components/Link.astro";
 import Logo from "@/components/Logo.astro";
 import AppFooter from "@/components/nav/AppFooter.astro";
 import ThemeToggle from "@/components/ThemeToggle.astro";
 import { m } from "@/i18n";
 import Layout from "@/layouts/Layout.astro";
-import { urls } from "@/urls";
+import { anchor, urls } from "@/urls";
 
 export const prerender = false;
 
@@ -70,10 +71,10 @@ const features: { scene: SceneName; title: string; body: string }[] = [
   <div class="min-h-screen text-base-content">
     <header class="border-b border-edge">
       <div class="wrap flex items-center justify-between py-3">
-        <a href="#top" aria-label={m.auth_home_logo_label()}><Logo height={40} /></a>
+        <Link href={anchor("top")} aria-label={m.auth_home_logo_label()}><Logo height={40} /></Link>
         <div class="flex items-center gap-2">
           <ThemeToggle />
-          <a class="btn btn-primary" href={urls.login()}>{m.auth_login_action()}</a>
+          <Link class="btn btn-primary" href={urls.login()}>{m.auth_login_action()}</Link>
         </div>
       </div>
     </header>
@@ -87,9 +88,9 @@ const features: { scene: SceneName; title: string; body: string }[] = [
             {m.auth_home_lead()}
           </p>
           <div class="mt-8 flex flex-wrap items-center gap-4">
-            <a class="btn btn-primary btn-lg" href={urls.login()}>{m.auth_login_action()}</a>
-            <a class="link link-hover font-bold" href="#how-it-works">{m.auth_home_see_how()}</a>
-            <a class="link link-hover font-bold" href="#join">{m.auth_home_have_code()}</a>
+            <Link class="btn btn-primary btn-lg" href={urls.login()}>{m.auth_login_action()}</Link>
+            <Link class="link link-hover font-bold" href={anchor("how-it-works")}>{m.auth_home_see_how()}</Link>
+            <Link class="link link-hover font-bold" href={anchor("join")}>{m.auth_home_have_code()}</Link>
           </div>
         </div>
 
@@ -233,7 +234,7 @@ const features: { scene: SceneName; title: string; body: string }[] = [
                   />
                 </fieldset>
                 <button type="submit" class="btn btn-primary">{m.auth_join_submit()}</button>
-                <a class="btn btn-ghost" href={urls.login()}>{m.auth_login_action()}</a>
+                <Link class="btn btn-ghost" href={urls.login()}>{m.auth_login_action()}</Link>
               </form>
             </div>
           </div>

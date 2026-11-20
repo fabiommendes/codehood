@@ -14,6 +14,7 @@ import Icon from "@/components/grading/Icon.astro";
 import ObjectiveReview from "@/components/grading/ObjectiveReview.astro";
 import PassHistory from "@/components/grading/PassHistory.astro";
 import RubricGrader from "@/components/grading/RubricGrader";
+import Link from "@/components/Link.astro";
 import { db } from "@/db";
 import { loadResultPolicy } from "@/db/result-policy";
 import { m } from "@/i18n";
@@ -281,7 +282,7 @@ const review = auto
 >
   <CourseHeader course={course} tabs={tabs} active="exams" />
 
-  <a href={examLinks.grading({ names })} class="text-sm text-muted hover:text-primary">← {m.grades_question_back()}</a>
+  <Link href={examLinks.grading({ names })} class="text-sm text-muted hover:text-primary">← {m.grades_question_back()}</Link>
 
   <p class="mt-2 text-sm">
     <QuestionNumber number={position + 1} points={points} />
@@ -290,24 +291,24 @@ const review = auto
   {auto ? (
     <div class="relative flex items-center gap-2">
       {previous ? (
-        <a href={examLinks.gradingQuestion(previous, { view: wantedList ? "list" : undefined, names })} class="btn btn-ghost btn-sm btn-square text-base-content/60 lg:absolute lg:right-full lg:mr-1" aria-label={m.grades_question_previous()} title={m.grades_question_previous()}>
+        <Link href={examLinks.gradingQuestion(previous, { view: wantedList ? "list" : undefined, names })} class="btn btn-ghost btn-sm btn-square text-base-content/60 lg:absolute lg:right-full lg:mr-1" aria-label={m.grades_question_previous()} title={m.grades_question_previous()}>
           <Icon name="chevronLeft" />
-        </a>
+        </Link>
       ) : <span class="btn btn-ghost btn-sm btn-square invisible lg:absolute lg:right-full lg:mr-1" aria-hidden="true"></span>}
       <h2 class="page-subheader">{title}</h2>
       {next && (
-        <a href={examLinks.gradingQuestion(next, { view: wantedList ? "list" : undefined, names })} class="btn btn-ghost btn-sm btn-square text-base-content/60" aria-label={m.grades_question_next()} title={m.grades_question_next()}>
+        <Link href={examLinks.gradingQuestion(next, { view: wantedList ? "list" : undefined, names })} class="btn btn-ghost btn-sm btn-square text-base-content/60" aria-label={m.grades_question_next()} title={m.grades_question_next()}>
           <Icon name="chevronRight" />
-        </a>
+        </Link>
       )}
     </div>
   ) : <h2 class="page-subheader">{title}</h2>}
 
   {!auto && <nav class="mt-3 flex gap-4 text-sm">
-    {previous && <a href={examLinks.gradingQuestion(previous, { view: wantedList ? "list" : undefined, names })} class="link">{m.grades_question_previous()}</a>}
-    {next && <a href={examLinks.gradingQuestion(next, { view: wantedList ? "list" : undefined, names })} class="link">{m.grades_question_next()}</a>}
-    <a href={examLinks.gradingQuestion(questionSlug, { view: listView ? undefined : "list", names })} class="link">{listView ? m.grades_question_view_one() : m.grades_question_view_list()}</a>
-    <a href={examLinks.gradingQuestion(questionSlug, { view: wantedList ? "list" : undefined, names: !names })} role="switch" aria-checked={names ? "true" : "false"} class="link ml-auto">{m.grades_question_show_names()}</a>
+    {previous && <Link href={examLinks.gradingQuestion(previous, { view: wantedList ? "list" : undefined, names })} class="link">{m.grades_question_previous()}</Link>}
+    {next && <Link href={examLinks.gradingQuestion(next, { view: wantedList ? "list" : undefined, names })} class="link">{m.grades_question_next()}</Link>}
+    <Link href={examLinks.gradingQuestion(questionSlug, { view: listView ? undefined : "list", names })} class="link">{listView ? m.grades_question_view_one() : m.grades_question_view_list()}</Link>
+    <Link href={examLinks.gradingQuestion(questionSlug, { view: wantedList ? "list" : undefined, names: !names })} role="switch" aria-checked={names ? "true" : "false"} class="link ml-auto">{m.grades_question_show_names()}</Link>
   </nav>}
 
   {versionMissing && (
@@ -374,7 +375,7 @@ const review = auto
             {shown.map(({ answer, result }, position) => (
               <div id={`answer-${answer.submission}`} hidden={position !== 0}>
                 {openRegrades.has(answer.submission) && (
-                  <a href={withAnchor(regradesHref, `regrade-${openRegrades.get(answer.submission)}`)} class="badge badge-warning badge-sm">{m.grades_regrade_requested()}</a>
+                  <Link href={withAnchor(regradesHref, `regrade-${openRegrades.get(answer.submission)}`)} class="badge badge-warning badge-sm">{m.grades_regrade_requested()}</Link>
                 )}
                 {sanctionLabel(answer.author) && <span class="badge badge-error badge-sm">{sanctionLabel(answer.author)}</span>}
                 {answer.passes.some((pass) => pass.notes !== undefined) && (
@@ -421,7 +422,7 @@ const review = auto
             <div class="card-body">
               <p class="text-sm font-semibold text-muted">{label}</p>
               {openRegrades.has(answer.submission) && (
-                <a href={withAnchor(regradesHref, `regrade-${openRegrades.get(answer.submission)}`)} class="badge badge-warning badge-sm">{m.grades_regrade_requested()}</a>
+                <Link href={withAnchor(regradesHref, `regrade-${openRegrades.get(answer.submission)}`)} class="badge badge-warning badge-sm">{m.grades_regrade_requested()}</Link>
               )}
               {sanctionLabel(answer.author) && <span class="badge badge-error badge-sm">{sanctionLabel(answer.author)}</span>}
               {answer.passes.some((pass) => pass.notes !== undefined) && (

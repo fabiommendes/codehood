@@ -1,4 +1,5 @@
 import { createMemo, createSignal, type JSX, Show } from "solid-js";
+import Link from "@/components/Link";
 import { m } from "@/i18n";
 import { adjustTotal, formatScore } from "@/services/exam-result";
 import type { RosterRow, RosterStatus } from "@/services/grading";
@@ -169,7 +170,7 @@ export default function AttemptActions(props: Props): JSX.Element {
 								sortKey: "name",
 								sortValue: (row) => row.name,
 								render: (row) => (
-									<a
+									<Link
 										class="link link-hover font-medium"
 										href={urls
 											.course(props.courseRef)
@@ -177,7 +178,7 @@ export default function AttemptActions(props: Props): JSX.Element {
 											.attempt(row.username)}
 									>
 										{row.name}
-									</a>
+									</Link>
 								),
 							},
 							{

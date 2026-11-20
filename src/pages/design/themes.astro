@@ -20,6 +20,8 @@ import {
 	seg,
 	wall,
 } from "@/components/brand/paper";
+import Link from "@/components/Link.astro";
+import { anchor } from "@/urls";
 
 export const prerender = false;
 
@@ -293,12 +295,12 @@ const glowIf = (t: Theme, p: Part) =>
 
             <div class="layout">
               <nav class="sidebar">
-                <a href="#" class="active">Home</a>
-                <a href="#">My courses</a>
-                <a href="#">Calendar</a>
+                <Link href={anchor("")} class="active">Home</Link>
+                <Link href={anchor("")}>My courses</Link>
+                <Link href={anchor("")}>Calendar</Link>
                 <p class="eyebrow">Courses</p>
                 {COURSES.map((c) => (
-                  <a href="#" class="course-link">
+                  <Link href={anchor("")} class="course-link">
                     <svg viewBox="0 0 60 60" aria-hidden="true">
                       {courseTile(c.code, t.figures, t.grounds).map((tile) => (
                         <g style={`transform:rotate(${tile.rotate}deg);transform-box:fill-box;transform-origin:center`}>
@@ -308,7 +310,7 @@ const glowIf = (t: Theme, p: Part) =>
                       ))}
                     </svg>
                     {c.code}
-                  </a>
+                  </Link>
                 ))}
               </nav>
 
@@ -389,7 +391,7 @@ const glowIf = (t: Theme, p: Part) =>
                     <input type="text" value="ada@example.edu" />
                   </label>
                   <p>
-                    Body text with a <a href="#">link</a> and <code>inline code</code>.
+                    Body text with a <Link href={anchor("")}>link</Link> and <code>inline code</code>.
                   </p>
                 </div>
 

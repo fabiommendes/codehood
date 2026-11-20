@@ -13,6 +13,7 @@ import {
 } from "solid-js";
 import FormAlert from "@/components/form/FormAlert";
 import AppliedItems from "@/components/grading/AppliedItems";
+import Link from "@/components/Link";
 import type { Exam, QuestionPublic } from "@/db";
 import { errorMessage } from "@/forms/field-errors";
 import { m } from "@/i18n";
@@ -30,6 +31,7 @@ import {
 import type { AttemptState } from "@/services/exam-state";
 import type { ReviewResult } from "@/services/review";
 import {
+	anchor,
 	type CourseRef,
 	examQuestionAttachmentUrl,
 	examSubmissionFileUrl,
@@ -1663,8 +1665,8 @@ function AttemptBar(props: AttemptBarProps): JSX.Element {
 				>
 					<Index each={props.questions}>
 						{(question) => (
-							<a
-								href={`#question-${question().number}`}
+							<Link
+								href={anchor(`question-${question().number}`)}
 								aria-label={
 									question().answered
 										? m.exams_attempt_question_answered({
@@ -1698,7 +1700,7 @@ function AttemptBar(props: AttemptBarProps): JSX.Element {
 										number: question().number,
 									})}
 								</span>
-							</a>
+							</Link>
 						)}
 					</Index>
 				</nav>
@@ -1742,14 +1744,14 @@ function SessionLostNotice(props: { next: string }): JSX.Element {
 	return (
 		<div role="alert" class="alert alert-error mt-2 text-sm">
 			<span>{m.exams_attempt_session_lost()}</span>
-			<a
+			<Link
 				href={href()}
 				target="_blank"
 				rel="noopener"
 				class="btn btn-sm btn-primary"
 			>
 				{m.exams_attempt_session_lost_link()}
-			</a>
+			</Link>
 		</div>
 	);
 }
@@ -1921,10 +1923,14 @@ function Outcome(props: {
 								{formatScore(outcome().score ?? 0)}
 							</Match>
 							<Match when={outcome().status === "pending" && props.manualKey}>
-								{m.exams_preview_manual_grading()}{" "}
-								<a href={props.manualKey} class="link font-normal">
-									{m.exams_preview_answer_key()}
-								</a>
+								{(manualKey) => (
+									<>
+										{m.exams_preview_manual_grading()}{" "}
+										<Link href={manualKey()} class="link font-normal">
+											{m.exams_preview_answer_key()}
+										</Link>
+									</>
+								)}
 							</Match>
 							<Match when={outcome().status === "pending"}>
 								{m.exams_attempt_waiting()}

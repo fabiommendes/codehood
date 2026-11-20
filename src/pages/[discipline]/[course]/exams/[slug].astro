@@ -6,6 +6,7 @@ import CloseExam from "@/components/exam/CloseExam";
 import ExamAttempt from "@/components/exam/ExamAttempt";
 import ExamQuestionsTable from "@/components/exam/ExamQuestionsTable.astro";
 import ReleaseGrades from "@/components/exam/ReleaseGrades";
+import Link from "@/components/Link.astro";
 import AttachmentList from "@/components/question/AttachmentList";
 import ReleasedScore from "@/components/ReleasedScore.astro";
 import {
@@ -309,9 +310,9 @@ const examOutcome = view.result;
             count: pendingAnswers,
           })}
         </span>
-        <a href={examLinks.grading()} class="btn btn-primary btn-sm">
+        <Link href={examLinks.grading()} class="btn btn-primary btn-sm">
           {m.exams_detail_grade_answers()}
-        </a>
+        </Link>
       </div>
     )
   }
@@ -319,9 +320,9 @@ const examOutcome = view.result;
   {
     canManage && openRegrades > 0 && (
       <p role="status" class="mt-6 rounded-box border border-edge bg-base-200 p-4 text-sm">
-        <a href={examLinks.regrades()} class="link font-medium">
+        <Link href={examLinks.regrades()} class="link font-medium">
           {m.grades_regrade_banner({ count: openRegrades })}
-        </a>
+        </Link>
       </p>
     )
   }
@@ -352,7 +353,7 @@ const examOutcome = view.result;
             {releaseBlocker === "pending" && (
               <>
                 {" "}
-                <a href={examLinks.grading()} class="link">{m.exams_detail_grade_answers()}</a>
+                <Link href={examLinks.grading()} class="link">{m.exams_detail_grade_answers()}</Link>
               </>
             )}
           </p>

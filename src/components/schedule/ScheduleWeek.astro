@@ -1,4 +1,5 @@
 ---
+import Link from "@/components/Link.astro";
 import OpenRollCallDialog from "@/components/roll-call/OpenRollCallDialog";
 // One week of a course's schedule: a heading and a card with a row per
 // meeting or exam. Each row carries an anchor (`event-<id>`, `exam-<slug>`)
@@ -131,7 +132,7 @@ function faded(entry: CalendarEntry): boolean {
                   {entry.event.title}
                 </p>
               ) : (
-                <a
+                <Link
                   href={links.exam(entry.exam.slug).index()}
                   class:list={[
                     "link link-hover font-medium",
@@ -139,7 +140,7 @@ function faded(entry: CalendarEntry): boolean {
                   ]}
                 >
                   {entry.exam.title}
-                </a>
+                </Link>
               )}
               {entry === next && <span class="badge badge-primary badge-sm">{m.schedule_badge_next()}</span>}
               {entry.kind === "event" && attendance.get(rollCallKey(entry.event)) === "present" && (
@@ -150,12 +151,12 @@ function faded(entry: CalendarEntry): boolean {
               )}
               {entry.kind === "event" && rollCallManager && entry.event.kind === "REGULAR" && (
                 rollCallKeys.has(rollCallKey(entry.event)) ? (
-                  <a
+                  <Link
                     href={links.rollCall(entry.event.week, entry.event.timeSlot.slug)}
                     class="btn btn-outline btn-sm"
                   >
                     {m.schedule_roll_call()}
-                  </a>
+                  </Link>
                 ) : rollCallOpenable(entry, now) && (
                   <OpenRollCallDialog
                     client:load

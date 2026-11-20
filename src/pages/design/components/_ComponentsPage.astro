@@ -1,5 +1,7 @@
 ---
+import Link from "@/components/Link.astro";
 import DesignLayout from "@/layouts/DesignLayout.astro";
+import { anchor, type Href, urls } from "@/urls";
 import { themes } from "./_themes";
 
 /**
@@ -9,7 +11,7 @@ import { themes } from "./_themes";
  */
 interface Props {
 	/// Which theme this is: its `href` in `themes`.
-	href: (typeof themes)[number]["href"];
+	href: Href;
 	/// Anchors of the sections, in page order.
 	sections: readonly { id: string; label: string }[];
 }
@@ -21,16 +23,16 @@ const label = theme?.label ?? "";
 
 <DesignLayout title={`${label} components`} active="components">
   <nav aria-label="Component themes" class="mb-8 flex flex-wrap gap-2">
-    <a href="/design/components" class="btn btn-sm btn-ghost">All</a>
+    <Link href={urls.design.components.index()} class="btn btn-sm btn-ghost">All</Link>
     {
       themes.map((t) => (
-        <a
+        <Link
           href={t.href}
           class:list={["btn btn-sm", t.href === href ? "btn-active btn-primary" : "btn-ghost"]}
           aria-current={t.href === href ? "page" : undefined}
         >
           {t.label}
-        </a>
+        </Link>
       ))
     }
   </nav>
@@ -42,12 +44,12 @@ const label = theme?.label ?? "";
         {
           sections.map((link) => (
             <li>
-              <a
-                href={`#${link.id}`}
+              <Link
+                href={anchor(link.id)}
                 class="-ml-px block border-l-2 border-transparent py-1 pl-3 text-sm text-muted transition-colors hover:border-edge hover:text-base-content"
               >
                 {link.label}
-              </a>
+              </Link>
             </li>
           ))
         }

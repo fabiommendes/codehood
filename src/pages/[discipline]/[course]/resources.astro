@@ -5,7 +5,7 @@ import CourseHeader from "@/components/CourseHeader.astro";
 import ListRow from "@/components/ListRow.astro";
 import Alert from "@/components/ui/Alert";
 import { db, groupResourcesByType } from "@/db";
-import { escapeHtml, m } from "@/i18n";
+import { escapeHtml, linkHtml, m } from "@/i18n";
 import AppLayout from "@/layouts/AppLayout.astro";
 import { splitByEvent } from "@/services/event-resources";
 import { breadcrumbs } from "@/utils/breadcrumbs";
@@ -53,7 +53,7 @@ function code(text: string): string {
   <CourseHeader course={course} tabs={tabs} active="resources" />
 
   {hasEventResources && <p class="mt-4 text-sm text-muted" set:html={m.courses_resources_on_schedule({
-    schedule: `<a href="${escapeHtml(links.schedule())}" class="link">${escapeHtml(m.courses_resources_schedule_link())}</a>`,
+    schedule: linkHtml(links.schedule(), m.courses_resources_schedule_link(), "link"),
   })} />}
   {
     all.length === 0 && canWrite && (

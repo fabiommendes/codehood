@@ -1,5 +1,7 @@
 ---
+import Link from "@/components/Link.astro";
 import DesignLayout from "@/layouts/DesignLayout.astro";
+import { anchor } from "@/urls";
 
 export const prerender = false;
 
@@ -190,9 +192,9 @@ const themes = [
                   Secondary text, <span class="font-mono text-xs">text-muted</span>,{" "}
                   <span class="font-mono text-xs">{theme.key === "light" ? "#575f5a" : "#8fb3a4"}</span>
                 </p>
-                <a href="#colors" class="link link-primary w-fit">
+                <Link href={anchor("colors")} class="link link-primary w-fit">
                   A link in primary
-                </a>
+                </Link>
                 {theme.key === "dark" && (
                   <p class="flex items-center gap-2">
                     <span class="inline-block size-3 rounded-full" style="background:#b5f000" />

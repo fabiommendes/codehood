@@ -20,9 +20,9 @@ import EventRepositories from "@/components/schedule/EventRepositories.astro";
 import EventResources from "@/components/schedule/EventResources.astro";
 import ScheduleWeek from "@/components/schedule/ScheduleWeek.astro";
 import { CheckInError } from "@/core/error";
-import { escapeHtml, m } from "@/i18n";
+import { linkHtml, m } from "@/i18n";
 import { checkInQrSvg } from "@/services/roll-call-qr";
-import { urls } from "@/urls";
+import { anchor, urls } from "@/urls";
 import ComponentsPage from "./_ComponentsPage.astro";
 import {
 	attendanceReport,
@@ -174,7 +174,11 @@ const refusals: {
 	},
 ];
 
-const logInLink = `<a class="link link-primary" href="#">${escapeHtml(m.auth_check_in_log_in())}</a>`;
+const logInLink = linkHtml(
+	anchor(""),
+	m.auth_check_in_log_in(),
+	"link link-primary",
+);
 
 //
 // Roll call: instructor.
@@ -249,7 +253,7 @@ const sections = [
 ];
 ---
 
-<ComponentsPage href="/design/components/schedule" sections={sections}>
+<ComponentsPage href={urls.design.components.schedule()} sections={sections}>
   <Fragment slot="intro">
     Meetings and attendance: what a student sees after scanning a roll call code, the instructor's roll call page, the
     classroom projection and the button that starts a roll call. Buttons above each component switch between the

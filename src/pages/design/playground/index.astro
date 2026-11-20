@@ -1,6 +1,8 @@
 ---
+import Link from "@/components/Link.astro";
 import PageKicker from "@/components/PageKicker.astro";
 import DesignLayout from "@/layouts/DesignLayout.astro";
+import { playgroundPage } from "@/urls";
 
 export const prerender = false;
 
@@ -13,7 +15,7 @@ const pages = Object.keys(import.meta.glob("./**/*.astro"))
 			.slice(2)
 			.replace(/\.astro$/, "")
 			.replace(/\/index$/, "");
-		return { route, href: `/design/playground/${route}` };
+		return { route, href: playgroundPage(route) };
 	})
 	.sort((a, b) => a.route.localeCompare(b.route));
 ---
@@ -35,9 +37,9 @@ const pages = Object.keys(import.meta.glob("./**/*.astro"))
       <ul class="menu rounded-box border border-edge bg-base-100">
         {pages.map((page) => (
           <li>
-            <a href={page.href} class="font-mono text-sm">
+            <Link href={page.href} class="font-mono text-sm">
               {page.route}
-            </a>
+            </Link>
           </li>
         ))}
       </ul>

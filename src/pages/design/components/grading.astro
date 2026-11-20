@@ -16,6 +16,7 @@ import type {
 	AnswerDistribution as Distribution,
 	QuestionStats as Stats,
 } from "@/services/question-stats";
+import { urls } from "@/urls";
 import ComponentsPage from "./_ComponentsPage.astro";
 import {
 	areaFunction,
@@ -362,7 +363,7 @@ const sections = [
 ];
 ---
 
-<ComponentsPage href="/design/components/grading" sections={sections}>
+<ComponentsPage href={urls.design.components.grading()} sections={sections}>
   <Fragment slot="intro">
     What happens to an answer once it is submitted: the rubric items applied to it, the student's request for a
     regrade, the instructor's reply and the statistics of the exam's questions. Buttons above each component switch

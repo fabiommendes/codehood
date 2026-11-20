@@ -8,6 +8,7 @@ import {
 	Show,
 } from "solid-js";
 import { createStore, reconcile } from "solid-js/store";
+import Link from "@/components/Link";
 import { errorMessage } from "@/forms/field-errors";
 import { m } from "@/i18n";
 import type { Href } from "@/urls";
@@ -258,9 +259,9 @@ export default function RollCallManager(
 						</Reserve>
 					</span>
 					<div class="ml-auto flex gap-2">
-						<a class="btn btn-primary btn-sm" href={props.projectHref}>
+						<Link class="btn btn-primary btn-sm" href={props.projectHref}>
 							{m.attendance_manager_project()}
-						</a>
+						</Link>
 						<button
 							type="button"
 							class="btn btn-outline btn-sm"

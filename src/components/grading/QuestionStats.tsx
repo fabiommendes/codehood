@@ -1,6 +1,7 @@
 import type { JSX } from "solid-js";
 import { createMemo, createSignal, Show } from "solid-js";
 import QuestionNumber from "@/components/exam/QuestionNumber";
+import Link from "@/components/Link";
 import Table, { type ColumnConfig } from "@/components/ui/Table";
 import {
 	compareNullsLast,
@@ -151,12 +152,12 @@ export default function QuestionStats(props: Props): JSX.Element {
 						class="min-w-8 text-lg font-bold tabular-nums"
 					/>
 					<div class="min-w-0">
-						<a
+						<Link
 							href={links().gradingQuestion(entry.question, { view: "list" })}
 							class="link"
 						>
 							{props.titles.get(entry.question) ?? entry.question}
-						</a>
+						</Link>
 						<Show when={props.points[entry.position - 1]}>
 							{(points) => (
 								<p class="text-xs tabular-nums text-muted">
@@ -187,9 +188,9 @@ export default function QuestionStats(props: Props): JSX.Element {
 		),
 		numeric(m.grades_stats_col_to_grade(), "pending", (entry) => (
 			<Show when={entry.pending > 0}>
-				<a href={links().gradingQuestion(entry.question)} class="link">
+				<Link href={links().gradingQuestion(entry.question)} class="link">
 					{entry.pending}
-				</a>
+				</Link>
 			</Show>
 		)),
 	];

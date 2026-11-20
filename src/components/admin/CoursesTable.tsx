@@ -1,4 +1,5 @@
 import type { JSX } from "solid-js";
+import Link from "@/components/Link";
 import PaginatedTable from "@/components/ui/PaginatedTable";
 import type { CursorPage } from "@/components/ui/Pagination";
 import type { ColumnConfig } from "@/components/ui/Table";
@@ -58,7 +59,7 @@ export default function CoursesTable(props: Props): JSX.Element {
 			class: "text-right",
 			headerClass: "text-right",
 			render: (row) => (
-				<a
+				<Link
 					href={urls
 						.course({
 							discipline: row.discipline.slug,
@@ -80,7 +81,7 @@ export default function CoursesTable(props: Props): JSX.Element {
 							stroke-linejoin="round"
 						/>
 					</svg>
-				</a>
+				</Link>
 			),
 		},
 	];

@@ -1,4 +1,5 @@
 ---
+import Link from "@/components/Link.astro";
 import { m } from "@/i18n";
 import ErrorLayout from "@/layouts/ErrorLayout.astro";
 import { urls } from "@/urls";
@@ -12,11 +13,11 @@ const signedIn = Boolean(Astro.locals.actor);
 <ErrorLayout code="404" title={m.nav_404_title()} scene="missingLeaf">
   {m.nav_404_text()}
   <div slot="actions">
-    <a
+    <Link
       href={signedIn ? urls.courses.index() : urls.root()}
       class="btn btn-primary rounded-full"
     >
       {signedIn ? m.nav_back_to_my_courses() : m.nav_back_to_home()}
-    </a>
+    </Link>
   </div>
 </ErrorLayout>

@@ -1,6 +1,7 @@
 ---
 import CountRow from "@/components/CountRow.astro";
 import EmptyState from "@/components/EmptyState.astro";
+import Link from "@/components/Link.astro";
 import PageKicker from "@/components/PageKicker.astro";
 import OpenRollCallDialog from "@/components/roll-call/OpenRollCallDialog";
 import { m } from "@/i18n";
@@ -77,7 +78,7 @@ const clock = (date: Date) =>
             <div class="card card-border bg-base-100">
               <div class="card-body flex-row flex-wrap items-center gap-x-4 gap-y-2 py-4">
                 <div class="min-w-0 flex-1">
-                  <a href={urls.course(event.course.ref).schedule()} class="font-medium link-hover">{event.title}</a>
+                  <Link href={urls.course(event.course.ref).schedule()} class="font-medium link-hover">{event.title}</Link>
                   <p class="text-sm text-muted">
                     <span class="font-mono">{event.course.code}</span>
                     {event.course.edition && ` · ${event.course.edition}`} ·{" "}
@@ -108,12 +109,12 @@ const clock = (date: Date) =>
                       }
                     />
                   ) : (
-                    <a
+                    <Link
                       href={urls.course(meeting.course.ref).rollCall(meeting.meeting.week, meeting.meeting.timeSlot)}
                       class:list={["btn btn-sm", meeting.rollCall === "open" ? "btn-primary" : "btn-ghost"]}
                     >
                       {m.courses_home_view_roll_call()}
-                    </a>
+                    </Link>
                   ))}
               </div>
             </div>
@@ -276,7 +277,7 @@ const clock = (date: Date) =>
         <h2 class="page-subheader">{m.courses_home_open_now()}</h2>
         <div class="mt-3 flex flex-col gap-3">
           {home.openNow.map(({ course, exam, deadline, started }) => (
-            <a
+            <Link
               href={urls.course(course.ref).exam(exam.slug).index()}
               class="card card-border bg-base-100 transition-colors hover:border-primary"
             >
@@ -299,7 +300,7 @@ const clock = (date: Date) =>
                   <span class="btn btn-primary btn-sm">{m.courses_home_start()}</span>
                 )}
               </div>
-            </a>
+            </Link>
           ))}
         </div>
       </section>
@@ -312,7 +313,7 @@ const clock = (date: Date) =>
         <h2 class="page-subheader">{m.courses_home_coming_up()}</h2>
         <div class="mt-3 flex flex-col gap-3">
           {home.upcoming.map(({ course, exam, opensAt }) => (
-            <a
+            <Link
               href={urls.course(course.ref).exam(exam.slug).index()}
               class="card card-border bg-base-100 transition-colors hover:border-primary"
             >
@@ -326,7 +327,7 @@ const clock = (date: Date) =>
                 </div>
                 <time datetime={opensAt.toISOString()} title={exact(opensAt)}>{m.courses_home_opens({ when: formatRelative(opensAt, now) })}</time>
               </div>
-            </a>
+            </Link>
           ))}
         </div>
       </section>
@@ -339,7 +340,7 @@ const clock = (date: Date) =>
         <h2 class="page-subheader">{m.courses_home_new_results()}</h2>
         <div class="mt-3 flex flex-col gap-3">
           {home.results.map(({ course, exam, total, releasedAt }) => (
-            <a
+            <Link
               href={urls.course(course.ref).exam(exam.slug).index()}
               class="card card-border bg-base-100 transition-colors hover:border-primary"
             >
@@ -358,7 +359,7 @@ const clock = (date: Date) =>
                   <span class="text-lg font-semibold">{formatScore(total)}</span>
                 )}
               </div>
-            </a>
+            </Link>
           ))}
         </div>
       </section>
@@ -371,7 +372,7 @@ const clock = (date: Date) =>
         <h2 class="page-subheader">{m.grades_regrade_home_resolved()}</h2>
         <div class="mt-3 flex flex-col gap-3">
           {home.regrades.map(({ course, exam, request, questionTitle }) => (
-            <a href={urls.course(course.ref).exam(exam.slug).index()} class={card}>
+            <Link href={urls.course(course.ref).exam(exam.slug).index()} class={card}>
               <div class="card-body flex-row items-center gap-4 py-4">
                 <div class="min-w-0 flex-1">
                   <p class="font-medium">{exam.title}</p>
@@ -384,7 +385,7 @@ const clock = (date: Date) =>
                   {request.status === "ACCEPTED" ? m.grades_regrade_accepted() : m.grades_regrade_rejected()}
                 </span>
               </div>
-            </a>
+            </Link>
           ))}
         </div>
       </section>

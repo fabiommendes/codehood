@@ -1,6 +1,8 @@
 import { CodeBlock } from "mdq/solid";
 import { For, type JSX, Show } from "solid-js";
+import Link from "@/components/Link";
 import { m } from "@/i18n";
+import type { LinkTarget } from "@/urls";
 import type { CodeBlocksHtml } from "@/utils/code-blocks";
 import { CodeBlocks } from "./CodeBlocks";
 
@@ -16,7 +18,7 @@ export interface AttachmentListProps {
 	/// The attachments of a question or an exam; nothing renders when it is empty or absent.
 	attachments: readonly AttachmentItem[] | undefined;
 	/// The download URL of the attachment `name`, or null for a list without download links.
-	url: (name: string) => string | null;
+	url: (name: string) => LinkTarget | null;
 	/// The highlighted code of the attachments, from `highlightQuestionCodeBlocks`, for a list outside an island that has them.
 	codeBlocks?: CodeBlocksHtml;
 }
@@ -59,14 +61,14 @@ function Attachments(props: AttachmentListProps): JSX.Element {
 										fallback={<span class="font-medium">{item.name}</span>}
 									>
 										{(href) => (
-											<a
+											<Link
 												class="btn btn-sm btn-outline"
 												href={href()}
 												download={item.name}
 											>
 												<DownloadIcon />
 												{item.name}
-											</a>
+											</Link>
 										)}
 									</Show>
 									<span class="badge badge-ghost badge-sm">{item.format}</span>

@@ -1,4 +1,5 @@
 ---
+import Link from "@/components/Link.astro";
 // The resources of one meeting, as compact rows under its description on the
 // schedule. A file downloads, a link opens in another tab, a note or snippet
 // opens its page.
@@ -25,7 +26,7 @@ const { resources, course } = Astro.props;
         const external = resource.data.type === "LINK";
         return (
           <li>
-            <a
+            <Link
               href={resourceHref(resource, course)}
               download={file ? fileDownloadName(resource, file) : undefined}
               target={external ? "_blank" : undefined}
@@ -49,7 +50,7 @@ const { resources, course } = Astro.props;
                 />
               </svg>
               {resource.title}
-            </a>
+            </Link>
           </li>
         );
       })}

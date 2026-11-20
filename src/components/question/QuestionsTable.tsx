@@ -9,6 +9,7 @@ import {
 	Show,
 } from "solid-js";
 import FormAlert from "@/components/form/FormAlert";
+import Link from "@/components/Link";
 import Badge from "@/components/ui/Badge";
 import PaginatedTable from "@/components/ui/PaginatedTable";
 import type { CursorPage } from "@/components/ui/Pagination";
@@ -212,9 +213,9 @@ export default function QuestionsTable(props: Props): JSX.Element {
 			class: "font-medium",
 			sortKey: "title" satisfies QuestionListSortField,
 			render: (question) => (
-				<a href={links.question(question.slug)} class="link link-hover">
+				<Link href={links.question(question.slug)} class="link link-hover">
 					{titleOf(question)}
-				</a>
+				</Link>
 			),
 		},
 		{
@@ -275,14 +276,14 @@ export default function QuestionsTable(props: Props): JSX.Element {
 						>
 							<action.Icon />
 						</button>
-						<a
+						<Link
 							href={links.question(question.slug)}
 							class="btn btn-ghost btn-square btn-sm"
 							aria-label={m.questions_open_named({ title: titleOf(question) })}
 							title={m.questions_open_title()}
 						>
 							<GoIcon />
-						</a>
+						</Link>
 					</div>
 				);
 			},

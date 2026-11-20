@@ -1,5 +1,6 @@
 import type { JSX } from "solid-js";
 import { createMemo, createSignal, Show } from "solid-js";
+import Link from "@/components/Link";
 import Table, { type ColumnConfig } from "@/components/ui/Table";
 import {
 	compareNullsLast,
@@ -103,9 +104,9 @@ export default function ExamResults(props: Props): JSX.Element {
 							toggle(row.author, event.currentTarget.checked)
 						}
 					/>
-					<a href={links().attempt(row.author)} class="link">
+					<Link href={links().attempt(row.author)} class="link">
 						{row.name}
-					</a>
+					</Link>
 					<Show when={row.dropped}>
 						<span class="badge badge-outline badge-sm ml-2">
 							{m.grades_results_dropped()}
@@ -160,14 +161,14 @@ export default function ExamResults(props: Props): JSX.Element {
 							{attemptTotalLabel(row.unadjusted ?? null, row.state)}
 						</del>
 					</Show>{" "}
-					<a
+					<Link
 						href={links().adjustments()}
 						class="link align-middle text-muted"
 						aria-label={m.grades_adjustment_title()}
 						title={m.grades_adjustment_title()}
 					>
 						<Icon name="badgePlus" class="inline size-4" />
-					</a>
+					</Link>
 				</Show>
 			),
 		},
@@ -179,9 +180,9 @@ export default function ExamResults(props: Props): JSX.Element {
 				<h3 class="page-subsubheader">{m.grades_results_students_title()}</h3>
 				<div class="flex items-center gap-2">
 					<Show when={props.rows.length > 0 && pending() === 0}>
-						<a href={links().grading()} class="btn btn-outline btn-sm">
+						<Link href={links().grading()} class="btn btn-outline btn-sm">
 							{m.grades_results_review()}
-						</a>
+						</Link>
 					</Show>
 					<button
 						type="button"

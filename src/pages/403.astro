@@ -1,4 +1,5 @@
 ---
+import Link from "@/components/Link.astro";
 // Reached via Astro.rewrite (see src/utils/load-course.ts), which keeps the
 // original URL in the browser while rendering this page — so a course page a
 // visitor isn't enrolled in or doesn't teach ends up here with `?course=` set
@@ -17,6 +18,6 @@ const course = Astro.url.searchParams.get("course");
 <ErrorLayout code="403" title={m.nav_403_title()} scene="lockedHouse">
   {course ? m.nav_403_course() : m.nav_403_page()}
   <div slot="actions">
-    <a href={urls.courses.index()} class="btn btn-primary rounded-full">{m.nav_back_to_my_courses()}</a>
+    <Link href={urls.courses.index()} class="btn btn-primary rounded-full">{m.nav_back_to_my_courses()}</Link>
   </div>
 </ErrorLayout>

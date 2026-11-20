@@ -2,6 +2,7 @@
 import CourseHeader from "@/components/CourseHeader.astro";
 import AdjustmentActions from "@/components/grading/AdjustmentActions";
 import AdjustStudents from "@/components/grading/AdjustStudents";
+import Link from "@/components/Link.astro";
 import { db } from "@/db";
 import { m } from "@/i18n";
 import AppLayout from "@/layouts/AppLayout.astro";
@@ -93,7 +94,7 @@ const rows = adjustments.map((entry) => ({
             {rows.map(({ entry, student, label, target, notes, by, revokedBy, active }) => (
               <tr class:list={["align-top", !active && "text-base-content/60"]}>
                 <th scope="row" class="font-medium">
-                  <a href={examLinks.attempt(entry.author)} class="link">{student}</a>
+                  <Link href={examLinks.attempt(entry.author)} class="link">{student}</Link>
                   <div class="whitespace-nowrap text-xs font-normal text-muted">{formatDateTime(entry.createdAt, { year: "numeric" })}</div>
                   {by && <div class="text-xs font-normal text-muted">{m.grades_adjustment_by_line({ name: by })}</div>}
                   {revokedBy && <div class="text-xs font-normal text-muted">{m.grades_adjustment_revoked_by_line({ name: revokedBy })}</div>}

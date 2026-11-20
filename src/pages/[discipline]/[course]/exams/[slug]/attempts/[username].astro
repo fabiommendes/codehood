@@ -19,6 +19,7 @@ import {
 	MARKS,
 	markLabel,
 } from "@/components/grading/question-mark";
+import Link from "@/components/Link.astro";
 import AttachmentList from "@/components/question/AttachmentList";
 import { db } from "@/db";
 import { loadResultPolicy } from "@/db/result-policy";
@@ -46,7 +47,7 @@ import {
 	questionMark,
 } from "@/services/grading";
 import { reviewResult } from "@/services/review";
-import { questionAttachmentUrl, urls, withAnchor } from "@/urls";
+import { anchor, questionAttachmentUrl, urls, withAnchor } from "@/urls";
 import { adjustmentEffect, adjustmentLabel } from "@/utils/adjustment-label";
 import { breadcrumbs } from "@/utils/breadcrumbs";
 import { highlightQuestionCodeBlocks } from "@/utils/highlight-code-blocks";
@@ -295,18 +296,18 @@ const totalText = (total: number | null | undefined): string =>
   <div class="mt-6 flex flex-wrap items-center justify-between gap-2">
     <div class="flex items-center gap-1">
       {previousStudent && (
-        <a href={examLinks.attempt(previousStudent.username)} class="btn btn-ghost btn-sm btn-square text-base-content/60" aria-label={m.grades_adjustment_previous_student()} title={m.grades_adjustment_previous_student()}>
+        <Link href={examLinks.attempt(previousStudent.username)} class="btn btn-ghost btn-sm btn-square text-base-content/60" aria-label={m.grades_adjustment_previous_student()} title={m.grades_adjustment_previous_student()}>
           <Icon name="chevronLeft" />
-        </a>
+        </Link>
       )}
       <h2 class="page-subheader">
         {name}
         {student?.dropped && <span class="badge badge-outline badge-sm ml-2">{m.exams_attempt_dropped()}</span>}
       </h2>
       {nextStudent && (
-        <a href={examLinks.attempt(nextStudent.username)} class="btn btn-ghost btn-sm btn-square text-base-content/60" aria-label={m.grades_adjustment_next_student()} title={m.grades_adjustment_next_student()}>
+        <Link href={examLinks.attempt(nextStudent.username)} class="btn btn-ghost btn-sm btn-square text-base-content/60" aria-label={m.grades_adjustment_next_student()} title={m.grades_adjustment_next_student()}>
           <Icon name="chevronRight" />
-        </a>
+        </Link>
       )}
     </div>
     <AttemptActions
@@ -351,7 +352,7 @@ const totalText = (total: number | null | undefined): string =>
         <span class="font-medium">{m.exams_attempt_exception()}:</span>{" "}
         {[exceptionExtra, exceptionDate && m.exams_detail_new_date({ date: exceptionDate })].filter(Boolean).join(" · ")}
         {" · "}
-        <a class="link" href={examLinks.exceptions()}>{m.exams_attempt_edit_exception()}</a>
+        <Link class="link" href={examLinks.exceptions()}>{m.exams_attempt_edit_exception()}</Link>
       </p>
     )
   }
@@ -412,12 +413,12 @@ const totalText = (total: number | null | undefined): string =>
   <nav aria-label={m.grades_adjustment_questions_nav()} class="sticky top-14 z-20 mt-6 flex flex-wrap items-center gap-x-4 gap-y-2 rounded-box border border-edge bg-base-100/90 px-3 py-2 backdrop-blur">
     <div class="flex flex-wrap gap-1.5">
       {rows.map((entry) => (
-        <a
-          href={`#question-${entry.number}`}
+        <Link
+          href={anchor(`question-${entry.number}`)}
           class={`btn btn-sm min-w-12 font-mono ${MARK_STYLE[entry.mark].chip}`}
           aria-label={m.grades_adjustment_question_state({ number: entry.number, state: markLabel(entry.mark) })}
           title={`Q${entry.number}: ${markLabel(entry.mark)}`}
-        >Q{entry.number}</a>
+        >Q{entry.number}</Link>
       ))}
     </div>
     <ul class="flex flex-wrap gap-x-3 gap-y-1 text-xs text-muted" aria-label={m.grades_adjustment_legend()}>
@@ -458,7 +459,7 @@ const totalText = (total: number | null | undefined): string =>
               <span class="badge badge-warning badge-sm">{m.exams_attempt_answered_late({ seconds: Math.round((counting.createdAt.getTime() - deadline.getTime()) / 1000) })}</span>
             )}
             {counting && openRegrades.has(counting.publicId) && (
-              <a href={withAnchor(examLinks.regrades(), `regrade-${openRegrades.get(counting.publicId)}`)} class="badge badge-warning badge-sm">{m.grades_regrade_requested()}</a>
+              <Link href={withAnchor(examLinks.regrades(), `regrade-${openRegrades.get(counting.publicId)}`)} class="badge badge-warning badge-sm">{m.grades_regrade_requested()}</Link>
             )}
             {counting && counting.payload !== null && asked ? (
               <>
@@ -485,12 +486,12 @@ const totalText = (total: number | null | undefined): string =>
             ))}
             {counting && counting.payload !== null && asked && closed && (
               <p>
-                <a
+                <Link
                   class="link"
                   href={withAnchor(examLinks.gradingQuestion(outcome.question, { names: true }), `answer-${counting.publicId}`)}
                 >
                   {m.exams_attempt_grade_this()}
-                </a>
+                </Link>
               </p>
             )}
             {editSummary && <AnswerEditSummary summary={editSummary} enabled={edits.enabled} />}

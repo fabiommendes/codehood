@@ -67,7 +67,10 @@
   parâmetros, e um padrão que nenhuma página serve não compila. O curso e os
   exames ficam em `urls.course(ref)`. `test/url-registry.spec.ts` garante que
   toda página está no registro e que nenhum código fora de `src/urls/` escreve
-  o caminho à mão. Depois de entrar num curso, o redirect usa `?joined=1`.
+  o caminho à mão. Todo `<a>` passa por `<Link>` (`.astro` e Solid), cujo
+  `href` vem do registro, de `external(url)` ou de `anchor(id)`; o mesmo spec
+  rejeita `<a` fora dele. Depois de entrar num curso, o redirect usa
+  `?joined=1`.
 - Prova: uma resposta digitada é salva no máximo uma vez a cada 30 s por
   questão, contando da primeira edição ainda não salva, em vez de a cada
   pausa de 500 ms (na prova de 2026-11-18 isso dava 9 saves por minuto por
@@ -90,6 +93,9 @@
 
 ### Fixed
 
+- A imagem e o botão de download da página de arquivo de repositório
+  apontavam para o caminho do arquivo no disco do servidor
+  (`Attachment.link`); agora usam `/files/<hash>/<nome>`.
 - O servidor não cai mais por falta de memória quando o instrutor abre a home
   ou a página do curso depois de uma prova. `response.findMany` (e
   `GET /api/course/{discipline}/{course}/response`) devolve, por questão, só

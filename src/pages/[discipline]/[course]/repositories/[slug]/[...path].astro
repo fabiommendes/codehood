@@ -3,6 +3,7 @@ import { actions } from "astro:actions";
 import { readFile } from "node:fs/promises";
 import { hasPerm } from "@/auth/permissions";
 import CourseHeader from "@/components/CourseHeader.astro";
+import Link from "@/components/Link.astro";
 import CloneBox from "@/components/repository/CloneBox.astro";
 import DirListing from "@/components/repository/DirListing.astro";
 import RotateToken from "@/components/repository/RotateToken.astro";
@@ -181,12 +182,12 @@ function code(text: string): string {
 
   {path && (
     <nav class="mt-4 flex flex-wrap items-center gap-1 font-mono text-sm" aria-label={path}>
-      <a href={repoHref} class="link link-hover">{repository.slug}</a>
+      <Link href={repoHref} class="link link-hover">{repository.slug}</Link>
       {segments.map((segment, index) => (
         <>
           <span class="text-muted">/</span>
           {index < segments.length - 1 ? (
-            <a href={links.repository(slug, segments.slice(0, index + 1))} class="link link-hover">{segment}</a>
+            <Link href={links.repository(slug, segments.slice(0, index + 1))} class="link link-hover">{segment}</Link>
           ) : (
             <span>{segment}</span>
           )}
@@ -230,15 +231,15 @@ function code(text: string): string {
         />
       )}
       {view.kind === "image" && (
-        <img src={file.link} alt={segments.at(-1)} class="max-w-full rounded-box border border-base-content/15" />
+        <img src={urls.files.named({ hash: file.hash, name: file.filename })} alt={segments.at(-1)} class="max-w-full rounded-box border border-base-content/15" />
       )}
       {view.kind === "download" && (
         <p class="text-sm text-base-content/70">{tooLarge ? m.repositories_too_large() : m.repositories_not_viewable()}</p>
       )}
-      <a href={file.link} download={segments.at(-1)} class="btn btn-outline btn-sm mt-4">
+      <Link href={urls.files.named({ hash: file.hash, name: file.filename })} download={segments.at(-1)} class="btn btn-outline btn-sm mt-4">
         {m.repositories_download_file({ name: segments.at(-1) ?? "" })}
-      </a>
-      <a href={parentHref} class="btn btn-ghost btn-sm mt-4">{m.repositories_up()}</a>
+      </Link>
+      <Link href={parentHref} class="btn btn-ghost btn-sm mt-4">{m.repositories_up()}</Link>
     </div>
   )}
 </AppLayout>

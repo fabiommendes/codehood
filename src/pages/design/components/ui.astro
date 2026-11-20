@@ -9,6 +9,7 @@ import PasswordConfirm from "@/components/PasswordConfirm.astro";
 import AttachmentList from "@/components/question/AttachmentList";
 import Button from "@/components/ui/Button";
 import type { FieldSpec } from "@/forms/describe-field";
+import { anchor, urls } from "@/urls";
 import ComponentsPage from "./_ComponentsPage.astro";
 
 export const prerender = false;
@@ -139,7 +140,7 @@ const csvRows = [
 ];
 ---
 
-<ComponentsPage href="/design/components/ui" sections={sections}>
+<ComponentsPage href={urls.design.components.ui()} sections={sections}>
   <Fragment slot="intro">
     The building blocks every screen is made of: empty states, form fields, the password confirmation, file lists and
     the glass wall. Each renders from fixture props.
@@ -230,7 +231,7 @@ const csvRows = [
     </p>
     <h3 class="mb-3 text-xl font-semibold">AttachmentList</h3>
     <div class="max-w-xl">
-      <AttachmentList attachments={attachments} url={(name: string) => `#${name}`} />
+      <AttachmentList attachments={attachments} url={(name: string) => anchor(name)} />
     </div>
     <h3 class="mt-10 mb-3 text-xl font-semibold">Without download links</h3>
     <div class="max-w-xl">

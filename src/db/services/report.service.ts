@@ -40,6 +40,7 @@ import {
 } from "@/db/conditional-write";
 import { defineService, op } from "@/db/define-service";
 import { m } from "@/i18n";
+import { reportAttachmentUrl } from "@/urls";
 import { cutPage, decodeCursor, encodeCursor, seekOf } from "@/utils/cursor";
 import { sanitizeFilename } from "@/utils/filename";
 import { extensionOf } from "@/utils/mime";
@@ -585,7 +586,7 @@ function attachmentView(publicId: string, row: DbAttachment) {
 		filename: row.filename,
 		mimeType: row.mimeType,
 		size: row.blob.size,
-		url: `/api/report/${publicId}/attachment/${encodeURIComponent(row.filename)}`,
+		url: reportAttachmentUrl(publicId, row.filename),
 	};
 }
 

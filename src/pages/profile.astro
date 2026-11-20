@@ -1,4 +1,5 @@
 ---
+import Link from "@/components/Link.astro";
 export const prerender = false;
 
 import { actions } from "astro:actions";
@@ -255,10 +256,10 @@ const profileTabs = [
               <p class="text-sm text-muted">
                 {m.profile_api_keys_note()}
               </p>
-              <a
+              <Link
                 href={urls.gettingStarted()}
                 class="text-sm text-primary hover:underline"
-                >{m.profile_api_keys_guide()}</a
+                >{m.profile_api_keys_guide()}</Link
               >
 
               {

@@ -1,4 +1,5 @@
 ---
+import Link from "@/components/Link.astro";
 /**
  * The questions of an exam for its instructor: number, title, grading, type, weight and, once attempts closed, how they went.
  *
@@ -78,7 +79,7 @@ const gapReasons: Record<DiscriminationGap, string> = {
                     <div class="flex items-center gap-3">
                       <span class="min-w-8 font-display text-lg font-bold tabular-nums">{m.exams_attempt_question_short({ number: index + 1 })}</span>
                       <div class="min-w-0">
-                        <a href={course.question(row.slug)} class="link">{row.title}</a>
+                        <Link href={course.question(row.slug)} class="link">{row.title}</Link>
                         {row.grading && <p class="text-sm text-muted">{row.grading}</p>}
                       </div>
                     </div>

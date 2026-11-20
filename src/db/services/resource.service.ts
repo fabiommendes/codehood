@@ -21,6 +21,7 @@ import {
 import { defineService, op } from "@/db/define-service";
 import { m } from "@/i18n";
 import type { FillUndefineds, Pretty } from "@/typing";
+import { urls } from "@/urls";
 import {
 	type Prisma,
 	type PrismaClient,
@@ -586,8 +587,7 @@ function fillData(row: DbResource): Resource["data"] {
 			return {
 				type: "FILE",
 				filename,
-				// TODO: create static routes
-				link: `/files/${hash}/${filename}`,
+				link: urls.files.named({ hash, name: filename }),
 				mimeType: row.attachment?.mimeType ?? "text/plain",
 			};
 		}

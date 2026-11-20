@@ -1,4 +1,5 @@
 import { For, type JSX } from "solid-js";
+import Link from "@/components/Link";
 import { m } from "@/i18n";
 import type { AttentionRow } from "@/services/objective-review";
 import { type Href, withAnchor } from "@/urls";
@@ -33,14 +34,14 @@ export default function AttentionList(props: Props): JSX.Element {
 						<span class="min-w-48 flex-1 text-muted">
 							{m.grades_objective_regrade_detail()}
 						</span>
-						<a
+						<Link
 							href={withAnchor(props.regradesHref, `regrade-${row.request}`)}
 							class="btn btn-ghost btn-sm btn-square"
 							aria-label={m.grades_objective_view_request()}
 							title={m.grades_objective_view_request()}
 						>
 							<Icon name="message" />
-						</a>
+						</Link>
 					</li>
 				)}
 			</For>
