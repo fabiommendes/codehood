@@ -57,15 +57,15 @@ test("a server-paged table links to its neighbours and sorts through the URL", a
 	await expect(cursor).toContainText("20,000 in all");
 	await expect(cursor.getByRole("link", { name: "Previous" })).toHaveAttribute(
 		"href",
-		"?cursor=a",
+		"/design/elements?cursor=a",
 	);
 	await expect(cursor.getByRole("link", { name: "Next" })).toHaveAttribute(
 		"href",
-		"?cursor=c",
+		"/design/elements?cursor=c",
 	);
 	await expect(table.getByRole("link", { name: "Name" })).toHaveAttribute(
 		"href",
-		"?sort=name",
+		"/design/elements?sort=name",
 	);
 	await expect(table.locator("tbody tr")).toHaveCount(2);
 });
