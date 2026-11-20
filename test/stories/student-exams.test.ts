@@ -13,6 +13,13 @@ import { expect, type Page, test } from "../fixtures";
 import { logInAs, resetDatabase, seedUser } from "./helpers";
 import { REGRADE_MESSAGE, releasedExam } from "./regrade-setup";
 import { gradedExam, NOTES } from "./sanction-support";
+import {
+	PDF_BYTES,
+	PDF_BYTES_V2,
+	PNG_BYTES,
+	storedFiles,
+	uploadExam,
+} from "./upload-support";
 import { weightedExam } from "./weighted-exam-support";
 
 test.beforeEach(resetDatabase);
@@ -1423,5 +1430,170 @@ test("student: read the questions of an exam I missed", async ({ page }) => {
 		for (const name of ["Start exam", "Submit exam"]) {
 			await expect(page.getByRole("button", { name })).toHaveCount(0);
 		}
+	});
+});
+
+test("student: answer an exam question with files", async ({ page }) => {
+	const { student, exam, href } = await uploadExam("upl");
+	const sent = () => storedFiles(student.username, exam.id);
+	const diagram = page.getByRole("listitem").filter({ hasText: "diagram.pdf" });
+	const photo = page.getByRole("listitem").filter({ hasText: "stack.png" });
+
+	await logInAs(page, student);
+	await page.goto(`${href}/exams/${exam.slug}`);
+	await page.getByRole("button", { name: "Start exam" }).click();
+	const chooser = page.getByLabel("Choose files");
+
+	await test.step("the question says what it accepts and that nothing was sent", async () => {
+		await expect(
+			page.getByText("Draw the call stack of factorial(3) and upload it."),
+		).toBeVisible();
+		await expect(
+			page.getByText("Up to 2 files; 1 MB each; accepted: .pdf, .png."),
+		).toBeVisible();
+		await expect(page.getByText("No files sent yet.")).toBeVisible();
+	});
+
+	await test.step("a program is refused with the reason, and nothing is stored", async () => {
+		await chooser.setInputFiles({
+			name: "virus.exe",
+			mimeType: "application/octet-stream",
+			buffer: Buffer.from("MZ"),
+		});
+
+		await expect(
+			page.getByText("virus.exe is not an accepted type (.pdf, .png).").first(),
+		).toBeVisible();
+		expect(await sent()).toEqual([]);
+	});
+
+	await test.step("a file over the size limit is refused with the reason", async () => {
+		await chooser.setInputFiles({
+			name: "huge.pdf",
+			mimeType: "application/pdf",
+			buffer: Buffer.alloc(2 * 1024 * 1024, 1),
+		});
+
+		await expect(
+			page.getByText("huge.pdf is larger than 1 MB.").first(),
+		).toBeVisible();
+		expect(await sent()).toEqual([]);
+	});
+
+	await test.step("a PDF and an image are sent and listed with their sizes", async () => {
+		await chooser.setInputFiles([
+			{ name: "diagram.pdf", mimeType: "application/pdf", buffer: PDF_BYTES },
+			{ name: "stack.png", mimeType: "image/png", buffer: PNG_BYTES },
+		]);
+
+		// Only a stored file has a button to remove it.
+		await expect(
+			diagram.getByRole("button", { name: "Remove diagram.pdf" }),
+		).toBeVisible();
+		await expect(
+			photo.getByRole("button", { name: "Remove stack.png" }),
+		).toBeVisible();
+		await expect(page.getByText("virus.exe is not")).toHaveCount(0);
+		await expect(page.getByText("No files sent yet.")).toHaveCount(0);
+		await expect.poll(sent).toEqual([
+			{ name: "diagram.pdf", size: PDF_BYTES.length },
+			{ name: "stack.png", size: PNG_BYTES.length },
+		]);
+	});
+
+	await test.step("a third file is refused while two are kept", async () => {
+		await chooser.setInputFiles({
+			name: "extra.pdf",
+			mimeType: "application/pdf",
+			buffer: PDF_BYTES,
+		});
+
+		await expect(
+			page.getByText(/Only 2 files are allowed/).first(),
+		).toBeVisible();
+		expect((await sent()).map((f) => f.name)).toEqual([
+			"diagram.pdf",
+			"stack.png",
+		]);
+	});
+
+	await test.step("sending a file with the same name replaces it", async () => {
+		await chooser.setInputFiles({
+			name: "diagram.pdf",
+			mimeType: "application/pdf",
+			buffer: PDF_BYTES_V2,
+		});
+
+		await expect.poll(sent).toEqual([
+			{ name: "diagram.pdf", size: PDF_BYTES_V2.length },
+			{ name: "stack.png", size: PNG_BYTES.length },
+		]);
+		await expect(
+			page.getByRole("listitem").filter({ hasText: "diagram.pdf" }),
+		).toHaveCount(1);
+	});
+
+	await test.step("removing a file takes it off the list, and the rest survive a reload", async () => {
+		await page.getByRole("button", { name: "Remove stack.png" }).click();
+
+		await expect(photo).toHaveCount(0);
+		await expect
+			.poll(sent)
+			.toEqual([{ name: "diagram.pdf", size: PDF_BYTES_V2.length }]);
+
+		await page.reload();
+
+		await expect(diagram).toBeVisible();
+		await expect(photo).toHaveCount(0);
+	});
+
+	await test.step("clearing asks first, then removes every file", async () => {
+		let asked = "";
+		page.once("dialog", (dialog) => {
+			asked = dialog.message();
+			void dialog.dismiss();
+		});
+		await page.getByRole("button", { name: "Clear answer" }).click();
+		await expect.poll(() => asked).toContain("Remove every file");
+		await expect(diagram).toBeVisible();
+		expect(await sent()).toHaveLength(1);
+
+		page.once("dialog", (dialog) => void dialog.accept());
+		await page.getByRole("button", { name: "Clear answer" }).click();
+
+		await expect(diagram).toHaveCount(0);
+		await expect(page.getByText("No files sent yet.")).toBeVisible();
+		await expect.poll(sent).toEqual([]);
+	});
+
+	await test.step("a clear that fails never deletes a file sent afterwards", async () => {
+		await chooser.setInputFiles({
+			name: "diagram.pdf",
+			mimeType: "application/pdf",
+			buffer: PDF_BYTES,
+		});
+		await expect(diagram).toBeVisible();
+
+		// Offline for the clear, whichever route it takes.
+		const failing = /\/files\/diagram\.pdf$|\/_actions\//;
+		await page.route(failing, (route) => route.abort());
+		page.once("dialog", (dialog) => void dialog.accept());
+		await page.getByRole("button", { name: "Clear answer" }).click();
+		await page.unroute(failing);
+
+		await chooser.setInputFiles({
+			name: "stack.png",
+			mimeType: "image/png",
+			buffer: PNG_BYTES,
+		});
+		await expect(photo).toBeVisible();
+		await page.waitForTimeout(4000);
+		await expect(photo).toBeVisible();
+		expect((await sent()).map((f) => f.name)).toContain("stack.png");
+
+		await page.reload();
+
+		await expect(photo).toBeVisible();
+		expect((await sent()).map((f) => f.name)).toContain("stack.png");
 	});
 });

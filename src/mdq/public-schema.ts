@@ -28,6 +28,7 @@ import {
 	type PublicOrderingQuestion,
 	type PublicShortAnswerQuestion,
 	type PublicTrueFalseQuestion,
+	type PublicUploadQuestion,
 	QuestionShuffle,
 	questionBaseShape,
 	Slug,
@@ -121,6 +122,14 @@ export const publicEssaySchema = z.object({
 	highlight: z.string().optional(),
 });
 
+export const publicUploadSchema = z.object({
+	...base,
+	type: z.literal("upload"),
+	maxFiles: z.number().int().min(1).optional(),
+	maxSize: z.union([z.number(), z.string()]).optional(),
+	extensions: z.array(z.string()).optional(),
+});
+
 const publicBlank = z.discriminatedUnion("type", [
 	z.object({
 		id: Slug,
@@ -181,6 +190,7 @@ export const publicQuestionSchema = z.discriminatedUnion("type", [
 	publicNumericSchema,
 	publicShortAnswerSchema,
 	publicEssaySchema,
+	publicUploadSchema,
 	publicFillInSchema,
 	publicOrderingSchema,
 	publicCodeSchema,
@@ -221,4 +231,8 @@ true satisfies AssertEqual<
 true satisfies AssertEqual<
 	z.infer<typeof publicCodeSchema>,
 	PublicCodeQuestion
+>;
+true satisfies AssertEqual<
+	z.infer<typeof publicUploadSchema>,
+	PublicUploadQuestion
 >;

@@ -234,6 +234,8 @@ enum AttachmentOwner {
   REPORT
   REPOSITORY
   EXAM
+  /// A student's file in an exam attempt: `attachedToId` is the `Response`.
+  RESPONSE
 }
 
 /// One use of a Blob by one owner, carrying the filename and mime type that
@@ -868,6 +870,7 @@ enum QuestionType {
   FILL_IN
   ORDERING
   CODE
+  UPLOAD
 }
 
 /// A QuestionRef is the main entity representing a unique question in the system.

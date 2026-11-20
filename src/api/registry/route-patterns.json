@@ -157,6 +157,18 @@
 		]
 	},
 	{
+		"pattern": "/api/course/[discipline]/[course]/exam/[slug]/question/[question]/file",
+		"methods": [
+			"post"
+		]
+	},
+	{
+		"pattern": "/api/course/[discipline]/[course]/exam/[slug]/question/[question]/file/[name]",
+		"methods": [
+			"delete"
+		]
+	},
+	{
 		"pattern": "/api/course/[discipline]/[course]/exam/[slug]/question/[question]/rubric",
 		"methods": [
 			"get",

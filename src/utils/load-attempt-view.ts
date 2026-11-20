@@ -37,6 +37,8 @@ export interface AttemptView {
 	answers: Record<string, AnswerPayload>;
 	/// When the server saved each answer, by question slug (ISO).
 	answeredAt: Record<string, string>;
+	/// The public id of the newest submission of each question, which names the files of an upload answer.
+	submissions: Record<string, string>;
 	/// The outcome of the exam, once the state is `results`.
 	result: ExamResult | undefined;
 	reviews: Record<string, ReviewResult> | undefined;
@@ -199,15 +201,18 @@ export async function loadAttemptView(
 
 	const answers: Record<string, AnswerPayload> = {};
 	const answeredAt: Record<string, string> = {};
+	const submissions: Record<string, string> = {};
 	for (const submission of attempt?.submissions ?? []) {
 		answers[submission.question] = submission.payload as AnswerPayload;
 		answeredAt[submission.question] = submission.createdAt.toISOString();
+		submissions[submission.question] = submission.publicId;
 	}
 
 	return {
 		questions,
 		answers,
 		answeredAt,
+		submissions,
 		result,
 		reviews,
 		regrades,

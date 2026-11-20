@@ -4179,6 +4179,139 @@
                       "type"
                     ],
                     "additionalProperties": false
+                  },
+                  {
+                    "type": "object",
+                    "properties": {
+                      "$schema": {
+                        "type": "string"
+                      },
+                      "id": {
+                        "type": "string",
+                        "minLength": 1
+                      },
+                      "uuid": {
+                        "type": "string",
+                        "pattern": "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$",
+                        "example": "123e4567-e89b-12d3-a456-426614174000"
+                      },
+                      "title": {
+                        "type": "string"
+                      },
+                      "author": {
+                        "type": "string"
+                      },
+                      "stem": {
+                        "type": "string"
+                      },
+                      "epilogue": {
+                        "type": "string"
+                      },
+                      "comment": {
+                        "type": "string"
+                      },
+                      "locale": {
+                        "type": "string"
+                      },
+                      "tags": {
+                        "type": "array",
+                        "items": {
+                          "type": "string"
+                        },
+                        "uniqueItems": true
+                      },
+                      "weight": {
+                        "type": "number",
+                        "minimum": 0
+                      },
+                      "meta": {
+                        "type": "object",
+                        "additionalProperties": {
+                          "nullable": true
+                        }
+                      },
+                      "attachments": {
+                        "type": "array",
+                        "items": {
+                          "type": "object",
+                          "properties": {
+                            "name": {
+                              "type": "string",
+                              "minLength": 1,
+                              "pattern": "^(?!\\.\\.?$)[^/\\\\\\t\\n\\v\\f\\r \\x85\\xa0\\u1680\\u2000-\\u200a\\u2028\\u2029\\u202f\\u205f\\u3000`]+$",
+                              "example": "consumo-2024.csv"
+                            },
+                            "format": {
+                              "type": "string",
+                              "minLength": 1,
+                              "pattern": "^[^\\t\\n\\v\\f\\r \\x85\\xa0\\u1680\\u2000-\\u200a\\u2028\\u2029\\u202f\\u205f\\u3000`]+$",
+                              "example": "csv"
+                            },
+                            "text": {
+                              "type": "string"
+                            },
+                            "origin": {
+                              "type": "string",
+                              "minLength": 1,
+                              "pattern": "^(?![A-Za-z][A-Za-z0-9+.-]*:)(?!\\/)[^?#\\r\\n]*[.][^.\\\\/?#\\r\\n]+$",
+                              "example": "dados/consumo-2024.csv"
+                            },
+                            "label": {
+                              "type": "string"
+                            }
+                          },
+                          "required": [
+                            "name",
+                            "format"
+                          ],
+                          "additionalProperties": false
+                        },
+                        "minItems": 1
+                      },
+                      "type": {
+                        "type": "string",
+                        "enum": [
+                          "upload"
+                        ]
+                      },
+                      "maxFiles": {
+                        "type": "integer",
+                        "minimum": 1,
+                        "maximum": 9007199254740991
+                      },
+                      "maxSize": {
+                        "anyOf": [
+                          {
+                            "type": "integer",
+                            "minimum": 1,
+                            "maximum": 9007199254740991
+                          },
+                          {
+                            "type": "string",
+                            "pattern": "^[0-9]+(\\.[0-9]{1,3})? ?(B|KB|MB|GB)$",
+                            "example": "5 MB"
+                          }
+                        ]
+                      },
+                      "extensions": {
+                        "type": "array",
+                        "items": {
+                          "type": "string",
+                          "pattern": "^\\.[a-z0-9][a-z0-9._+-]*$",
+                          "example": ".pdf"
+                        },
+                        "minItems": 1,
+                        "uniqueItems": true
+                      },
+                      "answerKey": {
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "stem",
+                      "type"
+                    ],
+                    "additionalProperties": false
                   }
                 ]
               },
@@ -4889,6 +5022,99 @@
                       },
                       "highlight": {
                         "type": "string"
+                      }
+                    },
+                    "required": [
+                      "stem",
+                      "type"
+                    ]
+                  },
+                  {
+                    "type": "object",
+                    "properties": {
+                      "attachments": {
+                        "type": "array",
+                        "items": {
+                          "type": "object",
+                          "properties": {
+                            "name": {
+                              "type": "string",
+                              "minLength": 1
+                            },
+                            "format": {
+                              "type": "string",
+                              "minLength": 1
+                            },
+                            "text": {
+                              "type": "string"
+                            },
+                            "label": {
+                              "type": "string"
+                            }
+                          },
+                          "required": [
+                            "name",
+                            "format"
+                          ]
+                        }
+                      },
+                      "id": {
+                        "type": "string",
+                        "minLength": 1
+                      },
+                      "uuid": {
+                        "type": "string",
+                        "pattern": "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$",
+                        "example": "123e4567-e89b-12d3-a456-426614174000"
+                      },
+                      "title": {
+                        "type": "string"
+                      },
+                      "stem": {
+                        "type": "string"
+                      },
+                      "epilogue": {
+                        "type": "string"
+                      },
+                      "tags": {
+                        "type": "array",
+                        "items": {
+                          "type": "string"
+                        },
+                        "uniqueItems": true
+                      },
+                      "locale": {
+                        "type": "string"
+                      },
+                      "weight": {
+                        "type": "number",
+                        "minimum": 0
+                      },
+                      "type": {
+                        "type": "string",
+                        "enum": [
+                          "upload"
+                        ]
+                      },
+                      "maxFiles": {
+                        "type": "integer",
+                        "minimum": 1
+                      },
+                      "maxSize": {
+                        "anyOf": [
+                          {
+                            "type": "number"
+                          },
+                          {
+                            "type": "string"
+                          }
+                        ]
+                      },
+                      "extensions": {
+                        "type": "array",
+                        "items": {
+                          "type": "string"
+                        }
                       }
                     },
                     "required": [
@@ -7318,6 +7544,139 @@
                   "type"
                 ],
                 "additionalProperties": false
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "$schema": {
+                    "type": "string"
+                  },
+                  "id": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "uuid": {
+                    "type": "string",
+                    "pattern": "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$",
+                    "example": "123e4567-e89b-12d3-a456-426614174000"
+                  },
+                  "title": {
+                    "type": "string"
+                  },
+                  "author": {
+                    "type": "string"
+                  },
+                  "stem": {
+                    "type": "string"
+                  },
+                  "epilogue": {
+                    "type": "string"
+                  },
+                  "comment": {
+                    "type": "string"
+                  },
+                  "locale": {
+                    "type": "string"
+                  },
+                  "tags": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    },
+                    "uniqueItems": true
+                  },
+                  "weight": {
+                    "type": "number",
+                    "minimum": 0
+                  },
+                  "meta": {
+                    "type": "object",
+                    "additionalProperties": {
+                      "nullable": true
+                    }
+                  },
+                  "attachments": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "name": {
+                          "type": "string",
+                          "minLength": 1,
+                          "pattern": "^(?!\\.\\.?$)[^/\\\\\\t\\n\\v\\f\\r \\x85\\xa0\\u1680\\u2000-\\u200a\\u2028\\u2029\\u202f\\u205f\\u3000`]+$",
+                          "example": "consumo-2024.csv"
+                        },
+                        "format": {
+                          "type": "string",
+                          "minLength": 1,
+                          "pattern": "^[^\\t\\n\\v\\f\\r \\x85\\xa0\\u1680\\u2000-\\u200a\\u2028\\u2029\\u202f\\u205f\\u3000`]+$",
+                          "example": "csv"
+                        },
+                        "text": {
+                          "type": "string"
+                        },
+                        "origin": {
+                          "type": "string",
+                          "minLength": 1,
+                          "pattern": "^(?![A-Za-z][A-Za-z0-9+.-]*:)(?!\\/)[^?#\\r\\n]*[.][^.\\\\/?#\\r\\n]+$",
+                          "example": "dados/consumo-2024.csv"
+                        },
+                        "label": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "name",
+                        "format"
+                      ],
+                      "additionalProperties": false
+                    },
+                    "minItems": 1
+                  },
+                  "type": {
+                    "type": "string",
+                    "enum": [
+                      "upload"
+                    ]
+                  },
+                  "maxFiles": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 9007199254740991
+                  },
+                  "maxSize": {
+                    "anyOf": [
+                      {
+                        "type": "integer",
+                        "minimum": 1,
+                        "maximum": 9007199254740991
+                      },
+                      {
+                        "type": "string",
+                        "pattern": "^[0-9]+(\\.[0-9]{1,3})? ?(B|KB|MB|GB)$",
+                        "example": "5 MB"
+                      }
+                    ]
+                  },
+                  "extensions": {
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "pattern": "^\\.[a-z0-9][a-z0-9._+-]*$",
+                      "example": ".pdf"
+                    },
+                    "minItems": 1,
+                    "uniqueItems": true
+                  },
+                  "answerKey": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "stem",
+                  "type"
+                ],
+                "additionalProperties": false
               }
             ]
           },
@@ -8174,6 +8533,62 @@
           "username",
           "role",
           "password"
+        ]
+      },
+      "ResponseFileList": {
+        "type": "object",
+        "properties": {
+          "files": {
+            "type": "array",
+            "nullable": true,
+            "items": {
+              "type": "object",
+              "properties": {
+                "name": {
+                  "type": "string"
+                },
+                "path": {
+                  "type": "string"
+                },
+                "size": {
+                  "type": "number"
+                }
+              },
+              "required": [
+                "name",
+                "path",
+                "size"
+              ]
+            },
+            "minItems": 1
+          },
+          "submission": {
+            "type": "string",
+            "maxLength": 64,
+            "pattern": "^[A-Za-z0-9_\\-]+$",
+            "example": "k3Vx9QpL2a"
+          }
+        },
+        "required": [
+          "files",
+          "submission"
+        ]
+      },
+      "ResponseFileUpload": {
+        "type": "object",
+        "properties": {
+          "file": {
+            "type": "string",
+            "format": "binary"
+          },
+          "name": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "required": [
+          "file",
+          "name"
         ]
       },
       "Rubric": {
@@ -15451,6 +15866,92 @@
                                   "stem",
                                   "type"
                                 ]
+                              },
+                              {
+                                "type": "object",
+                                "properties": {
+                                  "attachments": {
+                                    "type": "array",
+                                    "items": {
+                                      "type": "object",
+                                      "properties": {
+                                        "name": {
+                                          "type": "string",
+                                          "minLength": 1
+                                        },
+                                        "format": {
+                                          "type": "string",
+                                          "minLength": 1
+                                        },
+                                        "text": {
+                                          "type": "string"
+                                        },
+                                        "label": {
+                                          "type": "string"
+                                        }
+                                      },
+                                      "required": [
+                                        "name",
+                                        "format"
+                                      ]
+                                    }
+                                  },
+                                  "id": {
+                                    "type": "string",
+                                    "minLength": 1
+                                  },
+                                  "uuid": {
+                                    "type": "string",
+                                    "pattern": "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$",
+                                    "example": "123e4567-e89b-12d3-a456-426614174000"
+                                  },
+                                  "title": {
+                                    "type": "string"
+                                  },
+                                  "stem": {
+                                    "type": "string"
+                                  },
+                                  "epilogue": {
+                                    "type": "string"
+                                  },
+                                  "locale": {
+                                    "type": "string"
+                                  },
+                                  "weight": {
+                                    "type": "number",
+                                    "minimum": 0
+                                  },
+                                  "type": {
+                                    "type": "string",
+                                    "enum": [
+                                      "upload"
+                                    ]
+                                  },
+                                  "maxFiles": {
+                                    "type": "integer",
+                                    "minimum": 1
+                                  },
+                                  "maxSize": {
+                                    "anyOf": [
+                                      {
+                                        "type": "number"
+                                      },
+                                      {
+                                        "type": "string"
+                                      }
+                                    ]
+                                  },
+                                  "extensions": {
+                                    "type": "array",
+                                    "items": {
+                                      "type": "string"
+                                    }
+                                  }
+                                },
+                                "required": [
+                                  "stem",
+                                  "type"
+                                ]
                               }
                             ]
                           },
@@ -21801,6 +22302,7 @@
                   "multiple-selection",
                   "true-false",
                   "essay",
+                  "upload",
                   "numeric",
                   "short-answer",
                   "fill-in",
@@ -23780,6 +24282,139 @@
                                       "type"
                                     ],
                                     "additionalProperties": false
+                                  },
+                                  {
+                                    "type": "object",
+                                    "properties": {
+                                      "$schema": {
+                                        "type": "string"
+                                      },
+                                      "id": {
+                                        "type": "string",
+                                        "minLength": 1
+                                      },
+                                      "uuid": {
+                                        "type": "string",
+                                        "pattern": "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$",
+                                        "example": "123e4567-e89b-12d3-a456-426614174000"
+                                      },
+                                      "title": {
+                                        "type": "string"
+                                      },
+                                      "author": {
+                                        "type": "string"
+                                      },
+                                      "stem": {
+                                        "type": "string"
+                                      },
+                                      "epilogue": {
+                                        "type": "string"
+                                      },
+                                      "comment": {
+                                        "type": "string"
+                                      },
+                                      "locale": {
+                                        "type": "string"
+                                      },
+                                      "tags": {
+                                        "type": "array",
+                                        "items": {
+                                          "type": "string"
+                                        },
+                                        "uniqueItems": true
+                                      },
+                                      "weight": {
+                                        "type": "number",
+                                        "minimum": 0
+                                      },
+                                      "meta": {
+                                        "type": "object",
+                                        "additionalProperties": {
+                                          "nullable": true
+                                        }
+                                      },
+                                      "attachments": {
+                                        "type": "array",
+                                        "items": {
+                                          "type": "object",
+                                          "properties": {
+                                            "name": {
+                                              "type": "string",
+                                              "minLength": 1,
+                                              "pattern": "^(?!\\.\\.?$)[^/\\\\\\t\\n\\v\\f\\r \\x85\\xa0\\u1680\\u2000-\\u200a\\u2028\\u2029\\u202f\\u205f\\u3000`]+$",
+                                              "example": "consumo-2024.csv"
+                                            },
+                                            "format": {
+                                              "type": "string",
+                                              "minLength": 1,
+                                              "pattern": "^[^\\t\\n\\v\\f\\r \\x85\\xa0\\u1680\\u2000-\\u200a\\u2028\\u2029\\u202f\\u205f\\u3000`]+$",
+                                              "example": "csv"
+                                            },
+                                            "text": {
+                                              "type": "string"
+                                            },
+                                            "origin": {
+                                              "type": "string",
+                                              "minLength": 1,
+                                              "pattern": "^(?![A-Za-z][A-Za-z0-9+.-]*:)(?!\\/)[^?#\\r\\n]*[.][^.\\\\/?#\\r\\n]+$",
+                                              "example": "dados/consumo-2024.csv"
+                                            },
+                                            "label": {
+                                              "type": "string"
+                                            }
+                                          },
+                                          "required": [
+                                            "name",
+                                            "format"
+                                          ],
+                                          "additionalProperties": false
+                                        },
+                                        "minItems": 1
+                                      },
+                                      "type": {
+                                        "type": "string",
+                                        "enum": [
+                                          "upload"
+                                        ]
+                                      },
+                                      "maxFiles": {
+                                        "type": "integer",
+                                        "minimum": 1,
+                                        "maximum": 9007199254740991
+                                      },
+                                      "maxSize": {
+                                        "anyOf": [
+                                          {
+                                            "type": "integer",
+                                            "minimum": 1,
+                                            "maximum": 9007199254740991
+                                          },
+                                          {
+                                            "type": "string",
+                                            "pattern": "^[0-9]+(\\.[0-9]{1,3})? ?(B|KB|MB|GB)$",
+                                            "example": "5 MB"
+                                          }
+                                        ]
+                                      },
+                                      "extensions": {
+                                        "type": "array",
+                                        "items": {
+                                          "type": "string",
+                                          "pattern": "^\\.[a-z0-9][a-z0-9._+-]*$",
+                                          "example": ".pdf"
+                                        },
+                                        "minItems": 1,
+                                        "uniqueItems": true
+                                      },
+                                      "answerKey": {
+                                        "type": "string"
+                                      }
+                                    },
+                                    "required": [
+                                      "stem",
+                                      "type"
+                                    ],
+                                    "additionalProperties": false
                                   }
                                 ]
                               },
@@ -24490,6 +25125,99 @@
                                       },
                                       "highlight": {
                                         "type": "string"
+                                      }
+                                    },
+                                    "required": [
+                                      "stem",
+                                      "type"
+                                    ]
+                                  },
+                                  {
+                                    "type": "object",
+                                    "properties": {
+                                      "attachments": {
+                                        "type": "array",
+                                        "items": {
+                                          "type": "object",
+                                          "properties": {
+                                            "name": {
+                                              "type": "string",
+                                              "minLength": 1
+                                            },
+                                            "format": {
+                                              "type": "string",
+                                              "minLength": 1
+                                            },
+                                            "text": {
+                                              "type": "string"
+                                            },
+                                            "label": {
+                                              "type": "string"
+                                            }
+                                          },
+                                          "required": [
+                                            "name",
+                                            "format"
+                                          ]
+                                        }
+                                      },
+                                      "id": {
+                                        "type": "string",
+                                        "minLength": 1
+                                      },
+                                      "uuid": {
+                                        "type": "string",
+                                        "pattern": "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$",
+                                        "example": "123e4567-e89b-12d3-a456-426614174000"
+                                      },
+                                      "title": {
+                                        "type": "string"
+                                      },
+                                      "stem": {
+                                        "type": "string"
+                                      },
+                                      "epilogue": {
+                                        "type": "string"
+                                      },
+                                      "tags": {
+                                        "type": "array",
+                                        "items": {
+                                          "type": "string"
+                                        },
+                                        "uniqueItems": true
+                                      },
+                                      "locale": {
+                                        "type": "string"
+                                      },
+                                      "weight": {
+                                        "type": "number",
+                                        "minimum": 0
+                                      },
+                                      "type": {
+                                        "type": "string",
+                                        "enum": [
+                                          "upload"
+                                        ]
+                                      },
+                                      "maxFiles": {
+                                        "type": "integer",
+                                        "minimum": 1
+                                      },
+                                      "maxSize": {
+                                        "anyOf": [
+                                          {
+                                            "type": "number"
+                                          },
+                                          {
+                                            "type": "string"
+                                          }
+                                        ]
+                                      },
+                                      "extensions": {
+                                        "type": "array",
+                                        "items": {
+                                          "type": "string"
+                                        }
                                       }
                                     },
                                     "required": [
@@ -26990,6 +27718,139 @@
                           "type"
                         ],
                         "additionalProperties": false
+                      },
+                      {
+                        "type": "object",
+                        "properties": {
+                          "$schema": {
+                            "type": "string"
+                          },
+                          "id": {
+                            "type": "string",
+                            "minLength": 1
+                          },
+                          "uuid": {
+                            "type": "string",
+                            "pattern": "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$",
+                            "example": "123e4567-e89b-12d3-a456-426614174000"
+                          },
+                          "title": {
+                            "type": "string"
+                          },
+                          "author": {
+                            "type": "string"
+                          },
+                          "stem": {
+                            "type": "string"
+                          },
+                          "epilogue": {
+                            "type": "string"
+                          },
+                          "comment": {
+                            "type": "string"
+                          },
+                          "locale": {
+                            "type": "string"
+                          },
+                          "tags": {
+                            "type": "array",
+                            "items": {
+                              "type": "string"
+                            },
+                            "uniqueItems": true
+                          },
+                          "weight": {
+                            "type": "number",
+                            "minimum": 0
+                          },
+                          "meta": {
+                            "type": "object",
+                            "additionalProperties": {
+                              "nullable": true
+                            }
+                          },
+                          "attachments": {
+                            "type": "array",
+                            "items": {
+                              "type": "object",
+                              "properties": {
+                                "name": {
+                                  "type": "string",
+                                  "minLength": 1,
+                                  "pattern": "^(?!\\.\\.?$)[^/\\\\\\t\\n\\v\\f\\r \\x85\\xa0\\u1680\\u2000-\\u200a\\u2028\\u2029\\u202f\\u205f\\u3000`]+$",
+                                  "example": "consumo-2024.csv"
+                                },
+                                "format": {
+                                  "type": "string",
+                                  "minLength": 1,
+                                  "pattern": "^[^\\t\\n\\v\\f\\r \\x85\\xa0\\u1680\\u2000-\\u200a\\u2028\\u2029\\u202f\\u205f\\u3000`]+$",
+                                  "example": "csv"
+                                },
+                                "text": {
+                                  "type": "string"
+                                },
+                                "origin": {
+                                  "type": "string",
+                                  "minLength": 1,
+                                  "pattern": "^(?![A-Za-z][A-Za-z0-9+.-]*:)(?!\\/)[^?#\\r\\n]*[.][^.\\\\/?#\\r\\n]+$",
+                                  "example": "dados/consumo-2024.csv"
+                                },
+                                "label": {
+                                  "type": "string"
+                                }
+                              },
+                              "required": [
+                                "name",
+                                "format"
+                              ],
+                              "additionalProperties": false
+                            },
+                            "minItems": 1
+                          },
+                          "type": {
+                            "type": "string",
+                            "enum": [
+                              "upload"
+                            ]
+                          },
+                          "maxFiles": {
+                            "type": "integer",
+                            "minimum": 1,
+                            "maximum": 9007199254740991
+                          },
+                          "maxSize": {
+                            "anyOf": [
+                              {
+                                "type": "integer",
+                                "minimum": 1,
+                                "maximum": 9007199254740991
+                              },
+                              {
+                                "type": "string",
+                                "pattern": "^[0-9]+(\\.[0-9]{1,3})? ?(B|KB|MB|GB)$",
+                                "example": "5 MB"
+                              }
+                            ]
+                          },
+                          "extensions": {
+                            "type": "array",
+                            "items": {
+                              "type": "string",
+                              "pattern": "^\\.[a-z0-9][a-z0-9._+-]*$",
+                              "example": ".pdf"
+                            },
+                            "minItems": 1,
+                            "uniqueItems": true
+                          },
+                          "answerKey": {
+                            "type": "string"
+                          }
+                        },
+                        "required": [
+                          "stem",
+                          "type"
+                        ],
+                        "additionalProperties": false
                       }
                     ]
                   },
@@ -28955,6 +29816,139 @@
                                 "type"
                               ],
                               "additionalProperties": false
+                            },
+                            {
+                              "type": "object",
+                              "properties": {
+                                "$schema": {
+                                  "type": "string"
+                                },
+                                "id": {
+                                  "type": "string",
+                                  "minLength": 1
+                                },
+                                "uuid": {
+                                  "type": "string",
+                                  "pattern": "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$",
+                                  "example": "123e4567-e89b-12d3-a456-426614174000"
+                                },
+                                "title": {
+                                  "type": "string"
+                                },
+                                "author": {
+                                  "type": "string"
+                                },
+                                "stem": {
+                                  "type": "string"
+                                },
+                                "epilogue": {
+                                  "type": "string"
+                                },
+                                "comment": {
+                                  "type": "string"
+                                },
+                                "locale": {
+                                  "type": "string"
+                                },
+                                "tags": {
+                                  "type": "array",
+                                  "items": {
+                                    "type": "string"
+                                  },
+                                  "uniqueItems": true
+                                },
+                                "weight": {
+                                  "type": "number",
+                                  "minimum": 0
+                                },
+                                "meta": {
+                                  "type": "object",
+                                  "additionalProperties": {
+                                    "nullable": true
+                                  }
+                                },
+                                "attachments": {
+                                  "type": "array",
+                                  "items": {
+                                    "type": "object",
+                                    "properties": {
+                                      "name": {
+                                        "type": "string",
+                                        "minLength": 1,
+                                        "pattern": "^(?!\\.\\.?$)[^/\\\\\\t\\n\\v\\f\\r \\x85\\xa0\\u1680\\u2000-\\u200a\\u2028\\u2029\\u202f\\u205f\\u3000`]+$",
+                                        "example": "consumo-2024.csv"
+                                      },
+                                      "format": {
+                                        "type": "string",
+                                        "minLength": 1,
+                                        "pattern": "^[^\\t\\n\\v\\f\\r \\x85\\xa0\\u1680\\u2000-\\u200a\\u2028\\u2029\\u202f\\u205f\\u3000`]+$",
+                                        "example": "csv"
+                                      },
+                                      "text": {
+                                        "type": "string"
+                                      },
+                                      "origin": {
+                                        "type": "string",
+                                        "minLength": 1,
+                                        "pattern": "^(?![A-Za-z][A-Za-z0-9+.-]*:)(?!\\/)[^?#\\r\\n]*[.][^.\\\\/?#\\r\\n]+$",
+                                        "example": "dados/consumo-2024.csv"
+                                      },
+                                      "label": {
+                                        "type": "string"
+                                      }
+                                    },
+                                    "required": [
+                                      "name",
+                                      "format"
+                                    ],
+                                    "additionalProperties": false
+                                  },
+                                  "minItems": 1
+                                },
+                                "type": {
+                                  "type": "string",
+                                  "enum": [
+                                    "upload"
+                                  ]
+                                },
+                                "maxFiles": {
+                                  "type": "integer",
+                                  "minimum": 1,
+                                  "maximum": 9007199254740991
+                                },
+                                "maxSize": {
+                                  "anyOf": [
+                                    {
+                                      "type": "integer",
+                                      "minimum": 1,
+                                      "maximum": 9007199254740991
+                                    },
+                                    {
+                                      "type": "string",
+                                      "pattern": "^[0-9]+(\\.[0-9]{1,3})? ?(B|KB|MB|GB)$",
+                                      "example": "5 MB"
+                                    }
+                                  ]
+                                },
+                                "extensions": {
+                                  "type": "array",
+                                  "items": {
+                                    "type": "string",
+                                    "pattern": "^\\.[a-z0-9][a-z0-9._+-]*$",
+                                    "example": ".pdf"
+                                  },
+                                  "minItems": 1,
+                                  "uniqueItems": true
+                                },
+                                "answerKey": {
+                                  "type": "string"
+                                }
+                              },
+                              "required": [
+                                "stem",
+                                "type"
+                              ],
+                              "additionalProperties": false
                             }
                           ]
                         },
@@ -29665,6 +30659,99 @@
                                 },
                                 "highlight": {
                                   "type": "string"
+                                }
+                              },
+                              "required": [
+                                "stem",
+                                "type"
+                              ]
+                            },
+                            {
+                              "type": "object",
+                              "properties": {
+                                "attachments": {
+                                  "type": "array",
+                                  "items": {
+                                    "type": "object",
+                                    "properties": {
+                                      "name": {
+                                        "type": "string",
+                                        "minLength": 1
+                                      },
+                                      "format": {
+                                        "type": "string",
+                                        "minLength": 1
+                                      },
+                                      "text": {
+                                        "type": "string"
+                                      },
+                                      "label": {
+                                        "type": "string"
+                                      }
+                                    },
+                                    "required": [
+                                      "name",
+                                      "format"
+                                    ]
+                                  }
+                                },
+                                "id": {
+                                  "type": "string",
+                                  "minLength": 1
+                                },
+                                "uuid": {
+                                  "type": "string",
+                                  "pattern": "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$",
+                                  "example": "123e4567-e89b-12d3-a456-426614174000"
+                                },
+                                "title": {
+                                  "type": "string"
+                                },
+                                "stem": {
+                                  "type": "string"
+                                },
+                                "epilogue": {
+                                  "type": "string"
+                                },
+                                "tags": {
+                                  "type": "array",
+                                  "items": {
+                                    "type": "string"
+                                  },
+                                  "uniqueItems": true
+                                },
+                                "locale": {
+                                  "type": "string"
+                                },
+                                "weight": {
+                                  "type": "number",
+                                  "minimum": 0
+                                },
+                                "type": {
+                                  "type": "string",
+                                  "enum": [
+                                    "upload"
+                                  ]
+                                },
+                                "maxFiles": {
+                                  "type": "integer",
+                                  "minimum": 1
+                                },
+                                "maxSize": {
+                                  "anyOf": [
+                                    {
+                                      "type": "number"
+                                    },
+                                    {
+                                      "type": "string"
+                                    }
+                                  ]
+                                },
+                                "extensions": {
+                                  "type": "array",
+                                  "items": {
+                                    "type": "string"
+                                  }
                                 }
                               },
                               "required": [
@@ -32176,6 +33263,139 @@
                                 "type"
                               ],
                               "additionalProperties": false
+                            },
+                            {
+                              "type": "object",
+                              "properties": {
+                                "$schema": {
+                                  "type": "string"
+                                },
+                                "id": {
+                                  "type": "string",
+                                  "minLength": 1
+                                },
+                                "uuid": {
+                                  "type": "string",
+                                  "pattern": "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$",
+                                  "example": "123e4567-e89b-12d3-a456-426614174000"
+                                },
+                                "title": {
+                                  "type": "string"
+                                },
+                                "author": {
+                                  "type": "string"
+                                },
+                                "stem": {
+                                  "type": "string"
+                                },
+                                "epilogue": {
+                                  "type": "string"
+                                },
+                                "comment": {
+                                  "type": "string"
+                                },
+                                "locale": {
+                                  "type": "string"
+                                },
+                                "tags": {
+                                  "type": "array",
+                                  "items": {
+                                    "type": "string"
+                                  },
+                                  "uniqueItems": true
+                                },
+                                "weight": {
+                                  "type": "number",
+                                  "minimum": 0
+                                },
+                                "meta": {
+                                  "type": "object",
+                                  "additionalProperties": {
+                                    "nullable": true
+                                  }
+                                },
+                                "attachments": {
+                                  "type": "array",
+                                  "items": {
+                                    "type": "object",
+                                    "properties": {
+                                      "name": {
+                                        "type": "string",
+                                        "minLength": 1,
+                                        "pattern": "^(?!\\.\\.?$)[^/\\\\\\t\\n\\v\\f\\r \\x85\\xa0\\u1680\\u2000-\\u200a\\u2028\\u2029\\u202f\\u205f\\u3000`]+$",
+                                        "example": "consumo-2024.csv"
+                                      },
+                                      "format": {
+                                        "type": "string",
+                                        "minLength": 1,
+                                        "pattern": "^[^\\t\\n\\v\\f\\r \\x85\\xa0\\u1680\\u2000-\\u200a\\u2028\\u2029\\u202f\\u205f\\u3000`]+$",
+                                        "example": "csv"
+                                      },
+                                      "text": {
+                                        "type": "string"
+                                      },
+                                      "origin": {
+                                        "type": "string",
+                                        "minLength": 1,
+                                        "pattern": "^(?![A-Za-z][A-Za-z0-9+.-]*:)(?!\\/)[^?#\\r\\n]*[.][^.\\\\/?#\\r\\n]+$",
+                                        "example": "dados/consumo-2024.csv"
+                                      },
+                                      "label": {
+                                        "type": "string"
+                                      }
+                                    },
+                                    "required": [
+                                      "name",
+                                      "format"
+                                    ],
+                                    "additionalProperties": false
+                                  },
+                                  "minItems": 1
+                                },
+                                "type": {
+                                  "type": "string",
+                                  "enum": [
+                                    "upload"
+                                  ]
+                                },
+                                "maxFiles": {
+                                  "type": "integer",
+                                  "minimum": 1,
+                                  "maximum": 9007199254740991
+                                },
+                                "maxSize": {
+                                  "anyOf": [
+                                    {
+                                      "type": "integer",
+                                      "minimum": 1,
+                                      "maximum": 9007199254740991
+                                    },
+                                    {
+                                      "type": "string",
+                                      "pattern": "^[0-9]+(\\.[0-9]{1,3})? ?(B|KB|MB|GB)$",
+                                      "example": "5 MB"
+                                    }
+                                  ]
+                                },
+                                "extensions": {
+                                  "type": "array",
+                                  "items": {
+                                    "type": "string",
+                                    "pattern": "^\\.[a-z0-9][a-z0-9._+-]*$",
+                                    "example": ".pdf"
+                                  },
+                                  "minItems": 1,
+                                  "uniqueItems": true
+                                },
+                                "answerKey": {
+                                  "type": "string"
+                                }
+                              },
+                              "required": [
+                                "stem",
+                                "type"
+                              ],
+                              "additionalProperties": false
                             }
                           ]
                         },
@@ -32886,6 +34106,99 @@
                                 },
                                 "highlight": {
                                   "type": "string"
+                                }
+                              },
+                              "required": [
+                                "stem",
+                                "type"
+                              ]
+                            },
+                            {
+                              "type": "object",
+                              "properties": {
+                                "attachments": {
+                                  "type": "array",
+                                  "items": {
+                                    "type": "object",
+                                    "properties": {
+                                      "name": {
+                                        "type": "string",
+                                        "minLength": 1
+                                      },
+                                      "format": {
+                                        "type": "string",
+                                        "minLength": 1
+                                      },
+                                      "text": {
+                                        "type": "string"
+                                      },
+                                      "label": {
+                                        "type": "string"
+                                      }
+                                    },
+                                    "required": [
+                                      "name",
+                                      "format"
+                                    ]
+                                  }
+                                },
+                                "id": {
+                                  "type": "string",
+                                  "minLength": 1
+                                },
+                                "uuid": {
+                                  "type": "string",
+                                  "pattern": "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$",
+                                  "example": "123e4567-e89b-12d3-a456-426614174000"
+                                },
+                                "title": {
+                                  "type": "string"
+                                },
+                                "stem": {
+                                  "type": "string"
+                                },
+                                "epilogue": {
+                                  "type": "string"
+                                },
+                                "tags": {
+                                  "type": "array",
+                                  "items": {
+                                    "type": "string"
+                                  },
+                                  "uniqueItems": true
+                                },
+                                "locale": {
+                                  "type": "string"
+                                },
+                                "weight": {
+                                  "type": "number",
+                                  "minimum": 0
+                                },
+                                "type": {
+                                  "type": "string",
+                                  "enum": [
+                                    "upload"
+                                  ]
+                                },
+                                "maxFiles": {
+                                  "type": "integer",
+                                  "minimum": 1
+                                },
+                                "maxSize": {
+                                  "anyOf": [
+                                    {
+                                      "type": "number"
+                                    },
+                                    {
+                                      "type": "string"
+                                    }
+                                  ]
+                                },
+                                "extensions": {
+                                  "type": "array",
+                                  "items": {
+                                    "type": "string"
+                                  }
                                 }
                               },
                               "required": [
@@ -35359,6 +36672,139 @@
                           "type"
                         ],
                         "additionalProperties": false
+                      },
+                      {
+                        "type": "object",
+                        "properties": {
+                          "$schema": {
+                            "type": "string"
+                          },
+                          "id": {
+                            "type": "string",
+                            "minLength": 1
+                          },
+                          "uuid": {
+                            "type": "string",
+                            "pattern": "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$",
+                            "example": "123e4567-e89b-12d3-a456-426614174000"
+                          },
+                          "title": {
+                            "type": "string"
+                          },
+                          "author": {
+                            "type": "string"
+                          },
+                          "stem": {
+                            "type": "string"
+                          },
+                          "epilogue": {
+                            "type": "string"
+                          },
+                          "comment": {
+                            "type": "string"
+                          },
+                          "locale": {
+                            "type": "string"
+                          },
+                          "tags": {
+                            "type": "array",
+                            "items": {
+                              "type": "string"
+                            },
+                            "uniqueItems": true
+                          },
+                          "weight": {
+                            "type": "number",
+                            "minimum": 0
+                          },
+                          "meta": {
+                            "type": "object",
+                            "additionalProperties": {
+                              "nullable": true
+                            }
+                          },
+                          "attachments": {
+                            "type": "array",
+                            "items": {
+                              "type": "object",
+                              "properties": {
+                                "name": {
+                                  "type": "string",
+                                  "minLength": 1,
+                                  "pattern": "^(?!\\.\\.?$)[^/\\\\\\t\\n\\v\\f\\r \\x85\\xa0\\u1680\\u2000-\\u200a\\u2028\\u2029\\u202f\\u205f\\u3000`]+$",
+                                  "example": "consumo-2024.csv"
+                                },
+                                "format": {
+                                  "type": "string",
+                                  "minLength": 1,
+                                  "pattern": "^[^\\t\\n\\v\\f\\r \\x85\\xa0\\u1680\\u2000-\\u200a\\u2028\\u2029\\u202f\\u205f\\u3000`]+$",
+                                  "example": "csv"
+                                },
+                                "text": {
+                                  "type": "string"
+                                },
+                                "origin": {
+                                  "type": "string",
+                                  "minLength": 1,
+                                  "pattern": "^(?![A-Za-z][A-Za-z0-9+.-]*:)(?!\\/)[^?#\\r\\n]*[.][^.\\\\/?#\\r\\n]+$",
+                                  "example": "dados/consumo-2024.csv"
+                                },
+                                "label": {
+                                  "type": "string"
+                                }
+                              },
+                              "required": [
+                                "name",
+                                "format"
+                              ],
+                              "additionalProperties": false
+                            },
+                            "minItems": 1
+                          },
+                          "type": {
+                            "type": "string",
+                            "enum": [
+                              "upload"
+                            ]
+                          },
+                          "maxFiles": {
+                            "type": "integer",
+                            "minimum": 1,
+                            "maximum": 9007199254740991
+                          },
+                          "maxSize": {
+                            "anyOf": [
+                              {
+                                "type": "integer",
+                                "minimum": 1,
+                                "maximum": 9007199254740991
+                              },
+                              {
+                                "type": "string",
+                                "pattern": "^[0-9]+(\\.[0-9]{1,3})? ?(B|KB|MB|GB)$",
+                                "example": "5 MB"
+                              }
+                            ]
+                          },
+                          "extensions": {
+                            "type": "array",
+                            "items": {
+                              "type": "string",
+                              "pattern": "^\\.[a-z0-9][a-z0-9._+-]*$",
+                              "example": ".pdf"
+                            },
+                            "minItems": 1,
+                            "uniqueItems": true
+                          },
+                          "answerKey": {
+                            "type": "string"
+                          }
+                        },
+                        "required": [
+                          "stem",
+                          "type"
+                        ],
+                        "additionalProperties": false
                       }
                     ]
                   },
@@ -37318,6 +38764,139 @@
                                 "type"
                               ],
                               "additionalProperties": false
+                            },
+                            {
+                              "type": "object",
+                              "properties": {
+                                "$schema": {
+                                  "type": "string"
+                                },
+                                "id": {
+                                  "type": "string",
+                                  "minLength": 1
+                                },
+                                "uuid": {
+                                  "type": "string",
+                                  "pattern": "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$",
+                                  "example": "123e4567-e89b-12d3-a456-426614174000"
+                                },
+                                "title": {
+                                  "type": "string"
+                                },
+                                "author": {
+                                  "type": "string"
+                                },
+                                "stem": {
+                                  "type": "string"
+                                },
+                                "epilogue": {
+                                  "type": "string"
+                                },
+                                "comment": {
+                                  "type": "string"
+                                },
+                                "locale": {
+                                  "type": "string"
+                                },
+                                "tags": {
+                                  "type": "array",
+                                  "items": {
+                                    "type": "string"
+                                  },
+                                  "uniqueItems": true
+                                },
+                                "weight": {
+                                  "type": "number",
+                                  "minimum": 0
+                                },
+                                "meta": {
+                                  "type": "object",
+                                  "additionalProperties": {
+                                    "nullable": true
+                                  }
+                                },
+                                "attachments": {
+                                  "type": "array",
+                                  "items": {
+                                    "type": "object",
+                                    "properties": {
+                                      "name": {
+                                        "type": "string",
+                                        "minLength": 1,
+                                        "pattern": "^(?!\\.\\.?$)[^/\\\\\\t\\n\\v\\f\\r \\x85\\xa0\\u1680\\u2000-\\u200a\\u2028\\u2029\\u202f\\u205f\\u3000`]+$",
+                                        "example": "consumo-2024.csv"
+                                      },
+                                      "format": {
+                                        "type": "string",
+                                        "minLength": 1,
+                                        "pattern": "^[^\\t\\n\\v\\f\\r \\x85\\xa0\\u1680\\u2000-\\u200a\\u2028\\u2029\\u202f\\u205f\\u3000`]+$",
+                                        "example": "csv"
+                                      },
+                                      "text": {
+                                        "type": "string"
+                                      },
+                                      "origin": {
+                                        "type": "string",
+                                        "minLength": 1,
+                                        "pattern": "^(?![A-Za-z][A-Za-z0-9+.-]*:)(?!\\/)[^?#\\r\\n]*[.][^.\\\\/?#\\r\\n]+$",
+                                        "example": "dados/consumo-2024.csv"
+                                      },
+                                      "label": {
+                                        "type": "string"
+                                      }
+                                    },
+                                    "required": [
+                                      "name",
+                                      "format"
+                                    ],
+                                    "additionalProperties": false
+                                  },
+                                  "minItems": 1
+                                },
+                                "type": {
+                                  "type": "string",
+                                  "enum": [
+                                    "upload"
+                                  ]
+                                },
+                                "maxFiles": {
+                                  "type": "integer",
+                                  "minimum": 1,
+                                  "maximum": 9007199254740991
+                                },
+                                "maxSize": {
+                                  "anyOf": [
+                                    {
+                                      "type": "integer",
+                                      "minimum": 1,
+                                      "maximum": 9007199254740991
+                                    },
+                                    {
+                                      "type": "string",
+                                      "pattern": "^[0-9]+(\\.[0-9]{1,3})? ?(B|KB|MB|GB)$",
+                                      "example": "5 MB"
+                                    }
+                                  ]
+                                },
+                                "extensions": {
+                                  "type": "array",
+                                  "items": {
+                                    "type": "string",
+                                    "pattern": "^\\.[a-z0-9][a-z0-9._+-]*$",
+                                    "example": ".pdf"
+                                  },
+                                  "minItems": 1,
+                                  "uniqueItems": true
+                                },
+                                "answerKey": {
+                                  "type": "string"
+                                }
+                              },
+                              "required": [
+                                "stem",
+                                "type"
+                              ],
+                              "additionalProperties": false
                             }
                           ]
                         },
@@ -38028,6 +39607,99 @@
                                 },
                                 "highlight": {
                                   "type": "string"
+                                }
+                              },
+                              "required": [
+                                "stem",
+                                "type"
+                              ]
+                            },
+                            {
+                              "type": "object",
+                              "properties": {
+                                "attachments": {
+                                  "type": "array",
+                                  "items": {
+                                    "type": "object",
+                                    "properties": {
+                                      "name": {
+                                        "type": "string",
+                                        "minLength": 1
+                                      },
+                                      "format": {
+                                        "type": "string",
+                                        "minLength": 1
+                                      },
+                                      "text": {
+                                        "type": "string"
+                                      },
+                                      "label": {
+                                        "type": "string"
+                                      }
+                                    },
+                                    "required": [
+                                      "name",
+                                      "format"
+                                    ]
+                                  }
+                                },
+                                "id": {
+                                  "type": "string",
+                                  "minLength": 1
+                                },
+                                "uuid": {
+                                  "type": "string",
+                                  "pattern": "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$",
+                                  "example": "123e4567-e89b-12d3-a456-426614174000"
+                                },
+                                "title": {
+                                  "type": "string"
+                                },
+                                "stem": {
+                                  "type": "string"
+                                },
+                                "epilogue": {
+                                  "type": "string"
+                                },
+                                "tags": {
+                                  "type": "array",
+                                  "items": {
+                                    "type": "string"
+                                  },
+                                  "uniqueItems": true
+                                },
+                                "locale": {
+                                  "type": "string"
+                                },
+                                "weight": {
+                                  "type": "number",
+                                  "minimum": 0
+                                },
+                                "type": {
+                                  "type": "string",
+                                  "enum": [
+                                    "upload"
+                                  ]
+                                },
+                                "maxFiles": {
+                                  "type": "integer",
+                                  "minimum": 1
+                                },
+                                "maxSize": {
+                                  "anyOf": [
+                                    {
+                                      "type": "number"
+                                    },
+                                    {
+                                      "type": "string"
+                                    }
+                                  ]
+                                },
+                                "extensions": {
+                                  "type": "array",
+                                  "items": {
+                                    "type": "string"
+                                  }
                                 }
                               },
                               "required": [
@@ -43357,6 +45029,135 @@
         }
       }
     },
+    "/api/course/{discipline}/{course}/exam/{slug}/question/{question}/file": {
+      "post": {
+        "operationId": "responseFileAdd",
+        "summary": "Send a file to an upload question of the caller's attempt.",
+        "description": "Multipart with a file part `file` and a text part `name`, the name the client knows the file by. A file with the same stored name replaces the previous one. Answers the list of files of the question after the write.",
+        "tags": [
+          "Responses"
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string"
+            },
+            "required": true,
+            "name": "discipline",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": "string"
+            },
+            "required": true,
+            "name": "course",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": "string"
+            },
+            "required": true,
+            "name": "slug",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": "string"
+            },
+            "required": true,
+            "name": "question",
+            "in": "path"
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "$ref": "#/components/schemas/ResponseFileUpload"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ResponseFileList"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/course/{discipline}/{course}/exam/{slug}/question/{question}/file/{name}": {
+      "delete": {
+        "operationId": "responseFileRemove",
+        "summary": "Remove a file of an upload question of the caller's attempt.",
+        "description": "The file is addressed by its stored name, as the list of files gives it. Answers the list of files left.",
+        "tags": [
+          "Responses"
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string"
+            },
+            "required": true,
+            "name": "discipline",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": "string"
+            },
+            "required": true,
+            "name": "course",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": "string"
+            },
+            "required": true,
+            "name": "slug",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": "string"
+            },
+            "required": true,
+            "name": "question",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": "string"
+            },
+            "required": true,
+            "name": "name",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ResponseFileList"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/course/{discipline}/{course}/exam/{slug}/question/{question}/rubric": {
       "get": {
         "operationId": "rubricRead",
@@ -46762,6 +48563,139 @@
                                   },
                                   "template": {
                                     "type": "string"
+                                  },
+                                  "answerKey": {
+                                    "type": "string"
+                                  }
+                                },
+                                "required": [
+                                  "stem",
+                                  "type"
+                                ],
+                                "additionalProperties": false
+                              },
+                              {
+                                "type": "object",
+                                "properties": {
+                                  "$schema": {
+                                    "type": "string"
+                                  },
+                                  "id": {
+                                    "type": "string",
+                                    "minLength": 1
+                                  },
+                                  "uuid": {
+                                    "type": "string",
+                                    "pattern": "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$",
+                                    "example": "123e4567-e89b-12d3-a456-426614174000"
+                                  },
+                                  "title": {
+                                    "type": "string"
+                                  },
+                                  "author": {
+                                    "type": "string"
+                                  },
+                                  "stem": {
+                                    "type": "string"
+                                  },
+                                  "epilogue": {
+                                    "type": "string"
+                                  },
+                                  "comment": {
+                                    "type": "string"
+                                  },
+                                  "locale": {
+                                    "type": "string"
+                                  },
+                                  "tags": {
+                                    "type": "array",
+                                    "items": {
+                                      "type": "string"
+                                    },
+                                    "uniqueItems": true
+                                  },
+                                  "weight": {
+                                    "type": "number",
+                                    "minimum": 0
+                                  },
+                                  "meta": {
+                                    "type": "object",
+                                    "additionalProperties": {
+                                      "nullable": true
+                                    }
+                                  },
+                                  "attachments": {
+                                    "type": "array",
+                                    "items": {
+                                      "type": "object",
+                                      "properties": {
+                                        "name": {
+                                          "type": "string",
+                                          "minLength": 1,
+                                          "pattern": "^(?!\\.\\.?$)[^/\\\\\\t\\n\\v\\f\\r \\x85\\xa0\\u1680\\u2000-\\u200a\\u2028\\u2029\\u202f\\u205f\\u3000`]+$",
+                                          "example": "consumo-2024.csv"
+                                        },
+                                        "format": {
+                                          "type": "string",
+                                          "minLength": 1,
+                                          "pattern": "^[^\\t\\n\\v\\f\\r \\x85\\xa0\\u1680\\u2000-\\u200a\\u2028\\u2029\\u202f\\u205f\\u3000`]+$",
+                                          "example": "csv"
+                                        },
+                                        "text": {
+                                          "type": "string"
+                                        },
+                                        "origin": {
+                                          "type": "string",
+                                          "minLength": 1,
+                                          "pattern": "^(?![A-Za-z][A-Za-z0-9+.-]*:)(?!\\/)[^?#\\r\\n]*[.][^.\\\\/?#\\r\\n]+$",
+                                          "example": "dados/consumo-2024.csv"
+                                        },
+                                        "label": {
+                                          "type": "string"
+                                        }
+                                      },
+                                      "required": [
+                                        "name",
+                                        "format"
+                                      ],
+                                      "additionalProperties": false
+                                    },
+                                    "minItems": 1
+                                  },
+                                  "type": {
+                                    "type": "string",
+                                    "enum": [
+                                      "upload"
+                                    ]
+                                  },
+                                  "maxFiles": {
+                                    "type": "integer",
+                                    "minimum": 1,
+                                    "maximum": 9007199254740991
+                                  },
+                                  "maxSize": {
+                                    "anyOf": [
+                                      {
+                                        "type": "integer",
+                                        "minimum": 1,
+                                        "maximum": 9007199254740991
+                                      },
+                                      {
+                                        "type": "string",
+                                        "pattern": "^[0-9]+(\\.[0-9]{1,3})? ?(B|KB|MB|GB)$",
+                                        "example": "5 MB"
+                                      }
+                                    ]
+                                  },
+                                  "extensions": {
+                                    "type": "array",
+                                    "items": {
+                                      "type": "string",
+                                      "pattern": "^\\.[a-z0-9][a-z0-9._+-]*$",
+                                      "example": ".pdf"
+                                    },
+                                    "minItems": 1,
+                                    "uniqueItems": true
                                   },
                                   "answerKey": {
                                     "type": "string"

@@ -39,6 +39,7 @@ export const QUESTION_TYPES = [
 	"multiple-selection",
 	"true-false",
 	"essay",
+	"upload",
 	"numeric",
 	"short-answer",
 	"fill-in",

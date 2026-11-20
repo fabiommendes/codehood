@@ -171,6 +171,10 @@ export function responseSummary(
 				.join(" · ");
 			return truncated(text);
 		}
+		case "upload": {
+			const text = uploadNames(payload);
+			return text === "" ? { text: m.grades_summary_blank() } : truncated(text);
+		}
 		case "ordering":
 			return { text: orderingText(question.lines, payload) };
 		default:
@@ -178,4 +182,14 @@ export function responseSummary(
 				? truncated(payload.trim())
 				: { text: m.grades_summary_blank() };
 	}
+}
+
+/// The file names of an upload response, comma-separated; empty when there are none.
+function uploadNames(payload: unknown): string {
+	if (!Array.isArray(payload)) return "";
+	return payload
+		.flatMap((file) =>
+			file && typeof file.name === "string" ? [file.name] : [],
+		)
+		.join(", ");
 }

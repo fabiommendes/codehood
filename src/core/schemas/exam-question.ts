@@ -9,6 +9,7 @@ import {
 	publicOrderingSchema,
 	publicShortAnswerSchema,
 	publicTrueFalseSchema,
+	publicUploadSchema,
 } from "@/mdq/public-schema";
 import { publicId, slug } from "./base";
 import { courseRef } from "./course";
@@ -27,6 +28,7 @@ const studentQuestionSchema = z.discriminatedUnion("type", [
 	publicFillInSchema.omit({ tags: true }),
 	publicOrderingSchema.omit({ tags: true }),
 	publicCodeSchema.omit({ tags: true }),
+	publicUploadSchema.omit({ tags: true }),
 ]);
 
 /// A question of the attempt, in the public form.

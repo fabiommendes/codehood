@@ -87,6 +87,7 @@ import {
 	releaseBlocker,
 	viewerTiming,
 } from "@/services/exam-state";
+import { sanitizeFilename } from "@/utils/filename";
 import { activeAdjustmentsOf } from "../active-adjustments";
 import {
 	DbNull,
@@ -511,10 +512,17 @@ const buildExamService = (deps: Deps) =>
 						fields.blobs ?? {},
 						{ ...opts, tx },
 					);
-					await deps.attachments.detachExcept(owner, attachments.files, {
-						...opts,
-						tx,
-					});
+					await deps.attachments.detachExcept(
+						owner,
+						Object.entries(attachments.files).map(([filename, hash]) => ({
+							hash,
+							filename: sanitizeFilename(filename),
+						})),
+						{
+							...opts,
+							tx,
+						},
+					);
 				}
 
 				return fromDb(

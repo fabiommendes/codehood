@@ -6,6 +6,11 @@ const EXTENSION_RE = /^[a-z0-9]+$/i;
 const BLOB_HASH_RE = /^[0-9a-f]{64}$/;
 const MAX_BYTES = 255;
 
+/// Size of `text` in UTF-8, without `Buffer`, so the browser can run this module too.
+function byteLength(text: string): number {
+	return new TextEncoder().encode(text).length;
+}
+
 function reject(name: string, reason: string): never {
 	throw new InvalidData(
 		{ filename: [{ code: "invalid", message: reason }] },
@@ -61,9 +66,9 @@ export function sanitizeFilename(name: string): string {
 		slug = "file";
 	}
 
-	const suffixBytes = extension ? 1 + Buffer.byteLength(extension, "utf8") : 0;
+	const suffixBytes = extension ? 1 + byteLength(extension) : 0;
 	const available = MAX_BYTES - suffixBytes;
-	while (Buffer.byteLength(slug, "utf8") > available && slug.length > 0) {
+	while (byteLength(slug) > available && slug.length > 0) {
 		slug = slug.slice(0, -1);
 	}
 	// Truncation can stop on a separator that `slugify` would have trimmed,

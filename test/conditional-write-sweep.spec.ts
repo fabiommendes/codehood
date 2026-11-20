@@ -868,6 +868,12 @@ const UNGUARDED: Record<string, string> = {
 		"derived write: moves the version of the attempts it grades, takes no expectation",
 	"response.settleExpired":
 		"derived write: moves the version of the attempts it grades, takes no expectation",
+	"response.submissionFile":
+		"a read: it answers the bytes of a file of an answer and writes nothing",
+	"response.uploadFile":
+		"a student's save, like `answer`: it appends to the attempt and never fails on an expectation",
+	"response.removeFile":
+		"a student's save, like `answer`: it appends to the attempt and never fails on an expectation",
 	"response.restartPreview":
 		"the instructor's own simulation: it replaces the row with a new one and carries no expectation",
 	"rollCall.checkIn":

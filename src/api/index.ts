@@ -923,6 +923,55 @@ export const userApi = {
 	}),
 };
 
+const responseFilePath =
+	"/api/course/[discipline]/[course]/exam/[slug]/question/[question]/file";
+
+/// The upload question of the exam a response file path addresses.
+function responseFileKeyOf(params: Record<string, string>) {
+	return {
+		course: parseCourseParams(params),
+		exam: params.slug as string,
+		question: params.question as string,
+	};
+}
+
+const responseFileList = schema.responseFileList.openapi("ResponseFileList");
+
+export const responseFileApi = {
+	add: POST(responseFilePath, {
+		in: schema.responseFileUpload.openapi("ResponseFileUpload"),
+		inMultipart: true,
+		out: responseFileList,
+		summary: "Send a file to an upload question of the caller's attempt.",
+		description:
+			"Multipart with a file part `file` and a text part `name`, the name the client knows the file by. A file with the same stored name replaces the previous one. Answers the list of files of the question after the write.",
+		operationId: "responseFileAdd",
+		tags: ["Responses"],
+		handler: async ({ actor, body, params }) =>
+			db.response.uploadFile(
+				{
+					...responseFileKeyOf(params),
+					filename: body.name,
+					bytes: body.file,
+				},
+				{ actor },
+			),
+	}),
+	remove: DELETE(`${responseFilePath}/[name]`, {
+		out: responseFileList,
+		summary: "Remove a file of an upload question of the caller's attempt.",
+		description:
+			"The file is addressed by its stored name, as the list of files gives it. Answers the list of files left.",
+		operationId: "responseFileRemove",
+		tags: ["Responses"],
+		handler: async ({ actor, params }) =>
+			db.response.removeFile(
+				{ ...responseFileKeyOf(params), filename: params.name as string },
+				{ actor },
+			),
+	}),
+};
+
 const rubricTags = ["Rubrics"];
 const rubricPath =
 	"/api/course/[discipline]/[course]/exam/[slug]/question/[question]/rubric";

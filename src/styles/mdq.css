@@ -435,4 +435,48 @@
 	.mdq-feedback[data-sign="zero"] {
 		@apply border-info bg-info/10;
 	}
+
+	.mdq-upload {
+		@apply flex flex-col gap-2;
+	}
+	.mdq-upload-label {
+		@apply text-sm font-semibold;
+	}
+	.mdq-upload-input {
+		@apply file-input file-input-sm w-full max-w-sm;
+	}
+	.mdq-upload-limits {
+		@apply text-xs text-muted;
+	}
+	.mdq-upload-files {
+		@apply flex flex-col divide-y divide-edge rounded-box border border-edge;
+	}
+	.mdq-upload-file {
+		@apply flex flex-wrap items-center gap-x-3 gap-y-1 px-3 py-2 text-sm;
+	}
+	.mdq-upload-file[data-state="queued"],
+	.mdq-upload-file[data-state="sending"],
+	.mdq-upload-file[data-state="waiting"],
+	.mdq-upload-file[data-state="removing"] {
+		@apply text-muted;
+	}
+	.mdq-upload-file[data-state="error"] {
+		@apply bg-error/5 text-error;
+	}
+	.mdq-upload-name {
+		@apply font-mono font-medium;
+	}
+	a.mdq-upload-name {
+		@apply text-primary underline-offset-2 hover:underline;
+	}
+	.mdq-upload-size,
+	.mdq-upload-note {
+		@apply text-xs text-muted;
+	}
+	.mdq-upload-remove {
+		@apply btn btn-ghost btn-xs ml-auto;
+	}
+	.mdq-upload-status {
+		@apply min-h-5 text-sm;
+	}
 }

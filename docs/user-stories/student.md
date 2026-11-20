@@ -285,6 +285,22 @@ their original names, and a file the instructor wrote inline shows its code in a
 collapsed block that the student can open and read without downloading.
 
 
+### Answer an exam question with files
+
+    status: todo
+    url: /<discipline>/<course>/exams/<exam>
+
+Student opens a question that asks for files, such as a diagram or a report. It
+says how many files it takes, how large each may be and which types it accepts.
+They pick a program or a file that is too large and are told why it was not
+accepted, without losing anything already sent. Then they send a PDF and an
+image, and see both listed with their sizes. Sending a file with the same name
+replaces it, a third file is refused while two are kept, and the cross beside a
+file removes it, and "Clear" removes all of them after asking for confirmation.
+Each file is stored as soon as it is sent, so after a reload the list is still
+there, and a clear that failed never takes away a file sent afterwards.
+
+
 ### Practice questions outside an exam
 
     status: todo

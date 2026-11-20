@@ -101,7 +101,7 @@ const badges = {
           </header>
           <div class="card-body">
 
-            {asked && payload !== undefined && <Answer question={asked} payload={payload} />}
+            {asked && payload !== undefined && <Answer question={asked} payload={payload} submission={request.submission} />}
 
             {
               answer && (

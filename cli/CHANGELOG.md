@@ -5,6 +5,8 @@ CLI shares the server's version and is released with it.
 
 ## Unreleased
 
+- `push` sends `upload` questions (`maxFiles`, `maxSize`, `extensions`) like any
+  other type. `codehood show` has no widget for them: a TUI cannot attach files.
 - `push` reads `assignments/<slug>.md` (title, `due`, `closes`, `opens`,
   `team`, `template`, `restrictions`; the body is the statement) and syncs it
   three ways, after the repositories. `--drop-assignments` deletes one whose

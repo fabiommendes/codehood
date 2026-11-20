@@ -21,6 +21,7 @@ import {
 	ordering,
 	shortAnswer,
 	trueFalse,
+	upload,
 } from "./fixtures";
 import type {
 	CodeQuestion as Code,
@@ -33,6 +34,7 @@ import type {
 	QuestionDocument as Question,
 	ShortAnswerQuestion as ShortAnswer,
 	TrueFalseQuestion as TrueFalse,
+	UploadQuestion as Upload,
 } from "./index";
 
 type FillInBlank = FillIn["blanks"][number];
@@ -217,6 +219,17 @@ export const codeFactory = Factory.define<Code>(({ sequence }) =>
 	}),
 );
 
+export const uploadFactory = Factory.define<Upload>(({ sequence }) =>
+	upload({
+		id: id("upload", sequence),
+		title: faker.lorem.words(3),
+		stem: stem(),
+		maxFiles: 2,
+		maxSize: "5 MB",
+		extensions: [".pdf"],
+	}),
+);
+
 /// The factory for each question type, so a missing type is a compile error.
 const FACTORIES: {
 	[K in Question["type"]]: Factory<Extract<Question, { type: K }>>;
@@ -225,6 +238,7 @@ const FACTORIES: {
 	"multiple-selection": multipleSelectionFactory,
 	"true-false": trueFalseFactory,
 	essay: essayFactory,
+	upload: uploadFactory,
 	numeric: numericFactory,
 	"short-answer": shortAnswerFactory,
 	"fill-in": fillInFactory,
@@ -238,6 +252,7 @@ const TYPES = [
 	"multiple-selection",
 	"true-false",
 	"essay",
+	"upload",
 	"numeric",
 	"short-answer",
 	"fill-in",

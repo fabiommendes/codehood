@@ -25,16 +25,21 @@ import type { ResponseId } from "@/core/schemas/base";
 import {
 	responseAnswered,
 	responseCreate,
+	responseFileContent,
+	responseFileList,
 	responseFilter,
 	responseFinish,
 	responseGradeObjectives,
 	responsePK,
+	responseRemoveFile,
 	responseRestartPreview,
 	responseSchema,
 	responseSettleExpired,
+	responseSubmissionFile,
 	responseSubmit,
 	responseSubmitted,
 	responseUpdate,
+	responseUploadFile,
 } from "@/core/schemas/response";
 import type { ServiceOptsWithoutTx } from "@/db/base-service";
 import {
@@ -69,6 +74,11 @@ import {
 } from "../utils";
 import { loggingAnswerHistoryRemoval } from "./answer-edit.service";
 import {
+	type AttachmentService,
+	makeAttachmentService,
+} from "./attachment.service";
+import { type BlobService, makeBlobService } from "./blob.service";
+import {
 	examTimingFromDb,
 	examTimingSelect,
 	freezeQuestionVersions,
@@ -79,6 +89,11 @@ import {
 	gradeObjectives as gradeAttempt,
 	gradeExpiredObjectives,
 } from "./objective-grading";
+import {
+	type AttemptAccess,
+	makeResponseFiles,
+	type ResponseFiles,
+} from "./response-files";
 import {
 	assertAcceptingSubmissions,
 	assertExamOpen,
@@ -113,6 +128,10 @@ export interface ObjectiveGradingLine {
 export type ResponsePK = z.infer<typeof responsePK>;
 export type ResponseSubmit = z.infer<typeof responseSubmit>;
 export type ResponseAnswered = z.infer<typeof responseAnswered>;
+export type ResponseUploadFile = z.infer<typeof responseUploadFile>;
+export type ResponseSubmissionFile = z.infer<typeof responseSubmissionFile>;
+export type ResponseRemoveFile = z.infer<typeof responseRemoveFile>;
+export type ResponseFileList = z.infer<typeof responseFileList>;
 export type ResponseUpdate = z.infer<typeof responseUpdate>;
 
 /// The course shape the permission predicates need for a response write: of its enrollments, only those of `actor` and `authors`.
@@ -175,8 +194,17 @@ type ResponseT = {
 };
 
 /** The response service of `client` (the shared client by default). */
-const buildResponseService = () =>
+const buildResponseService = (
+	attachments: AttachmentService,
+	blob: BlobService,
+) =>
 	defineService<ResponseT>()(() => {
+		const files = makeResponseFiles({
+			attachments,
+			blob,
+			attempts: attemptAccess,
+		});
+
 		/**
 		 * Opens an attempt for one student on one exam.
 		 *
@@ -525,6 +553,10 @@ const buildResponseService = () =>
 						}
 
 						await measure({ responseIds: [response.id] });
+						await attachments.detach("RESPONSE", response.id, {
+							actor: SYSTEM,
+							tx: inner,
+						});
 						await inner.submission.deleteMany({
 							where: { responseId: response.id },
 						});
@@ -769,6 +801,7 @@ const buildResponseService = () =>
 					select: { id: true },
 				});
 				if (old) {
+					await attachments.detach("RESPONSE", old.id, { actor: SYSTEM, tx });
 					await tx.submission.deleteMany({ where: { responseId: old.id } });
 					await guardedDelete(tx, "response", { id: old.id }, {});
 				}
@@ -815,6 +848,7 @@ const buildResponseService = () =>
 					tx,
 					input,
 					opts.actor,
+					files,
 				);
 				const updated = valueOrNotFound(
 					"response",
@@ -848,6 +882,7 @@ const buildResponseService = () =>
 					tx,
 					input,
 					opts.actor,
+					files,
 				);
 				return {
 					response: row.publicId,
@@ -855,6 +890,58 @@ const buildResponseService = () =>
 					duplicate,
 				};
 			},
+		});
+
+		/**
+		 * Stores one file as the answer to an upload question, replacing the file of the same name.
+		 *
+		 * @throws {@link InvalidData} If the attempt is closed, the question is not an upload one, or the file does not fit it.
+		 * @throws {@link NotAllowed} If `actor` may not write the author's work or the file is over their quota.
+		 * @throws {@link NotFound} If the question is not in the exam.
+		 */
+		const uploadFile = op({
+			transaction: false,
+			args: [responseUploadFile],
+			returns: responseFileList,
+			run: (
+				tx: PrismaTx,
+				input: ResponseUploadFile,
+				opts: ServiceOptsWithoutTx,
+			): Promise<ResponseFileList> => files.uploadFile(tx, input, opts),
+		});
+
+		/**
+		 * Removes the file of that exact name from an upload question's answer.
+		 *
+		 * @throws {@link NotFound} If the attempt holds no file of that name.
+		 * @throws {@link InvalidData} If the attempt is closed or the question is not an upload one.
+		 */
+		const removeFile = op({
+			transaction: false,
+			args: [responseRemoveFile],
+			returns: responseFileList,
+			run: (
+				tx: PrismaTx,
+				input: ResponseRemoveFile,
+				opts: ServiceOptsWithoutTx,
+			): Promise<ResponseFileList> => files.removeFile(tx, input, opts),
+		});
+
+		/**
+		 * Reads a file an upload answer cites, or `null` once the attempt stopped keeping it.
+		 *
+		 * @throws {@link NotAllowed} If the actor is neither the attempt's author nor someone who may read it.
+		 * @throws {@link NotFound} If the submission is not in the exam or cites no file of that name.
+		 */
+		const submissionFile = op({
+			transaction: false,
+			args: [responseSubmissionFile],
+			returns: responseFileContent.nullable(),
+			run: (
+				tx: PrismaTx,
+				input: ResponseSubmissionFile,
+				opts: ServiceOptsWithoutTx,
+			) => files.submissionFile(tx, input, opts),
 		});
 
 		return {
@@ -870,14 +957,24 @@ const buildResponseService = () =>
 			restartPreview,
 			submit,
 			answer,
+			uploadFile,
+			submissionFile,
+			removeFile,
 		};
 	});
 
 /**
- * Builds the response service over `client`.
+ * Builds the response service; `attachments` detaches the files of an attempt
+ * that is deleted.
  */
-export const makeResponseService = (client: PrismaClient = prisma) =>
-	buildResponseService()(client);
+export const makeResponseService = (
+	client: PrismaClient = prisma,
+	attachments: AttachmentService = makeAttachmentService(
+		makeBlobService(),
+		client,
+	),
+	blob: BlobService = makeBlobService(),
+) => buildResponseService(attachments, blob)(client);
 
 /** The response service, as built by {@link makeResponseService}. */
 export type ResponseService = ReturnType<typeof makeResponseService>;
@@ -889,6 +986,7 @@ async function appendSubmission(
 	tx: PrismaTx,
 	input: ResponseSubmit,
 	actor: Actor,
+	files: ResponseFiles,
 ): Promise<{ row: DbAttempt; duplicate: boolean }> {
 	const { attempt: row, exception } = await resolveOrCreateAttempt(
 		tx,
@@ -912,6 +1010,11 @@ async function appendSubmission(
 		input.question,
 		input.payload,
 	);
+	if (question.type === "UPLOAD" && input.kind !== "SUBMIT") {
+		// The write lock comes first, so the list is read after a concurrent upload commits.
+		await touch(tx, "response", { id: row.id }, {});
+		await files.assertAnswer(tx, row.id, question.id, input.payload);
+	}
 
 	let duplicate = false;
 	if (input.kind === "SUBMIT") {
@@ -952,6 +1055,7 @@ async function appendSubmission(
 	// The submissions are part of the response, so appending one moves its
 	// version. A student's save carries no expectation and never fails on one.
 	if (!duplicate) await touch(tx, "response", { id: row.id }, {});
+	if (question.type === "UPLOAD" && !duplicate) await files.release(tx, row.id);
 	return { row, duplicate };
 }
 
@@ -1346,6 +1450,47 @@ async function resolveOrCreateAttempt(
 	perm: "response.create" | "response.submit",
 	expected: Date | null | undefined,
 ) {
+	const found = await lookupAttempt(tx, input, actor, perm);
+	const { exam, authorId, preview, withExam } = found;
+	if (found.existing) {
+		checkExpectedUpdatedAt(found.existing.updatedAt, expected);
+		return withExam(found.existing);
+	}
+	checkExpectedUpdatedAt(null, expected);
+
+	// A simulation has one slot on any exam, and no session window.
+	if (exam.type !== "PRACTICE" || preview) {
+		const created = await invalidIfExists(tx.response.create, {
+			data: {
+				publicId: generateToken(9),
+				authorId,
+				examId: exam.id,
+				preview,
+			},
+		});
+		if (!preview) await freezeQuestionVersions(tx, exam.id);
+		return withExam(created);
+	}
+
+	return withExam(
+		await invalidIfExists(tx.response.create, {
+			data: {
+				publicId: generateToken(9),
+				authorId,
+				examId: exam.id,
+				slotKey: dateToSlotKey(input.practiceSession ?? new Date()),
+			},
+		}),
+	);
+}
+
+/// Checks everything `resolveOrCreateAttempt` checks and finds the attempt, writing nothing; `existing` is `null` when none is open yet.
+async function lookupAttempt(
+	tx: PrismaTx,
+	input: AttemptInput,
+	actor: Actor,
+	perm: "response.create" | "response.submit",
+) {
 	const { course, exam, authorId, preview } = await prepareAttempt(
 		tx,
 		input,
@@ -1369,54 +1514,91 @@ async function resolveOrCreateAttempt(
 		exception,
 	});
 
-	// A simulation has one slot on any exam, and no session window.
+	let existing: Awaited<ReturnType<typeof tx.response.findFirst>>;
 	if (exam.type !== "PRACTICE" || preview) {
-		const existing = await tx.response.findUnique({
+		existing = await tx.response.findUnique({
 			where: {
 				authorId_examId_slotKey: { authorId, examId: exam.id, slotKey: 0 },
 			},
 		});
-		if (existing) {
-			checkExpectedUpdatedAt(existing.updatedAt, expected);
-			return withExam(existing);
-		}
-
-		checkExpectedUpdatedAt(null, expected);
-		const created = await invalidIfExists(tx.response.create, {
-			data: {
-				publicId: generateToken(9),
-				authorId,
-				examId: exam.id,
-				preview,
-			},
+	} else {
+		const windowStart = dateToSlotKey(
+			new Date(Date.now() - PRACTICE_SESSION_WINDOW_MS),
+		);
+		existing = await tx.response.findFirst({
+			where: { authorId, examId: exam.id, slotKey: { gte: windowStart } },
+			orderBy: { slotKey: "desc" },
 		});
-		if (!preview) await freezeQuestionVersions(tx, exam.id);
-		return withExam(created);
 	}
+	return { course, exam, authorId, preview, exception, existing, withExam };
+}
 
-	const windowStart = dateToSlotKey(
-		new Date(Date.now() - PRACTICE_SESSION_WINDOW_MS),
-	);
-	const existing = await tx.response.findFirst({
-		where: { authorId, examId: exam.id, slotKey: { gte: windowStart } },
-		orderBy: { slotKey: "desc" },
-	});
-	if (existing) {
-		checkExpectedUpdatedAt(existing.updatedAt, expected);
-		return withExam(existing);
-	}
+/// The attempt lookups the file operations of an attempt are built on.
+const attemptAccess: AttemptAccess = {
+	async readable(tx, input, actor) {
+		const course = valueOrNotFound(
+			"course",
+			await tx.course.findUnique({
+				where: courseRefWhere(input.course),
+				select: { id: true },
+			}),
+		);
+		const row = valueOrNotFound(
+			"submission",
+			await tx.submission.findFirst({
+				where: {
+					publicId: input.submission,
+					response: { exam: { courseId: course.id, slug: input.exam } },
+				},
+				select: {
+					payload: true,
+					responseId: true,
+					response: {
+						select: { id: true, authorId: true, ...attemptInclude(actor) },
+					},
+				},
+			}),
+		);
+		if (!hasPerm(actor, "response.read", responseTarget(row.response))) {
+			throw new NotAllowed("response.read");
+		}
+		return { attemptId: row.responseId, payload: row.payload };
+	},
+	async inspect(tx, input, actor) {
+		const found = await inspectAttempt(tx, input, actor);
+		return {
+			attempt: found.attempt,
+			courseId: found.course.id,
+			examId: found.exam.id,
+			exception: found.exception,
+		};
+	},
+	async open(tx, input, actor) {
+		const found = await resolveOrCreateAttempt(
+			tx,
+			input,
+			actor,
+			"response.submit",
+			undefined,
+		);
+		return {
+			attempt: found.attempt,
+			courseId: found.attempt.exam.courseId,
+			examId: found.attempt.examId,
+			exception: found.exception,
+		};
+	},
+};
 
-	checkExpectedUpdatedAt(null, expected);
-	return withExam(
-		await invalidIfExists(tx.response.create, {
-			data: {
-				publicId: generateToken(9),
-				authorId,
-				examId: exam.id,
-				slotKey: dateToSlotKey(input.practiceSession ?? new Date()),
-			},
-		}),
-	);
+/// The attempt of an upload write, read without opening one.
+async function inspectAttempt(tx: PrismaTx, input: AttemptInput, actor: Actor) {
+	const found = await lookupAttempt(tx, input, actor, "response.submit");
+	return {
+		attempt: found.existing ? found.withExam(found.existing).attempt : null,
+		course: found.course,
+		exam: found.exam,
+		exception: found.exception,
+	};
 }
 
 /// The `closedAt` to write when `row` is set to `accepting`: now on closing an open attempt, `null` on reopening, and `undefined` (untouched) otherwise, so a second close keeps the first instant.

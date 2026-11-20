@@ -14,6 +14,7 @@ export const questionTypeLabels: Record<QuestionType, string> = {
 	"multiple-selection": m.questions_type_multiple_selection(),
 	"true-false": m.questions_type_true_false(),
 	essay: m.questions_type_essay(),
+	upload: m.questions_type_upload(),
 	numeric: m.questions_type_numeric(),
 	"short-answer": m.questions_type_short_answer(),
 	"fill-in": m.questions_type_fill_in(),

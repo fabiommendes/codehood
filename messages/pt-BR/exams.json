@@ -247,6 +247,7 @@
 	"exams_attempt_not_saved": "Não salva",
 	"exams_attempt_saved": "Salva",
 	"exams_attempt_clear_answer": "Limpar resposta",
+	"exams_attempt_clear_files_confirm": "Remover todos os arquivos enviados para esta questão?",
 	"exams_attempt_clear": "Limpar",
 	"exams_attempt_nav_back": "Questões anteriores",
 	"exams_attempt_nav_forward": "Próximas questões",

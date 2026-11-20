@@ -201,6 +201,26 @@ fail. The server trusts the proxy's `X-Forwarded-*` headers only for the
 `instance.publicUrl` host; with a wrong one, form posts fail Astro's origin
 check and every client has the proxy's IP.
 
+The proxy serves `storage.resourceRoot` as `/files/` straight from disk
+(ADR 0010). Files there come from users, so that location must send
+`X-Content-Type-Options: nosniff`, `Content-Security-Policy: sandbox` for
+anything but a PDF (the sandbox stops Chrome's PDF viewer), and
+`Content-Disposition: attachment` for anything that is not an image or a PDF.
+Otherwise an uploaded `.html` or `.svg` runs as a page on the app's origin.
+With Caddy:
+
+```caddy
+handle_path /files/* {
+	root * /srv/codehood/storage/resources
+	header X-Content-Type-Options nosniff
+	@notpdf not path *.pdf
+	header @notpdf Content-Security-Policy "sandbox"
+	@download not path *.png *.jpg *.jpeg *.gif *.webp *.pdf
+	header @download Content-Disposition attachment
+	file_server
+}
+```
+
 Assignments keep one bare git repository per team in
 `storage.repositoryRoot`, and the server runs the `git` binary on them
 (ADR 0021):

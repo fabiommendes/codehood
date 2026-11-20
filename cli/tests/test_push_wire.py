@@ -54,3 +54,14 @@ def test_ordering_without_alternatives_omits_empty_lists() -> None:
     payload = wire("Sort the lines.\n\n[ordering]:\n* first\n* second\n")
     assert payload["type"] == "ordering"
     assert not {"extra", "accept", "reject"} & payload.keys()
+
+
+def test_upload_keeps_its_limits() -> None:
+    payload = wire(
+        "---\nmaxFiles: 2\nmaxSize: 5 MB\nextensions: [.pdf, .png]\n---\n\n"
+        "Send a drawing.\n\n[upload]\n"
+    )
+    assert payload["type"] == "upload"
+    assert payload["maxFiles"] == 2
+    assert payload["maxSize"] == "5 MB"
+    assert payload["extensions"] == [".pdf", ".png"]

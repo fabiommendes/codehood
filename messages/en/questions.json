@@ -17,6 +17,7 @@
 	"questions_type_multiple_selection": "Multiple selection",
 	"questions_type_true_false": "True / false",
 	"questions_type_essay": "Essay",
+	"questions_type_upload": "File upload",
 	"questions_type_numeric": "Numeric",
 	"questions_type_short_answer": "Short answer",
 	"questions_type_fill_in": "Fill in the blank",

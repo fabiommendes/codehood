@@ -5,6 +5,7 @@ import {
 	link as fsLink,
 	lstat,
 	mkdir,
+	open,
 	readFile,
 	readlink,
 	rename,
@@ -14,6 +15,7 @@ import {
 	writeFile,
 } from "node:fs/promises";
 import path from "node:path";
+import { Readable } from "node:stream";
 import type { z } from "zod";
 import { SYSTEM } from "@/auth/actor";
 import type { AttachmentLinkMode } from "@/core/constants";
@@ -188,6 +190,26 @@ export function makeBlobService(
 		} catch {
 			return null;
 		}
+	}
+
+	/**
+	 * Opens a live blob's bytes as a stream, or `null` when they are gone.
+	 *
+	 * The file is opened before this returns, so a missing one is `null` rather than an error in the middle of a response.
+	 */
+	async function openBlob(
+		blob: Pick<Blob, "hash" | "deletedAt">,
+	): Promise<ReadableStream<Uint8Array> | null> {
+		if (blob.deletedAt) return null;
+		let handle: Awaited<ReturnType<typeof open>>;
+		try {
+			handle = await open(blobPath(blob.hash), "r");
+		} catch {
+			return null;
+		}
+		return Readable.toWeb(
+			handle.createReadStream(),
+		) as unknown as ReadableStream<Uint8Array>;
 	}
 
 	/**
@@ -386,7 +408,41 @@ export function makeBlobService(
 		return db.blob.create({ data: { hash, size, gitSha } });
 	}
 
-	/// Deletes the attachments whose `REPORT`, `RESOURCE` or `REPOSITORY` owner row is gone, unlinking names no sibling uses.
+	/**
+	 * Stores bytes already in memory as a blob: the file first, then its row.
+	 *
+	 * Idempotent, and safe under concurrent calls with the same bytes. A
+	 * tombstoned blob of the same bytes is revived. Runs outside any
+	 * interactive transaction, so a row never exists without its file.
+	 *
+	 * @throws {@link NotAllowed} If the actor is not SYSTEM.
+	 */
+	async function storeBytes(bytes: Buffer, opts: ServiceOpts): Promise<Blob> {
+		assertSystem(opts, "blob.create");
+		const hash = hashBytes(bytes);
+		const gitSha = blobSha(bytes);
+		const dest = blobPath(hash);
+		await mkdir(path.dirname(dest), { recursive: true });
+		const tmp = `${dest}.${randomUUID()}.tmp`;
+		await writeFile(tmp, bytes);
+		await rename(tmp, dest);
+		// A fresh `createdAt` keeps the collector, which only takes blobs older
+		// than its grace, off these bytes until the caller attaches them.
+		const row = await client.blob.upsert({
+			where: { hash },
+			create: { hash, size: bytes.length, gitSha },
+			update: { deletedAt: null, gitSha, createdAt: new Date() },
+		});
+		// A collection that ran between the write and the upsert removed the file.
+		if (!(await exists(dest))) {
+			await mkdir(path.dirname(dest), { recursive: true });
+			await writeFile(tmp, bytes);
+			await rename(tmp, dest);
+		}
+		return row;
+	}
+
+	/// Deletes the attachments whose `REPORT`, `RESOURCE`, `REPOSITORY` or `RESPONSE` owner row is gone, unlinking names no sibling uses.
 	async function deleteOrphanAttachments(
 		db: PrismaClient | PrismaTx,
 	): Promise<void> {
@@ -413,18 +469,36 @@ export function makeBlobService(
 				where: { id: { in: orphans.map((o) => o.id) } },
 			});
 			for (const row of orphans) {
-				const siblings = await db.attachment.count({
-					where: { hash: row.hash, filename: row.filename },
-				});
-				if (siblings === 0) await unlink(row.hash, row.filename);
+				await unlinkUnused(db, row);
 			}
 		}
+
+		// Attempts are many, so their orphans are found in SQL rather than by
+		// listing every id that still exists.
+		const responseOrphans = await db.$queryRaw<
+			{ hash: string; filename: string }[]
+		>`DELETE FROM Attachment
+			WHERE attachedToType = 'RESPONSE'
+				AND NOT EXISTS (SELECT 1 FROM ResponseRef r WHERE r.id = Attachment.attachedToId)
+			RETURNING hash, filename`;
+		for (const row of responseOrphans) await unlinkUnused(db, row);
+	}
+
+	/// Unlinks a name once no attachment served by name still holds it; a `RESPONSE` file never has one.
+	async function unlinkUnused(
+		db: PrismaClient | PrismaTx,
+		row: { hash: string; filename: string },
+	): Promise<void> {
+		const holders = await db.attachment.count({
+			where: { ...row, attachedToType: { not: "RESPONSE" } },
+		});
+		if (holders === 0) await unlink(row.hash, row.filename);
 	}
 
 	/**
 	 * Remove all blobs no attachment points at.
 	 *
-	 * First deletes the attachments of `REPORT`, `RESOURCE` and `REPOSITORY` owners that no
+	 * First deletes the attachments of `REPORT`, `RESOURCE`, `REPOSITORY` and `RESPONSE` owners that no
 	 * longer exist (database cascades cannot reach the polymorphic owner), so
 	 * their blobs are collected in the same pass.
 	 *
@@ -449,11 +523,19 @@ export function makeBlobService(
 
 		const collected: string[] = [];
 		for (const blob of candidates) {
-			await rm(blobDir(blob.hash), { recursive: true, force: true });
-			await db.blob.update({
-				where: { hash: blob.hash },
+			// Tombstoned only if still unused and old: `storeBytes` may have
+			// renewed it since the query, and then its bytes must stay.
+			const { count } = await db.blob.updateMany({
+				where: {
+					hash: blob.hash,
+					deletedAt: null,
+					createdAt: { lt: olderThan },
+					attachments: { none: {} },
+				},
 				data: { deletedAt: new Date() },
 			});
+			if (count !== 1) continue;
+			await rm(blobDir(blob.hash), { recursive: true, force: true });
 			collected.push(blob.hash);
 		}
 		return collected;
@@ -514,11 +596,13 @@ export function makeBlobService(
 	return {
 		...ops,
 		createFromFile,
+		storeBytes,
 		collectGarbage,
 		tempPath,
 		link,
 		unlink,
 		readBlob,
+		openBlob,
 		serve,
 		blobPath,
 		attachmentPath,
@@ -527,6 +611,16 @@ export function makeBlobService(
 
 /** The blob service, as built by {@link makeBlobService}. */
 export type BlobService = ReturnType<typeof makeBlobService>;
+
+/// Whether a file exists at `filePath`.
+async function exists(filePath: string): Promise<boolean> {
+	try {
+		await stat(filePath);
+		return true;
+	} catch {
+		return false;
+	}
+}
 
 /// Sha-256 and git sha1 of a file, read once in streaming.
 async function digestFile(

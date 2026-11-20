@@ -15,6 +15,7 @@ import type { AnswerPayload } from "./answer-payload";
 import { CodeAnswer } from "./CodeAnswer";
 import { CodeEssayAnswer, type CodeEssayAnswerProps } from "./CodeEssayAnswer";
 import type { CodeSends } from "./code-sends";
+import type { UploadContext } from "./upload-host";
 
 export interface AnswerFieldProps {
 	question: QuestionPublic["question"];
@@ -39,6 +40,11 @@ export interface AnswerFieldProps {
 	attachmentUrl?: AttachmentListProps["url"];
 	/// The highlighted fenced blocks of the question, from `highlightQuestionCodeBlocks`.
 	codeBlocks?: CodeBlocksHtml;
+	/// What an `upload` question needs to send, remove and link files; without it the files are only listed.
+	files?: UploadContext & {
+		/// Hears the stored list, instead of `onChange`: the server already wrote the answer.
+		onFiles: (files: AnswerPayload) => void;
+	};
 }
 
 /// What a code question in answer mode needs besides the question itself.
@@ -112,7 +118,15 @@ function EssayOrOtherField(props: AnswerFieldProps): JSX.Element {
 				<AnyQuestionView
 					question={props.question}
 					value={props.payload ?? null}
-					onChange={props.onChange}
+					onChange={
+						props.files && props.question.type === "upload"
+							? props.files.onFiles
+							: props.onChange
+					}
+					upload={props.files?.upload}
+					remove={props.files?.remove}
+					fileUrl={props.files?.fileUrl}
+					normalizeName={props.files?.normalizeName}
 					mode={
 						props.review ? "review" : props.readonly ? "readonly" : "answer"
 					}

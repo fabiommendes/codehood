@@ -114,7 +114,8 @@ sem aviso. O mesmo vale para duas abas da web gravando a mesma entidade.
   para o banco não tem linha: um `Date` falha com `null` sem copiá-la. A
   edição de um item não muda as notas que o aplicam: ele aparece embutido
   nelas e tem versão própria.
-- O caminho do aluno (`response.submit`, `response.finish`) grava o
+- O caminho do aluno (`response.submit`, `response.finish`, `answer`,
+  `uploadFile`, `removeFile`) grava o
   `updatedAt` pelo helper sem expectativa: nunca recebe
   `expectedUpdatedAt` e não falha com 412, mesmo que ele chegue.
 - `rev` continua opaco e gravado pelo cliente. Ele diz quem escreveu por

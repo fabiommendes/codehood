@@ -82,8 +82,8 @@ const doc = stored.question;
 const title = doc.title ?? stored.slug;
 const points = pointsByPosition(exam.questions)[position] ?? "0";
 const asked = publicForm(doc);
-// An essay's model answer is a hint for the grader, not a correct answer.
-const hasKey = doc.type !== "essay";
+// An essay's or upload's model answer is a hint for the grader, not a correct answer.
+const hasKey = doc.type !== "essay" && doc.type !== "upload";
 // The answer key carries the statement, so only a question without one shows it alone.
 const statementHtml = await highlightCodeBlocks(
 	renderMarkdown([asked.stem, asked.epilogue].filter(Boolean).join("\n\n")),
@@ -381,7 +381,7 @@ const review = auto
                   <span class="badge badge-error badge-sm">{m.grades_question_suspicious()}</span>
                 )}
                 {names && <p class="font-medium">{studentNames.get(answer.author) ?? answer.author}</p>}
-                <Answer question={asked} codeBlocks={askedBlocks} payload={answer.payload as AnswerPayload} result={result} submission={answer.submission} />
+                <Answer question={asked} codeBlocks={askedBlocks} payload={answer.payload as AnswerPayload} answerKey={doc.type === "upload" ? doc.answerKey : undefined} result={result} submission={answer.submission} />
                 {worker && sendsOf.has(answer.submission) && <CodeSends sends={sendsOf.get(answer.submission)!} question={worker} />}
                 {answer.passes
                   .filter((pass) => pass.bot !== null)
@@ -428,7 +428,7 @@ const review = auto
                 <span class="badge badge-error badge-sm">{m.grades_question_suspicious()}</span>
               )}
               {names && <p class="font-medium">{studentNames.get(answer.author) ?? answer.author}</p>}
-              <Answer question={asked} codeBlocks={askedBlocks} payload={answer.payload as AnswerPayload} result={result} submission={answer.submission} reviewLabel={names ? (studentNames.get(answer.author) ?? answer.author) : label} />
+              <Answer question={asked} codeBlocks={askedBlocks} payload={answer.payload as AnswerPayload} answerKey={doc.type === "upload" ? doc.answerKey : undefined} result={result} submission={answer.submission} reviewLabel={names ? (studentNames.get(answer.author) ?? answer.author) : label} />
               {worker && sendsOf.has(answer.submission) && <CodeSends sends={sendsOf.get(answer.submission)!} question={worker} />}
 
               {!isPending && (

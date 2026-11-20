@@ -2429,12 +2429,16 @@ class SeededTyping {
 	}
 }
 
+/// The upload question of `quiz-02` and `test-02`.
+const UPLOAD_QUESTION = "upload-diagram";
+
 /**
  * Seeds an open, timed quiz nobody has started, with one question of each answerable type.
  *
  * It has no date, so each student gets the full duration from the moment
  * they start, and the taking screen, its countdown and autosave can be tried
- * on any day.
+ * on any day. It includes the upload question `upload-diagram`, which the
+ * dev student can answer with a PDF or an image.
  */
 async function seedOpenQuiz(course: Course["id"], knuth: User): Promise<void> {
 	const values = Buffer.from("n,fact\n0,1\n1,1\n2,2\n3,6\n", "utf8");
@@ -2504,6 +2508,7 @@ async function seedOpenQuiz(course: Course["id"], knuth: User): Promise<void> {
 				{ slug: "csv-attachments", version: "v1" },
 				{ slug: "pdf-attachment", version: "v1" },
 				{ slug: "csv-versions", version: "v1" },
+				{ slug: UPLOAD_QUESTION, version: "v1" },
 			],
 			attachments: [
 				{
@@ -2734,7 +2739,11 @@ const CASO_BASE_TEXT = {
  * marked will-not-grade, a blank question, code to run (JavaScript, Python and
  * Prolog), Elm sends corrected by the bot `runner`, the instructor's edit
  * history of the typed answers, and the exceptions of the exam (`liskov` has
- * a personal window still open, `backus` a makeup). The exam stays `ONGOING`
+ * a personal window still open, `backus` a makeup). The upload question
+ * `upload-diagram` is pending for `ritchie` (a PDF and a PNG), graded with a
+ * comment for `hopper`, skipped by `thompson`, and holds one file of
+ * `liskov`, who delivered within his personal window. A student still sending
+ * files is the dev student in `quiz-02`. The exam stays `ONGOING`
  * with its window over: `COMPLETED` would not let an extra time reopen it.
  */
 async function seedGradingShowcase(
@@ -2867,6 +2876,17 @@ async function seedGradingShowcase(
 			},
 		},
 	});
+	await createQuestion(course, UPLOAD_QUESTION, {
+		type: "upload",
+		title: "Recursion diagram",
+		stem: "Draw the call stack of `factorial(3)` and upload it as a PDF or an image. Show each call and the value it returns.",
+		tags: ["recursion"],
+		maxFiles: 2,
+		maxSize: "5 MB",
+		extensions: [".pdf", ".png", ".jpg"],
+		answerKey:
+			"A diagram with four frames, factorial(3) down to factorial(0), and the returns 1, 1, 2 and 6 going back up. Any legible sketch counts.",
+	});
 	await createQuestion(course, essay, {
 		type: "essay",
 		title: "O caso base da recursão em Prolog",
@@ -2894,6 +2914,7 @@ async function seedGradingShowcase(
 				py,
 				prolog,
 				elm,
+				UPLOAD_QUESTION,
 			].map((slug) => ({ slug, version: "v1" })),
 		},
 		FULL_ACCESS,
@@ -2962,6 +2983,21 @@ async function seedGradingShowcase(
 		long: verdict,
 		negatives: verdict,
 	});
+	/// Sends `files` to the upload question as `student`; returns the id of the answer that holds them.
+	const sendFiles = async (
+		student: User,
+		files: Record<string, Buffer>,
+	): Promise<string> => {
+		let submission = "";
+		for (const [filename, bytes] of Object.entries(files)) {
+			const sent = await db.response.uploadFile(
+				{ course, exam, question: UPLOAD_QUESTION, filename, bytes },
+				{ actor: student },
+			);
+			submission = sent.submission;
+		}
+		return submission;
+	};
 	const as = { actor: instructor };
 	const listing = (...lines: string[]) => lines.join("\n");
 	const rightOrder: [number, string][] = [
@@ -3027,7 +3063,19 @@ async function seedGradingShowcase(
 			negatives: "fail",
 		});
 		await sendElm(hopper, ELM_ANSWERS.correct, all("pass"));
+		const diagram = await sendFiles(hopper, {
+			"factorial-stack.pdf": minimalPdf("factorial(3) call stack"),
+		});
 		await finish(hopper);
+		await db.feedback.create(
+			{
+				submission: { publicId: diagram },
+				ref: "manual-2",
+				score: "0.9",
+				feedback: "Clear diagram; label the return values next time.",
+			},
+			as,
+		);
 		await db.feedback.create(
 			{
 				submission: { publicId: saved[essay] ?? "" },
@@ -3113,6 +3161,9 @@ async function seedGradingShowcase(
 				"comprimento([_|T], N) :- N > 0, F is N *",
 			),
 		});
+		await sendFiles(liskov, {
+			"stack-sketch.png": solidPng(64, 40, [120, 90, 180]),
+		});
 		await finish(liskov);
 		await db.feedback.create(
 			{
@@ -3188,6 +3239,10 @@ async function seedGradingShowcase(
 	await put(ritchie, {
 		[basics]: "base-case",
 		[essay]: `  ${CASO_BASE_TEXT.same.replace(", e o", ",   e o")}\n`,
+	});
+	await sendFiles(ritchie, {
+		"factorial-stack.pdf": minimalPdf("factorial(3) call stack, ritchie"),
+		"factorial-frames.png": solidPng(64, 40, [60, 120, 200]),
 	});
 	await finish(ritchie);
 	await put(thompson, { [basics]: "base-case", [essay]: CASO_BASE_TEXT.other });

@@ -62,6 +62,8 @@ export type {
 	TextResponse,
 	TrueFalseQuestion,
 	TrueFalseResponse,
+	UploadQuestion,
+	UploadResponse,
 } from "mdq";
 export {
 	combineBlanks,

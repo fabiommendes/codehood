@@ -374,6 +374,37 @@ test("restarting deletes the simulation with its submissions and opens a new one
 	).toBe(1);
 });
 
+test("restarting detaches the old simulation's RESPONSE attachments and the new one has none", async () => {
+	const world = await makeWorld({ status: "DRAFT" });
+	const old = await world.open();
+	const stored = await db.blob.storeBytes(Buffer.from(`preview ${tag("b")}`), {
+		actor: SYSTEM,
+	});
+	await db.attachment.attach(
+		{
+			hash: stored.hash,
+			filename: "answer.txt",
+			attachedTo: { type: "RESPONSE", id: old.id },
+		},
+		FULL_ACCESS,
+	);
+
+	const fresh = await db.response.restartPreview(world.ref, {
+		actor: world.instructor,
+	});
+
+	expect(
+		await prisma.attachment.count({
+			where: { attachedToType: "RESPONSE", attachedToId: old.id },
+		}),
+	).toBe(0);
+	expect(
+		await prisma.attachment.count({
+			where: { attachedToType: "RESPONSE", attachedToId: fresh.id },
+		}),
+	).toBe(0);
+});
+
 test("restarting with no simulation opens one, and touches nobody else's attempt", async () => {
 	const world = await makeWorld({ status: "ONGOING" });
 	const attempt = await db.response.create(world.ref, {

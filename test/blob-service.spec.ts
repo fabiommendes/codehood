@@ -12,11 +12,13 @@ import path from "node:path";
 import { expect, test } from "@playwright/test";
 import fc from "fast-check";
 import type { Actor } from "@/auth/actor";
-import { FULL_ACCESS } from "@/auth/actor";
+import { FULL_ACCESS, SYSTEM } from "@/auth/actor";
 import type { AttachmentLinkMode } from "@/core/constants";
 import { prisma } from "@/db/client";
+import { makeAttachmentService } from "@/db/services/attachment.service";
 import { type BlobService, makeBlobService } from "@/db/services/blob.service";
 import { persistedResourceFactory } from "@/fixtures/resource.factory";
+import { persistedResponseFactory } from "@/fixtures/response.factory";
 import { hashBytes, isBlobHash } from "@/utils/content-hash";
 import { TEST_RESOURCE_ROOT } from "./env";
 
@@ -316,4 +318,204 @@ test("serve sanitizes the URL's filename segment: a CR/LF in it never reaches th
 	expect(plain.headers.get("Content-Disposition")).toBe(
 		'attachment; filename="report.pdf"',
 	);
+});
+
+//
+// storeBytes: writes the file, then upserts the row, outside any transaction.
+//
+
+test("storeBytes creates the blob, is idempotent, and resurrects a tombstoned blob that can then be attached", async () => {
+	const service = makeService();
+	const bytes = Buffer.from(`stored ${tag("bytes")}`);
+
+	const first = await service.storeBytes(bytes, { actor: SYSTEM });
+	expect(first.hash).toBe(hashOf(bytes));
+	expect(first.size).toBe(bytes.length);
+	expect(readFileSync(service.blobPath(first.hash))).toEqual(bytes);
+
+	const second = await service.storeBytes(bytes, { actor: SYSTEM });
+	expect(second.hash).toBe(first.hash);
+	expect(await prisma.blob.count({ where: { hash: first.hash } })).toBe(1);
+
+	const collected = await service.collectGarbage({
+		actor: SYSTEM,
+		olderThan: new Date(Date.now() + 60_000),
+	});
+	expect(collected).toContain(first.hash);
+	expect(
+		(await prisma.blob.findUniqueOrThrow({ where: { hash: first.hash } }))
+			.deletedAt,
+	).not.toBeNull();
+
+	const revived = await service.storeBytes(bytes, { actor: SYSTEM });
+	expect(revived.deletedAt).toBeNull();
+	expect(await service.readBlob(revived)).toEqual(bytes);
+
+	const attachments = makeAttachmentService(service);
+	const resource = await persistedResourceFactory.create();
+	await expect(
+		attachments.attach(
+			{
+				hash: revived.hash,
+				filename: "revived.txt",
+				attachedTo: { type: "RESOURCE", id: resource.id },
+			},
+			FULL_ACCESS,
+		),
+	).resolves.toMatchObject({ filename: "revived.txt" });
+});
+
+/// `prisma`, with `before` run right after `blob.findMany` answers or right before `blob.upsert` writes, to interleave a race there.
+function hookedClient(
+	method: "findMany" | "upsert",
+	before: () => Promise<void>,
+): typeof prisma {
+	const delegate = new Proxy(prisma.blob, {
+		get(target, key) {
+			const value = Reflect.get(target, key);
+			if (typeof value !== "function") return value;
+			const real = (...args: unknown[]) => value.apply(target, args);
+			if (key !== method) return real;
+			return async (...args: unknown[]) => {
+				if (method === "upsert") {
+					await before();
+					return real(...args);
+				}
+				const stale = await real(...args);
+				await before();
+				return stale;
+			};
+		},
+	});
+	return new Proxy(prisma, {
+		get(target, key) {
+			if (key === "blob") return delegate;
+			const value = Reflect.get(target, key);
+			return typeof value === "function" ? value.bind(target) : value;
+		},
+	}) as typeof prisma;
+}
+
+/// Makes the blob of `bytes` look older than the collector's grace, with no attachment.
+async function ageBlob(hash: string): Promise<void> {
+	await prisma.blob.update({
+		where: { hash },
+		data: { createdAt: new Date(Date.now() - 3_600_000) },
+	});
+}
+
+test("a collection that listed a blob before storeBytes renewed it spares its row and its file", async () => {
+	const root = makeRoot();
+	const store = makeBlobService(prisma, { root });
+	const bytes = Buffer.from(`renewed ${tag("bytes")}`);
+	const { hash } = await store.storeBytes(bytes, { actor: SYSTEM });
+	await ageBlob(hash);
+
+	const collector = makeBlobService(
+		hookedClient("findMany", async () => {
+			await store.storeBytes(bytes, { actor: SYSTEM });
+		}),
+		{ root },
+	);
+	const collected = await collector.collectGarbage({
+		actor: SYSTEM,
+		olderThan: new Date(Date.now() - 60_000),
+	});
+
+	expect(collected).not.toContain(hash);
+	const row = await prisma.blob.findUniqueOrThrow({ where: { hash } });
+	expect(row.deletedAt).toBeNull();
+	expect(readFileSync(store.blobPath(hash))).toEqual(bytes);
+});
+
+test("storeBytes rewrites the file a collection removed between its write and its row", async () => {
+	const root = makeRoot();
+	const plain = makeBlobService(prisma, { root });
+	const bytes = Buffer.from(`rewritten ${tag("bytes")}`);
+	const { hash } = await plain.storeBytes(bytes, { actor: SYSTEM });
+	await ageBlob(hash);
+
+	const store = makeBlobService(
+		hookedClient("upsert", async () => {
+			await plain.collectGarbage({
+				actor: SYSTEM,
+				olderThan: new Date(Date.now() - 60_000),
+			});
+		}),
+		{ root },
+	);
+	await store.storeBytes(bytes, { actor: SYSTEM });
+
+	const row = await prisma.blob.findUniqueOrThrow({ where: { hash } });
+	expect(row.deletedAt).toBeNull();
+	expect(readFileSync(store.blobPath(hash))).toEqual(bytes);
+});
+
+test("storeBytes refuses a caller that is not SYSTEM", async () => {
+	const service = makeService();
+	await expect(
+		service.storeBytes(Buffer.from(`denied ${tag("bytes")}`), {
+			actor: notSystem,
+		}),
+	).rejects.toThrow();
+});
+
+test("concurrent storeBytes calls with the same fresh bytes both succeed and leave one row", async () => {
+	const service = makeService();
+	const bytes = Buffer.from(`concurrent ${tag("bytes")}`);
+
+	const [one, two] = await Promise.all([
+		service.storeBytes(bytes, { actor: SYSTEM }),
+		service.storeBytes(bytes, { actor: SYSTEM }),
+	]);
+
+	expect(one.hash).toBe(hashOf(bytes));
+	expect(two.hash).toBe(one.hash);
+	expect(await prisma.blob.count({ where: { hash: one.hash } })).toBe(1);
+});
+
+test("collectGarbage deletes RESPONSE attachments whose attempt is gone, collecting their blob in the same pass, and keeps a live attempt's", async () => {
+	const service = makeService();
+	const orphanBlob = await service.create(
+		{ bytes: Buffer.from(`orphan-response ${tag("bytes")}`) },
+		FULL_ACCESS,
+	);
+	const liveBlob = await service.create(
+		{ bytes: Buffer.from(`live-response ${tag("bytes")}`) },
+		FULL_ACCESS,
+	);
+	const attempt = await persistedResponseFactory.create();
+	const missingId =
+		((await prisma.response.aggregate({ _max: { id: true } }))._max.id ?? 0) +
+		1000;
+	const row = (hash: string, attachedToId: number) =>
+		prisma.attachment.create({
+			data: {
+				hash,
+				filename: "answer.txt",
+				mimeType: "text/plain",
+				attachedToType: "RESPONSE",
+				attachedToId,
+			},
+		});
+	const orphan = await row(orphanBlob.hash, missingId);
+	const live = await row(liveBlob.hash, attempt.id);
+
+	const collected = await service.collectGarbage({
+		actor: SYSTEM,
+		olderThan: new Date(Date.now() + 60_000),
+	});
+
+	expect(
+		await prisma.attachment.findUnique({ where: { id: orphan.id } }),
+	).toBeNull();
+	expect(collected).toContain(orphanBlob.hash);
+	expect(
+		await prisma.attachment.findUnique({ where: { id: live.id } }),
+	).not.toBeNull();
+	expect(collected).not.toContain(liveBlob.hash);
+	expect(
+		(await prisma.blob.findUniqueOrThrow({ where: { hash: liveBlob.hash } }))
+			.deletedAt,
+	).toBeNull();
 });

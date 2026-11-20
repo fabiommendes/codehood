@@ -59,3 +59,25 @@ com a mesma regra. O sigilo vem de o hash nunca chegar ao aluno: nenhum read
 model de aluno, página de aluno ou cabeçalho de resposta (ETag incluso) contém
 o sha256 de um anexo. O aluno baixa o anexo só pelas rotas da prova, que
 conferem a janela de abertura.
+
+## Adendo (2026-11-19): arquivos de respostas de upload
+
+O proxy de produção serve o diretório de blobs direto do disco, sem passar pelo
+app. Para o arquivo de um aluno, o hash é então o único segredo. Ele chega só
+ao autor da tentativa (a resposta do POST traz `files[].path`) e a quem pode
+corrigi-la; nenhum outro leitor o vê. Por isso um anexo de `RESPONSE` nunca
+ganha o link nomeado ao lado dos bytes, que o proxy serviria como
+`/files/<hash>/<nome>`, e a rota lê sempre pelo caminho dos bytes. As páginas apontam para a rota
+autenticada `/api/course/<disciplina>/<curso>/exam/<prova>/submission/<id>/file/<nome>`
+(R21), sempre pelo nome, nunca por `/files/<hash>`. A rota responde 404 a quem
+não pode ler a tentativa (um aluno nunca lê a prévia do instrutor) e ao nome
+que a submissão não cita, para não confirmar que o arquivo existe; e 410 ao arquivo que a tentativa deixou de manter.
+Fora o POST do próprio autor, nenhuma resposta traz o hash, nem em ETag.
+`serve` não muda.
+
+O proxy deve servir `/files/` com `X-Content-Type-Options: nosniff`,
+`Content-Security-Policy: sandbox` (menos em PDF) e `Content-Disposition:
+attachment` para tudo que não seja imagem ou PDF (ver "Deploying" no `README.md`). Sem isso,
+um anexo com link nomeado que algum usuário enviou (um `.html` num relato de
+erro, por exemplo) roda como página na origem do app. O arquivo de resposta
+de upload não depende disso, porque não tem link nomeado.

@@ -154,6 +154,7 @@ export const questionType = z.enum([
 	"multiple-selection",
 	"true-false",
 	"essay",
+	"upload",
 	"numeric",
 	"short-answer",
 	"fill-in",

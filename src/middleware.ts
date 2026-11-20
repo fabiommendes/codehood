@@ -12,7 +12,8 @@ import { RUNNER_ORIGIN, SESSION_COOKIE } from "./core/constants";
 
 /**
  * Answers 404 for `/runner/` paths on the app origin and for anything but
- * `/runner/` on the runner origin, and adds `APP_CSP` to app responses.
+ * `/runner/` on the runner origin, and adds `APP_CSP` to app responses,
+ * as a second policy beside the one a route already set.
  */
 export const runnerOriginMiddleware = defineMiddleware(
 	async (context, next) => {
@@ -21,13 +22,18 @@ export const runnerOriginMiddleware = defineMiddleware(
 		if (side === "runner") return next();
 
 		const response = await next();
+		// A route that sets a policy of its own, such as a sandbox, keeps it as a
+		// separate policy: the browser enforces both, so `APP_CSP` can only
+		// tighten what the route allows, never override it.
+		const own = response.headers.get("Content-Security-Policy");
+		const policy = own ? `${own}, ${APP_CSP}` : APP_CSP;
 		try {
-			response.headers.set("Content-Security-Policy", APP_CSP);
+			response.headers.set("Content-Security-Policy", policy);
 			return response;
 		} catch {
 			// Headers of a `fetch()` or redirect response are immutable.
 			const headers = new Headers(response.headers);
-			headers.set("Content-Security-Policy", APP_CSP);
+			headers.set("Content-Security-Policy", policy);
 			return new Response(response.body, {
 				status: response.status,
 				statusText: response.statusText,

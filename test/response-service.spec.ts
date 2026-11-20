@@ -1,3 +1,4 @@
+import { existsSync } from "node:fs";
 import { expect, test } from "@playwright/test";
 import { type Actor, FULL_ACCESS, SYSTEM } from "@/auth/actor";
 import { InvalidData, NotAllowed, NotFound } from "@/core/error";
@@ -708,4 +709,45 @@ test("delete: an attempt whose sanction was revoked is removed with the sanction
 	expect(
 		await prisma.examAdjustment.count({ where: { responseId: response.id } }),
 	).toBe(0);
+});
+
+test("delete: the attempt's RESPONSE attachments are detached, while another attempt holding the same file keeps its row and blob, and no name is ever linked", async () => {
+	const { instructor, response } = await makeMatrixFixtures();
+	const other = await makeMatrixFixtures();
+	const bytes = Buffer.from(`shared-answer ${tag("bytes")}`);
+	const stored = await db.blob.storeBytes(bytes, { actor: SYSTEM });
+	for (const attempt of [response, other.response]) {
+		await db.attachment.attach(
+			{
+				hash: stored.hash,
+				filename: "answer.txt",
+				attachedTo: { type: "RESPONSE", id: attempt.id },
+			},
+			FULL_ACCESS,
+		);
+	}
+
+	await db.response.delete(
+		{ publicId: response.publicId },
+		{ actor: instructor },
+	);
+
+	expect(
+		await prisma.attachment.count({
+			where: { attachedToType: "RESPONSE", attachedToId: response.id },
+		}),
+	).toBe(0);
+	expect(
+		await prisma.attachment.count({
+			where: { attachedToType: "RESPONSE", attachedToId: other.response.id },
+		}),
+	).toBe(1);
+	expect(existsSync(db.blob.attachmentPath(stored.hash, "answer.txt"))).toBe(
+		false,
+	);
+	expect(existsSync(db.blob.blobPath(stored.hash))).toBe(true);
+	expect(
+		(await prisma.blob.findUniqueOrThrow({ where: { hash: stored.hash } }))
+			.deletedAt,
+	).toBeNull();
 });

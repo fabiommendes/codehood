@@ -207,6 +207,7 @@ test.describe("isHistoryField", () => {
 		expect(isHistoryField("essay", "answer")).toBe(true);
 		expect(isHistoryField("essay", "notes")).toBe(false);
 		expect(isHistoryField("code", "answer")).toBe(true);
+		expect(isHistoryField("upload", "answer")).toBe(false);
 		expect(isHistoryField("multiple-choice", "answer")).toBe(false);
 		expect(isHistoryField(undefined, "answer")).toBe(false);
 	});

@@ -940,6 +940,26 @@ class ListQuestionResponseItemsItem2QuestionTrueFalse(Model):
     choices: list[ListQuestionResponseItemsItem2QuestionMultipleChoiceChoicesItem]
 
 
+class ListQuestionResponseItemsItem2QuestionUpload(Model):
+    model_config = ConfigDict(populate_by_name=True)
+
+    attachments: (
+        list[ListQuestionResponseItemsItem2QuestionCodeAttachmentsItem] | None
+    ) = None
+    id: str | None = None
+    uuid: str | None = None
+    title: str | None = None
+    stem: str
+    epilogue: str | None = None
+    tags: list[str] | None = None
+    locale: str | None = None
+    weight: float | None = None
+    type: Literal["upload"]
+    max_files: int | None = Field(default=None, alias="maxFiles")
+    max_size: float | str | None = Field(default=None, alias="maxSize")
+    extensions: list[str] | None = None
+
+
 class ListQuestionResponseItemsItemQuestionCode(Model):
     model_config = ConfigDict(populate_by_name=True)
 
@@ -1181,6 +1201,29 @@ class ListQuestionResponseItemsItemQuestionTrueFalse(Model):
         | None
     ) = None
     shuffle: bool | Literal["inherit"] | None = None
+
+
+class ListQuestionResponseItemsItemQuestionUpload(Model):
+    model_config = ConfigDict(populate_by_name=True)
+
+    field_schema: str | None = Field(default=None, alias="$schema")
+    id: str | None = None
+    uuid: str | None = None
+    title: str | None = None
+    author: str | None = None
+    stem: str
+    epilogue: str | None = None
+    comment: str | None = None
+    locale: str | None = None
+    tags: list[str] | None = None
+    weight: float | None = None
+    meta: dict[str, object | None] | None = None
+    attachments: list[ExamCreateAttachmentsItem] | None = None
+    type: Literal["upload"]
+    max_files: int | None = Field(default=None, alias="maxFiles")
+    max_size: int | str | None = Field(default=None, alias="maxSize")
+    extensions: list[str] | None = None
+    answer_key: str | None = Field(default=None, alias="answerKey")
 
 
 class ListUserResponse(Model):
@@ -1531,6 +1574,7 @@ class JobsItem(Model):
         | ListQuestionResponseItemsItemQuestionFillIn
         | ListQuestionResponseItemsItemQuestionOrdering
         | ListQuestionResponseItemsItemQuestionCode
+        | ListQuestionResponseItemsItemQuestionUpload
     )
     exam: str
     course: str
@@ -1564,6 +1608,7 @@ class ListQuestionResponseItemsItem(Model):
         | ListQuestionResponseItemsItemQuestionFillIn
         | ListQuestionResponseItemsItemQuestionOrdering
         | ListQuestionResponseItemsItemQuestionCode
+        | ListQuestionResponseItemsItemQuestionUpload
     )
     public_id: str = Field(alias="publicId")
     files: dict[str, str] | None = None
@@ -1585,6 +1630,7 @@ class ListQuestionResponseItemsItem2(Model):
         | ListQuestionResponseItemsItem2QuestionNumeric
         | ListQuestionResponseItemsItem2QuestionShortAnswer
         | ListQuestionResponseItemsItem2QuestionEssay
+        | ListQuestionResponseItemsItem2QuestionUpload
         | ListQuestionResponseItemsItem2QuestionFillIn
         | ListQuestionResponseItemsItem2QuestionOrdering
         | ListQuestionResponseItemsItem2QuestionCode
@@ -1606,6 +1652,7 @@ class QuestionCreate(Model):
         | ListQuestionResponseItemsItemQuestionFillIn
         | ListQuestionResponseItemsItemQuestionOrdering
         | ListQuestionResponseItemsItemQuestionCode
+        | ListQuestionResponseItemsItemQuestionUpload
     )
     files: dict[str, str] | None = None
 
@@ -1630,6 +1677,7 @@ class UpdateQuestionRequest(Model):
         | ListQuestionResponseItemsItemQuestionFillIn
         | ListQuestionResponseItemsItemQuestionOrdering
         | ListQuestionResponseItemsItemQuestionCode
+        | ListQuestionResponseItemsItemQuestionUpload
         | None
     ) = None
     files: dict[str, str] | None = None
@@ -2689,6 +2737,7 @@ def list_question(
             "multiple-selection",
             "true-false",
             "essay",
+            "upload",
             "numeric",
             "short-answer",
             "fill-in",

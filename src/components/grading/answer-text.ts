@@ -60,6 +60,13 @@ export function displayAnswer(
 function responseText(response: unknown): string {
 	if (typeof response === "string") return response;
 	if (typeof response === "number") return String(response);
+	if (Array.isArray(response)) {
+		return response
+			.flatMap((file) =>
+				file && typeof file.name === "string" ? [file.name] : [],
+			)
+			.join(", ");
+	}
 	if (response && typeof response === "object" && "value" in response) {
 		const { value, unit } = response as { value: unknown; unit?: string };
 		return unit ? `${value} ${unit}` : String(value);

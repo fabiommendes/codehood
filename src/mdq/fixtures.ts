@@ -19,6 +19,7 @@ import type {
 	QuestionDocument,
 	ShortAnswerQuestion,
 	TrueFalseQuestion,
+	UploadQuestion,
 } from "./index";
 
 // -----------------------------------------------------------------------------
@@ -48,6 +49,11 @@ export function trueFalse(
 /** Builds an essay document, supplying its discriminator. */
 export function essay(data: Omit<EssayQuestion, "type">): EssayQuestion {
 	return { type: "essay", ...data };
+}
+
+/** Builds an upload document, supplying its discriminator. */
+export function upload(data: Omit<UploadQuestion, "type">): UploadQuestion {
+	return { type: "upload", ...data };
 }
 
 /** Builds a code document, supplying its discriminator. */

@@ -595,6 +595,40 @@ export async function resolveExamQuestion(
 	slug: string,
 	payload: unknown,
 ) {
+	const { question, document } = await loadExamQuestion(
+		tx,
+		courseId,
+		examId,
+		slug,
+	);
+	try {
+		assertResponse(document, payload);
+	} catch (error) {
+		if (!(error instanceof ResponseError)) throw error;
+		throw new InvalidData({
+			payload: [
+				{
+					code: "invalid",
+					message: m.errors_response_malformed({ detail: error.message }),
+				},
+			],
+		});
+	}
+
+	return question;
+}
+
+/**
+ * Loads a question of the exam with the document of the version the exam pins.
+ *
+ * @throws {@link NotFound} If the question does not exist or is not one of the exam's.
+ */
+export async function loadExamQuestion(
+	tx: PrismaTx,
+	courseId: number,
+	examId: number,
+	slug: string,
+) {
 	const question = valueOrNotFound(
 		"question",
 		await tx.questionRef.findFirst({
@@ -625,24 +659,10 @@ export async function resolveExamQuestion(
 			{ privatePayload: true },
 		),
 	);
-	try {
-		assertResponse(
-			version.privatePayload as unknown as QuestionDocument,
-			payload,
-		);
-	} catch (error) {
-		if (!(error instanceof ResponseError)) throw error;
-		throw new InvalidData({
-			payload: [
-				{
-					code: "invalid",
-					message: m.errors_response_malformed({ detail: error.message }),
-				},
-			],
-		});
-	}
-
-	return question;
+	return {
+		question,
+		document: version.privatePayload as unknown as QuestionDocument,
+	};
 }
 
 /// The minimal relations `fromDb` needs to fill in the submission's public

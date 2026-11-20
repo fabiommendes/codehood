@@ -4,6 +4,21 @@
 
 ### Added
 
+- Questão de envio de arquivo (`upload`, do MDQ): o aluno responde com até
+  `maxFiles` arquivos, cada um até `maxSize` e com as `extensions` aceitas,
+  enviados um por requisição em
+  `POST /api/course/{discipline}/{course}/exam/{exam}/question/{question}/file`
+  (remoção por nome com `DELETE .../file/{name}`), com 429 e nova tentativa
+  quando há envios demais ao mesmo tempo. A correção é manual, com a rubrica,
+  como no essay. Os arquivos ficam presos à tentativa (`Attachment` com dono
+  `RESPONSE`): contam na cota de quem enviou só enquanto a tentativa está
+  aberta, e o servidor guarda apenas os da resposta atual e os de submissões
+  corrigidas ou com pedido de revisão. Quem corrige e o autor baixam o
+  arquivo por
+  `GET /api/course/{discipline}/{course}/exam/{exam}/submission/{submission}/file/{name}`,
+  com `sandbox` em tudo que não é PDF; o hash do arquivo de um aluno não chega
+  a outro aluno (adendo à ADR 0010). A CLI envia a questão pelo push. O seed
+  traz `upload-diagram` em `quiz-02` e `test-02`.
 - Trabalhos entregues por repositório git. Um trabalho (`Assignment`) é uma
   entidade do curso, fora das provas: cada equipe (`Team`) ganha um
   repositório git hospedado no servidor, criado do zero ou a partir de um

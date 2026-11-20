@@ -1423,3 +1423,47 @@ def test_a_dry_run_plans_an_exam_with_its_type_and_status(repo, monkeypatch):
 
     assert result.exit_code == 0, result.output
     assert "planned  exam week1 (QUIZ, SCHEDULED)" in result.output
+
+
+UPLOAD_MDQ = """---
+maxFiles: 2
+maxSize: 5 MB
+extensions: [.pdf, .png]
+---
+
+Draw the water cycle and send a photo.
+
+[upload]
+"""
+
+
+def test_push_sends_an_upload_question(repo, monkeypatch):
+    questions = repo / "questions"
+    questions.mkdir()
+    (questions / "water-cycle.md").write_text(UPLOAD_MDQ, encoding="utf-8")
+    sent: list[dict] = []
+    fresh = _fresh_server_handler([])
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        if request.url.path == f"{BASE}/question":
+            if request.method == "PUT":
+                body = json.loads(request.content)
+                sent.append(body)
+                return httpx.Response(
+                    200,
+                    json=_question_json(
+                        body["slug"], body["version"], question=body["question"]
+                    ),
+                )
+            return httpx.Response(200, json=page([]))
+        return fresh(request)
+
+    _install_transport(monkeypatch, handler)
+    result = runner.invoke(app, ["push", str(repo)])
+
+    assert result.exit_code == 0, result.output
+    [body] = sent
+    assert body["slug"] == "water-cycle"
+    assert body["question"]["type"] == "upload"
+    assert body["question"]["maxFiles"] == 2
+    assert body["question"]["extensions"] == [".pdf", ".png"]

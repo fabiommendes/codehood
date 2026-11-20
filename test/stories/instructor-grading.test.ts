@@ -22,6 +22,12 @@ import {
 	passesOf,
 } from "./objective-support";
 import { releasedExam, requestRegrade } from "./regrade-setup";
+import {
+	PDF_BYTES,
+	PNG_BYTES,
+	UPLOAD_SLUG,
+	uploadExam,
+} from "./upload-support";
 import { weightedExam } from "./weighted-exam-support";
 
 test.beforeEach(resetDatabase);
@@ -2034,5 +2040,75 @@ test("instructor: review an automatically graded question", async ({
 			page.getByRole("link", { name: objectiveLabel("edit_question") }),
 		).toHaveAttribute("href", new RegExp(`${world.href}/questions/q-choice`));
 		await expect(page.getByRole("note")).toBeVisible();
+	});
+});
+
+test("instructor: grade a question answered with files", async ({ page }) => {
+	const { teacher, student, course, exam, href } = await uploadExam("ugr");
+	for (const [filename, bytes] of [
+		["diagram.pdf", PDF_BYTES],
+		["stack.png", PNG_BYTES],
+	] as const) {
+		await db.response.uploadFile(
+			{
+				course: course.id,
+				exam: exam.slug,
+				question: UPLOAD_SLUG,
+				filename,
+				bytes,
+			},
+			{ actor: student },
+		);
+	}
+	await db.response.finish(
+		{ course: course.id, exam: exam.slug },
+		{ actor: student },
+	);
+	await prisma.exam.update({
+		where: { id: exam.id },
+		data: { status: "COMPLETED" },
+	});
+	const page_ = `${href}/exams/${exam.slug}/grading/${UPLOAD_SLUG}?view=list`;
+
+	await logInAs(page, teacher);
+	await page.goto(page_);
+
+	await test.step("the student's files are listed with their sizes, ungraded", async () => {
+		const answer = page.getByRole("article", { name: "Answer 1", exact: true });
+		await expect(
+			answer.getByRole("link", { name: "diagram.pdf" }),
+		).toBeVisible();
+		await expect(answer.getByRole("link", { name: "stack.png" })).toBeVisible();
+		await expect(
+			answer.getByRole("button", { name: "Save grade" }),
+		).toBeVisible();
+	});
+
+	await test.step("a file opens from its link with the bytes the student sent", async () => {
+		const link = page
+			.getByRole("article", { name: "Answer 1", exact: true })
+			.getByRole("link", { name: "diagram.pdf" });
+		const href = await link.getAttribute("href");
+		expect(href).toMatch(/\/submission\/[^/]+\/file\/diagram\.pdf$/);
+
+		const response = await page.request.get(href ?? "");
+
+		expect(response.status()).toBe(200);
+		expect(Buffer.from(await response.body()).equals(PDF_BYTES)).toBe(true);
+	});
+
+	await test.step("a manual score and a comment grade the answer", async () => {
+		const answer = page.getByRole("article", { name: "Answer 1", exact: true });
+		await answer.getByLabel("Score (%)", { exact: true }).fill("90");
+		await answer.getByLabel("Comment", { exact: true }).fill("Clear diagram");
+		await answer.getByRole("button", { name: "Save grade" }).click();
+
+		const graded = page.getByRole("article").filter({ hasText: "diagram.pdf" });
+		await expect(graded).toContainText("90%");
+		await expect(graded).toContainText("Clear diagram");
+		await expect(
+			graded.getByRole("button", { name: "Save grade" }),
+		).toHaveCount(0);
+		await expect(graded.getByRole("link", { name: "stack.png" })).toBeVisible();
 	});
 });

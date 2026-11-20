@@ -135,3 +135,27 @@ test("sanitizeFilename: NFC-normalises before slugifying", () => {
 	expect(nfd).not.toBe(nfc); // sanity: the two source strings really differ
 	expect(sanitizeFilename(nfd)).toBe(sanitizeFilename(nfc));
 });
+
+test("sanitizeFilename removes control characters, line breaks and Unicode line separators from a name", () => {
+	const hasControl = (text: string) =>
+		[...text].some((char) => {
+			const code = char.charCodeAt(0);
+			return (
+				code < 0x20 ||
+				(code >= 0x7f && code <= 0x9f) ||
+				code === 0x2028 ||
+				code === 0x2029
+			);
+		});
+	for (const name of [
+		"a\nb\r\t.pdf",
+		"a\u0085b.pdf",
+		"a\u2028b.pdf",
+		"a\u2029b.pdf",
+		"a\u007fb.pdf",
+	]) {
+		const result = sanitizeFilename(name);
+		expect(hasControl(result)).toBe(false);
+		expect(result.endsWith(".pdf")).toBe(true);
+	}
+});

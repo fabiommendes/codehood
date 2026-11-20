@@ -353,6 +353,18 @@ the deadline they mark will-not-grade, which is distinct from a zero and from
 still being pending.
 
 
+### Grade a question answered with files
+
+    status: todo
+    url: /<discipline>/<course>/exams/<exam>/grading/<question>
+
+Instructor opens the grading page of an upload question and sees, under each
+answer, the files the student sent. Each file opens from its link with exactly
+the bytes the student uploaded. They give the answer a score and a comment as
+they would for an essay, or apply the rubric, and the answer moves under Graded
+with its files still listed.
+
+
 ### Run a student's code while grading
 
     status: implemented

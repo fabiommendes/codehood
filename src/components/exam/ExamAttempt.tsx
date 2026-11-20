@@ -29,7 +29,7 @@ import {
 } from "@/services/exam-result";
 import type { AttemptState } from "@/services/exam-state";
 import type { ReviewResult } from "@/services/review";
-import { examQuestionAttachmentUrl } from "@/urls";
+import { examQuestionAttachmentUrl, examSubmissionFileUrl } from "@/urls";
 import { adjustmentLabel } from "@/utils/adjustment-label";
 import type { CodeBlocksHtml } from "@/utils/code-blocks";
 import type { PretestSource } from "@/utils/pretest-sources";
@@ -37,6 +37,7 @@ import { formatRelative } from "@/utils/relative-time";
 import { formatDateTime } from "@/utils/schedule-time";
 import {
 	AnswerField,
+	type AnswerFieldProps,
 	type CodeAnswerContext,
 	codeLanguageOf,
 } from "./AnswerField";
@@ -60,6 +61,7 @@ import RegradeControls, { type QuestionRegrade } from "./RegradeControls";
 import { retryDelay } from "./save-retry";
 import { createSaveSchedule } from "./save-schedule";
 import { questionList, unansweredWarning } from "./unanswered-warning";
+import { uploadContext } from "./upload-host";
 
 export interface ExamAttemptProps {
 	/// The course's URL segments and the exam slug, as the exam actions take them.
@@ -104,6 +106,8 @@ export interface ExamAttemptProps {
 	username?: string;
 	/// When the server saved each answer, by question slug (ISO), for the draft conflict panel.
 	answeredAt?: Record<string, string>;
+	/// The public id of the newest submission of each question, which names the files of an upload answer.
+	submissions?: Record<string, string>;
 	/// How long after the deadline the server still accepts an answer, which the last resend uses.
 	graceMs?: number;
 	/// The attempt's `publicId`, which keys its local edit history and names it to the history actions.
@@ -203,6 +207,10 @@ export default function ExamAttempt(props: ExamAttemptProps): JSX.Element {
 	const [answers, setAnswers] = createSignal<Record<string, AnswerPayload>>({
 		...props.answers,
 	});
+	// The newest submission of each question, which the links of an upload answer name.
+	const [submissionIds, setSubmissionIds] = createSignal<
+		Record<string, string>
+	>({ ...props.submissions });
 	const [saveErrors, setSaveErrors] = createSignal<Record<string, string>>({});
 	// Questions with a change not yet confirmed by the server.
 	const [unsaved, setUnsaved] = createSignal<ReadonlySet<string>>(new Set());
@@ -317,6 +325,77 @@ export default function ExamAttempt(props: ExamAttemptProps): JSX.Element {
 			const { [slug]: _dropped, ...rest } = current;
 			return message === null ? rest : { ...rest, [slug]: message };
 		});
+	}
+
+	const uploadFilesBySlug = new Map<string, AnswerFieldProps["files"]>();
+
+	/// What an `upload` question needs: the file routes, and the server's list taken as the saved answer, which never goes through the autosave queue.
+	function uploadFiles(
+		slug: string,
+		question: QuestionPublic["question"],
+	): AnswerFieldProps["files"] {
+		if (question.type !== "upload") return undefined;
+		const known = uploadFilesBySlug.get(slug);
+		if (known) return known;
+		const context = uploadContext({
+			courseSegment: `${props.discipline}/${props.course}`,
+			exam: props.exam,
+			question: slug,
+			extensions: question.extensions,
+			submission: () => submissionIds()[slug],
+			onSessionLost: () => setSessionLost(true),
+			onStored: (submission) =>
+				setSubmissionIds((current) => ({ ...current, [slug]: submission })),
+			fileUrl: (submission, name) =>
+				examSubmissionFileUrl(
+					`${props.discipline}/${props.course}`,
+					props.exam,
+					submission,
+					name,
+				),
+		});
+		const files: AnswerFieldProps["files"] = {
+			...context,
+			onFiles: (files) => {
+				// The server already wrote this list: a queued save must not overwrite it.
+				pending.delete(slug);
+				schedule.cancel(slug);
+				setAnswers((current) => ({ ...current, [slug]: files }));
+				setSaveError(slug, null);
+				setSavedAt((current) => ({ ...current, [slug]: serverNow() }));
+				setConfirmed((current) => new Set(current).add(slug));
+				if (!pending.has(slug)) markUnsaved(slug, false);
+			},
+		};
+		uploadFilesBySlug.set(slug, files);
+		return files;
+	}
+
+	/// Removes the files of an `upload` question one by one through the file routes, never the autosave queue; stops at the first failure and says why.
+	async function clearUploadFiles(slug: string): Promise<void> {
+		const host = uploadFilesBySlug.get(slug);
+		if (!host) return;
+		const current = answers()[slug];
+		const names = Array.isArray(current)
+			? current.flatMap((f) =>
+					typeof f === "object" && f !== null && "name" in f
+						? [String(f.name)]
+						: [],
+				)
+			: [];
+		for (const file of names) {
+			const result = await host.remove(file);
+			if (!result.ok) {
+				setSaveError(
+					slug,
+					"message" in result && result.message
+						? result.message
+						: m.exams_attempt_connection_failed(),
+				);
+				return;
+			}
+			host.onFiles(result.value.length > 0 ? [...result.value] : null);
+		}
 	}
 
 	function markUnsaved(slug: string, value: boolean): void {
@@ -1218,9 +1297,18 @@ export default function ExamAttempt(props: ExamAttemptProps): JSX.Element {
 										type="button"
 										aria-label={m.exams_attempt_clear_answer()}
 										class="btn btn-ghost btn-xs -mr-1.5 gap-1 whitespace-nowrap px-1.5 text-muted"
-										onClick={() =>
-											change(entry.slug, entry.question.type, null)
-										}
+										onClick={() => {
+											if (
+												entry.question.type === "upload" &&
+												!window.confirm(m.exams_attempt_clear_files_confirm())
+											)
+												return;
+											if (entry.question.type === "upload") {
+												void clearUploadFiles(entry.slug);
+												return;
+											}
+											change(entry.slug, entry.question.type, null);
+										}}
 									>
 										<svg
 											aria-hidden="true"
@@ -1293,6 +1381,7 @@ export default function ExamAttempt(props: ExamAttemptProps): JSX.Element {
 										pretests={props.pretests?.[entry.slug]}
 										exampleHtml={props.exampleHtml?.[entry.slug]}
 										codeBlocks={props.codeBlocks}
+										files={uploadFiles(entry.slug, entry.question)}
 										sends={allSends()[entry.slug]}
 										onSubmit={(code) => submitCode(entry.slug, code)}
 										runnerOrigin={props.runnerOrigin ?? null}

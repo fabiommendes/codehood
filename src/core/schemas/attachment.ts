@@ -8,6 +8,7 @@ import {
 	reportId,
 	repositoryId,
 	resourceId,
+	responseId,
 	slug,
 	username,
 } from "./base";
@@ -28,6 +29,7 @@ export const attachmentSchema = z.object({
 		z.lazy(() => attachedToExam),
 		z.lazy(() => attachedToReport),
 		z.lazy(() => attachedToRepository),
+		z.lazy(() => attachedToResponse),
 	]),
 	createdAt: z.date(),
 });
@@ -38,6 +40,7 @@ export const attachmentToType = z.enum([
 	"EXAM",
 	"REPORT",
 	"REPOSITORY",
+	"RESPONSE",
 ]);
 
 export const attachedToResource = z.object({
@@ -73,6 +76,12 @@ export const attachedToRepository = z.object({
 	slug: slug,
 });
 
+export const attachedToResponse = z.object({
+	type: z.literal("RESPONSE"),
+	id: responseId,
+	publicId: publicId,
+});
+
 export const attachmentCreate = attachmentSchema
 	.pick({ filename: true })
 	.extend({
@@ -86,13 +95,16 @@ export const attachmentCreate = attachmentSchema
 			attachedToExam.pick({ type: true, id: true }),
 			attachedToReport.pick({ type: true, id: true }),
 			attachedToRepository.pick({ type: true, id: true }),
+			attachedToResponse.pick({ type: true, id: true }),
 		]),
 	});
 
 /// Attaches a blob already stored on the server, without sending its bytes.
-export const attachmentAttach = attachmentCreate
-	.omit({ buffer: true })
-	.extend({ hash: blobHash });
+export const attachmentAttach = attachmentCreate.omit({ buffer: true }).extend({
+	hash: blobHash,
+	/// The filename is stored as given: the caller already reduced it to a safe basename.
+	exactFilename: z.boolean().optional(),
+});
 
 export const attachmentUpdate = attachmentSchema.pick({ filename: true });
 

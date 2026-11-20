@@ -16,6 +16,7 @@ import type {
 	QuestionRefId,
 	ReportId,
 	RepositoryId,
+	ResponseId,
 } from "@/core/schemas/base";
 import type { ServiceOptsWithoutTx } from "@/db/base-service";
 import { rejectExpectedUpdatedAt, touch } from "@/db/conditional-write";
@@ -248,6 +249,13 @@ export function makeAttachmentService(
 					slug: repository.slug,
 				};
 			}
+			case "RESPONSE": {
+				const response = await tx.response.findUnique({
+					where: { id: raw.attachedToId as ResponseId },
+					select: { id: true, publicId: true },
+				});
+				return response && { ...response, type: "RESPONSE" };
+			}
 		}
 	}
 
@@ -256,6 +264,32 @@ export function makeAttachmentService(
 	 * */
 	function quotaFor(role: Role): number | null {
 		return BLOB_QUOTA_BY_ROLE[role];
+	}
+
+	/// Whether `type` owns files the proxy may serve by name; a student's file in an attempt is read only through the app.
+	function isNamed(type: Attachment["attachedTo"]["type"]): boolean {
+		return type !== "RESPONSE";
+	}
+
+	/// Links `filename` beside the blob's bytes for an owner that is served by name.
+	async function linkFor(
+		type: Attachment["attachedTo"]["type"],
+		hash: string,
+		filename: string,
+	): Promise<void> {
+		if (isNamed(type)) await blob.link(hash, filename);
+	}
+
+	/// Unlinks `filename` once no attachment served by name still holds it.
+	async function unlinkUnused(
+		tx: PrismaTx,
+		hash: string,
+		filename: string,
+	): Promise<void> {
+		const holders = await tx.attachment.count({
+			where: { hash, filename, attachedToType: { not: "RESPONSE" } },
+		});
+		if (holders === 0) await blob.unlink(hash, filename);
 	}
 
 	const ops = defineService<AttachmentT>()(() => {
@@ -299,7 +333,7 @@ export function makeAttachmentService(
 					{ bytes: input.buffer },
 					{ tx, actor: SYSTEM },
 				);
-				await blob.link(stored.hash, filename);
+				await linkFor(input.attachedTo.type, stored.hash, filename);
 				const uploaderId =
 					opts.actor === SYSTEM
 						? (input.uploaderId ?? null)
@@ -324,6 +358,9 @@ export function makeAttachmentService(
 
 		/**
 		 * Finds a single attachment by id.
+		 *
+		 * A student's file in an attempt is found only by `SYSTEM`: its hash is
+		 * the only secret of its bytes.
 		 */
 		const findOne = op({
 			transaction: false,
@@ -332,12 +369,15 @@ export function makeAttachmentService(
 			run: async (
 				tx: PrismaTx,
 				filter: AttachmentPK,
-				_opts: ServiceOptsWithoutTx,
+				opts: ServiceOptsWithoutTx,
 			): Promise<Attachment | null> => {
 				const row = await tx.attachment.findUnique({
 					where: { id: filter.id },
 					include: attachmentInclude,
 				});
+				if (row?.attachedToType === "RESPONSE" && opts.actor !== SYSTEM) {
+					return null;
+				}
 
 				return row && fromDbWithSource(row, tx);
 			},
@@ -345,6 +385,8 @@ export function makeAttachmentService(
 
 		/**
 		 * Finds many attachments, narrowed by any combination of the filter.
+		 *
+		 * Students' files in attempts are left out unless the actor is `SYSTEM`.
 		 */
 		const findMany = op({
 			transaction: false,
@@ -353,11 +395,14 @@ export function makeAttachmentService(
 			run: async (
 				tx: PrismaTx,
 				filter: AttachmentFilter,
-				_opts: ServiceOptsWithoutTx,
+				opts: ServiceOptsWithoutTx,
 			): Promise<Attachment[]> => {
 				const rows = await tx.attachment.findMany({
 					where: {
 						AND: [
+							opts.actor === SYSTEM
+								? {}
+								: { attachedToType: { not: "RESPONSE" } },
 							filter.ids ? { id: { in: filter.ids } } : {},
 							filter.hashes ? { hash: { in: filter.hashes } } : {},
 							filter.type ? { attachedToType: filter.type } : {},
@@ -393,7 +438,7 @@ export function makeAttachmentService(
 				const filename = sanitizeFilename(fields.filename);
 				if (filename === target.filename) return target;
 
-				await blob.link(target.hash, filename);
+				await linkFor(target.attachedTo.type, target.hash, filename);
 
 				const updated = await tx.attachment.update({
 					where: { id: target.id },
@@ -402,12 +447,7 @@ export function makeAttachmentService(
 				});
 				await touchResource(tx, updated);
 
-				const sameName = await tx.attachment.count({
-					where: { hash: target.hash, filename: target.filename },
-				});
-				if (sameName === 0) {
-					await blob.unlink(target.hash, target.filename);
-				}
+				await unlinkUnused(tx, target.hash, target.filename);
 
 				return fromDb(updated, target.attachedTo);
 			},
@@ -436,12 +476,7 @@ export function makeAttachmentService(
 				await touchResource(tx, target);
 				await tx.attachment.delete({ where: { id: target.id } });
 
-				const sameName = await tx.attachment.count({
-					where: { hash: target.hash, filename: target.filename },
-				});
-				if (sameName === 0) {
-					await blob.unlink(target.hash, target.filename);
-				}
+				await unlinkUnused(tx, target.hash, target.filename);
 
 				// Tombstone the blob once nothing (under any name) still points at
 				// it, so a stale `/files/<hash>` URL keeps explaining itself (410)
@@ -483,13 +518,7 @@ export function makeAttachmentService(
 				});
 
 				for (const row of rows) {
-					const siblings = await tx.attachment.count({
-						where: { hash: row.hash, filename: row.filename },
-					});
-
-					if (siblings === 0) {
-						await blob.unlink(row.hash, row.filename);
-					}
+					await unlinkUnused(tx, row.hash, row.filename);
 				}
 
 				return { deleted: deleted.count };
@@ -499,8 +528,9 @@ export function makeAttachmentService(
 		/**
 		 * Records one more use of a blob already stored, without its bytes.
 		 *
-		 * Sanitises the filename, derives the mime type and links the name beside
-		 * the bytes, like `create`. An attachment with the same hash, filename and
+		 * Sanitises the filename, unless `exactFilename` says the caller already
+		 * prepared it, derives the mime type and links the name beside the bytes,
+		 * like `create`, except for a `RESPONSE` owner, whose name is never linked. An attachment with the same hash, filename and
 		 * owner is returned as is. The uploader follows the rules of `create`: a
 		 * `SYSTEM` call without `uploaderId` charges nobody, so its bytes count in
 		 * no quota.
@@ -524,7 +554,9 @@ export function makeAttachmentService(
 					throw new NotFound("blob", { id: input.hash });
 				}
 
-				const filename = sanitizeFilename(input.filename);
+				const filename = input.exactFilename
+					? input.filename
+					: sanitizeFilename(input.filename);
 				const duplicate = await tx.attachment.findFirst({
 					where: {
 						hash: stored.hash,
@@ -537,7 +569,7 @@ export function makeAttachmentService(
 				if (duplicate) return ownedOrNotFound(duplicate, tx);
 
 				await assertWithinQuota(tx, stored.size, opts);
-				await blob.link(stored.hash, filename);
+				await linkFor(input.attachedTo.type, stored.hash, filename);
 				const uploaderId =
 					opts.actor === SYSTEM
 						? (input.uploaderId ?? null)
@@ -608,7 +640,7 @@ export function makeAttachmentService(
 
 		/**
 		 * Deletes the attachments of `owner` whose (hash, filename) is not in
-		 * `keep` (name to hash).
+		 * `keep`, comparing the stored names exactly.
 		 *
 		 * No blob is tombstoned, so a file that moves to another owner in the same
 		 * write survives; the garbage collector reaps what stays unattached. A name
@@ -618,14 +650,12 @@ export function makeAttachmentService(
 			run: async (
 				tx: PrismaTx,
 				owner: AttachmentCreate["attachedTo"],
-				keep: Record<string, string>,
+				keep: Array<{ hash: string; filename: string }>,
 				opts: ServiceOptsWithoutTx,
 			): Promise<void> => {
 				rejectExpectedUpdatedAt(opts);
 				const kept = new Set(
-					Object.entries(keep).map(
-						([name, hash]) => `${hash}\0${sanitizeFilename(name)}`,
-					),
+					keep.map(({ hash, filename }) => `${hash}\0${filename}`),
 				);
 				const rows = await tx.attachment.findMany({
 					where: { attachedToType: owner.type, attachedToId: owner.id },
@@ -634,10 +664,7 @@ export function makeAttachmentService(
 				for (const row of rows) {
 					if (kept.has(`${row.hash}\0${row.filename}`)) continue;
 					await tx.attachment.delete({ where: { id: row.id } });
-					const sameName = await tx.attachment.count({
-						where: { hash: row.hash, filename: row.filename },
-					});
-					if (sameName === 0) await blob.unlink(row.hash, row.filename);
+					await unlinkUnused(tx, row.hash, row.filename);
 				}
 			},
 		});
@@ -664,7 +691,9 @@ export function makeAttachmentService(
 		/**
 		 * Bytes charged to a user
 		 *
-		 * The sum of the sizes of the blobs their attachments point at.
+		 * The sum of the sizes of the blobs their attachments point at. An
+		 * attachment of a `RESPONSE` counts only while that response still accepts
+		 * submissions.
 		 *
 		 * Charged per attachment rather than per distinct byte on disk, so dedupe
 		 * lowers the server's real cost without lowering anyone's bill.
@@ -678,10 +707,36 @@ export function makeAttachmentService(
 			): Promise<number> => {
 				const rows = await tx.attachment.findMany({
 					where: { uploaderId: username },
-					include: { blob: true },
+					select: {
+						attachedToType: true,
+						attachedToId: true,
+						blob: { select: { size: true } },
+					},
 				});
+				const responseIds = rows
+					.filter((row) => row.attachedToType === "RESPONSE")
+					.map((row) => row.attachedToId as ResponseId);
+				const open = new Set(
+					responseIds.length === 0
+						? []
+						: (
+								await tx.response.findMany({
+									where: {
+										id: { in: responseIds },
+										acceptingSubmissions: true,
+									},
+									select: { id: true },
+								})
+							).map((r): number => r.id),
+				);
 
-				return rows.reduce((total, row) => total + row.blob.size, 0);
+				return rows.reduce(
+					(total, row) =>
+						row.attachedToType === "RESPONSE" && !open.has(row.attachedToId)
+							? total
+							: total + row.blob.size,
+					0,
+				);
 			},
 		});
 

@@ -31,10 +31,24 @@ interface Props {
 	reviewLabel?: string;
 	/// The highlighted fenced blocks of `question`, when the page already has them.
 	codeBlocks?: CodeBlocksHtml;
+	/// The answer key of an `upload` question, for a page that may show it.
+	answerKey?: string | null;
 }
 
-const { question, payload, result, submission, reviewLabel, codeBlocks } =
-	Astro.props;
+const {
+	question,
+	payload,
+	result,
+	submission,
+	reviewLabel,
+	codeBlocks,
+	answerKey,
+} = Astro.props;
+const { discipline, course, slug } = Astro.params;
+const files =
+	submission && discipline && course && slug
+		? { course: `${discipline}/${course}`, exam: slug, submission }
+		: undefined;
 const shown = displayAnswer(
 	question.type,
 	payload,
@@ -85,4 +99,4 @@ const viewBlocks =
     <CodeBlock code={shown.text} lang={shown.highlight} data-answer-code="" />
   )
 }
-{shown.kind === "view" && <AnswerView client:load question={question} payload={payload} result={result} codeBlocks={viewBlocks} />}
+{shown.kind === "view" && <AnswerView client:load question={question} payload={payload} result={result} codeBlocks={viewBlocks} files={files} answerKey={answerKey} />}

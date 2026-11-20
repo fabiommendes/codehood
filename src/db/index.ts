@@ -5,6 +5,7 @@
  */
 export * as schema from "@/core/schemas/all";
 
+import { prisma } from "./client";
 import { nameServices } from "./define-service";
 import { makeAnswerEditService } from "./services/answer-edit.service";
 import { makeApiKeyService } from "./services/api-key.service";
@@ -347,7 +348,7 @@ export const db = {
 	report: makeReportService(attachmentService, blobService),
 	repository: makeRepositoryService(blobService, attachmentService),
 	resource: makeResourceService(attachmentService),
-	response: makeResponseService(),
+	response: makeResponseService(prisma, attachmentService, blobService),
 	rollCall: makeRollCallService(),
 	rubric: makeRubricService(),
 	session: { ...makeSessionService(), validate: validateSession },

@@ -33,3 +33,32 @@ export function questionAttachmentUrl(
 	const query = version ? `?version=${encodeURIComponent(version)}` : "";
 	return `/api/question/${encodeURIComponent(publicId)}/attachment/${encodeURIComponent(name)}${query}`;
 }
+
+/** The authenticated download URL of the file `name` an upload answer cites, by the public id of the submission. */
+export function examSubmissionFileUrl(
+	courseSegment: string,
+	exam: string,
+	submission: string,
+	name: string,
+): string {
+	return `${examApi(courseSegment, exam)}/submission/${encodeURIComponent(submission)}/file/${encodeURIComponent(name)}`;
+}
+
+/** The URL a file is sent to for an upload question of the author's attempt, and which answers the question's files. */
+export function examQuestionFilesUrl(
+	courseSegment: string,
+	exam: string,
+	question: string,
+): string {
+	return `${examApi(courseSegment, exam)}/question/${encodeURIComponent(question)}/file`;
+}
+
+/** The URL that removes the file `name` of an upload question of the author's attempt. */
+export function examQuestionFileUrl(
+	courseSegment: string,
+	exam: string,
+	question: string,
+	name: string,
+): string {
+	return `${examQuestionFilesUrl(courseSegment, exam, question)}/${encodeURIComponent(name)}`;
+}

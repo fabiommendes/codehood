@@ -4,6 +4,7 @@ import {
 	ptBR,
 	type QuestionMode,
 	QuestionView,
+	type UploadProps,
 } from "mdq/solid";
 import type { JSX } from "solid-js";
 import { locale, m } from "@/i18n";
@@ -39,6 +40,13 @@ export interface AnyQuestionViewProps {
 				correct?: CorrectResponses;
 		  };
 	messages?: Partial<Messages>;
+	/// The callbacks of an `upload` question, as `Upload` of `mdq/solid` takes them.
+	upload?: UploadProps["upload"];
+	remove?: UploadProps["remove"];
+	fileUrl?: UploadProps["fileUrl"];
+	normalizeName?: UploadProps["normalizeName"];
+	/// The answer key of an `upload` question, for a page that may show it.
+	answerKey?: string | null;
 }
 
 /**

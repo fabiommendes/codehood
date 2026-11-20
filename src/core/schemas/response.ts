@@ -1,5 +1,6 @@
 import { z } from "zod";
 import {
+	buffer,
 	courseId,
 	examId,
 	instant,
@@ -182,4 +183,54 @@ export const responseAnswered = z.object({
 	answerHistory: z.boolean(),
 	/// Whether the code sent was already sent, so nothing was queued or spent.
 	duplicate: z.boolean(),
+});
+
+/// Sends one file to an upload question of an attempt.
+export const responseUploadFile = z.object({
+	course: courseRef,
+	exam: slug,
+	question: slug,
+
+	/// Defaults to the actor.
+	author: username.optional(),
+
+	/// The name as the client gave it; the stored name is derived from it.
+	filename: z.string().min(1),
+	bytes: buffer,
+});
+
+/// The multipart body of a file sent over REST: the bytes, and the name as text since the file part carries none.
+export const responseFileUpload = z.object({
+	file: buffer,
+	name: z.string().min(1),
+});
+
+/// Removes one file, by its stored name, from an upload question of an attempt.
+export const responseRemoveFile = responseUploadFile.omit({ bytes: true });
+
+/// Reads one file an upload answer cites, by the public id of the submission and the name it stores.
+export const responseSubmissionFile = z.object({
+	course: courseRef,
+	exam: slug,
+	submission: publicId,
+	name: z.string().min(1),
+});
+
+/// A file an upload answer cites, as a stream of its bytes with their size and mime type.
+export const responseFileContent = z.object({
+	stream: z.custom<ReadableStream<Uint8Array>>(
+		(value) =>
+			typeof ReadableStream !== "undefined" && value instanceof ReadableStream,
+	),
+	size: z.number(),
+	mimeType: z.string(),
+});
+
+/// The answer to an upload question after a file was sent or removed: its list of files, or `null` when none is left, and the submission that holds it.
+export const responseFileList = z.object({
+	files: z
+		.array(z.object({ name: z.string(), path: z.string(), size: z.number() }))
+		.min(1)
+		.nullable(),
+	submission: publicId,
 });

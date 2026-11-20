@@ -4,6 +4,7 @@ import { CodeBlocks } from "@/components/question/CodeBlocks";
 import { AnyQuestionView, mdqMessages } from "@/components/question/mdq";
 import type { QuestionPublic } from "@/db";
 import type { ReviewResult } from "@/services/review";
+import { examSubmissionFileUrl } from "@/urls";
 import type { CodeBlocksHtml } from "@/utils/code-blocks";
 
 export interface AnswerViewProps {
@@ -15,6 +16,10 @@ export interface AnswerViewProps {
 	result?: ReviewResult;
 	/// The highlighted fenced blocks of `question`, from `highlightQuestionCodeBlocks`.
 	codeBlocks?: CodeBlocksHtml;
+	/// Where the files of an `upload` answer are downloaded from: the course segment, the exam and the answer's submission.
+	files?: { course: string; exam: string; submission: string };
+	/// The answer key of an `upload` question, as guidance for the grader.
+	answerKey?: string | null;
 }
 
 /**
@@ -34,6 +39,18 @@ export default function AnswerView(props: AnswerViewProps): JSX.Element {
 				result={props.result}
 				hideScore
 				messages={mdqMessages}
+				fileUrl={(file) => {
+					const { files } = props;
+					return files
+						? examSubmissionFileUrl(
+								files.course,
+								files.exam,
+								files.submission,
+								file.name,
+							)
+						: null;
+				}}
+				answerKey={props.answerKey}
 			/>
 		</CodeBlocks>
 	);
