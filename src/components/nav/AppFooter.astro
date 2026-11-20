@@ -1,8 +1,10 @@
 ---
 // The one-line footer of AppLayout and the landing page: logo, source code,
 // and the version. The design system link shows in development only.
+import Link from "@/components/Link.astro";
 import Logo from "@/components/Logo.astro";
 import { m } from "@/i18n";
+import { external, urls } from "@/urls";
 import { homepage, version } from "../../../package.json";
 
 interface Props {
@@ -21,7 +23,7 @@ const { class: className, reportable = false } = Astro.props;
   ]}
 >
   <Logo height={22} />
-  <a href={homepage} class="hover:text-primary">{m.nav_source_code()}</a>
+  <Link href={external(homepage)} class="hover:text-primary">{m.nav_source_code()}</Link>
   {
     reportable && (
       <button type="button" data-report-open class="hover:text-primary">
@@ -31,9 +33,9 @@ const { class: className, reportable = false } = Astro.props;
   }
   {
     import.meta.env.DEV && (
-      <a href="/design" class="hover:text-primary">
+      <Link href={urls.design.index()} class="hover:text-primary">
         {m.nav_design_system()}
-      </a>
+      </Link>
     )
   }
   <span class="ml-auto font-mono text-xs">v{version}</span>

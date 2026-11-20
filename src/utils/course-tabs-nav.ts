@@ -5,7 +5,7 @@
  */
 
 import { m } from "@/i18n";
-import { type CourseUrls, type Href, withAnchor } from "@/urls";
+import { anchor, type CourseUrls, type Href, withAnchor } from "@/urls";
 import type { CourseNav, NavEntry, NavLink, NavSection } from "./course-nav";
 import { examTypeLabels } from "./exam-display";
 
@@ -143,7 +143,7 @@ export function studentHomeNav(
 			{
 				entries: sections.map(({ id, label }) => ({
 					label,
-					href: `#${id}`,
+					href: anchor(id),
 				})),
 			},
 		],

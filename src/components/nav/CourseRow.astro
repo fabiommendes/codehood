@@ -1,6 +1,7 @@
 ---
 // One course row of the sidebar's course list.
 import CourseTile from "@/components/CourseTile.astro";
+import Link from "@/components/Link.astro";
 import { m } from "@/i18n";
 import { courseTransitionName } from "@/utils/view-transition";
 import type { SidebarCourse } from "./AppSidebar.astro";
@@ -14,7 +15,7 @@ const { course, active } = Astro.props;
 ---
 
 <li>
-  <a
+  <Link
     href={course.href}
     aria-current={active ? "page" : undefined}
     data-course-transition
@@ -30,5 +31,5 @@ const { course, active } = Astro.props;
       <span class="text-muted"> · {course.edition}</span>
     </span>
     {course.teaching && <span class="badge badge-ghost badge-xs px-1">{m.nav_teaching()}</span>}
-  </a>
+  </Link>
 </li>

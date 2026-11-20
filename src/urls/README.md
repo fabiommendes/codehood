@@ -43,8 +43,9 @@ A component that links to several pages of a course takes `course: CourseUrls`
 `courseRef: CourseRef` instead, since its props must be serializable, and calls
 `urls.course()` itself. `withAnchor(href, id)` adds a fragment and
 `withSearch(href, search)` a query built by a codec of its own (the question
-bank's filters); both keep the `Href`. Appending a string to an `Href` gives a
-plain `string`.
+bank's filters); both keep the `Href`. `currentPage(Astro.url)` is the path
+of the page being shown, for links that change only its query (pagination,
+sorting). Appending a string to an `Href` gives a plain `string`.
 
 `test/url-registry.spec.ts` covers what types cannot. For each prefix in its
 `MIGRATED_PREFIXES`, it checks that every page under the prefix is registered
@@ -53,9 +54,17 @@ and that no code outside `src/urls/` writes the path as a string literal
 rejects any interpolation followed by a static segment of a course page
 (`${x}/roster`, `${x}/exams`).
 
-Every page is in the registry. The decision, the
-`<Link>` component that comes next and the alternatives left out are in ADR 0022
-(`dev/adr/0022-rotas-tipadas-pelo-registro-urls.md`).
+Markup links through `<Link>` (`src/components/Link.astro`, or
+`src/components/Link` in an island), the only place that writes `<a>`. Its
+`href` is a `LinkTarget`: an `Href`, an `external(url)` for another site or a
+`mailto:`, or an `anchor(id)` for a fragment of the same page. A message
+rendered with `set:html` takes its links from `linkHtml(href, text)`
+(`@/i18n`). The same spec fails on any `<a` in a `.astro` or `.tsx` file
+outside the two `Link` components.
+
+Pages under `/design/playground/` come and go, so they are not registered:
+`playgroundPage(path)` links to one. The decision and the alternatives left
+out are in ADR 0022 (`dev/adr/0022-rotas-tipadas-pelo-registro-urls.md`).
 
 ## The root namespace belongs to disciplines
 

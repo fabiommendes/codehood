@@ -12,6 +12,7 @@ import PaginatedTable from "@/components/ui/PaginatedTable";
 import Table from "@/components/ui/Table";
 import Tabs from "@/components/ui/Tabs.astro";
 import DesignLayout from "@/layouts/DesignLayout.astro";
+import { anchor, urls, withSearch } from "@/urls";
 
 export const prerender = false;
 
@@ -288,8 +289,12 @@ const tabItems = [
     <PaginatedTable
       columns={tableColumns}
       data={tableRows}
-      cursor={{ prevHref: "?cursor=a", nextHref: "?cursor=c", total: 20000 }}
-      sortHref={(key) => `?sort=${key}`}
+      cursor={{
+        prevHref: withSearch(urls.design.elements(), "cursor=a"),
+        nextHref: withSearch(urls.design.elements(), "cursor=c"),
+        total: 20000,
+      }}
+      sortHref={(key) => withSearch(urls.design.elements(), new URLSearchParams({ sort: key }))}
     />
   </section>
 
@@ -340,7 +345,7 @@ const tabItems = [
       > otherwise. Used for exam, resource, and upcoming-item rows across the app.
     </p>
     <div class="flex flex-col gap-3">
-      <ListRow href="#">
+      <ListRow href={anchor("")}>
         <div class="font-medium">Midterm exam</div>
         <div class="text-xs text-muted">
           opens Mar 3 &middot; 90 minutes

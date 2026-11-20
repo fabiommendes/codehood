@@ -5,6 +5,7 @@ import CountRow from "@/components/CountRow.astro";
 import CourseHeader from "@/components/CourseHeader.astro";
 import CourseTile from "@/components/CourseTile.astro";
 import SectionHeader from "@/components/SectionHeader.astro";
+import { urls } from "@/urls";
 import ComponentsPage from "./_ComponentsPage.astro";
 import { headerCourse, instructorTabs, studentTabs } from "./_fixtures";
 
@@ -36,8 +37,8 @@ const sections = [
     </div>
     <h3 class="mt-10 mb-3 text-xl font-semibold">SectionHeader</h3>
     <div class="flex max-w-xl flex-col gap-6 rounded-box border border-edge bg-base-100 p-5">
-      <SectionHeader title="Upcoming" href="#" />
-      <SectionHeader title="Resources" href="#" linkText="Open the library" />
+      <SectionHeader title="Upcoming" href={urls.design.components.course()} />
+      <SectionHeader title="Resources" href={urls.design.components.course()} linkText="Open the library" />
       <SectionHeader title="Without a link" />
     </div>
     <h3 class="mt-10 mb-3 text-xl font-semibold">CliSetupLink</h3>
@@ -93,7 +94,7 @@ const sections = [
     <h3 class="mt-10 mb-3 text-xl font-semibold">CountRow</h3>
     <div class="grid max-w-3xl gap-3 sm:grid-cols-2">
       <CountRow
-        href="#"
+        href={urls.design.components.course()}
         count={5}
         unit="to grade"
         label="5 answers to grade"
@@ -101,7 +102,7 @@ const sections = [
         course={{ href: "/algorithms/ada_2026-2", code: "algorithms", edition: "2026-2" }}
       />
       <CountRow
-        href="#"
+        href={urls.design.components.course()}
         count={3}
         of={10}
         unit="graded"

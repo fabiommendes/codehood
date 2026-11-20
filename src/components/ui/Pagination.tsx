@@ -1,6 +1,8 @@
 import type { JSX } from "solid-js";
 import { For, Show } from "solid-js";
+import Link from "@/components/Link";
 import { locale, m } from "@/i18n";
+import type { Href } from "@/urls";
 import { pageSlots } from "./pagination";
 
 /// Classes shared by every button of a pager.
@@ -89,15 +91,15 @@ export default function Pagination(props: PaginationProps): JSX.Element {
  * an absent href disables that direction.
  */
 export interface CursorPage {
-	prevHref?: string;
-	nextHref?: string;
+	prevHref?: Href;
+	nextHref?: Href;
 	/// Rows across all pages, when the server counts them.
 	total?: number;
 }
 
 /** A previous/next pager over links, for rows paginated on the server with cursors. */
 export function CursorPagination(props: CursorPage): JSX.Element {
-	const link = (href: string | undefined, content: JSX.Element) => (
+	const link = (href: Href | undefined, content: JSX.Element) => (
 		<Show
 			when={href}
 			fallback={
@@ -107,9 +109,9 @@ export function CursorPagination(props: CursorPage): JSX.Element {
 			}
 		>
 			{(target) => (
-				<a class={ITEM} href={target()}>
+				<Link class={ITEM} href={target()}>
 					{content}
-				</a>
+				</Link>
 			)}
 		</Show>
 	);

@@ -8,6 +8,7 @@ import {
 	reportStatus,
 } from "@/core/schemas/report";
 import { m } from "@/i18n";
+import { currentPage, type Href, withSearch } from "@/urls";
 import { ALL_REPORTS, type ReportFilters } from "@/utils/report-filters";
 import { REPORT_KIND_LABELS, REPORT_STATUS_LABELS } from "@/utils/report-row";
 
@@ -23,14 +24,11 @@ const { filters, hideKind = false } = Astro.props;
 const limit = Astro.url.searchParams.get("limit");
 
 /// The first page of the queue with `status` and `kind` replaced; `kind` is left out when unset or hidden.
-function hrefWith(
-	status: ReportStatus | null,
-	kind: ReportKind | null,
-): string {
+function hrefWith(status: ReportStatus | null, kind: ReportKind | null): Href {
 	const params = new URLSearchParams({ status: status ?? ALL_REPORTS });
 	if (kind && !hideKind) params.set("kind", kind);
 	if (limit) params.set("limit", limit);
-	return `?${params}`;
+	return withSearch(currentPage(Astro.url), params);
 }
 
 const statusOptions = [

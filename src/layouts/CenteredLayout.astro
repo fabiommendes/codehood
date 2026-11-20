@@ -1,8 +1,10 @@
 ---
 import GlassWall from "@/components/brand/GlassWall.astro";
+import Link from "@/components/Link.astro";
 import Logo from "@/components/Logo.astro";
 import ThemeToggle from "@/components/ThemeToggle.astro";
 import { m } from "@/i18n";
+import { urls } from "@/urls";
 import Layout from "./Layout.astro";
 
 interface Props {
@@ -21,9 +23,9 @@ const { title, quiet = false } = Astro.props;
     <ThemeToggle class="absolute top-4 right-4 z-10" />
     <div class:list={["card card-border w-full max-w-sm bg-base-100", quiet ? "shadow-sm" : "tape shadow-xl"]}>
       <div class="card-body">
-        <a href="/" class="mb-2">
+        <Link href={urls.root()} class="mb-2">
           <Logo height={34} />
-        </a>
+        </Link>
         <h2 class="card-title">{title}</h2>
         <slot />
       </div>

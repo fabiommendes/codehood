@@ -1,6 +1,8 @@
 import type { JSX } from "solid-js";
 import { For, Show } from "solid-js";
+import Link from "@/components/Link";
 import { m } from "@/i18n";
+import type { Href } from "@/urls";
 
 /**
  * Describes one column: its header text, how to render a row's cell, and the
@@ -47,7 +49,7 @@ export interface TableProps<T> {
 	 * Builds the link a column's header follows to sort by its `sortKey`, for
 	 * tables sorted on the server; takes precedence over `onSort`.
 	 */
-	sortHref?: (key: string) => string;
+	sortHref?: (key: string) => Href;
 	/// Classes for the `<table>` itself, such as `min-w-max` for a wide matrix that scrolls.
 	tableClass?: string;
 	/// Classes for a row, such as dimming one that no longer counts.
@@ -151,13 +153,13 @@ export default function Table<T>(props: TableProps<T>): JSX.Element {
 												}
 											>
 												{(sortHref) => (
-													<a
+													<Link
 														href={sortHref()(column.sortKey ?? "")}
 														class="inline-flex items-center gap-1"
 													>
 														{column.title}
 														{indicator()}
-													</a>
+													</Link>
 												)}
 											</Show>
 										</Show>

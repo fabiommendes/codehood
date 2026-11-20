@@ -23,6 +23,7 @@ export {
 	anchor,
 	type CourseUrls,
 	courseRoutes,
+	currentPage,
 	type ExamUrls,
 	type ExternalUrl,
 	external,

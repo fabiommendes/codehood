@@ -5,6 +5,7 @@
 // holds the logo, so it scrolls away with the content. The course root is
 // drawn as the course tile and the discipline code.
 import CourseTile from "@/components/CourseTile.astro";
+import Link from "@/components/Link.astro";
 import { m } from "@/i18n";
 import type { Crumb } from "@/utils/breadcrumbs";
 
@@ -43,14 +44,14 @@ const { trail, static: isStatic = false } = Astro.props;
           return (
             <li>
               {crumb.href ? (
-                <a
+                <Link
                   href={crumb.href}
                   aria-label={course ? crumb.label : undefined}
                   title={course ? crumb.label : undefined}
                   data-crumb-course={course || undefined}
                 >
                   {content}
-                </a>
+                </Link>
               ) : (
                 <span
                   aria-current="page"

@@ -1,9 +1,11 @@
 ---
+import Link from "@/components/Link.astro";
 import { m } from "@/i18n";
+import type { Href } from "@/urls";
 
 interface Props {
 	title: string;
-	href?: string;
+	href?: Href;
 	linkText?: string;
 }
 
@@ -14,9 +16,9 @@ const { title, href, linkText = m.common_view_all() } = Astro.props;
   <h2 class="page-subheader">{title}</h2>
   {
     href && (
-      <a href={href} class="text-sm text-primary hover:underline">
+      <Link href={href} class="text-sm text-primary hover:underline">
         {linkText}
-      </a>
+      </Link>
     )
   }
 </div>

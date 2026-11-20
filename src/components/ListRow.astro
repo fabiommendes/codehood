@@ -1,11 +1,14 @@
 ---
 // A single-row card: optional leading icon/chip/dot, main content, optional
-// trailing badge/link/date. Renders as an <a> when href is given, a <button>
+// trailing badge/link/date. Renders as a <Link> when href is given, a <button>
 // that opens a <dialog> when openDialog is given (see AppLayout's generic
 // data-open-dialog wiring), or a plain <div> otherwise. Used for exam,
 // resource, and "upcoming" list rows across the app.
+import Link from "@/components/Link.astro";
+import type { LinkTarget } from "@/urls";
+
 interface Props {
-	href?: string;
+	href?: LinkTarget;
 	openDialog?: string;
 	/** Downloads the link instead of following it, saved under this file name. */
 	download?: string;
@@ -38,23 +41,39 @@ const cardClass = [
 	.filter(Boolean)
 	.join(" ");
 
-const Tag = href ? "a" : openDialog ? "button" : "div";
+const Tag = openDialog ? "button" : "div";
 ---
 
-<Tag
-  href={href}
-  download={download}
-  target={external ? "_blank" : undefined}
-  rel={external ? "noopener noreferrer" : undefined}
-  type={openDialog ? "button" : undefined}
-  data-open-dialog={openDialog}
-  class={cardClass}
->
-  <div class="card-body flex-row items-center gap-4 py-4">
-    <slot name="leading" />
-    <div class="min-w-0 flex-1">
-      <slot />
-    </div>
-    <slot name="trailing" />
-  </div>
-</Tag>
+{
+  href ? (
+    <Link
+      href={href}
+      download={download}
+      target={external ? "_blank" : undefined}
+      rel={external ? "noopener noreferrer" : undefined}
+      class={cardClass}
+    >
+      <div class="card-body flex-row items-center gap-4 py-4">
+        <slot name="leading" />
+        <div class="min-w-0 flex-1">
+          <slot />
+        </div>
+        <slot name="trailing" />
+      </div>
+    </Link>
+  ) : (
+    <Tag
+      type={openDialog ? "button" : undefined}
+      data-open-dialog={openDialog}
+      class={cardClass}
+    >
+      <div class="card-body flex-row items-center gap-4 py-4">
+        <slot name="leading" />
+        <div class="min-w-0 flex-1">
+          <slot />
+        </div>
+        <slot name="trailing" />
+      </div>
+    </Tag>
+  )
+}

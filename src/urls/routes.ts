@@ -235,6 +235,19 @@ export function playgroundPage(path: string): Href {
 	return `/design/playground/${path.split("/").map(encodeURIComponent).join("/")}` as Href;
 }
 
+/**
+ * The path of the page being served at `url`, without its query or hash.
+ *
+ * For links that change only the query of the page being shown, such as
+ * pagination and sorting; Astro served the page, so the path is one of ours.
+ *
+ * @example
+ * withSearch(currentPage(Astro.url), "page=2"); // "/admin/users?page=2"
+ */
+export function currentPage(url: URL): Href {
+	return url.pathname as Href;
+}
+
 /// The query of the grading pages: the list view of a question and the students' names.
 type GradingQuery = { view?: "list"; names?: boolean };
 

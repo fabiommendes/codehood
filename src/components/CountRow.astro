@@ -1,11 +1,13 @@
 ---
 import CourseTile from "@/components/CourseTile.astro";
+import Link from "@/components/Link.astro";
+import type { Href } from "@/urls";
 
 /**
  * A linked card led by the number that asks for action, such as answers to grade, with a short caption under it.
  */
 interface Props {
-	href: string;
+	href: Href;
 	/// The number shown large; `of` adds a total after a slash, as in 3/10.
 	count: number;
 	of?: number;
@@ -20,7 +22,7 @@ interface Props {
 const { href, count, of, unit, label, title, course } = Astro.props;
 ---
 
-<a href={href} class="card card-border bg-base-100 transition-colors hover:border-primary">
+<Link href={href} class="card card-border bg-base-100 transition-colors hover:border-primary">
   <div class="card-body flex-row items-center gap-4 py-3">
     <div class="w-16 shrink-0 text-center sm:w-20" aria-hidden="true">
       <span class="count-figure block text-4xl leading-none tabular-nums">
@@ -37,7 +39,7 @@ const { href, count, of, unit, label, title, course } = Astro.props;
       </p>
     </div>
   </div>
-</a>
+</Link>
 
 <style>
   .count-figure {

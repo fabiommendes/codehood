@@ -4,9 +4,10 @@
 // tabs across /admin/*) and by same-page tabs like /profile.
 //
 // Two modes, chosen by whether `name` is set:
-//   - Link mode (no `name`): each item needs an `href` — plain <a> tabs that
-//     navigate, exactly what AdminHeader needs. The strip scrolls horizontally
-//     when the tabs outgrow it, and `overflow-y-hidden` is load-bearing: CSS
+//   - Link mode (no `name`): each item takes an `href` — <Link> tabs that
+//     navigate, exactly what AdminHeader needs; a tab without one is an inert
+//     <span>, for mockups. The strip scrolls horizontally when the tabs
+//     outgrow it, and `overflow-y-hidden` is load-bearing: CSS
 //     promotes an `overflow-y` of `visible` to `auto` the moment the other
 //     axis is not `visible`, and the active tab's `-mb-px` puts its border one
 //     pixel below the box — enough for the browser to offer a vertical
@@ -22,10 +23,13 @@
 //     the strip keeps one clean row with the underline sitting right below
 //     it — the same shape as link-mode's border, instead of trailing off
 //     after all the (mostly hidden) panel content.
+import Link from "@/components/Link.astro";
+import type { Href } from "@/urls";
+
 export interface TabItem {
 	key: string;
 	label: string;
-	href?: string;
+	href?: Href;
 }
 
 interface Props {
@@ -80,28 +84,36 @@ const panelCss = name
 			data-tab-strip
 			class="mb-8 flex gap-6 overflow-x-auto overflow-y-hidden border-b border-edge"
 		>
-			{items.map((item) => (
-				<a
-					role="tab"
-					href={item.href}
-					aria-selected={item.key === active ? "true" : "false"}
-					class:list={[
+			{items.map((item) => {
+				const attrs = {
+					role: "tab",
+					"aria-selected": item.key === active ? "true" : "false",
+					class: [
 						"relative -mb-px shrink-0 border-b-2 border-transparent pb-3 text-sm",
 						item.key === active
 							? activeClasses
-							: [inactiveClasses, "hover:text-base-content"],
-					]}
-				>
-					{item.label}
-					{item.key === active && (
-						<span
-							data-tab-underline
-							aria-hidden="true"
-							class="absolute inset-x-0 -bottom-0.5 h-0.5 bg-primary"
-						/>
-					)}
-				</a>
-			))}
+							: `${inactiveClasses} hover:text-base-content`,
+					].join(" "),
+				} as const;
+				const underline = item.key === active && (
+					<span
+						data-tab-underline
+						aria-hidden="true"
+						class="absolute inset-x-0 -bottom-0.5 h-0.5 bg-primary"
+					/>
+				);
+				return item.href === undefined ? (
+					<span {...attrs}>
+						{item.label}
+						{underline}
+					</span>
+				) : (
+					<Link href={item.href} {...attrs}>
+						{item.label}
+						{underline}
+					</Link>
+				);
+			})}
 		</div>
 	)
 }

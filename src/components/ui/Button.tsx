@@ -1,4 +1,6 @@
 import type { JSX, ParentProps } from "solid-js";
+import Link from "@/components/Link";
+import type { LinkTarget } from "@/urls";
 
 interface ButtonProps extends ParentProps {
 	variant?:
@@ -13,7 +15,7 @@ interface ButtonProps extends ParentProps {
 		| "warning"
 		| "info";
 	size?: "xs" | "sm" | "md" | "lg" | "xl";
-	href?: string;
+	href?: LinkTarget;
 	type?: "button" | "submit" | "reset";
 	disabled?: boolean;
 	class?: string;
@@ -31,9 +33,9 @@ export default function Button(props: ButtonProps): JSX.Element {
 			.join(" ");
 
 	return props.href ? (
-		<a href={props.href} class={classes()}>
+		<Link href={props.href} class={classes()}>
 			{props.children}
-		</a>
+		</Link>
 	) : (
 		<button
 			type={props.type ?? "button"}

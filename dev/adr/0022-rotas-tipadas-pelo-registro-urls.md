@@ -29,14 +29,14 @@ silêncio quando uma página muda de nome, e cada um cuida do próprio encoding.
 - **Componentes recebem URLs, não bases.** Um componente que linka várias
   páginas do curso recebe `CourseUrls`, não um `href` para anexar pedaços.
   Ilhas Solid recebem o `CourseRef`, que é serializável.
-- **`<a>` passa por `<Link href: Href>`**, em `.astro` e em Solid. Um plugin
-  GritQL do Biome proíbe `<a href>` fora dele. O tipo da prop garante a
-  origem do link, e a regra garante que ninguém contorna o `Link`.
-- **Exceções explícitas.** `external(url)` para links externos e `mailto:`,
-  `anchor(id)` para `#id` na mesma página.
+- **`<a>` passa por `<Link>`**, em `.astro` e em Solid. A prop `href` é um
+  `LinkTarget`: um `Href`, ou uma das exceções explícitas, `external(url)`
+  para outro site e `mailto:`, e `anchor(id)` para `#id` na mesma página.
 - **Um teste cobre o que os tipos não cobrem.** `test/url-registry.spec.ts`
-  exige que toda página esteja no registro e rejeita caminhos de página
-  escritos à mão fora de `src/urls/`.
+  exige que toda página esteja no registro, rejeita caminhos de página
+  escritos à mão fora de `src/urls/` e rejeita `<a` em `.astro` e `.tsx` fora
+  dos dois `Link`. O tipo da prop garante a origem do link, e o teste garante
+  que ninguém contorna o `Link`.
 
 ## Alternativas descartadas
 
@@ -48,5 +48,8 @@ silêncio quando uma página muda de nome, e cada um cuida do próprio encoding.
   (TS2717).
 - **`pnpm patch` nos tipos do Astro e do Solid.** Checaria todo `<a>`, mas o
   patch teria de ser refeito a cada atualização das bibliotecas.
+- **Um plugin GritQL do Biome contra `<a>`.** O Biome 2.5 não roda plugins
+  sobre o template `.astro`, onde está a maior parte dos links. Cobriria só
+  as ilhas.
 - **Gerar o registro a partir de `src/pages/`.** Os parâmetros também seriam
   strings. A geração serve só para conferir os padrões.

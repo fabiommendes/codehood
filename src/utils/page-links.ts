@@ -1,5 +1,6 @@
 import type { CursorPage } from "@/components/ui/Pagination";
 import type { Page } from "@/core/schemas/page";
+import { currentPage, withSearch } from "@/urls";
 
 /**
  * The links a cursor pager follows from `url` to the pages around `page`.
@@ -21,7 +22,7 @@ export function pageLinks(
 		query.delete("after");
 		query.delete("before");
 		query.set(param, cursor);
-		return `${url.pathname}?${query}`;
+		return withSearch(currentPage(url), query);
 	};
 	return {
 		prevHref: link("before", page.prev),

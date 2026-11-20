@@ -1,12 +1,14 @@
 import type { JSX } from "solid-js";
 import { For } from "solid-js";
+import Link from "@/components/Link";
+import type { Href } from "@/urls";
 
 /// One choice of a toggle group.
 export interface ToggleOption<V extends string> {
 	value: V;
 	label: JSX.Element;
 	/// Makes the choice a link that navigates, for filters kept in the query string.
-	href?: string;
+	href?: Href;
 	/// Extra `data-*` attributes for the choice's element, such as `{ "data-status": "OPEN" }`.
 	attrs?: Record<`data-${string}`, string>;
 }
@@ -83,7 +85,7 @@ export default function ToggleGroup<V extends string>(
 			<For each={props.options}>
 				{(option) =>
 					option.href !== undefined ? (
-						<a
+						<Link
 							href={option.href}
 							class={classes(option.value)}
 							aria-current={
@@ -92,7 +94,7 @@ export default function ToggleGroup<V extends string>(
 							{...option.attrs}
 						>
 							{option.label}
-						</a>
+						</Link>
 					) : (
 						<button
 							type="button"

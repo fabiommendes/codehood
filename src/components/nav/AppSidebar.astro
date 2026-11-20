@@ -4,6 +4,7 @@
 // in pencil. The `course-nav` slot, when filled, replaces the row of the
 // current course (or follows the list when no course is current).
 import Sketch, { type SketchArt } from "@/components/brand/Sketch.astro";
+import Link from "@/components/Link.astro";
 import { m } from "@/i18n";
 import { type Href, urls } from "@/urls";
 import CourseRow from "./CourseRow.astro";
@@ -85,7 +86,7 @@ function sketch(): { art: SketchArt; seed?: string } {
     {
       nav.map((item) => (
         <li>
-          <a
+          <Link
             href={item.href}
             aria-current={isActive(item.href) ? "page" : undefined}
             class:list={[
@@ -112,7 +113,7 @@ function sketch(): { art: SketchArt; seed?: string } {
               />
             </svg>
             {item.label}
-          </a>
+          </Link>
         </li>
       ))
     }

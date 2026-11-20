@@ -3,8 +3,9 @@
  * Link from an empty section of an instructor's own course to the CLI guide,
  * since everything those sections show is pushed with the CLI.
  */
+import Link from "@/components/Link.astro";
 import { m } from "@/i18n";
 import { urls } from "@/urls";
 ---
 
-<a href={urls.gettingStarted()} class="link link-primary">{m.common_set_up_cli()}</a>
+<Link href={urls.gettingStarted()} class="link link-primary">{m.common_set_up_cli()}</Link>

@@ -5,6 +5,7 @@
 import { actions } from "astro:actions";
 import type { UserActor } from "@/auth/actor";
 import Avatar from "@/components/Avatar.astro";
+import Link from "@/components/Link.astro";
 import ThemeToggle from "@/components/ThemeToggle.astro";
 import { m } from "@/i18n";
 import { urls } from "@/urls";
@@ -39,12 +40,12 @@ const { user, open = false } = Astro.props;
       </span>
     </li>
     <li>
-      <a href={urls.profile()} class="cut">{m.nav_profile()}</a>
+      <Link href={urls.profile()} class="cut">{m.nav_profile()}</Link>
     </li>
     {
       user.role !== "STUDENT" && (
         <li>
-          <a href={urls.gettingStarted()} class="cut">{m.nav_set_up_cli()}</a>
+          <Link href={urls.gettingStarted()} class="cut">{m.nav_set_up_cli()}</Link>
         </li>
       )
     }

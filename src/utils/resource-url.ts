@@ -1,4 +1,4 @@
-import type { CourseUrls } from "@/urls";
+import { type CourseUrls, external, type LinkTarget, urls } from "@/urls";
 import { extensionForMime } from "./mime";
 import { slugify } from "./slugify";
 
@@ -18,21 +18,6 @@ export function fileDownloadName(
 }
 
 /**
- * The URL for a blob: `/files/<slugHash>/<name>`, or `/files/<slugHash>` with
- * no decorative name segment. The route resolves purely on `slugHash` either
- * way — the name is a courtesy for the browser's save dialog and the
- * `Content-Disposition` fallback, not part of the address.
- */
-export function blobHref(
-	file: { slugHash: string },
-	downloadName?: string,
-): string {
-	return downloadName
-		? `/files/${file.slugHash}/${downloadName}`
-		: `/files/${file.slugHash}`;
-}
-
-/**
  * Where a resource's row leads: the file's download, the link itself, or the
  * resource's own page in `course`.
  */
@@ -40,19 +25,22 @@ export function resourceHref(
 	resource: {
 		slug: string;
 		data:
-			| { type: "FILE"; link: string }
+			| { type: "FILE"; link: string; filename: string }
 			| { type: "LINK"; url: string }
 			| {
 					type: "MD" | "CODE";
 			  };
 	},
 	course: CourseUrls,
-): string {
+): LinkTarget {
 	switch (resource.data.type) {
-		case "FILE":
-			return resource.data.link;
+		case "FILE": {
+			// `link` is `/files/<hash>/<filename>`.
+			const hash = resource.data.link.split("/")[2] ?? "";
+			return urls.files.named({ hash, name: resource.data.filename });
+		}
 		case "LINK":
-			return resource.data.url;
+			return external(resource.data.url);
 		default:
 			return course.resource(resource.slug);
 	}
