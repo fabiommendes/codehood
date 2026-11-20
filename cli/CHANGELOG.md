@@ -5,6 +5,8 @@ CLI shares the server's version and is released with it.
 
 ## Unreleased
 
+## 0.7.1 (2026-11-20)
+
 ## 0.7.0 (2026-11-20)
 
 - `push` sends `upload` questions (`maxFiles`, `maxSize`, `extensions`) like any

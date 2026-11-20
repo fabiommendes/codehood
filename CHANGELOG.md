@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+## 0.7.1 (2026-11-20)
+
 ### Fixed
 
 - A rubrica de uma questão com milhares de autosaves respondia 500 (Prisma
