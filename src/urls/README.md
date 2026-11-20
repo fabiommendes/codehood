@@ -23,15 +23,17 @@ not one: a prop typed `Href` only takes a URL built here. Each function also
 carries its `pattern`, typed `UrlPattern`: the union of every route under
 `src/pages/`, which the `urlPatterns()` integration (`src/urls/integration.ts`)
 writes to `src/generated/url-patterns.ts` whenever Astro resolves the routes
-(`astro sync`, `astro dev`, `astro build`). A pattern no page serves, or a
-parameterized one given to `staticRoute`, fails the typecheck.
+(`astro sync`, `astro dev`, `astro build`). A pattern no page serves fails the
+typecheck. Routes are declared with `route(pattern, query?)`: the parameters
+come from the pattern (`urls.invite({ token })`), the query from
+`query<{ next?: string }>()`, and both are encoded there.
 
 `test/url-registry.spec.ts` covers what types cannot. For each prefix in its
 `MIGRATED_PREFIXES`, it checks that every page under the prefix is registered
 and that no code outside `src/urls/` writes the path as a string literal
 (comments are allowed).
 
-The migration goes one prefix at a time. So far: `/admin`. The decision, the
+The migration goes one prefix at a time. So far: `/admin` and every route outside a course. The decision, the
 `<Link>` component that comes next and the alternatives left out are in ADR 0022
 (`dev/adr/0022-rotas-tipadas-pelo-registro-urls.md`).
 

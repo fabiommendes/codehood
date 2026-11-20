@@ -27,11 +27,9 @@ const disciplineResult = Astro.getActionResult(actions.admin.createDiscipline);
 const editionResult = Astro.getActionResult(actions.admin.createEdition);
 
 const inviteResult = Astro.getActionResult(actions.auth.createPersonalInvite);
-const inviteUrl = inviteResult?.data
-	? new URL(
-			urls.invite({ token: inviteResult.data.token }),
-			Astro.url,
-		).toString()
+const inviteToken = inviteResult?.data?.token;
+const inviteUrl = inviteToken
+	? new URL(urls.invite({ token: inviteToken }), Astro.url).toString()
 	: null;
 
 const inviteForm = await actionForm(

@@ -7,6 +7,7 @@ import CourseHeader from "@/components/CourseHeader.astro";
 import { NotFound } from "@/core/error";
 import { type Assignment, db } from "@/db";
 import AppLayout from "@/layouts/AppLayout.astro";
+import { urls } from "@/urls";
 import { pushViews } from "@/utils/assignment-view";
 import { breadcrumbs } from "@/utils/breadcrumbs";
 import { assignmentsNav } from "@/utils/course-tabs-nav";
@@ -36,7 +37,7 @@ const changed = [
 });
 if (changed) return Astro.redirect(Astro.url.pathname);
 
-if (!slug) return Astro.rewrite("/404");
+if (!slug) return Astro.rewrite(urls.notFound());
 let assignment: Assignment;
 try {
 	assignment = await db.assignment.findOne(
@@ -44,7 +45,7 @@ try {
 		{ actor },
 	);
 } catch (error) {
-	if (error instanceof NotFound) return Astro.rewrite("/404");
+	if (error instanceof NotFound) return Astro.rewrite(urls.notFound());
 	throw error;
 }
 

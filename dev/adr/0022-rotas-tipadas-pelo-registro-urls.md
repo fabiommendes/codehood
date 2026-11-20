@@ -27,9 +27,10 @@ como as URLs passam a ser montadas e como migrar o que falta.
   (`src/urls/integration.ts`) escreve em `src/generated/url-patterns.ts` a
   união dos padrões de todas as rotas do projeto. Ela roda no hook
   `astro:routes:resolved`, que dispara em `astro sync`, `astro build` e no
-  `astro dev`. Cada rota guarda o seu `pattern: UrlPattern`, e `staticRoute`
-  só aceita padrão sem `[parâmetro]`. Um padrão que nenhuma página serve não
-  compila. `pnpm run typecheck` roda `astro sync` antes do `tsc`.
+  `astro dev`. Cada rota é declarada por `route(pattern, query?)`, que tira
+  os nomes dos parâmetros do próprio padrão (`route("/invite/[token]")` recebe
+  `{ token }`) e monta a URL a partir dele, então montagem e padrão não
+  divergem. Um padrão que nenhuma página serve não compila. `pnpm run typecheck` roda `astro sync` antes do `tsc`.
 - **`<a>` passa por `<Link href: Href>`.** O link tem duas versões, uma
   `.astro` e outra Solid. Um plugin GritQL do Biome proíbe `<a href>` fora
   delas. A regra não lê tipos: o tipo da prop garante que o link foi montado
@@ -47,7 +48,7 @@ como as URLs passam a ser montadas e como migrar o que falta.
   estar no registro, e nenhum código fora de `src/urls/` escreve o caminho
   como literal. A regra do `<a>` só é ligada quando os links ainda não
   migrados deixarem de quebrá-la, seja por prefixo, seja no fim da migração.
-  Ordem: `/admin` (feito), depois as rotas fora de curso, o curso e por
+  Ordem: `/admin` e as rotas fora de curso (feitos), depois o curso e por
   último os exames.
 
 ## Alternativas descartadas
@@ -71,6 +72,7 @@ como as URLs passam a ser montadas e como migrar o que falta.
 
 1. Crie a página em `src/pages/`. O `astro dev` (ou `astro sync`) acrescenta o
    padrão a `UrlPattern`.
-2. Registre a rota em `urls`: `staticRoute("/x")` quando não tem parâmetro, ou
-   uma função que recebe os tipos do domínio quando tem.
+2. Registre a rota em `urls` com `route("/x/[id]")`, mais
+   `query<{ ... }>()` se ela lê a query string. Para receber tipos do domínio
+   (`CourseRef`), embrulhe a rota numa função que os converte.
 3. Faça os links com `<Link href={urls.x()}>`.

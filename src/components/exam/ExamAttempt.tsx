@@ -29,11 +29,7 @@ import {
 } from "@/services/exam-result";
 import type { AttemptState } from "@/services/exam-state";
 import type { ReviewResult } from "@/services/review";
-import {
-	examQuestionAttachmentUrl,
-	examSubmissionFileUrl,
-	urls,
-} from "@/urls";
+import { examQuestionAttachmentUrl, examSubmissionFileUrl, urls } from "@/urls";
 import { adjustmentLabel } from "@/utils/adjustment-label";
 import type { CodeBlocksHtml } from "@/utils/code-blocks";
 import type { PretestSource } from "@/utils/pretest-sources";
