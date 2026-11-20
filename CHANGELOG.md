@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+## 0.7.0 (2026-11-20)
+
 ### Added
 
 - Questão de envio de arquivo (`upload`, do MDQ): o aluno responde com até

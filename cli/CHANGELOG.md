@@ -5,6 +5,8 @@ CLI shares the server's version and is released with it.
 
 ## Unreleased
 
+## 0.7.0 (2026-11-20)
+
 - `push` sends `upload` questions (`maxFiles`, `maxSize`, `extensions`) like any
   other type. `codehood show` has no widget for them: a TUI cannot attach files.
 - `push` reads `assignments/<slug>.md` (title, `due`, `closes`, `opens`,
