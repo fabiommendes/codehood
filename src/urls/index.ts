@@ -1,4 +1,5 @@
 import type { CourseNaturalKey } from "./parsing";
+import { type Href, urls } from "./routes";
 
 export {
 	DISCIPLINE_SLUG_RE,
@@ -12,9 +13,19 @@ export type { CourseNaturalKey as CourseRef } from "./parsing";
 export * from "./parsing";
 
 /** Builds `/<discipline-slug>/<username>_<edition>` for a course. */
-export function courseHref(ref: CourseNaturalKey): string {
-	return `/${ref.discipline}/${ref.instructor}_${ref.edition}`;
+export function courseHref(ref: CourseNaturalKey): Href {
+	return urls.course(ref).index();
 }
 
 export * from "./attachments";
-export { type Href, type Route, type UrlPattern, urls } from "./routes";
+export {
+	type CourseUrls,
+	courseRoutes,
+	type ExamUrls,
+	type Href,
+	type Route,
+	type UrlPattern,
+	urls,
+	withAnchor,
+	withSearch,
+} from "./routes";

@@ -1,5 +1,6 @@
 import type { UrlPattern } from "@/generated/url-patterns";
 import type { Marked } from "@/typing/branding";
+import type { CourseNaturalKey as CourseRef } from "./parsing";
 
 export type { UrlPattern };
 
@@ -70,12 +71,37 @@ function fill(
 	pattern: string,
 	params: Record<string, string | readonly string[]>,
 ): string {
-	return pattern.replace(/\[(\.\.\.)?(\w+)\]/g, (_, rest, name: string) => {
-		const value = params[name] ?? "";
-		return rest
-			? (value as readonly string[]).map(encodeURIComponent).join("/")
-			: encodeURIComponent(value as string);
-	});
+	const filled = pattern.replace(
+		/\[(\.\.\.)?(\w+)\]/g,
+		(_, rest, name: string) => {
+			const value = params[name] ?? "";
+			return rest
+				? (value as readonly string[]).map(encodeURIComponent).join("/")
+				: encodeURIComponent(value as string);
+		},
+	);
+	// An empty rest parameter leaves a trailing slash the page is not served at.
+	return filled.length > 1 ? filled.replace(/\/$/, "") : filled;
+}
+
+/**
+ * `href` with `id` as its fragment, still an {@link Href}.
+ *
+ * @example
+ * withAnchor(urls.home(), "today"); // "/home#today"
+ */
+export function withAnchor(href: Href, id: string): Href {
+	return `${href}#${encodeURIComponent(id)}` as Href;
+}
+
+/**
+ * `href` with a query string built elsewhere, for the pages whose filters
+ * have a codec of their own (`?status=draft,hidden&sort=title`); `""` and
+ * `"?"` leave `href` as it is.
+ */
+export function withSearch(href: Href, search: string | URLSearchParams): Href {
+	const text = String(search).replace(/^\?/, "");
+	return (text === "" ? href : `${href}?${text}`) as Href;
 }
 
 /// The route served at `pattern`: its parameters come from the pattern, its query from `_query`.
@@ -131,4 +157,123 @@ export const urls = {
 		editions: route("/admin/editions"),
 		reports: route("/admin/reports"),
 	},
+	course: courseUrls,
 } as const;
+
+/// The query of the grading pages: the list view of a question and the students' names.
+type GradingQuery = { view?: "list"; names?: boolean };
+
+/** Every route under a course, keyed as `urls.course(ref)` exposes them. */
+export const courseRoutes = {
+	index: route("/[discipline]/[course]", query<{ joined?: boolean }>()),
+	assignments: route("/[discipline]/[course]/assignments"),
+	assignment: route("/[discipline]/[course]/assignments/[slug]"),
+	attendance: route("/[discipline]/[course]/attendance"),
+	grades: route("/[discipline]/[course]/grades"),
+	manage: route("/[discipline]/[course]/manage"),
+	questions: route("/[discipline]/[course]/questions"),
+	question: route("/[discipline]/[course]/questions/[slug]"),
+	reports: route("/[discipline]/[course]/reports"),
+	repositories: route("/[discipline]/[course]/repositories"),
+	repositoryZip: route("/[discipline]/[course]/repositories/[slug].zip"),
+	repositoryPath: route(
+		"/[discipline]/[course]/repositories/[slug]/[...path]",
+		query<{ rotate?: boolean }>(),
+	),
+	resources: route("/[discipline]/[course]/resources"),
+	resource: route("/[discipline]/[course]/resources/[slug]"),
+	rollCall: route("/[discipline]/[course]/roll-call/[week]/[timeSlot]"),
+	rollCallProject: route(
+		"/[discipline]/[course]/roll-call/[week]/[timeSlot]/project",
+	),
+	roster: route("/[discipline]/[course]/roster"),
+	schedule: route("/[discipline]/[course]/schedule"),
+	settings: route("/[discipline]/[course]/settings"),
+	exams: route("/[discipline]/[course]/exams"),
+	exam: {
+		index: route("/[discipline]/[course]/exams/[slug]"),
+		adjustments: route("/[discipline]/[course]/exams/[slug]/adjustments"),
+		attempt: route("/[discipline]/[course]/exams/[slug]/attempts/[username]"),
+		exceptions: route("/[discipline]/[course]/exams/[slug]/exceptions"),
+		grading: route(
+			"/[discipline]/[course]/exams/[slug]/grading",
+			query<GradingQuery>(),
+		),
+		gradingQuestion: route(
+			"/[discipline]/[course]/exams/[slug]/grading/[question]",
+			query<GradingQuery>(),
+		),
+		preview: route("/[discipline]/[course]/exams/[slug]/preview"),
+		regrades: route("/[discipline]/[course]/exams/[slug]/regrades"),
+		results: route("/[discipline]/[course]/exams/[slug]/results"),
+	},
+} as const;
+
+/** The URLs of the pages of one exam, as `urls.course(ref).exam(slug)` builds them. */
+export type ExamUrls = ReturnType<ReturnType<typeof courseUrls>["exam"]>;
+
+/** The URLs of the pages of one course, as `urls.course(ref)` builds them. */
+export type CourseUrls = ReturnType<typeof courseUrls>;
+
+/**
+ * The URLs of the pages of the course `ref`, each a function that takes the
+ * slugs below the course and the page's query.
+ *
+ * @example
+ * const course = urls.course({ discipline: "cs101", instructor: "ana", edition: "2026-1" });
+ * course.index(); // "/cs101/ana_2026-1"
+ * course.resource("intro"); // "/cs101/ana_2026-1/resources/intro"
+ * course.exam("p1").grading({ names: true }); // "/cs101/ana_2026-1/exams/p1/grading?names=1"
+ */
+function courseUrls(ref: CourseRef) {
+	const at = {
+		discipline: ref.discipline,
+		course: `${ref.instructor}_${ref.edition}`,
+	};
+	const r = courseRoutes;
+	const e = r.exam;
+	return {
+		index: (q?: { joined?: boolean }) => r.index(at, q),
+		assignments: () => r.assignments(at),
+		assignment: (slug: string) => r.assignment({ ...at, slug }),
+		attendance: () => r.attendance(at),
+		grades: () => r.grades(at),
+		manage: () => r.manage(at),
+		questions: () => r.questions(at),
+		question: (slug: string) => r.question({ ...at, slug }),
+		reports: () => r.reports(at),
+		repositories: () => r.repositories(at),
+		repositoryZip: (slug: string) => r.repositoryZip({ ...at, slug }),
+		/// A file or directory of a repository; `path` is its segments, empty for the root.
+		repository: (
+			slug: string,
+			path: readonly string[] = [],
+			q?: { rotate?: boolean },
+		) => r.repositoryPath({ ...at, slug, path }, q),
+		resources: () => r.resources(at),
+		resource: (slug: string) => r.resource({ ...at, slug }),
+		rollCall: (week: number | string, timeSlot: string) =>
+			r.rollCall({ ...at, week: String(week), timeSlot }),
+		rollCallProject: (week: number | string, timeSlot: string) =>
+			r.rollCallProject({ ...at, week: String(week), timeSlot }),
+		roster: () => r.roster(at),
+		schedule: () => r.schedule(at),
+		settings: () => r.settings(at),
+		exams: () => r.exams(at),
+		exam: (slug: string) => {
+			const x = { ...at, slug };
+			return {
+				index: () => e.index(x),
+				adjustments: () => e.adjustments(x),
+				attempt: (username: string) => e.attempt({ ...x, username }),
+				exceptions: () => e.exceptions(x),
+				grading: (q?: GradingQuery) => e.grading(x, q),
+				gradingQuestion: (question: string, q?: GradingQuery) =>
+					e.gradingQuestion({ ...x, question }, q),
+				preview: () => e.preview(x),
+				regrades: () => e.regrades(x),
+				results: () => e.results(x),
+			};
+		},
+	};
+}

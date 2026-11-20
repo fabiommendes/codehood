@@ -2,12 +2,24 @@ import type { AstroGlobal } from "astro";
 import { hasPerm } from "@/auth/permissions";
 import { NotAllowed } from "@/core/error";
 import { type Course, db } from "@/db";
-import { urls } from "@/urls";
-import { courseHref, parseCourseSegment } from "../urls";
+import {
+	type CourseRef,
+	type CourseUrls,
+	type Href,
+	parseCourseSegment,
+	urls,
+} from "@/urls";
 import { type CourseTab, courseTabs } from "./course-tabs";
 
 export type LoadCourseResult =
-	| { course: Course; href: string; tabs: readonly CourseTab[] }
+	| {
+			course: Course;
+			/// The course's own page; the other pages are in `links`.
+			href: Href;
+			ref: CourseRef;
+			links: CourseUrls;
+			tabs: readonly CourseTab[];
+	  }
 	| { redirect: Response };
 
 // TODO: IMPORTANT! database access must be done through service classes.
@@ -16,8 +28,8 @@ export type LoadCourseResult =
  * course, check the actor may see it, and 403/404 on failure. `Astro.rewrite`
  * keeps the browser URL (unlike `Astro.redirect`), which is what lets the 403
  * page name the course the visitor was trying to reach. Also hands back the
- * course's `href`, so the same five-line `courseHref(...)` call isn't
- * repeated on every page, and the tab strip the actor sees, which
+ * course's URLs (`links`), so the course reference isn't rebuilt on
+ * every page, and the tab strip the actor sees, which
  * `CourseHeader` renders.
  *
  * Pass `manage: true` on instructor-only pages (`/manage`, `/roster`) to
@@ -68,14 +80,17 @@ export async function loadCourse(
 		return { redirect: await forbidden(Astro, segment) };
 	}
 
-	const ref = {
+	const ref: CourseRef = {
 		discipline: course.discipline.slug,
 		instructor: course.instructor.username,
 		edition: course.edition.slug,
 	};
+	const links = urls.course(ref);
 	return {
 		course,
-		href: courseHref(ref),
+		href: links.index(),
+		ref,
+		links,
 		tabs: courseTabs(course, ref, actor),
 	};
 }
