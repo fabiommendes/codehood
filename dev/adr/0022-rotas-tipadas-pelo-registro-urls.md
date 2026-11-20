@@ -8,80 +8,45 @@ creator: claude
 
 # Rotas tipadas pelo registro `urls`
 
-Os links do servidor eram montados com template strings
-(`` `${props.href}/grading/${q}?view=list` ``): eram 113 assim, em 39 arquivos.
-Quando uma página era renomeada, os links para ela quebravam em silêncio, e
-cada lugar que montava um link cuidava do próprio encoding. Este documento diz
-como as URLs passam a ser montadas e como migrar o que falta.
+Links montados com template strings (`` `${href}/grading/${q}` ``) quebram em
+silêncio quando uma página muda de nome, e cada um cuida do próprio encoding.
 
 ## Decisão
 
-- **Um registro escrito à mão, em `src/urls/routes.ts`.** `urls` tem uma função
-  por rota, aninhada como as URLs (`urls.admin.users()`). As funções recebem
-  tipos do domínio (`CourseRef`, slug), não as strings dos arquivos, e o
-  encoding é feito ali.
-- **`Href`, uma string marcada.** Toda função do registro devolve
-  `Href = Marked<string, "Href">`. Um `Href` vale onde se espera `string`, mas
-  uma string comum não vale onde se espera `Href`.
-- **`UrlPattern`, gerado pelo Astro.** A integração `urlPatterns()`
-  (`src/urls/integration.ts`) escreve em `src/generated/url-patterns.ts` a
-  união dos padrões de todas as rotas do projeto. Ela roda no hook
-  `astro:routes:resolved`, que dispara em `astro sync`, `astro build` e no
-  `astro dev`. Cada rota é declarada por `route(pattern, query?)`, que tira
-  os nomes dos parâmetros do próprio padrão (`route("/invite/[token]")` recebe
-  `{ token }`) e monta a URL a partir dele, então montagem e padrão não
-  divergem. Um padrão que nenhuma página serve não compila. `pnpm run typecheck` roda `astro sync` antes do `tsc`.
-- **`<a>` passa por `<Link href: Href>`.** O link tem duas versões, uma
-  `.astro` e outra Solid. Um plugin GritQL do Biome proíbe `<a href>` fora
-  delas. A regra não lê tipos: o tipo da prop garante que o link foi montado
-  pelo registro, e a regra garante que ninguém contorna o `Link`.
-- **Saídas explícitas para o que não é rota nossa:** `external(url)` para
-  links externos e `mailto:`, `anchor(id)` para `#id` na mesma página.
-  Qualquer exceção à regra fica visível no código.
-- **Query string e âncora preservam a marca.** As rotas que levam parâmetros
-  de query os recebem tipados (`exam.grading.question(q, { list, names })`).
-  Os construtores de `src/urls/` que juntam query ou âncora a um `Href`
-  devolvem `Href`. Concatenar strings a um `Href` produz `string`, e o
-  resultado não passa no `Link`.
-- **Migração por prefixo.** `test/url-registry.spec.ts` tem
-  `MIGRATED_PREFIXES`. Para cada prefixo da lista, toda página dele precisa
-  estar no registro, e nenhum código fora de `src/urls/` escreve o caminho
-  como literal. A regra do `<a>` só é ligada quando os links ainda não
-  migrados deixarem de quebrá-la, seja por prefixo, seja no fim da migração.
-  Ordem: `/admin` e as rotas fora de curso, depois o curso e os exames
-  juntos, porque os links de exame estão espalhados pelas páginas do curso.
-  Todas as rotas estão migradas.
-- **O curso como objeto de URLs.** `urls.course(ref)` recebe um `CourseRef`
-  e devolve `CourseUrls`, com as sub-rotas do curso e `exam(slug)` com as
-  do exame. Componentes recebem `CourseUrls` (ou `ExamUrls`) em vez de um
-  `href` base. Ilhas Solid recebem `courseRef: CourseRef`, porque suas props
-  precisam ser serializáveis. Loaders devolvem o `ref` do curso, não URLs
-  prontas. Como o caminho do curso começa com parâmetros, o teste de
-  literais rejeita, fora de `src/urls/` e `src/api/`, uma interpolação
-  seguida de um segmento estático de página do curso.
+- **Um registro escrito à mão.** `urls` (`src/urls/routes.ts`) tem uma função
+  por rota, aninhada como as URLs. As funções recebem tipos do domínio
+  (`CourseRef`, slug), e o encoding é feito ali. As rotas do curso ficam em
+  `urls.course(ref)`, que devolve um objeto com as sub-rotas.
+- **`Href`, uma string marcada.** O registro devolve
+  `Href = Marked<string, "Href">`. Um `Href` vale como `string`, mas uma
+  `string` não vale como `Href`. Concatenar algo a um `Href` dá `string`.
+  Query e âncora entram pelo registro (query tipada por rota, `withAnchor`),
+  que preserva a marca.
+- **Padrões conferidos pelo Astro.** Cada rota declara o padrão da página
+  (`route("/invite/[token]")`), e os parâmetros saem dele. O Astro gera a
+  união `UrlPattern` das rotas existentes, e um padrão que nenhuma página
+  serve não compila.
+- **Componentes recebem URLs, não bases.** Um componente que linka várias
+  páginas do curso recebe `CourseUrls`, não um `href` para anexar pedaços.
+  Ilhas Solid recebem o `CourseRef`, que é serializável.
+- **`<a>` passa por `<Link href: Href>`**, em `.astro` e em Solid. Um plugin
+  GritQL do Biome proíbe `<a href>` fora dele. O tipo da prop garante a
+  origem do link, e a regra garante que ninguém contorna o `Link`.
+- **Exceções explícitas.** `external(url)` para links externos e `mailto:`,
+  `anchor(id)` para `#id` na mesma página.
+- **Um teste cobre o que os tipos não cobrem.** `test/url-registry.spec.ts`
+  exige que toda página esteja no registro e rejeita caminhos de página
+  escritos à mão fora de `src/urls/`.
 
 ## Alternativas descartadas
 
-- **`astro-typesafe-routes`.** A documentação declara suporte ao Astro 4 e 5,
-  e o projeto está no 7. É dependência de um mantenedor só, e a API mudou
-  bastante entre as versões 2 e 4. Os parâmetros seriam as strings dos
-  arquivos: `[course]` vira `string`, e não o `CourseRef` composto.
+- **`astro-typesafe-routes`.** Suporta Astro 4 e 5, não o 7. Tem um
+  mantenedor só e mudou a API várias vezes. Os parâmetros seriam as strings
+  dos arquivos (`[course]`), não o `CourseRef`.
 - **Estreitar `href` nos tipos de JSX por declaration merging.** O TypeScript
-  não deixa uma interface mesclada mudar o tipo de uma propriedade que já
-  existe (TS2717). As declarações são `href?: string | URL | null` no Astro e
-  `href?: string` no Solid.
-- **`pnpm patch` nos tipos do Astro e do Solid.** Checaria todo `<a>` sem
-  componente, mas o patch teria de ser refeito a cada atualização das duas
-  bibliotecas.
-- **Gerador próprio a partir de `src/pages/`.** Teria o mesmo problema dos
-  parâmetros como strings. `UrlPattern` aproveita a geração só para conferir
-  os padrões e deixa a montagem da URL com o registro.
-
-## Como adicionar uma rota
-
-1. Crie a página em `src/pages/`. O `astro dev` (ou `astro sync`) acrescenta o
-   padrão a `UrlPattern`.
-2. Registre a rota em `urls` com `route("/x/[id]")`, mais
-   `query<{ ... }>()` se ela lê a query string. Para receber tipos do domínio
-   (`CourseRef`), embrulhe a rota numa função que os converte.
-3. Faça os links com `<Link href={urls.x()}>`.
+  não deixa uma interface mesclada mudar o tipo de uma propriedade existente
+  (TS2717).
+- **`pnpm patch` nos tipos do Astro e do Solid.** Checaria todo `<a>`, mas o
+  patch teria de ser refeito a cada atualização das bibliotecas.
+- **Gerar o registro a partir de `src/pages/`.** Os parâmetros também seriam
+  strings. A geração serve só para conferir os padrões.
